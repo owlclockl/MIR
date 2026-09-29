@@ -8,7 +8,6 @@
   
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/cs2-sidebar.css" />
-  <link rel="stylesheet" href="/css/game-room.css" />
 </head>
 <body>
 
@@ -30,38 +29,6 @@
           
         </div>
 
-        <nav class="nav-links">
-          <button class="nav-btn active" id="navMenuBtn" data-screen="menu">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            </svg>
-            Главное меню
-          </button>
-          <button class="nav-btn" id="navLobbyBtn" data-screen="lobby">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            Лобби
-          </button>
-          <button class="nav-btn" id="navGameBtn" data-screen="game">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-            Партия
-          </button>
-        </nav>
-      </div>
-
-      <div class="header-center">
-        <div class="quick-join-bar">
-          <input type="text" id="quickJoinInput" placeholder="КОД: MIR-XXXX" maxlength="10" />
-          <button id="quickJoinBtn">Войти</button>
-        </div>
       </div>
 
       <div class="header-right">
@@ -172,110 +139,6 @@
           </div>
         </div>
 
-        <!-- Screen 2: Full Stage Lobby -->
-        <div class="lobby-full-stage" id="screenLobby" style="display: none;">
-          <div class="lobby-header-bar">
-            <div>
-              <div class="lh-title" id="stageRoomTitle">Лобби приключения</div>
-              <div class="lh-desc" id="stageRoomDesc">Ожидание сбора всех искателей приключений...</div>
-            </div>
-            <div class="lh-right">
-              <div class="room-code-badge" id="stageCopyCodeBtn" title="Скопировать код для друзей">
-                <span>КОД: <strong id="stageRoomCode">MIR-0000</strong></span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Squad 5-Slot Podiums Grid -->
-          <div class="lobby-podiums-grid" id="stagePodiumsGrid">
-            <!-- Rendered by JS -->
-          </div>
-
-          <!-- Bottom Stage Controls & Mini Chat -->
-          <div class="lobby-stage-footer">
-            <div style="flex: 1; max-width: 480px; background: rgba(18,19,25,0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-              <div style="font-size: 11.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Чат лобби</div>
-              <div id="lobbyChatFeed" style="height: 80px; overflow-y: auto;"></div>
-              <form id="lobbyChatForm" style="display: flex; gap: 8px;">
-                <input type="text" id="lobbyChatInput" placeholder="Напишите сообщение в лобби..." style="flex: 1; padding: 6px 10px; font-size: 12.5px;" />
-                <button type="submit" class="btn-primary btn-sm" style="padding: 6px 12px;">Отправить</button>
-              </form>
-            </div>
-
-            <div style="display: flex; gap: 12px; align-items: center;">
-              <button class="btn-cs-ready" id="stageReadyBtn" style="width: 200px;">ГОТОВ</button>
-              <button class="btn-cs-start" id="stageStartBtn" style="width: 220px; display: none;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>НАЧАТЬ ИГРУ</span></button>
-              <button class="btn-secondary" id="stageLeaveBtn" style="color: #e7b0b0;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg><span>Выйти</span></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Screen 3: Active RPG Game Board -->
-        <div class="game-room-container" id="screenGame" style="display: none;">
-          <div class="game-active-layout">
-            <div class="game-main-area">
-              <!-- Scene Master Banner -->
-              <div class="scene-banner">
-                <div class="scene-tag-row">
-                  <span class="scene-loc-tag" id="gameSceneLoc"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span>Локация</span></span>
-                  <span class="scene-atmosphere" id="gameSceneAtm"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"></path></svg><span>Атмосфера</span></span>
-                </div>
-                <h2 class="scene-title" id="gameSceneTitle">Заглавие текущей сцены</h2>
-                <p class="scene-desc" id="gameSceneDesc">Описание происходящего в текущем эпизоде...</p>
-              </div>
-
-              <!-- Master DM Control Panel (Visible to Master) -->
-              <div class="dm-master-panel" id="dmMasterPanel" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div class="dm-panel-title"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>Панель Ведущего</span></div>
-                  <button class="btn-secondary btn-sm" id="dmEditSceneBtn">Редактировать сцену</button>
-                </div>
-                <form id="dmBroadcastForm" class="dm-input-row">
-                  <textarea id="dmStoryText" placeholder="Опишите новое сюжетное событие или действие мира..."></textarea>
-                  <button type="submit" class="btn-gold btn-sm" style="height: 50px;">Озвучить событие</button>
-                </form>
-              </div>
-
-              <!-- Game Chat & Dice Feed -->
-              <div class="game-feed-panel">
-                <div class="feed-header">
-                  <span>Журнал партии и бросков</span>
-                  <span style="font-size: 11px; color: var(--text-dim);">Поддержка /roll d20</span>
-                </div>
-                <div class="feed-messages" id="gameFeedList"></div>
-                <form class="feed-input-bar" id="gameFeedForm">
-                  <input type="text" id="gameFeedInput" placeholder="Действие персонажа или сообщение в чат... (/roll d20)" />
-                  <button type="submit" class="btn-primary btn-sm">Отправить</button>
-                </form>
-              </div>
-
-              <!-- Dice Roller Dock Bar -->
-              <div class="dice-dock-bar">
-                <div class="dice-buttons-set">
-                  <button class="dice-quick-btn d20" data-dice="d20"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"></circle></svg><span>d20</span></button>
-                  <button class="dice-quick-btn" data-dice="d12">d12</button>
-                  <button class="dice-quick-btn" data-dice="d10">d10</button>
-                  <button class="dice-quick-btn" data-dice="d8">d8</button>
-                  <button class="dice-quick-btn" data-dice="d6">d6</button>
-                  <button class="dice-quick-btn" data-dice="d4">d4</button>
-                  <button class="dice-quick-btn" data-dice="d100">d100</button>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <input type="number" class="dice-modifier-input" id="diceModifier" placeholder="+0" value="0" />
-                  <input type="text" class="dice-reason-input" id="diceReason" placeholder="Причина (навык, атака)" />
-                </div>
-              </div>
-            </div>
-
-            <!-- In-Game Side Character Roster -->
-            <div class="game-side-roster">
-              <div class="roster-title">Герои партии</div>
-              <div id="gameRosterList" style="display: flex; flex-direction: column; gap: 10px;"></div>
-            </div>
-          </div>
-        </div>
-
       </div> <!-- /screen-container -->
 
       <!-- ================= CS2 Right Sidebar ================= -->
@@ -309,7 +172,7 @@
                 <div class="friends-tab-pills">
                   <button class="friend-filter-btn active" data-filter="all">Все</button>
                   <button class="friend-filter-btn" data-filter="online">В сети</button>
-                  <button class="friend-filter-btn" data-filter="ingame">В игре</button>
+                  <button class="friend-filter-btn" data-filter="inlobby">В лобби</button>
                 </div>
                 <button class="btn-primary btn-sm" id="addFriendBtn" style="padding: 5px 10px; font-size: 11.5px;">+ Друг</button>
               </div>
@@ -322,21 +185,6 @@
               <div id="sideInvitesContainer"></div>
             </div>
 
-            <!-- Pane 4: Direct Messages Mini-Chat -->
-            <div class="sidebar-view-pane" id="sidePane-dms" style="display: none; flex-direction: column; height: 100%; width: 100%;">
-              <div class="dm-chat-container">
-                <div class="dm-top-bar">
-                  <button class="btn-secondary btn-sm" id="dmBackBtn" style="padding: 4px 8px;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M15 18l-6-6 6-6"></path></svg><span>Назад</span></button>
-                  <div id="dmPartnerAvatar"></div>
-                  <span style="font-size: 13.5px; font-weight: 700; color: #fff;" id="dmPartnerName">Друг</span>
-                </div>
-                <div class="dm-messages-feed" id="dmFeed"></div>
-                <form class="dm-input-row" id="dmSendForm">
-                  <input type="text" id="dmInput" placeholder="Написать сообщение..." />
-                  <button type="submit" class="btn-primary btn-sm">Отправить</button>
-                </form>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -580,80 +428,17 @@
     </div>
   </div>
 
-  <!-- Modal 5: Customize Character -->
-  <div class="modal-overlay" id="charCustomizeOverlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Настройка персонажа</h3>
-        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
-      </div>
-      <form id="charCustomizeForm" class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Имя героя</label>
-          <input type="text" id="charCustName" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Класс / Роль</label>
-          <input type="text" id="charCustClass" placeholder="Боевой Маг, Паладин, Следопыт..." required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Максимум HP</label>
-          <input type="number" id="charCustHp" value="20" min="1" max="500" required />
-        </div>
-        <button type="submit" class="btn-primary">Сохранить персонажа</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal 6: Edit Scene (Master) -->
-  <div class="modal-overlay" id="editSceneOverlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Редактировать сцену</h3>
-        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
-      </div>
-      <form id="editSceneForm" class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Заглавие сцены</label>
-          <input type="text" id="esSceneTitle" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Локация</label>
-          <input type="text" id="esSceneLoc" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Атмосфера / Окружение</label>
-          <input type="text" id="esSceneAtm" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Подробное описание сцены</label>
-          <textarea id="esSceneDesc" rows="4" required></textarea>
-        </div>
-        <button type="submit" class="btn-gold">Применить изменения</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal 7: Settings -->
+  <!-- Modal: Settings (пока без опций — содержимое не запрашивалось) -->
   <div class="modal-overlay" id="settingsOverlay">
     <div class="modal-card">
       <div class="modal-header">
         <h3>Настройки</h3>
-        <button class="modal-close-btn" id="closeSettings"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+        <button class="modal-close-btn" id="closeSettings">
+          <svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
       </div>
       <div class="modal-body">
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Звуковые эффекты UI и кубиков</span>
-          <button class="toggle" id="soundToggle" role="switch" aria-checked="true"></button>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Фоновые эмбиент-звуки</span>
-          <button class="toggle" id="musicToggle" role="switch" aria-checked="true"></button>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Полноэкранный режим</span>
-          <button class="toggle" id="fullscreenToggle" role="switch" aria-checked="false"></button>
-        </div>
+        <div class="settings-empty">Настроек пока нет</div>
       </div>
     </div>
   </div>
@@ -662,13 +447,11 @@
   <div id="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="/js/audio.js"></script>
   <script src="/js/avatars.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/sidebar.js"></script>
   <script src="/js/lobby.js"></script>
-  <script src="/js/game.js"></script>
   <script src="/js/app.js"></script>
 
 </body>

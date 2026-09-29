@@ -1,5 +1,5 @@
 /**
- * API and WebSocket client for MIR RPG
+ * API and WebSocket client (accounts, friends, invites, rooms)
  */
 class ApiClient {
   constructor() {
@@ -208,7 +208,7 @@ class ApiClient {
       body: payload
     });
     this.currentRoom = res.room;
-    this.sendPresence(res.room.status === 'in_game' ? 'in_game' : 'in_lobby', res.room.id);
+    this.sendPresence('in_lobby', res.room.id);
     return res.room;
   }
 
@@ -239,23 +239,7 @@ class ApiClient {
     return res.room;
   }
 
-  async startGame(id) {
-    const res = await this.request(`/api/rooms/${id}/start`, {
-      method: 'POST'
-    });
-    this.currentRoom = res.room;
-    this.sendPresence('in_game', res.room.id);
-    return res.room;
-  }
 
-  async updateCharacter(id, payload) {
-    const res = await this.request(`/api/rooms/${id}/update-char`, {
-      method: 'POST',
-      body: payload
-    });
-    this.currentRoom = res.room;
-    return res.room;
-  }
 
   async inviteFriend(id, friendId) {
     return this.request(`/api/rooms/${id}/invite`, {
@@ -276,50 +260,9 @@ class ApiClient {
     });
     if (action === 'accept' && res.room) {
       this.currentRoom = res.room;
-      this.sendPresence(res.room.status === 'in_game' ? 'in_game' : 'in_lobby', res.room.id);
+      this.sendPresence('in_lobby', res.room.id);
     }
     return res;
-  }
-
-  // ================= Game Session & Chat =================
-  async getRoomMessages(id) {
-    const res = await this.request(`/api/rooms/${id}/messages`);
-    return res.messages;
-  }
-
-  async sendRoomMessage(id, content, type = 'room_lobby', extra_data = {}) {
-    return this.request(`/api/rooms/${id}/messages`, {
-      method: 'POST',
-      body: { content, type, extra_data }
-    });
-  }
-
-  async rollDice(id, diceType, count = 1, modifier = 0, reason = '') {
-    return this.request(`/api/rooms/${id}/roll`, {
-      method: 'POST',
-      body: { diceType, count, modifier, reason }
-    });
-  }
-
-  async updateGameState(id, payload) {
-    const res = await this.request(`/api/rooms/${id}/game-state`, {
-      method: 'POST',
-      body: payload
-    });
-    this.currentRoom = res.room;
-    return res.room;
-  }
-
-  async getDirectMessages(friendId) {
-    const res = await this.request(`/api/messages/direct/${friendId}`);
-    return res.messages;
-  }
-
-  async sendDirectMessage(friendId, content) {
-    return this.request(`/api/messages/direct/${friendId}`, {
-      method: 'POST',
-      body: { content }
-    });
   }
 
   // ================= WebSocket =================

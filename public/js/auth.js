@@ -28,20 +28,17 @@ class AuthController {
   bindEvents() {
     // Top Bar Profile Click -> Open Profile Modal
     document.getElementById('userProfileBadge')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.openProfileModal();
     });
 
     // Login/Register Button (when logged out)
     document.getElementById('headerLoginBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.openAuthModal();
     });
 
     // Auth Modal Tabs
     document.querySelectorAll('.auth-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         const tab = e.target.getAttribute('data-tab');
         this.switchAuthTab(tab);
       });
@@ -50,7 +47,6 @@ class AuthController {
     // Login Form Submit
     document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const userField = document.getElementById('loginUsername').value;
       const passField = document.getElementById('loginPassword').value;
       const errEl = document.getElementById('loginError');
@@ -58,7 +54,6 @@ class AuthController {
 
       try {
         await window.api.login(userField, passField);
-        window.sounds.playReady();
         this.closeAuthModal();
         window.app.showToast('Успешный вход', `С возвращением, ${window.api.currentUser.display_name}!`, 'info');
       } catch (err) {
@@ -69,7 +64,6 @@ class AuthController {
     // Register Form Submit
     document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const username = document.getElementById('regUsername').value;
       const displayName = document.getElementById('regDisplayName').value;
       const password = document.getElementById('regPassword').value;
@@ -88,7 +82,6 @@ class AuthController {
           avatar: this.selectedAvatar,
           avatar_frame: this.selectedFrame
         });
-        window.sounds.playReady();
         this.closeAuthModal();
         window.app.showToast('Аккаунт создан', `Добро пожаловать в МИР, ${window.api.currentUser.display_name}!`, 'info');
       } catch (err) {
@@ -99,7 +92,6 @@ class AuthController {
     // Profile Save Form Submit
     document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const displayName = document.getElementById('profDisplayName').value;
       const customStatus = document.getElementById('profCustomStatus').value;
       const roleTitle = document.getElementById('profRoleTitle').value;
@@ -112,7 +104,6 @@ class AuthController {
           avatar: this.selectedAvatar,
           avatar_frame: this.selectedFrame
         });
-        window.sounds.playReady();
         this.closeProfileModal();
         window.app.showToast('Профиль обновлен', 'Изменения сохранены', 'info');
       } catch (err) {
@@ -122,7 +113,6 @@ class AuthController {
 
     // Logout Button
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       window.api.logout();
       this.closeProfileModal();
       window.app.showToast('Вы вышли из системы', 'Авторизуйтесь для игры', 'info');
@@ -130,7 +120,6 @@ class AuthController {
 
     // Copy Tag Button
     document.getElementById('copyTagBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       if (window.api.currentUser) {
         const fullTag = `${window.api.currentUser.username}#${window.api.currentUser.tag}`;
         navigator.clipboard?.writeText(fullTag);
@@ -183,11 +172,9 @@ class AuthController {
 
     container.querySelectorAll('.demo-login-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        window.sounds.playClick();
         const userId = e.currentTarget.getAttribute('data-user-id');
         try {
           await window.api.demoLogin(userId);
-          window.sounds.playReady();
           this.closeAuthModal();
           window.app.showToast('Вход выполнен', `Вы вошли как ${window.api.currentUser.display_name}`, 'info');
         } catch (err) {
@@ -210,7 +197,6 @@ class AuthController {
 
     container.querySelectorAll('.avatar-pick-option').forEach(item => {
       item.addEventListener('click', (e) => {
-        window.sounds.playClick();
         container.querySelectorAll('.avatar-pick-option').forEach(i => i.classList.remove('selected'));
         item.classList.add('selected');
         this.selectedAvatar = item.getAttribute('data-avatar');
@@ -243,7 +229,6 @@ class AuthController {
 
     container.querySelectorAll('.frame-badge-option').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         container.querySelectorAll('.frame-badge-option').forEach(i => i.classList.remove('selected'));
         btn.classList.add('selected');
         this.selectedFrame = btn.getAttribute('data-frame');

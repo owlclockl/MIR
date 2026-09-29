@@ -1,5 +1,5 @@
 /* =========================================================
-   МИР RPG - CS2-Style Right Sidebar & Lobby Podiums
+   МИР — правая панель в стиле CS2 (лобби, друзья, приглашения)
    ========================================================= */
 
 .cs2-sidebar-container {
@@ -286,18 +286,6 @@
   color: var(--cs-cyan);
 }
 
-.slot-char-row {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.slot-hp-indicator {
-  color: #e6e7eb;
-  font-weight: 600;
-}
 
 .slot-ready-indicator {
   display: flex;
@@ -393,26 +381,6 @@
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 
-.btn-cs-start {
-  width: 100%;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: linear-gradient(135deg, #e6e7eb, #b6b8c0);
-  color: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: all var(--transition);
-}
-.btn-cs-start:hover {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
-  transform: translateY(-1px);
-}
 
 .lobby-sub-actions {
   display: flex;
@@ -589,66 +557,6 @@
 .friend-action-btn.invite-btn:hover {
   background: var(--cs-cyan);
   color: #0a0b0e;
-}
-
-/* =========================================================
-   CS2 Direct Messages Drawer / Mini Chat
-   ========================================================= */
-.dm-chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.dm-top-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.dm-messages-feed {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 0;
-}
-.dm-bubble {
-  max-width: 82%;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-.dm-bubble.incoming {
-  align-self: flex-start;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-}
-.dm-bubble.outgoing {
-  align-self: flex-end;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-}
-.dm-time {
-  font-size: 10px;
-  color: var(--text-dim);
-  margin-top: 3px;
-  text-align: right;
-}
-
-.dm-input-row {
-  display: flex;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-.dm-input-row input {
-  flex: 1;
 }
 
 /* =========================================================

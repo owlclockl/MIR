@@ -210,76 +210,8 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 20px;
-}
-.nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  transition: all var(--transition);
-}
-.nav-btn:hover {
-  color: var(--text-main);
-  background: var(--bg-hover);
-}
-.nav-btn.active {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 -2px 0 var(--cs-cyan);
-}
 
-.header-center {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
-.quick-join-bar {
-  display: flex;
-  align-items: center;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 4px 6px 4px 12px;
-  transition: border-color var(--transition);
-}
-.quick-join-bar:focus-within {
-  border-color: var(--cs-cyan);
-}
-.quick-join-bar input {
-  background: none;
-  border: none;
-  padding: 4px 8px;
-  font-size: 13px;
-  width: 140px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.quick-join-bar button {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition);
-}
-.quick-join-bar button:hover {
-  color: #fff;
-  background: var(--cs-cyan);
-  color: #0a0b0e;
-  border-color: var(--cs-cyan);
-}
 
 .header-right {
   display: flex;
@@ -618,8 +550,6 @@ body.screen-menu .top-header {
   -webkit-backdrop-filter: none;
   border-bottom-color: transparent;
 }
-body.screen-menu .nav-links,
-body.screen-menu .header-center,
 body.screen-menu .logo-brand { display: none; }
 
 @keyframes fadeInUp {
@@ -1120,18 +1050,52 @@ button svg { pointer-events: none; }
 .modal-close-btn:hover { color: var(--text-main); background: var(--bg-hover); }
 
 /* Buttons / tags containing icons keep an even rhythm */
-.scene-loc-tag, .scene-atmosphere, .dm-panel-title,
-.dice-quick-btn, .btn-cs-ready, .btn-cs-start, .ls-pill {
+.btn-cs-ready, .ls-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* =========================================================
+   Списки комнат и пустые состояния
+   ========================================================= */
+.list-hint {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 24px 12px;
+}
+.list-hint.error { color: var(--cs-red); }
+
+.public-room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: 8px;
+}
+.public-room-item .pr-left { display: flex; align-items: center; gap: 12px; }
+.public-room-item .pr-title { font-size: 14px; font-weight: 600; color: var(--text-main); }
+.public-room-item .pr-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.public-room-item .pr-right { display: flex; align-items: center; gap: 12px; }
+.public-room-item .pr-count { font-size: 12.5px; color: var(--text-muted); }
+
+.settings-empty {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 </style>
   <style>
 /* css/cs2-sidebar.css */
 /* =========================================================
-   МИР RPG - CS2-Style Right Sidebar & Lobby Podiums
+   МИР — правая панель в стиле CS2 (лобби, друзья, приглашения)
    ========================================================= */
 
 .cs2-sidebar-container {
@@ -1418,18 +1382,6 @@ button svg { pointer-events: none; }
   color: var(--cs-cyan);
 }
 
-.slot-char-row {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.slot-hp-indicator {
-  color: #e6e7eb;
-  font-weight: 600;
-}
 
 .slot-ready-indicator {
   display: flex;
@@ -1525,26 +1477,6 @@ button svg { pointer-events: none; }
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 
-.btn-cs-start {
-  width: 100%;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: linear-gradient(135deg, #e6e7eb, #b6b8c0);
-  color: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: all var(--transition);
-}
-.btn-cs-start:hover {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
-  transform: translateY(-1px);
-}
 
 .lobby-sub-actions {
   display: flex;
@@ -1724,66 +1656,6 @@ button svg { pointer-events: none; }
 }
 
 /* =========================================================
-   CS2 Direct Messages Drawer / Mini Chat
-   ========================================================= */
-.dm-chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.dm-top-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.dm-messages-feed {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 0;
-}
-.dm-bubble {
-  max-width: 82%;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-.dm-bubble.incoming {
-  align-self: flex-start;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-}
-.dm-bubble.outgoing {
-  align-self: flex-end;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-}
-.dm-time {
-  font-size: 10px;
-  color: var(--text-dim);
-  margin-top: 3px;
-  text-align: right;
-}
-
-.dm-input-row {
-  display: flex;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-.dm-input-row input {
-  flex: 1;
-}
-
-/* =========================================================
    CS2 Invites & Notifications Tab
    ========================================================= */
 .invite-item-box {
@@ -1814,591 +1686,6 @@ button svg { pointer-events: none; }
 }
 
 </style>
-  <style>
-/* css/game-room.css */
-/* =========================================================
-   МИР RPG - Game Room & Full Screen Lobby Styling
-   ========================================================= */
-
-.game-room-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: var(--bg-main);
-  position: relative;
-  overflow: hidden;
-}
-
-/* =========================================================
-   Lobby Stage (Center Squad View)
-   ========================================================= */
-.lobby-full-stage {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 30px 40px;
-  position: relative;
-  overflow-y: auto;
-}
-
-.lobby-header-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 1100px;
-  background: rgba(18, 19, 25, 0.7);
-  border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(8px);
-  padding: 16px 24px;
-  border-radius: var(--radius-xl);
-}
-.lh-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: 0.02em;
-}
-.lh-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.lh-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.room-code-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--cs-cyan);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.room-code-badge:hover {
-  background: var(--cs-cyan);
-  color: #0a0b0e;
-}
-
-/* Squad Podiums Grid */
-.lobby-podiums-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 20px;
-  width: 100%;
-  max-width: 1100px;
-  margin: 30px 0;
-}
-
-.podium-card {
-  height: 280px;
-  background: linear-gradient(180deg, rgba(25, 27, 34, 0.9) 0%, rgba(14, 15, 20, 0.95) 100%);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 16px 16px;
-  position: relative;
-  transition: all var(--transition);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
-}
-.podium-card.ready-state {
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
-}
-.podium-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--border-light);
-}
-
-.podium-crown {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  color: var(--cs-gold);
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.3));
-}
-
-.podium-avatar-wrap {
-  width: 80px;
-  height: 80px;
-}
-.podium-avatar-wrap .user-avatar-wrapper {
-  width: 80px;
-  height: 80px;
-}
-
-.podium-player-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
-  text-align: center;
-  margin-top: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
-.podium-char-class {
-  font-size: 12px;
-  color: var(--cs-cyan);
-  text-align: center;
-  margin-top: 2px;
-}
-
-.podium-status-pill {
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-dim);
-  border: 1px solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.podium-status-pill.ready {
-  background: rgba(255, 255, 255, 0.2);
-  color: #e6e7eb;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Empty Podium Card */
-.podium-empty-card {
-  height: 280px;
-  border: 2px dashed var(--border-subtle);
-  border-radius: var(--radius-xl);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  background: rgba(255, 255, 255, 0.01);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.podium-empty-card:hover {
-  border-color: var(--cs-cyan);
-  background: rgba(255, 255, 255, 0.04);
-  transform: translateY(-4px);
-}
-.empty-card-plus {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: 2px dashed var(--text-dim);
-  display: grid;
-  place-items: center;
-  color: var(--text-dim);
-  transition: all var(--transition);
-}
-.podium-empty-card:hover .empty-card-plus {
-  border-color: var(--cs-cyan);
-  color: var(--cs-cyan);
-  transform: scale(1.15);
-}
-.empty-card-text {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-/* Stage Bottom Controls */
-.lobby-stage-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 1100px;
-  gap: 20px;
-}
-
-/* =========================================================
-   Active Game Board Session (Мастер & Игроки)
-   ========================================================= */
-.game-active-layout {
-  display: flex;
-  height: 100%;
-  width: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Main Game Scene & Feed */
-.game-main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
-  padding: 24px 30px;
-  gap: 20px;
-}
-
-/* Scene Master Banner */
-.scene-banner {
-  background: linear-gradient(135deg, rgba(26, 27, 33, 0.9), rgba(17, 17, 20, 0.95));
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-}
-.scene-banner::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.14);
-}
-.scene-tag-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.scene-loc-tag {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--cs-amber);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.scene-title {
-  font-size: 22px;
-  font-weight: 800;
-  color: #fff;
-}
-.scene-desc {
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: #cbd5e1;
-}
-.scene-atmosphere {
-  font-size: 13px;
-  font-style: italic;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Master Narration Input Box (For DM) */
-.dm-master-panel {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.dm-panel-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--cs-amber);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dm-input-row {
-  display: flex;
-  gap: 10px;
-}
-.dm-input-row textarea {
-  flex: 1;
-  height: 50px;
-  resize: none;
-}
-
-/* Game Feed / Chat & Dice Rolls */
-.game-feed-panel {
-  flex: 1;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 300px;
-}
-.feed-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.feed-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Feed Items */
-.feed-msg-item {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  animation: fadeInDown 200ms ease-out;
-}
-.feed-msg-content {
-  flex: 1;
-}
-.feed-msg-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.feed-sender-name {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #fff;
-}
-.feed-time {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-.feed-text {
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: #e2e8f0;
-}
-
-/* Dice Roll Result Feed Item */
-.feed-msg-item.dice-item {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-lg);
-  padding: 12px 16px;
-}
-.feed-msg-item.dice-item.crit-20 {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
-}
-.feed-msg-item.dice-item.crit-1 {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
-.dice-result-badge {
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--cs-cyan);
-  padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-md);
-  display: inline-block;
-  margin-top: 4px;
-}
-.dice-result-badge.crit-20 {
-  color: var(--cs-gold);
-  background: rgba(255, 255, 255, 0.2);
-}
-.dice-result-badge.crit-1 {
-  color: var(--cs-red);
-  background: rgba(239, 68, 68, 0.2);
-}
-
-.feed-input-bar {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  gap: 10px;
-  background: rgba(0, 0, 0, 0.1);
-}
-.feed-input-bar input {
-  flex: 1;
-}
-
-/* =========================================================
-   Interactive Dice Roller Dock (Bottom Floating / Fixed)
-   ========================================================= */
-.dice-dock-bar {
-  background: rgba(18, 19, 25, 0.95);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-  flex-wrap: wrap;
-}
-
-.dice-buttons-set {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.dice-quick-btn {
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 800;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  transition: all var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dice-quick-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--cs-cyan);
-  color: var(--cs-cyan);
-  transform: translateY(-2px);
-}
-.dice-quick-btn.d20 {
-  border-color: rgba(255, 255, 255, 0.3);
-  color: var(--cs-cyan);
-}
-.dice-quick-btn.d20:hover {
-  background: var(--cs-cyan);
-  color: #0a0b0e;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
-}
-
-.dice-modifier-input {
-  width: 60px;
-  text-align: center;
-  padding: 8px;
-  font-weight: 700;
-}
-.dice-reason-input {
-  width: 180px;
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-/* =========================================================
-   Character Roster Side Panel (In-Game)
-   ========================================================= */
-.game-side-roster {
-  width: 320px;
-  background: var(--bg-surface);
-  border-left: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  gap: 16px;
-  overflow-y: auto;
-}
-.roster-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.roster-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: all var(--transition);
-}
-.roster-card:hover {
-  border-color: var(--border-light);
-}
-.rc-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.rc-names {
-  flex: 1;
-  min-width: 0;
-}
-.rc-player {
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-}
-.rc-class {
-  font-size: 11.5px;
-  color: var(--cs-cyan);
-}
-
-/* HP Progress Bar */
-.hp-bar-track {
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-  position: relative;
-}
-.hp-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #d5d7dd, #e6e7eb);
-  border-radius: 999px;
-  transition: width 300ms ease;
-}
-.hp-bar-fill.low { background: linear-gradient(90deg, #e07a7a, #e79a9a); }
-.hp-bar-fill.mid { background: linear-gradient(90deg, #d5d7dd, #e6e7eb); }
-
-.hp-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.hp-btn-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  transition: all var(--transition);
-}
-.hp-btn-sm:hover {
-  color: #fff;
-  background: var(--bg-active);
-}
-
-</style>
 </head>
 <body>
 
@@ -2420,38 +1707,6 @@ button svg { pointer-events: none; }
           
         </div>
 
-        <nav class="nav-links">
-          <button class="nav-btn active" id="navMenuBtn" data-screen="menu">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            </svg>
-            Главное меню
-          </button>
-          <button class="nav-btn" id="navLobbyBtn" data-screen="lobby">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            Лобби
-          </button>
-          <button class="nav-btn" id="navGameBtn" data-screen="game">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-            Партия
-          </button>
-        </nav>
-      </div>
-
-      <div class="header-center">
-        <div class="quick-join-bar">
-          <input type="text" id="quickJoinInput" placeholder="КОД: MIR-XXXX" maxlength="10" />
-          <button id="quickJoinBtn">Войти</button>
-        </div>
       </div>
 
       <div class="header-right">
@@ -2562,110 +1817,6 @@ button svg { pointer-events: none; }
           </div>
         </div>
 
-        <!-- Screen 2: Full Stage Lobby -->
-        <div class="lobby-full-stage" id="screenLobby" style="display: none;">
-          <div class="lobby-header-bar">
-            <div>
-              <div class="lh-title" id="stageRoomTitle">Лобби приключения</div>
-              <div class="lh-desc" id="stageRoomDesc">Ожидание сбора всех искателей приключений...</div>
-            </div>
-            <div class="lh-right">
-              <div class="room-code-badge" id="stageCopyCodeBtn" title="Скопировать код для друзей">
-                <span>КОД: <strong id="stageRoomCode">MIR-0000</strong></span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Squad 5-Slot Podiums Grid -->
-          <div class="lobby-podiums-grid" id="stagePodiumsGrid">
-            <!-- Rendered by JS -->
-          </div>
-
-          <!-- Bottom Stage Controls & Mini Chat -->
-          <div class="lobby-stage-footer">
-            <div style="flex: 1; max-width: 480px; background: rgba(18,19,25,0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-              <div style="font-size: 11.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Чат лобби</div>
-              <div id="lobbyChatFeed" style="height: 80px; overflow-y: auto;"></div>
-              <form id="lobbyChatForm" style="display: flex; gap: 8px;">
-                <input type="text" id="lobbyChatInput" placeholder="Напишите сообщение в лобби..." style="flex: 1; padding: 6px 10px; font-size: 12.5px;" />
-                <button type="submit" class="btn-primary btn-sm" style="padding: 6px 12px;">Отправить</button>
-              </form>
-            </div>
-
-            <div style="display: flex; gap: 12px; align-items: center;">
-              <button class="btn-cs-ready" id="stageReadyBtn" style="width: 200px;">ГОТОВ</button>
-              <button class="btn-cs-start" id="stageStartBtn" style="width: 220px; display: none;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>НАЧАТЬ ИГРУ</span></button>
-              <button class="btn-secondary" id="stageLeaveBtn" style="color: #e7b0b0;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg><span>Выйти</span></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Screen 3: Active RPG Game Board -->
-        <div class="game-room-container" id="screenGame" style="display: none;">
-          <div class="game-active-layout">
-            <div class="game-main-area">
-              <!-- Scene Master Banner -->
-              <div class="scene-banner">
-                <div class="scene-tag-row">
-                  <span class="scene-loc-tag" id="gameSceneLoc"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span>Локация</span></span>
-                  <span class="scene-atmosphere" id="gameSceneAtm"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"></path></svg><span>Атмосфера</span></span>
-                </div>
-                <h2 class="scene-title" id="gameSceneTitle">Заглавие текущей сцены</h2>
-                <p class="scene-desc" id="gameSceneDesc">Описание происходящего в текущем эпизоде...</p>
-              </div>
-
-              <!-- Master DM Control Panel (Visible to Master) -->
-              <div class="dm-master-panel" id="dmMasterPanel" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div class="dm-panel-title"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>Панель Ведущего</span></div>
-                  <button class="btn-secondary btn-sm" id="dmEditSceneBtn">Редактировать сцену</button>
-                </div>
-                <form id="dmBroadcastForm" class="dm-input-row">
-                  <textarea id="dmStoryText" placeholder="Опишите новое сюжетное событие или действие мира..."></textarea>
-                  <button type="submit" class="btn-gold btn-sm" style="height: 50px;">Озвучить событие</button>
-                </form>
-              </div>
-
-              <!-- Game Chat & Dice Feed -->
-              <div class="game-feed-panel">
-                <div class="feed-header">
-                  <span>Журнал партии и бросков</span>
-                  <span style="font-size: 11px; color: var(--text-dim);">Поддержка /roll d20</span>
-                </div>
-                <div class="feed-messages" id="gameFeedList"></div>
-                <form class="feed-input-bar" id="gameFeedForm">
-                  <input type="text" id="gameFeedInput" placeholder="Действие персонажа или сообщение в чат... (/roll d20)" />
-                  <button type="submit" class="btn-primary btn-sm">Отправить</button>
-                </form>
-              </div>
-
-              <!-- Dice Roller Dock Bar -->
-              <div class="dice-dock-bar">
-                <div class="dice-buttons-set">
-                  <button class="dice-quick-btn d20" data-dice="d20"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"></circle></svg><span>d20</span></button>
-                  <button class="dice-quick-btn" data-dice="d12">d12</button>
-                  <button class="dice-quick-btn" data-dice="d10">d10</button>
-                  <button class="dice-quick-btn" data-dice="d8">d8</button>
-                  <button class="dice-quick-btn" data-dice="d6">d6</button>
-                  <button class="dice-quick-btn" data-dice="d4">d4</button>
-                  <button class="dice-quick-btn" data-dice="d100">d100</button>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <input type="number" class="dice-modifier-input" id="diceModifier" placeholder="+0" value="0" />
-                  <input type="text" class="dice-reason-input" id="diceReason" placeholder="Причина (навык, атака)" />
-                </div>
-              </div>
-            </div>
-
-            <!-- In-Game Side Character Roster -->
-            <div class="game-side-roster">
-              <div class="roster-title">Герои партии</div>
-              <div id="gameRosterList" style="display: flex; flex-direction: column; gap: 10px;"></div>
-            </div>
-          </div>
-        </div>
-
       </div> <!-- /screen-container -->
 
       <!-- ================= CS2 Right Sidebar ================= -->
@@ -2699,7 +1850,7 @@ button svg { pointer-events: none; }
                 <div class="friends-tab-pills">
                   <button class="friend-filter-btn active" data-filter="all">Все</button>
                   <button class="friend-filter-btn" data-filter="online">В сети</button>
-                  <button class="friend-filter-btn" data-filter="ingame">В игре</button>
+                  <button class="friend-filter-btn" data-filter="inlobby">В лобби</button>
                 </div>
                 <button class="btn-primary btn-sm" id="addFriendBtn" style="padding: 5px 10px; font-size: 11.5px;">+ Друг</button>
               </div>
@@ -2712,21 +1863,6 @@ button svg { pointer-events: none; }
               <div id="sideInvitesContainer"></div>
             </div>
 
-            <!-- Pane 4: Direct Messages Mini-Chat -->
-            <div class="sidebar-view-pane" id="sidePane-dms" style="display: none; flex-direction: column; height: 100%; width: 100%;">
-              <div class="dm-chat-container">
-                <div class="dm-top-bar">
-                  <button class="btn-secondary btn-sm" id="dmBackBtn" style="padding: 4px 8px;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M15 18l-6-6 6-6"></path></svg><span>Назад</span></button>
-                  <div id="dmPartnerAvatar"></div>
-                  <span style="font-size: 13.5px; font-weight: 700; color: #fff;" id="dmPartnerName">Друг</span>
-                </div>
-                <div class="dm-messages-feed" id="dmFeed"></div>
-                <form class="dm-input-row" id="dmSendForm">
-                  <input type="text" id="dmInput" placeholder="Написать сообщение..." />
-                  <button type="submit" class="btn-primary btn-sm">Отправить</button>
-                </form>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -2970,80 +2106,17 @@ button svg { pointer-events: none; }
     </div>
   </div>
 
-  <!-- Modal 5: Customize Character -->
-  <div class="modal-overlay" id="charCustomizeOverlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Настройка персонажа</h3>
-        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
-      </div>
-      <form id="charCustomizeForm" class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Имя героя</label>
-          <input type="text" id="charCustName" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Класс / Роль</label>
-          <input type="text" id="charCustClass" placeholder="Боевой Маг, Паладин, Следопыт..." required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Максимум HP</label>
-          <input type="number" id="charCustHp" value="20" min="1" max="500" required />
-        </div>
-        <button type="submit" class="btn-primary">Сохранить персонажа</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal 6: Edit Scene (Master) -->
-  <div class="modal-overlay" id="editSceneOverlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Редактировать сцену</h3>
-        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
-      </div>
-      <form id="editSceneForm" class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Заглавие сцены</label>
-          <input type="text" id="esSceneTitle" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Локация</label>
-          <input type="text" id="esSceneLoc" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Атмосфера / Окружение</label>
-          <input type="text" id="esSceneAtm" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Подробное описание сцены</label>
-          <textarea id="esSceneDesc" rows="4" required></textarea>
-        </div>
-        <button type="submit" class="btn-gold">Применить изменения</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal 7: Settings -->
+  <!-- Modal: Settings (пока без опций — содержимое не запрашивалось) -->
   <div class="modal-overlay" id="settingsOverlay">
     <div class="modal-card">
       <div class="modal-header">
         <h3>Настройки</h3>
-        <button class="modal-close-btn" id="closeSettings"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+        <button class="modal-close-btn" id="closeSettings">
+          <svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
       </div>
       <div class="modal-body">
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Звуковые эффекты UI и кубиков</span>
-          <button class="toggle" id="soundToggle" role="switch" aria-checked="true"></button>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Фоновые эмбиент-звуки</span>
-          <button class="toggle" id="musicToggle" role="switch" aria-checked="true"></button>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
-          <span style="font-size: 14px; font-weight: 600;">Полноэкранный режим</span>
-          <button class="toggle" id="fullscreenToggle" role="switch" aria-checked="false"></button>
-        </div>
+        <div class="settings-empty">Настроек пока нет</div>
       </div>
     </div>
   </div>
@@ -3052,211 +2125,6 @@ button svg { pointer-events: none; }
   <div id="toast-container"></div>
 
   <!-- Scripts -->
-  <script>
-/* js/audio.js */
-/**
- * Web Audio API Sound Generator for MIR RPG
- * Procedural UI sound effects (Zero external files needed)
- */
-class SoundEngine {
-  constructor() {
-    this.ctx = null;
-    this.enabled = true;
-    this.musicEnabled = true;
-  }
-
-  init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-  }
-
-  playClick() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.04);
-      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.05);
-    } catch (e) {}
-  }
-
-  playReady() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.06); // E5
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(now + 0.2);
-    } catch (e) {}
-  }
-
-  playInvite() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-      notes.forEach((freq, idx) => {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
-        gain.gain.setValueAtTime(0, now + idx * 0.06);
-        gain.gain.linearRampToValueAtTime(0.18, now + idx * 0.06 + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now + idx * 0.06);
-        osc.stop(now + idx * 0.06 + 0.3);
-      });
-    } catch (e) {}
-  }
-
-  playJoin() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(329.63, now); // E4
-      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.12); // E5
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.26);
-    } catch (e) {}
-  }
-
-  playDiceRoll() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      // Synthesize noise/rattle of tumbling dice
-      for (let i = 0; i < 6; i++) {
-        const timeOffset = now + i * 0.04 + Math.random() * 0.02;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(200 + Math.random() * 600, timeOffset);
-        gain.gain.setValueAtTime(0.08, timeOffset);
-        gain.gain.exponentialRampToValueAtTime(0.001, timeOffset + 0.035);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(timeOffset);
-        osc.stop(timeOffset + 0.04);
-      }
-    } catch (e) {}
-  }
-
-  playCritSuccess() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const fanFare = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-      fanFare.forEach((freq, idx) => {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-        gain.gain.setValueAtTime(0.25, now + idx * 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.4);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now + idx * 0.08);
-        osc.stop(now + idx * 0.08 + 0.45);
-      });
-    } catch (e) {}
-  }
-
-  playCritFail() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(80, now + 0.35);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.45);
-    } catch (e) {}
-  }
-
-  playGameStart() {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const chords = [
-        [261.63, 329.63, 392.00], // C major
-        [329.63, 392.00, 523.25], // E min/C inv
-        [392.00, 493.88, 587.33, 783.99] // G major climax
-      ];
-      chords.forEach((chord, step) => {
-        const time = now + step * 0.15;
-        chord.forEach(freq => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, time);
-          gain.gain.setValueAtTime(0.12, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.55);
-        });
-      });
-    } catch (e) {}
-  }
-}
-
-window.sounds = new SoundEngine();
-
-</script>
   <script>
 /* js/avatars.js */
 /**
@@ -3572,7 +2440,7 @@ window.renderAvatar = renderAvatar;
   <script>
 /* js/api.js */
 /**
- * API and WebSocket client for MIR RPG
+ * API and WebSocket client (accounts, friends, invites, rooms)
  */
 class ApiClient {
   constructor() {
@@ -3781,7 +2649,7 @@ class ApiClient {
       body: payload
     });
     this.currentRoom = res.room;
-    this.sendPresence(res.room.status === 'in_game' ? 'in_game' : 'in_lobby', res.room.id);
+    this.sendPresence('in_lobby', res.room.id);
     return res.room;
   }
 
@@ -3812,23 +2680,7 @@ class ApiClient {
     return res.room;
   }
 
-  async startGame(id) {
-    const res = await this.request(`/api/rooms/${id}/start`, {
-      method: 'POST'
-    });
-    this.currentRoom = res.room;
-    this.sendPresence('in_game', res.room.id);
-    return res.room;
-  }
 
-  async updateCharacter(id, payload) {
-    const res = await this.request(`/api/rooms/${id}/update-char`, {
-      method: 'POST',
-      body: payload
-    });
-    this.currentRoom = res.room;
-    return res.room;
-  }
 
   async inviteFriend(id, friendId) {
     return this.request(`/api/rooms/${id}/invite`, {
@@ -3849,50 +2701,9 @@ class ApiClient {
     });
     if (action === 'accept' && res.room) {
       this.currentRoom = res.room;
-      this.sendPresence(res.room.status === 'in_game' ? 'in_game' : 'in_lobby', res.room.id);
+      this.sendPresence('in_lobby', res.room.id);
     }
     return res;
-  }
-
-  // ================= Game Session & Chat =================
-  async getRoomMessages(id) {
-    const res = await this.request(`/api/rooms/${id}/messages`);
-    return res.messages;
-  }
-
-  async sendRoomMessage(id, content, type = 'room_lobby', extra_data = {}) {
-    return this.request(`/api/rooms/${id}/messages`, {
-      method: 'POST',
-      body: { content, type, extra_data }
-    });
-  }
-
-  async rollDice(id, diceType, count = 1, modifier = 0, reason = '') {
-    return this.request(`/api/rooms/${id}/roll`, {
-      method: 'POST',
-      body: { diceType, count, modifier, reason }
-    });
-  }
-
-  async updateGameState(id, payload) {
-    const res = await this.request(`/api/rooms/${id}/game-state`, {
-      method: 'POST',
-      body: payload
-    });
-    this.currentRoom = res.room;
-    return res.room;
-  }
-
-  async getDirectMessages(friendId) {
-    const res = await this.request(`/api/messages/direct/${friendId}`);
-    return res.messages;
-  }
-
-  async sendDirectMessage(friendId, content) {
-    return this.request(`/api/messages/direct/${friendId}`, {
-      method: 'POST',
-      body: { content }
-    });
   }
 
   // ================= WebSocket =================
@@ -3992,20 +2803,17 @@ class AuthController {
   bindEvents() {
     // Top Bar Profile Click -> Open Profile Modal
     document.getElementById('userProfileBadge')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.openProfileModal();
     });
 
     // Login/Register Button (when logged out)
     document.getElementById('headerLoginBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.openAuthModal();
     });
 
     // Auth Modal Tabs
     document.querySelectorAll('.auth-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         const tab = e.target.getAttribute('data-tab');
         this.switchAuthTab(tab);
       });
@@ -4014,7 +2822,6 @@ class AuthController {
     // Login Form Submit
     document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const userField = document.getElementById('loginUsername').value;
       const passField = document.getElementById('loginPassword').value;
       const errEl = document.getElementById('loginError');
@@ -4022,7 +2829,6 @@ class AuthController {
 
       try {
         await window.api.login(userField, passField);
-        window.sounds.playReady();
         this.closeAuthModal();
         window.app.showToast('Успешный вход', `С возвращением, ${window.api.currentUser.display_name}!`, 'info');
       } catch (err) {
@@ -4033,7 +2839,6 @@ class AuthController {
     // Register Form Submit
     document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const username = document.getElementById('regUsername').value;
       const displayName = document.getElementById('regDisplayName').value;
       const password = document.getElementById('regPassword').value;
@@ -4052,7 +2857,6 @@ class AuthController {
           avatar: this.selectedAvatar,
           avatar_frame: this.selectedFrame
         });
-        window.sounds.playReady();
         this.closeAuthModal();
         window.app.showToast('Аккаунт создан', `Добро пожаловать в МИР, ${window.api.currentUser.display_name}!`, 'info');
       } catch (err) {
@@ -4063,7 +2867,6 @@ class AuthController {
     // Profile Save Form Submit
     document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const displayName = document.getElementById('profDisplayName').value;
       const customStatus = document.getElementById('profCustomStatus').value;
       const roleTitle = document.getElementById('profRoleTitle').value;
@@ -4076,7 +2879,6 @@ class AuthController {
           avatar: this.selectedAvatar,
           avatar_frame: this.selectedFrame
         });
-        window.sounds.playReady();
         this.closeProfileModal();
         window.app.showToast('Профиль обновлен', 'Изменения сохранены', 'info');
       } catch (err) {
@@ -4086,7 +2888,6 @@ class AuthController {
 
     // Logout Button
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       window.api.logout();
       this.closeProfileModal();
       window.app.showToast('Вы вышли из системы', 'Авторизуйтесь для игры', 'info');
@@ -4094,7 +2895,6 @@ class AuthController {
 
     // Copy Tag Button
     document.getElementById('copyTagBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       if (window.api.currentUser) {
         const fullTag = `${window.api.currentUser.username}#${window.api.currentUser.tag}`;
         navigator.clipboard?.writeText(fullTag);
@@ -4147,11 +2947,9 @@ class AuthController {
 
     container.querySelectorAll('.demo-login-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        window.sounds.playClick();
         const userId = e.currentTarget.getAttribute('data-user-id');
         try {
           await window.api.demoLogin(userId);
-          window.sounds.playReady();
           this.closeAuthModal();
           window.app.showToast('Вход выполнен', `Вы вошли как ${window.api.currentUser.display_name}`, 'info');
         } catch (err) {
@@ -4174,7 +2972,6 @@ class AuthController {
 
     container.querySelectorAll('.avatar-pick-option').forEach(item => {
       item.addEventListener('click', (e) => {
-        window.sounds.playClick();
         container.querySelectorAll('.avatar-pick-option').forEach(i => i.classList.remove('selected'));
         item.classList.add('selected');
         this.selectedAvatar = item.getAttribute('data-avatar');
@@ -4207,7 +3004,6 @@ class AuthController {
 
     container.querySelectorAll('.frame-badge-option').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         container.querySelectorAll('.frame-badge-option').forEach(i => i.classList.remove('selected'));
         btn.classList.add('selected');
         this.selectedFrame = btn.getAttribute('data-frame');
@@ -4284,13 +3080,12 @@ window.authController = new AuthController();
  */
 class SidebarController {
   constructor() {
-    this.activeTab = 'lobby'; // 'lobby' | 'friends' | 'invites' | 'dms'
+    this.activeTab = 'lobby'; // 'lobby' | 'friends' | 'invites'
     this.isOpen = true;
     this.friends = [];
     this.invites = [];
     this.friendRequests = { incoming: [], outgoing: [] };
-    this.activeDmFriend = null;
-    this.friendFilter = 'all'; // 'all' | 'online' | 'ingame'
+    this.friendFilter = 'all'; // 'all' | 'online' | 'inlobby'
     this.init();
   }
 
@@ -4303,7 +3098,6 @@ class SidebarController {
     // Dock Button Clicks
     document.querySelectorAll('.dock-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         const tab = btn.getAttribute('data-tab');
         if (this.isOpen && this.activeTab === tab) {
           this.toggleSidebar(false);
@@ -4316,14 +3110,12 @@ class SidebarController {
 
     // Drawer Close Button
     document.getElementById('sidebarCloseBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.toggleSidebar(false);
     });
 
     // Friend Filters
     document.querySelectorAll('.friend-filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         document.querySelectorAll('.friend-filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.friendFilter = btn.getAttribute('data-filter');
@@ -4338,31 +3130,7 @@ class SidebarController {
 
     // Add Friend Form
     document.getElementById('addFriendBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.promptAddFriend();
-    });
-
-    // DM Send Form
-    document.getElementById('dmSendForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('dmInput');
-      const text = input.value.trim();
-      if (!text || !this.activeDmFriend) return;
-      window.sounds.playClick();
-      input.value = '';
-
-      try {
-        const res = await window.api.sendDirectMessage(this.activeDmFriend.id, text);
-        this.appendDmMessage(res.message, true);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Back to Friends from DM
-    document.getElementById('dmBackBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      this.switchTab('friends');
     });
 
     // Auth Change -> reload friends & invites
@@ -4394,7 +3162,6 @@ class SidebarController {
     // Incoming Room Invite
     window.api.on('room_invite', (data) => {
       if (!data || !data.invite) return;
-      window.sounds.playInvite();
       this.invites.unshift(data.invite);
       this.renderInvites();
       this.updateDockBadges();
@@ -4406,7 +3173,6 @@ class SidebarController {
     // Incoming Friend Request
     window.api.on('friend_request', (data) => {
       if (!data || !data.request) return;
-      window.sounds.playInvite();
       this.friendRequests.incoming.unshift(data.request);
       this.renderInvites();
       this.updateDockBadges();
@@ -4420,30 +3186,12 @@ class SidebarController {
 
     // Friend Request Accepted
     window.api.on('friend_request_accepted', (data) => {
-      window.sounds.playReady();
       this.refreshFriends();
       window.app.showToast('Новый друг!', `${data.user.display_name} принял ваш запрос!`, 'info');
     });
 
-    // Direct Message Received
-    window.api.on('direct_message', (data) => {
-      if (!data || !data.message) return;
-      window.sounds.playInvite();
-
-      if (this.activeTab === 'dms' && this.activeDmFriend && this.activeDmFriend.id === data.message.from_user.id) {
-        this.appendDmMessage(data.message, false);
-      } else {
-        window.app.showToast(
-          `Сообщение от ${data.message.from_user.display_name}`,
-          data.message.content,
-          'info'
-        );
-      }
-    });
-
     // Room update events
     window.api.on('room_member_joined', (data) => {
-      window.sounds.playJoin();
       if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
         window.api.currentRoom = data.room;
         this.renderLobby();
@@ -4458,33 +3206,14 @@ class SidebarController {
     });
 
     window.api.on('room_ready_changed', (data) => {
-      window.sounds.playReady();
       if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
         window.api.currentRoom = data.room;
-        this.renderLobby();
-      }
-    });
-
-    window.api.on('room_char_updated', (data) => {
-      if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
-        window.api.currentRoom = data.room;
-        this.renderLobby();
-      }
-    });
-
-    window.api.on('game_started', (data) => {
-      window.sounds.playGameStart();
-      if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
-        window.api.currentRoom = data.room;
-        window.app.navigateTo('game');
         this.renderLobby();
       }
     });
 
     window.api.on('room_kicked', (data) => {
-      window.sounds.playCritFail();
       window.api.currentRoom = null;
-      window.app.navigateTo('menu');
       window.app.showToast('Исключение', `Вы были исключены из комнаты ${data.room.title}`, 'info');
       this.renderLobby();
     });
@@ -4548,8 +3277,7 @@ class SidebarController {
     const titles = {
       lobby: 'Лобби / Группа',
       friends: 'Друзья',
-      invites: 'Приглашения',
-      dms: this.activeDmFriend ? this.activeDmFriend.display_name : 'Личные сообщения'
+      invites: 'Приглашения'
     };
     if (titleEl) titleEl.textContent = titles[tab] || 'Панель';
 
@@ -4623,11 +3351,9 @@ class SidebarController {
       `;
 
       document.getElementById('sideCreateRoomBtn')?.addEventListener('click', () => {
-        window.sounds.playClick();
         window.lobbyController.openCreateModal();
       });
       document.getElementById('sideBrowseRoomsBtn')?.addEventListener('click', () => {
-        window.sounds.playClick();
         window.lobbyController.openBrowseModal();
       });
       return;
@@ -4660,10 +3386,6 @@ class SidebarController {
               <div class="slot-name-row">
                 <span class="slot-user-name">${m.display_name}</span>
                 <span class="slot-role-badge ${isMaster ? 'master' : 'player'}">${isMaster ? 'Мастер' : 'Игрок'}</span>
-              </div>
-              <div class="slot-char-row">
-                <span>${m.character_class || 'Авантюрист'}</span>
-                <span class="slot-hp-indicator">HP: ${m.hp}/${m.max_hp}</span>
               </div>
             </div>
             <div class="slot-ready-indicator ${m.is_ready ? 'ready' : ''}">
@@ -4703,18 +3425,10 @@ class SidebarController {
             ${isReady ? '<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg> ГОТОВ К ИГРЕ' : 'ГОТОВ'}
           </button>
 
-          ${isHost ? `
-            <button class="btn-cs-start" id="sideStartGameBtn">
-              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg> ЗАПУСТИТЬ ПАРТИЮ
-            </button>
-          ` : ''}
 
           <div class="lobby-sub-actions">
             <button class="lobby-sub-btn" id="sideInviteFriendBtn">
               <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"></path></svg> Пригласить
-            </button>
-            <button class="lobby-sub-btn" id="sideCustomizeCharBtn">
-              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 7c0-1 1-2 2-2h14c1 0 2 1 2 2v4c0 5-4 9-9 9s-9-4-9-9z"></path><circle cx="9" cy="11" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15" cy="11" r="1.2" fill="currentColor" stroke="none"></circle></svg> Персонаж
             </button>
             <button class="lobby-sub-btn" id="sideLeaveRoomBtn" style="color: #e7b0b0;">
               <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg> Выйти
@@ -4726,13 +3440,11 @@ class SidebarController {
 
     // Event Bindings
     document.getElementById('sideCopyCodeBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       navigator.clipboard?.writeText(room.code);
       window.app.showToast('Скопировано', `Код комнаты ${room.code} скопирован в буфер!`, 'info');
     });
 
     document.getElementById('sideReadyBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.setReady(room.id, !isReady);
       } catch (err) {
@@ -4740,30 +3452,15 @@ class SidebarController {
       }
     });
 
-    document.getElementById('sideStartGameBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
-      try {
-        await window.api.startGame(room.id);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
 
     document.getElementById('sideInviteFriendBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.switchTab('friends');
     });
 
-    document.getElementById('sideCustomizeCharBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      window.lobbyController.openCharCustomizeModal();
-    });
 
     document.getElementById('sideLeaveRoomBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.leaveRoom(room.id);
-        window.app.navigateTo('menu');
         this.renderLobby();
       } catch (err) {
         alert(err.message);
@@ -4772,7 +3469,6 @@ class SidebarController {
 
     container.querySelectorAll('.lobby-empty-slot').forEach(el => {
       el.addEventListener('click', () => {
-        window.sounds.playClick();
         this.switchTab('friends');
       });
     });
@@ -4806,8 +3502,8 @@ class SidebarController {
 
     if (this.friendFilter === 'online') {
       filtered = filtered.filter(f => f.isOnline);
-    } else if (this.friendFilter === 'ingame') {
-      filtered = filtered.filter(f => f.status === 'in_game' || f.status === 'in_lobby');
+    } else if (this.friendFilter === 'inlobby') {
+      filtered = filtered.filter(f => f.status === 'in_lobby');
     }
 
     if (filtered.length === 0) {
@@ -4820,14 +3516,14 @@ class SidebarController {
     }
 
     // Group by status
-    const inGameOrLobby = filtered.filter(f => f.status === 'in_game' || f.status === 'in_lobby');
-    const online = filtered.filter(f => f.isOnline && f.status !== 'in_game' && f.status !== 'in_lobby');
+    const inLobby = filtered.filter(f => f.status === 'in_lobby');
+    const online = filtered.filter(f => f.isOnline && f.status !== 'in_lobby');
     const offline = filtered.filter(f => !f.isOnline);
 
     const renderGroup = (title, list) => {
       if (list.length === 0) return '';
       const items = list.map(f => {
-        const canInvite = window.api.currentRoom && f.isOnline && f.status !== 'in_game';
+        const canInvite = window.api.currentRoom && f.isOnline;
         const canJoin = f.currentRoom && (!window.api.currentRoom || window.api.currentRoom.id !== f.currentRoom.id);
         
         let statusText = 'В сети';
@@ -4835,9 +3531,6 @@ class SidebarController {
         if (f.status === 'in_lobby') {
           statusText = f.currentRoom ? `В лобби: ${f.currentRoom.title}` : 'В лобби МИР';
           statusClass = 'in_lobby';
-        } else if (f.status === 'in_game') {
-          statusText = f.currentRoom ? `В игре: ${f.currentRoom.title}` : 'В партии';
-          statusClass = 'in_game';
         } else if (!f.isOnline) {
           statusText = 'Не в сети';
           statusClass = 'offline';
@@ -4866,9 +3559,6 @@ class SidebarController {
                   <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
                 </button>
               ` : ''}
-              <button class="friend-action-btn friend-dm-btn" data-friend-id="${f.id}" title="Написать">
-                <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"></path></svg>
-              </button>
             </div>
           </div>
         `;
@@ -4883,7 +3573,7 @@ class SidebarController {
     };
 
     container.innerHTML = `
-      ${renderGroup('В игре и в лобби', inGameOrLobby)}
+      ${renderGroup('В лобби', inLobby)}
       ${renderGroup('В сети', online)}
       ${renderGroup('Не в сети', offline)}
     `;
@@ -4892,7 +3582,6 @@ class SidebarController {
     container.querySelectorAll('.friend-invite-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        window.sounds.playClick();
         const friendId = btn.getAttribute('data-friend-id');
         if (window.api.currentRoom) {
           try {
@@ -4908,11 +3597,9 @@ class SidebarController {
     container.querySelectorAll('.friend-join-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        window.sounds.playClick();
         const roomId = btn.getAttribute('data-room-id');
         try {
           await window.api.joinRoom(roomId);
-          window.app.navigateTo('lobby');
           this.switchTab('lobby');
         } catch (err) {
           alert(err.message);
@@ -4920,80 +3607,6 @@ class SidebarController {
       });
     });
 
-    container.querySelectorAll('.friend-dm-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.sounds.playClick();
-        const friendId = btn.getAttribute('data-friend-id');
-        const friend = this.friends.find(f => f.id === friendId);
-        if (friend) {
-          this.openDirectChat(friend);
-        }
-      });
-    });
-  }
-
-  // ================= Direct Messages =================
-  async openDirectChat(friend) {
-    this.activeDmFriend = friend;
-    this.switchTab('dms');
-
-    const nameEl = document.getElementById('dmPartnerName');
-    const avWrap = document.getElementById('dmPartnerAvatar');
-    if (nameEl) nameEl.textContent = friend.display_name;
-    if (avWrap) avWrap.innerHTML = window.renderAvatar(friend.avatar, friend.avatar_frame, 32);
-
-    const feed = document.getElementById('dmFeed');
-    if (feed) feed.innerHTML = '<div style="text-align: center; color: var(--text-dim);">Загрузка сообщений...</div>';
-
-    try {
-      const messages = await window.api.getDirectMessages(friend.id);
-      this.renderDmMessages(messages);
-    } catch (e) {
-      if (feed) feed.innerHTML = '<div style="color: var(--cs-red);">Ошибка загрузки истории</div>';
-    }
-  }
-
-  renderDmMessages(messages) {
-    const feed = document.getElementById('dmFeed');
-    if (!feed) return;
-
-    if (!messages || messages.length === 0) {
-      feed.innerHTML = `
-        <div style="text-align: center; padding: 30px 10px; color: var(--text-dim); font-size: 12.5px;">
-          Начните диалог с ${this.activeDmFriend.display_name}
-        </div>
-      `;
-      return;
-    }
-
-    feed.innerHTML = messages.map(m => {
-      const isOutgoing = m.from_user.id === window.api.currentUser?.id;
-      const timeStr = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="dm-bubble ${isOutgoing ? 'outgoing' : 'incoming'}">
-          <div>${m.content}</div>
-          <div class="dm-time">${timeStr}</div>
-        </div>
-      `;
-    }).join('');
-
-    feed.scrollTop = feed.scrollHeight;
-  }
-
-  appendDmMessage(msg, isOutgoing) {
-    const feed = document.getElementById('dmFeed');
-    if (!feed) return;
-    const timeStr = new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const bubble = document.createElement('div');
-    bubble.className = `dm-bubble ${isOutgoing ? 'outgoing' : 'incoming'}`;
-    bubble.innerHTML = `
-      <div>${msg.content}</div>
-      <div class="dm-time">${timeStr}</div>
-    `;
-    feed.appendChild(bubble);
-    feed.scrollTop = feed.scrollHeight;
   }
 
   // ================= Render Invites & Notifications =================
@@ -5067,14 +3680,12 @@ class SidebarController {
     // Bind invite buttons
     container.querySelectorAll('.accept-invite-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-invite-id');
         try {
-          const res = await window.api.respondInvite(id, 'accept');
+          await window.api.respondInvite(id, 'accept');
           this.invites = this.invites.filter(i => i.id !== id);
           this.renderInvites();
           this.updateDockBadges();
-          window.app.navigateTo('lobby');
           this.switchTab('lobby');
         } catch (err) {
           alert(err.message);
@@ -5084,7 +3695,6 @@ class SidebarController {
 
     container.querySelectorAll('.decline-invite-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-invite-id');
         try {
           await window.api.respondInvite(id, 'decline');
@@ -5098,7 +3708,6 @@ class SidebarController {
     // Bind friend request buttons
     container.querySelectorAll('.accept-req-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-request-id');
         try {
           await window.api.respondFriendRequest(id, 'accept');
@@ -5113,7 +3722,6 @@ class SidebarController {
 
     container.querySelectorAll('.decline-req-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-request-id');
         try {
           await window.api.respondFriendRequest(id, 'decline');
@@ -5128,7 +3736,6 @@ class SidebarController {
     const target = prompt('Введите Никнейм#Тег друга (например ElenaArcana#2048):');
     if (target && target.trim()) {
       window.api.sendFriendRequest(target.trim()).then(res => {
-        window.sounds.playReady();
         window.app.showToast('Запрос отправлен', res.message, 'info');
         this.refreshFriendRequests();
       }).catch(err => {
@@ -5151,177 +3758,67 @@ window.sidebarController = new SidebarController();
   <script>
 /* js/lobby.js */
 /**
- * Lobby & Room Management Controller
+ * Комнаты: создание (Мастер), список открытых комнат, вход по коду.
+ * Само лобби отображается в правой панели (sidebar.js).
  */
 class LobbyController {
   constructor() {
-    this.init();
-  }
-
-  init() {
     this.bindEvents();
   }
 
   bindEvents() {
-    // Role Buttons on Main Menu
+    // Кнопка «Мастер» в меню
     document.getElementById('masterRoleBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       if (!window.api.currentUser) {
         window.authController.openAuthModal();
         return;
       }
-      this.openCreateModal('master');
+      this.openCreateModal();
     });
 
+    // Кнопка «Игрок» в меню
     document.getElementById('playerRoleBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.openBrowseModal();
     });
 
-    // Quick Join input in Top Header
-    document.getElementById('quickJoinBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      const code = document.getElementById('quickJoinInput').value.trim();
-      if (code) {
-        this.joinByCode(code);
-      }
-    });
-
-    // Join by code from the centered main-menu field
+    // Вход по коду комнаты (поле по центру меню)
     document.getElementById('menuJoinForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      window.sounds.playClick();
       const code = document.getElementById('menuJoinInput').value.trim();
       if (code) this.joinByCode(code);
     });
 
-    // Create Room Form Submit
+    // Создание комнаты
     document.getElementById('createRoomForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      window.sounds.playClick();
-      const title = document.getElementById('crTitle').value;
-      const description = document.getElementById('crDesc').value;
-      const setting = document.getElementById('crSetting').value;
-      const max_players = document.getElementById('crMaxPlayers').value;
-      const privacy = document.getElementById('crPrivacy').value;
-      const password = document.getElementById('crPassword').value;
+      const payload = {
+        title: document.getElementById('crTitle').value,
+        description: document.getElementById('crDesc').value,
+        setting: document.getElementById('crSetting').value,
+        max_players: document.getElementById('crMaxPlayers').value,
+        privacy: document.getElementById('crPrivacy').value,
+        password: document.getElementById('crPassword').value,
+        role: 'master'
+      };
 
       try {
-        const room = await window.api.createRoom({
-          title, description, setting, max_players, privacy, password, role: 'master'
-        });
-        window.sounds.playJoin();
+        const room = await window.api.createRoom(payload);
         this.closeCreateModal();
-        window.app.navigateTo('lobby');
-        window.sidebarController.renderLobby();
-        window.app.showToast('Лобби создано!', `Код комнаты: ${room.code}`, 'info');
+        this.showLobbyPanel();
+        window.app.showToast('Лобби создано', `Код комнаты: ${room.code}`, 'info');
       } catch (err) {
         alert(err.message);
-      }
-    });
-
-    // Customize Character Form Submit
-    document.getElementById('charCustomizeForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      window.sounds.playClick();
-      const charName = document.getElementById('charCustName').value;
-      const charClass = document.getElementById('charCustClass').value;
-      const charHp = parseInt(document.getElementById('charCustHp').value) || 20;
-
-      if (window.api.currentRoom) {
-        try {
-          await window.api.updateCharacter(window.api.currentRoom.id, {
-            character_name: charName,
-            character_class: charClass,
-            hp: charHp,
-            max_hp: charHp
-          });
-          this.closeCharCustomizeModal();
-          window.app.showToast('Персонаж сохранен', 'Характеристики обновлены', 'info');
-        } catch (err) {
-          alert(err.message);
-        }
-      }
-    });
-
-    // Lobby Chat Submit
-    document.getElementById('lobbyChatForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('lobbyChatInput');
-      const text = input.value.trim();
-      if (!text || !window.api.currentRoom) return;
-      window.sounds.playClick();
-      input.value = '';
-
-      try {
-        await window.api.sendRoomMessage(window.api.currentRoom.id, text, 'room_lobby');
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Full Stage Ready Button
-    document.getElementById('stageReadyBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
-      const room = window.api.currentRoom;
-      const user = window.api.currentUser;
-      if (!room || !user) return;
-      const myMember = room.members?.find(m => m.user_id === user.id);
-      const isReady = myMember ? myMember.is_ready === 1 : false;
-
-      try {
-        await window.api.setReady(room.id, !isReady);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Full Stage Start Game Button (Master only)
-    document.getElementById('stageStartBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
-      const room = window.api.currentRoom;
-      if (!room) return;
-      try {
-        await window.api.startGame(room.id);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Full Stage Leave Button
-    document.getElementById('stageLeaveBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
-      const room = window.api.currentRoom;
-      if (!room) return;
-      try {
-        await window.api.leaveRoom(room.id);
-        window.app.navigateTo('menu');
-        window.sidebarController.renderLobby();
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Copy Code Button on Stage
-    document.getElementById('stageCopyCodeBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      const room = window.api.currentRoom;
-      if (room && room.code) {
-        navigator.clipboard?.writeText(room.code);
-        window.app.showToast('Скопировано', `Код комнаты ${room.code} скопирован в буфер!`, 'info');
-      }
-    });
-
-    // Listen to Room Messages in Lobby
-    window.api.on('room_message', (data) => {
-      if (!data || !data.message) return;
-      if (data.message.type === 'room_lobby') {
-        this.appendLobbyMessage(data.message);
       }
     });
   }
 
-  openCreateModal(defaultRole = 'master') {
+  showLobbyPanel() {
+    window.sidebarController.toggleSidebar(true);
+    window.sidebarController.switchTab('lobby');
+    window.sidebarController.renderLobby();
+  }
+
+  openCreateModal() {
     document.getElementById('createRoomOverlay')?.classList.add('open');
   }
 
@@ -5341,57 +3838,48 @@ class LobbyController {
   async refreshPublicRooms() {
     const listEl = document.getElementById('publicRoomsList');
     if (!listEl) return;
-    listEl.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Загрузка списка открытых комнат...</div>';
+    listEl.innerHTML = '<div class="list-hint">Загрузка списка комнат...</div>';
 
     try {
       const rooms = await window.api.getRooms();
       if (rooms.length === 0) {
-        listEl.innerHTML = `
-          <div style="text-align: center; color: var(--text-dim); padding: 30px;">
-            Нет активных открытых комнат. Создайте первую!
-          </div>
-        `;
+        listEl.innerHTML = '<div class="list-hint">Нет открытых комнат. Создайте первую.</div>';
         return;
       }
 
       listEl.innerHTML = rooms.map(r => `
-        <div class="public-room-item" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); margin-bottom: 10px;">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            ${window.renderAvatar(r.host_avatar, r.host_avatar_frame, 44)}
+        <div class="public-room-item">
+          <div class="pr-left">
+            ${window.renderAvatar(r.host_avatar, r.host_avatar_frame, 40)}
             <div>
-              <div style="font-size: 15px; font-weight: 700; color: #fff;">${r.title}</div>
-              <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
-                Мастер: <strong>${r.host_display_name}</strong> · Сеттинг: ${r.setting} · Код: <strong>${r.code}</strong>
-              </div>
+              <div class="pr-title">${r.title}</div>
+              <div class="pr-sub">Мастер: ${r.host_display_name} · ${r.setting} · код ${r.code}</div>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <span style="font-size: 13px; font-weight: 600; color: var(--cs-cyan);">${r.current_players}/${r.max_players} игроков</span>
+          <div class="pr-right">
+            <span class="pr-count">${r.current_players}/${r.max_players}</span>
             <button class="btn-primary btn-sm join-room-btn" data-room-id="${r.id}">Войти</button>
           </div>
         </div>
       `).join('');
 
       listEl.querySelectorAll('.join-room-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          window.sounds.playClick();
+        btn.addEventListener('click', async () => {
           if (!window.api.currentUser) {
             window.authController.openAuthModal();
             return;
           }
-          const roomId = btn.getAttribute('data-room-id');
           try {
-            await window.api.joinRoom(roomId);
+            await window.api.joinRoom(btn.getAttribute('data-room-id'));
             this.closeBrowseModal();
-            window.app.navigateTo('lobby');
-            window.sidebarController.renderLobby();
+            this.showLobbyPanel();
           } catch (err) {
             alert(err.message);
           }
         });
       });
     } catch (e) {
-      listEl.innerHTML = `<div style="color: var(--cs-red); padding: 20px;">Ошибка: ${e.message}</div>`;
+      listEl.innerHTML = `<div class="list-hint error">Ошибка: ${e.message}</div>`;
     }
   }
 
@@ -5402,137 +3890,11 @@ class LobbyController {
     }
     try {
       const room = await window.api.joinRoom(code);
-      window.sounds.playJoin();
-      window.app.navigateTo('lobby');
-      window.sidebarController.renderLobby();
-      window.app.showToast('Успешный вход', `Вы присоединились к лобби ${room.title}`, 'info');
+      this.showLobbyPanel();
+      window.app.showToast('Вход выполнен', `Вы в лобби «${room.title}»`, 'info');
     } catch (err) {
       alert(err.message);
     }
-  }
-
-  openCharCustomizeModal() {
-    const room = window.api.currentRoom;
-    const user = window.api.currentUser;
-    if (!room || !user) return;
-    const member = room.members?.find(m => m.user_id === user.id);
-
-    document.getElementById('charCustName').value = (member && member.character_name) || user.display_name;
-    document.getElementById('charCustClass').value = (member && member.character_class) || 'Боевой Маг';
-    document.getElementById('charCustHp').value = (member && member.hp) || 20;
-
-    document.getElementById('charCustomizeOverlay')?.classList.add('open');
-  }
-
-  closeCharCustomizeModal() {
-    document.getElementById('charCustomizeOverlay')?.classList.remove('open');
-  }
-
-  // Render Full Screen Lobby Stage
-  renderFullLobbyStage() {
-    const room = window.api.currentRoom;
-    const user = window.api.currentUser;
-    if (!room) return;
-
-    document.getElementById('stageRoomTitle').textContent = room.title;
-    document.getElementById('stageRoomDesc').textContent = room.description || `Сеттинг: ${room.setting} · Макс. игроков: ${room.max_players}`;
-    document.getElementById('stageRoomCode').textContent = room.code;
-
-    const isHost = user && room.host_user_id === user.id;
-    const myMember = room.members?.find(m => m.user_id === user?.id);
-    const isReady = myMember ? myMember.is_ready === 1 : false;
-
-    // Stage Ready & Start buttons
-    const readyBtn = document.getElementById('stageReadyBtn');
-    if (readyBtn) {
-      readyBtn.classList.toggle('ready', isReady);
-      readyBtn.innerHTML = isReady ? `<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg><span>ГОТОВ К ИГРЕ</span>` : '<span>ГОТОВ</span>';
-    }
-
-    const startBtn = document.getElementById('stageStartBtn');
-    if (startBtn) {
-      startBtn.style.display = isHost ? 'inline-flex' : 'none';
-    }
-
-    // Render Podiums Grid
-    const grid = document.getElementById('stagePodiumsGrid');
-    if (!grid) return;
-
-    const maxPlayers = room.max_players || 5;
-    const membersBySlot = {};
-    (room.members || []).forEach(m => {
-      membersBySlot[m.slot_index] = m;
-    });
-
-    let html = '';
-    for (let i = 0; i < maxPlayers; i++) {
-      const m = membersBySlot[i];
-      if (m) {
-        const isMaster = m.role === 'master' || m.user_id === room.host_user_id;
-        html += `
-          <div class="podium-card ${m.is_ready ? 'ready-state' : ''}" data-user-id="${m.user_id}">
-            ${isMaster ? `<div class="podium-crown" title="Мастер/Хост"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg></div>` : ''}
-            <div class="podium-avatar-wrap">
-              ${window.renderAvatar(m.avatar, m.avatar_frame, 80)}
-            </div>
-            <div>
-              <div class="podium-player-name">${m.display_name}</div>
-              <div class="podium-char-class">${m.character_class || 'Авантюрист'} (HP: ${m.hp})</div>
-            </div>
-            <div class="podium-status-pill ${m.is_ready ? 'ready' : ''}">
-              ${m.is_ready ? 'ГОТОВ' : 'НЕ ГОТОВ'}
-            </div>
-          </div>
-        `;
-      } else {
-        html += `
-          <div class="podium-empty-card" data-slot="${i}">
-            <div class="empty-card-plus">+</div>
-            <div class="empty-card-text">Свободный слот</div>
-          </div>
-        `;
-      }
-    }
-
-    grid.innerHTML = html;
-
-    grid.querySelectorAll('.podium-empty-card').forEach(el => {
-      el.addEventListener('click', () => {
-        window.sounds.playClick();
-        window.sidebarController.toggleSidebar(true);
-        window.sidebarController.switchTab('friends');
-      });
-    });
-
-    // Fetch and render initial lobby chat
-    this.loadLobbyChat(room.id);
-  }
-
-  async loadLobbyChat(roomId) {
-    const feed = document.getElementById('lobbyChatFeed');
-    if (!feed) return;
-    try {
-      const messages = await window.api.getRoomMessages(roomId);
-      feed.innerHTML = '';
-      messages.filter(m => m.type === 'room_lobby').forEach(m => this.appendLobbyMessage(m));
-    } catch (e) {}
-  }
-
-  appendLobbyMessage(msg) {
-    const feed = document.getElementById('lobbyChatFeed');
-    if (!feed) return;
-    const timeStr = new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const el = document.createElement('div');
-    el.className = 'lobby-chat-item';
-    el.style.cssText = 'display: flex; gap: 8px; font-size: 13px; line-height: 1.4; margin-bottom: 6px;';
-    el.innerHTML = `
-      <span style="font-weight: 700; color: var(--cs-cyan);">${msg.from_user.display_name}:</span>
-      <span style="color: #e2e8f0; flex: 1;">${msg.content}</span>
-      <span style="font-size: 10px; color: var(--text-dim);">${timeStr}</span>
-    `;
-    feed.appendChild(el);
-    feed.scrollTop = feed.scrollHeight;
   }
 }
 
@@ -5540,420 +3902,43 @@ window.lobbyController = new LobbyController();
 
 </script>
   <script>
-/* js/game.js */
-/**
- * In-Game Session Controller (Master & Player RPG Experience)
- */
-class GameController {
-  constructor() {
-    this.init();
-  }
-
-  init() {
-    this.bindEvents();
-    this.listenWebSockets();
-  }
-
-  bindEvents() {
-    // Dice Quick Roll Buttons (d4, d6, d8, d10, d12, d20, d100)
-    document.querySelectorAll('.dice-quick-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        window.sounds.playClick();
-        const diceType = btn.getAttribute('data-dice') || 'd20';
-        const modInput = document.getElementById('diceModifier');
-        const reasonInput = document.getElementById('diceReason');
-        const modifier = parseInt(modInput?.value) || 0;
-        const reason = reasonInput?.value || (diceType === 'd20' ? 'Проверка навыка / Атака' : 'Бросок урона');
-
-        if (window.api.currentRoom) {
-          window.sounds.playDiceRoll();
-          try {
-            await window.api.rollDice(window.api.currentRoom.id, diceType, 1, modifier, reason);
-          } catch (err) {
-            alert(err.message);
-          }
-        }
-      });
-    });
-
-    // In-game Feed Send Form
-    document.getElementById('gameFeedForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('gameFeedInput');
-      const text = input.value.trim();
-      if (!text || !window.api.currentRoom) return;
-      window.sounds.playClick();
-      input.value = '';
-
-      // Check if command like /roll
-      if (text.startsWith('/roll') || text.startsWith('/r ')) {
-        const parts = text.split(' ');
-        const diceStr = parts[1] || 'd20';
-        window.sounds.playDiceRoll();
-        try {
-          await window.api.rollDice(window.api.currentRoom.id, diceStr.startsWith('d') ? diceStr : 'd20', 1, 0, 'Бросок чата');
-        } catch (err) {
-          alert(err.message);
-        }
-        return;
-      }
-
-      try {
-        await window.api.sendRoomMessage(window.api.currentRoom.id, text, 'room_game');
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Master Story Broadcast Form
-    document.getElementById('dmBroadcastForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('dmStoryText');
-      const text = input.value.trim();
-      if (!text || !window.api.currentRoom) return;
-      window.sounds.playClick();
-      input.value = '';
-
-      try {
-        await window.api.updateGameState(window.api.currentRoom.id, {
-          broadcastStoryText: text
-        });
-        window.app.showToast('Мастер', 'Событие отправлено всем игрокам', 'info');
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Master Edit Scene Modal
-    document.getElementById('dmEditSceneBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      this.openEditSceneModal();
-    });
-
-    document.getElementById('editSceneForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      window.sounds.playClick();
-      const title = document.getElementById('esSceneTitle').value;
-      const desc = document.getElementById('esSceneDesc').value;
-      const loc = document.getElementById('esSceneLoc').value;
-      const atm = document.getElementById('esSceneAtm').value;
-
-      if (window.api.currentRoom) {
-        try {
-          await window.api.updateGameState(window.api.currentRoom.id, {
-            scene: {
-              title,
-              description: desc,
-              location: loc,
-              atmosphere: atm
-            }
-          });
-          this.closeEditSceneModal();
-          this.renderGameBoard();
-          window.app.showToast('Сцена обновлена', 'Новое описание видно всем игрокам', 'info');
-        } catch (err) {
-          alert(err.message);
-        }
-      }
-    });
-  }
-
-  listenWebSockets() {
-    window.api.on('game_state_updated', (data) => {
-      if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
-        window.api.currentRoom = data.room;
-        this.renderGameBoard();
-      }
-    });
-
-    window.api.on('room_message', (data) => {
-      if (!data || !data.message) return;
-      if (data.message.type === 'room_game' || data.message.type === 'dice' || data.message.type === 'story') {
-        this.appendGameFeedItem(data.message);
-      }
-    });
-  }
-
-  renderGameBoard() {
-    const room = window.api.currentRoom;
-    const user = window.api.currentUser;
-    if (!room) return;
-
-    const state = room.gameState || {};
-    const scene = state.scene || {
-      title: room.title,
-      description: 'Мастер начинает партию...',
-      location: 'Неизведанные земли',
-      atmosphere: 'Таинственная тишина'
-    };
-
-    // Render Scene Banner
-    document.getElementById('gameSceneTitle').textContent = scene.title || room.title;
-    document.getElementById('gameSceneDesc').textContent = scene.description;
-    document.getElementById('gameSceneLoc').innerHTML = `<svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span></span>`;
-    document.getElementById('gameSceneLoc').querySelector('span').textContent = scene.location || 'Локация';
-    document.getElementById('gameSceneAtm').innerHTML = `<svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"></path></svg><span></span>`;
-    document.getElementById('gameSceneAtm').querySelector('span').textContent = scene.atmosphere || 'Спокойная обстановка';
-
-    // Master narration box visibility
-    const isMaster = user && room.host_user_id === user.id;
-    const masterPanel = document.getElementById('dmMasterPanel');
-    if (masterPanel) {
-      masterPanel.style.display = isMaster ? 'flex' : 'none';
-    }
-
-    // Render Side Roster & HP
-    this.renderRoster(room);
-
-    // Load Game Feed
-    this.loadGameFeed(room.id);
-  }
-
-  renderRoster(room) {
-    const container = document.getElementById('gameRosterList');
-    if (!container) return;
-
-    const user = window.api.currentUser;
-    const isMaster = user && room.host_user_id === user.id;
-
-    container.innerHTML = (room.members || []).map(m => {
-      const isSelf = user && m.user_id === user.id;
-      const hpPct = Math.max(0, Math.min(100, Math.round((m.hp / m.max_hp) * 100)));
-      const fillClass = hpPct < 30 ? 'low' : (hpPct < 65 ? 'mid' : '');
-
-      return `
-        <div class="roster-card" data-user-id="${m.user_id}">
-          <div class="rc-top">
-            ${window.renderAvatar(m.avatar, m.avatar_frame, 40)}
-            <div class="rc-names">
-              <div class="rc-player">${m.display_name}</div>
-              <div class="rc-class">${m.character_class || 'Игрок'} (${m.character_name || m.display_name})</div>
-            </div>
-          </div>
-
-          <div class="hp-bar-track">
-            <div class="hp-bar-fill ${fillClass}" style="width: ${hpPct}%;"></div>
-          </div>
-
-          <div class="hp-controls-row">
-            <span>Здоровье: <strong>${m.hp} / ${m.max_hp} HP</strong></span>
-            ${(isSelf || isMaster) ? `
-              <div style="display: flex; gap: 4px;">
-                <button class="hp-btn-sm hp-minus-btn" data-user-id="${m.user_id}" data-hp="${m.hp}">-</button>
-                <button class="hp-btn-sm hp-plus-btn" data-user-id="${m.user_id}" data-hp="${m.hp}">+</button>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // HP Controls Click
-    container.querySelectorAll('.hp-minus-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        window.sounds.playClick();
-        const targetId = btn.getAttribute('data-user-id');
-        const curHp = parseInt(btn.getAttribute('data-hp')) || 20;
-        const newHp = Math.max(0, curHp - 1);
-        try {
-          await window.api.updateCharacter(room.id, { hp: newHp });
-        } catch (e) {}
-      });
-    });
-
-    container.querySelectorAll('.hp-plus-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        window.sounds.playClick();
-        const targetId = btn.getAttribute('data-user-id');
-        const curHp = parseInt(btn.getAttribute('data-hp')) || 20;
-        const newHp = curHp + 1;
-        try {
-          await window.api.updateCharacter(room.id, { hp: newHp });
-        } catch (e) {}
-      });
-    });
-  }
-
-  async loadGameFeed(roomId) {
-    const feed = document.getElementById('gameFeedList');
-    if (!feed) return;
-    try {
-      const messages = await window.api.getRoomMessages(roomId);
-      feed.innerHTML = '';
-      messages.filter(m => m.type !== 'room_lobby').forEach(m => this.appendGameFeedItem(m));
-    } catch (e) {}
-  }
-
-  appendGameFeedItem(msg) {
-    const feed = document.getElementById('gameFeedList');
-    if (!feed) return;
-    const timeStr = new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const item = document.createElement('div');
-
-    if (msg.type === 'dice') {
-      const extra = msg.extra_data || {};
-      const isCrit20 = extra.isCriticalSuccess;
-      const isCrit1 = extra.isCriticalFail;
-
-      if (isCrit20) window.sounds.playCritSuccess();
-      if (isCrit1) window.sounds.playCritFail();
-
-      item.className = `feed-msg-item dice-item ${isCrit20 ? 'crit-20' : (isCrit1 ? 'crit-1' : '')}`;
-      item.innerHTML = `
-        ${window.renderAvatar(msg.from_user.avatar, msg.from_user.avatar_frame, 36)}
-        <div class="feed-msg-content">
-          <div class="feed-msg-head">
-            <span class="feed-sender-name">${msg.from_user.display_name}</span>
-            <span class="feed-time">${timeStr}</span>
-          </div>
-          <div class="feed-text">${msg.content}</div>
-        </div>
-      `;
-    } else if (msg.type === 'story') {
-      item.className = 'feed-msg-item story-item';
-      item.style.cssText = 'background: rgba(255, 255, 255, 0.08); border-left: 3px solid var(--cs-amber); padding: 12px 16px; border-radius: var(--radius-md);';
-      item.innerHTML = `
-        <div class="feed-msg-content">
-          <div class="feed-msg-head">
-            <span style="font-weight: 800; color: var(--cs-amber);"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg> ПОВЕСТВОВАНИЕ МАСТЕРА:</span>
-            <span class="feed-time">${timeStr}</span>
-          </div>
-          <div class="feed-text" style="font-style: italic; color: #fde68a;">${msg.content}</div>
-        </div>
-      `;
-    } else {
-      item.className = 'feed-msg-item';
-      item.innerHTML = `
-        ${window.renderAvatar(msg.from_user.avatar, msg.from_user.avatar_frame, 36)}
-        <div class="feed-msg-content">
-          <div class="feed-msg-head">
-            <span class="feed-sender-name">${msg.from_user.display_name}</span>
-            <span class="feed-time">${timeStr}</span>
-          </div>
-          <div class="feed-text">${msg.content}</div>
-        </div>
-      `;
-    }
-
-    feed.appendChild(item);
-    feed.scrollTop = feed.scrollHeight;
-  }
-
-  openEditSceneModal() {
-    const room = window.api.currentRoom;
-    if (!room) return;
-    const scene = room.gameState?.scene || {};
-
-    document.getElementById('esSceneTitle').value = scene.title || room.title;
-    document.getElementById('esSceneDesc').value = scene.description || '';
-    document.getElementById('esSceneLoc').value = scene.location || 'Таверна';
-    document.getElementById('esSceneAtm').value = scene.atmosphere || 'Уютно и таинственно';
-
-    document.getElementById('editSceneOverlay')?.classList.add('open');
-  }
-
-  closeEditSceneModal() {
-    document.getElementById('editSceneOverlay')?.classList.remove('open');
-  }
-}
-
-window.gameController = new GameController();
-
-</script>
-  <script>
 /* js/app.js */
 /**
- * Main Application Orchestrator for MIR RPG
+ * Оркестратор приложения: единственный экран — главное меню.
+ * Лобби, друзья и приглашения живут в правой панели (sidebar.js).
  */
 class App {
   constructor() {
-    this.currentScreen = 'menu'; // 'menu' | 'lobby' | 'game'
-    this.settings = { sound: true, music: true };
-    this.init();
-  }
-
-  init() {
-    this.loadSettings();
     this.bindGlobalEvents();
     this.bindSettingsModal();
-    this.navigateTo('menu');
-  }
-
-  loadSettings() {
-    try {
-      const saved = localStorage.getItem('mir.settings');
-      if (saved) {
-        this.settings = { ...this.settings, ...JSON.parse(saved) };
-      }
-    } catch (e) {}
-
-    window.sounds.enabled = this.settings.sound;
-    window.sounds.musicEnabled = this.settings.music;
-  }
-
-  saveSettings() {
-    try {
-      localStorage.setItem('mir.settings', JSON.stringify(this.settings));
-    } catch (e) {}
+    document.body.classList.add('screen-menu');
   }
 
   bindGlobalEvents() {
-    // Logo Click -> Go to Main Menu
+    // Логотип — возврат к меню (меню и так единственный экран, просто закрываем модалки)
     document.getElementById('logoBrand')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      this.navigateTo('menu');
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
     });
 
-    // Nav Links
-    document.getElementById('navMenuBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      this.navigateTo('menu');
-    });
-
-    document.getElementById('navLobbyBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      if (window.api.currentRoom) {
-        this.navigateTo('lobby');
-      } else {
-        window.lobbyController.openBrowseModal();
-      }
-    });
-
-    document.getElementById('navGameBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      if (window.api.currentRoom) {
-        this.navigateTo('game');
-      } else {
-        this.showToast('Нет активной игры', 'Войдите в лобби и запустите партию', 'info');
-      }
-    });
-
-    // Header Invites / Notifications Bell
+    // Колокольчик уведомлений в шапке
     document.getElementById('headerNotifBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       window.sidebarController.toggleSidebar(true);
       window.sidebarController.switchTab('invites');
     });
 
-    // Close Modals on Overlay Click / Close Buttons
+    // Закрытие модальных окон
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          overlay.classList.remove('open');
-        }
+        if (e.target === overlay) overlay.classList.remove('open');
       });
     });
 
     document.querySelectorAll('.modal-close-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
-        const modal = btn.closest('.modal-overlay');
-        if (modal) modal.classList.remove('open');
+      btn.addEventListener('click', () => {
+        btn.closest('.modal-overlay')?.classList.remove('open');
       });
     });
 
-    // Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
@@ -5962,96 +3947,12 @@ class App {
   }
 
   bindSettingsModal() {
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsOverlay = document.getElementById('settingsOverlay');
-    const closeBtn = document.getElementById('closeSettings');
-
-    settingsBtn?.addEventListener('click', () => {
-      window.sounds.playClick();
-      settingsOverlay?.classList.add('open');
-    });
-
-    closeBtn?.addEventListener('click', () => {
-      window.sounds.playClick();
-      settingsOverlay?.classList.remove('open');
-    });
-
-    // Sound Toggle
-    const soundToggle = document.getElementById('soundToggle');
-    if (soundToggle) {
-      soundToggle.setAttribute('aria-checked', String(this.settings.sound));
-      soundToggle.addEventListener('click', () => {
-        this.settings.sound = !this.settings.sound;
-        soundToggle.setAttribute('aria-checked', String(this.settings.sound));
-        window.sounds.enabled = this.settings.sound;
-        this.saveSettings();
-        if (this.settings.sound) window.sounds.playClick();
-      });
-    }
-
-    // Music Toggle
-    const musicToggle = document.getElementById('musicToggle');
-    if (musicToggle) {
-      musicToggle.setAttribute('aria-checked', String(this.settings.music));
-      musicToggle.addEventListener('click', () => {
-        this.settings.music = !this.settings.music;
-        musicToggle.setAttribute('aria-checked', String(this.settings.music));
-        window.sounds.musicEnabled = this.settings.music;
-        this.saveSettings();
-        window.sounds.playClick();
-      });
-    }
-
-    // Fullscreen Toggle
-    const fsToggle = document.getElementById('fullscreenToggle');
-    if (fsToggle) {
-      fsToggle.addEventListener('click', () => {
-        window.sounds.playClick();
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen?.().catch(() => {});
-          fsToggle.setAttribute('aria-checked', 'true');
-        } else {
-          document.exitFullscreen?.();
-          fsToggle.setAttribute('aria-checked', 'false');
-        }
-      });
-    }
-
-    document.addEventListener('fullscreenchange', () => {
-      fsToggle?.setAttribute('aria-checked', String(!!document.fullscreenElement));
-    });
+    const overlay = document.getElementById('settingsOverlay');
+    document.getElementById('settingsBtn')?.addEventListener('click', () => overlay?.classList.add('open'));
+    document.getElementById('closeSettings')?.addEventListener('click', () => overlay?.classList.remove('open'));
   }
 
-  navigateTo(screen) {
-    this.currentScreen = screen;
-
-    // Body state class (used by CSS to keep the menu chrome minimal)
-    document.body.classList.remove('screen-menu', 'screen-lobby', 'screen-game');
-    document.body.classList.add(`screen-${screen}`);
-
-    // Toggle Nav Buttons Active
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      const s = btn.getAttribute('data-screen');
-      btn.classList.toggle('active', s === screen);
-    });
-
-    // Toggle Screen Elements
-    const menuEl = document.getElementById('screenMenu');
-    const lobbyEl = document.getElementById('screenLobby');
-    const gameEl = document.getElementById('screenGame');
-
-    if (menuEl) menuEl.style.display = screen === 'menu' ? 'flex' : 'none';
-    if (lobbyEl) lobbyEl.style.display = screen === 'lobby' ? 'flex' : 'none';
-    if (gameEl) gameEl.style.display = screen === 'game' ? 'flex' : 'none';
-
-    if (screen === 'lobby') {
-      window.lobbyController.renderFullLobbyStage();
-    } else if (screen === 'game') {
-      window.gameController.renderGameBoard();
-    }
-  }
-
-  // ================= Notification Toasts =================
+  // ================= Уведомления =================
   showToast(title, message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -6064,12 +3965,10 @@ class App {
         <div class="toast-msg">${message}</div>
       </div>
     `;
-
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateX(40px)';
       setTimeout(() => toast.remove(), 250);
     }, 4000);
   }
@@ -6081,9 +3980,7 @@ class App {
     const toast = document.createElement('div');
     toast.className = 'cs-toast invite-toast';
     toast.innerHTML = `
-      <div style="flex-shrink: 0;">
-        ${window.renderAvatar(invite.from_user?.avatar, invite.from_user?.avatar_frame, 40)}
-      </div>
+      <div>${window.renderAvatar(invite.from_user?.avatar, invite.from_user?.avatar_frame, 38)}</div>
       <div class="toast-content">
         <div class="toast-title">Приглашение в лобби</div>
         <div class="toast-msg"><strong>${invite.from_user?.display_name}</strong> приглашает вас в «${invite.room?.title}»</div>
@@ -6093,23 +3990,20 @@ class App {
         </div>
       </div>
     `;
-
     container.appendChild(toast);
 
     toast.querySelector('.toast-accept-btn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.respondInvite(invite.id, 'accept');
         toast.remove();
-        this.navigateTo('lobby');
-        window.sidebarController.renderLobby();
+        window.sidebarController.toggleSidebar(true);
+        window.sidebarController.switchTab('lobby');
       } catch (err) {
         alert(err.message);
       }
     });
 
     toast.querySelector('.toast-decline-btn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.respondInvite(invite.id, 'decline');
         toast.remove();
@@ -6117,11 +4011,7 @@ class App {
     });
 
     setTimeout(() => {
-      if (toast.parentNode) {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(40px)';
-        setTimeout(() => toast.remove(), 250);
-      }
+      if (toast.parentNode) toast.remove();
     }, 12000);
   }
 }
