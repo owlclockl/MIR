@@ -4,30 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MIR — меню игры</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #08090b;
-      --bg-soft: #0d0f12;
-      --surface: rgba(18, 20, 24, 0.86);
-      --surface-solid: #121418;
-      --surface-2: #181b20;
-      --stroke: rgba(255, 255, 255, 0.08);
-      --stroke-strong: rgba(255, 255, 255, 0.14);
-      --text: #f4f5f6;
-      --muted: #a8adb5;
-      --subtle: #707781;
+      --bg: #0a0a0a;
+      --bg-soft: #101012;
+      --surface: rgba(20, 20, 22, 0.9);
+      --surface-solid: #141416;
+      --surface-2: #1b1b1e;
+      --stroke: rgba(255, 255, 255, 0.1);
+      --stroke-strong: rgba(255, 255, 255, 0.18);
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --subtle: #71717a;
       --white: #ffffff;
-      --danger: #ff6b6b;
-      --ok: #66e3a6;
-      --warn: #d9d9d9;
-      --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+      --danger: #f87171;
+      --ok: #4ade80;
+      --warn: #d4d4d8;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
       --radius-xl: 28px;
-      --radius-lg: 20px;
+      --radius-lg: 24px;
       --radius-md: 14px;
       --radius-sm: 10px;
       --ease: cubic-bezier(.2, .7, .2, 1);
       --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
     }
 
     * {
@@ -44,9 +48,8 @@
       font-family: var(--font);
       color: var(--text);
       background:
-        radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.075), transparent 28%),
-        radial-gradient(circle at 78% 70%, rgba(255, 255, 255, 0.045), transparent 30%),
-        linear-gradient(135deg, #060709 0%, #101217 48%, #090a0d 100%);
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 34%),
+        #0a0a0a;
       overflow-x: hidden;
     }
 
@@ -56,10 +59,10 @@
       inset: 0;
       pointer-events: none;
       background-image:
-        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-      background-size: 68px 68px;
-      mask-image: radial-gradient(circle at 50% 42%, black, transparent 72%);
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(circle at 50% 38%, black, transparent 68%);
     }
 
     button,
@@ -101,8 +104,8 @@
       place-items: center;
       border: 1px solid var(--stroke);
       border-radius: 50%;
-      background: rgba(18, 20, 24, 0.78);
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.24);
+      background: rgba(20, 20, 22, 0.8);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
       backdrop-filter: blur(18px);
       transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
     }
@@ -110,7 +113,7 @@
     .settings-button:hover {
       transform: translateY(-1px) rotate(16deg);
       border-color: var(--stroke-strong);
-      background: rgba(28, 31, 37, 0.9);
+      background: rgba(30, 30, 33, 0.92);
     }
 
     .icon {
@@ -157,17 +160,20 @@
       display: grid;
       place-items: center;
       border: 1px solid var(--stroke-strong);
-      border-radius: 16px;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.03));
-      letter-spacing: -0.05em;
-      font-weight: 800;
+      border-radius: 15px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03));
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 24px;
     }
 
     .brand h1,
     .main-title {
       margin: 0;
-      letter-spacing: -0.07em;
-      line-height: .9;
+      font-family: var(--serif);
+      font-weight: 400;
+      letter-spacing: -0.03em;
+      line-height: .92;
     }
 
     .brand h1 {
@@ -183,7 +189,9 @@
 
     .brand p {
       margin: 0;
-      font-size: 14px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 17px;
     }
 
     .auth-tabs {
@@ -239,7 +247,7 @@
     }
 
     .input::placeholder {
-      color: rgba(168, 173, 181, 0.55);
+      color: rgba(161, 161, 170, 0.5);
     }
 
     .input:focus {
@@ -262,21 +270,27 @@
     }
 
     .primary-button {
-      min-height: 50px;
+      min-height: 52px;
+      border-radius: 999px;
       background: var(--white);
-      color: #0b0c0f;
-      font-weight: 700;
+      color: #0a0a0a;
+      font-weight: 650;
     }
 
-    .primary-button:hover,
+    .primary-button:hover {
+      transform: translateY(-1px);
+      background: #e4e4e7;
+    }
+
     .main-button:hover {
       transform: translateY(-1px);
     }
 
     .ghost-button {
       min-height: 42px;
-      padding: 0 14px;
+      padding: 0 16px;
       border: 1px solid var(--stroke);
+      border-radius: 999px;
       background: rgba(255, 255, 255, 0.035);
       color: var(--muted);
     }
@@ -305,7 +319,7 @@
     }
 
     .tiny-button.danger:hover {
-      border-color: rgba(255, 107, 107, 0.35);
+      border-color: rgba(248, 113, 113, 0.4);
       color: var(--danger);
     }
 
@@ -328,6 +342,8 @@
       width: min(520px, calc(100vw - 64px));
       min-height: 500px;
       border-radius: var(--radius-xl);
+      background: rgba(19, 19, 21, 0.92);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow);
       padding: 44px;
       display: grid;
       align-content: center;
@@ -337,13 +353,14 @@
 
     .main-title {
       font-size: clamp(64px, 11vw, 118px);
-      font-weight: 850;
     }
 
     .main-subtitle {
-      margin: 12px 0 34px;
-      font-size: 15px;
-      line-height: 1.6;
+      margin: 14px 0 36px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 21px;
+      line-height: 1.5;
     }
 
     .main-actions {
@@ -353,25 +370,30 @@
     }
 
     .main-button {
-      min-height: 66px;
-      padding: 0 20px;
-      border: 1px solid var(--stroke-strong);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.115), rgba(255, 255, 255, 0.045));
-      color: var(--text);
-      font-weight: 760;
-      letter-spacing: -0.02em;
-      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+      min-height: 68px;
+      padding: 0 22px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--white);
+      color: #0a0a0a;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+    }
+
+    .main-button:hover {
+      background: #e4e4e7;
     }
 
     .main-button.secondary {
-      background: rgba(255, 255, 255, 0.045);
-      color: var(--muted);
+      border-color: var(--stroke-strong);
+      background: #131315;
+      color: var(--text);
       box-shadow: none;
     }
 
     .main-button.secondary:hover {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.075);
+      background: #1c1c1f;
     }
 
     .session-note {
@@ -432,8 +454,8 @@
     .section,
     .room-card {
       border: 1px solid var(--stroke);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.035);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.03);
     }
 
     .profile-card {
@@ -461,10 +483,10 @@
       flex: 0 0 auto;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background:
-        radial-gradient(circle at 30% 24%, rgba(255,255,255,.38), transparent 26%),
-        linear-gradient(145deg, hsl(var(--hue) 12% 38%), hsl(var(--hue) 10% 18%));
+        radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.16), transparent 30%),
+        linear-gradient(145deg, #333336, #17171a);
       color: white;
-      font-weight: 780;
+      font-weight: 650;
       text-transform: uppercase;
       overflow: hidden;
     }
@@ -548,9 +570,9 @@
     .request-card,
     .room-card {
       padding: 10px;
-      border-radius: 15px;
-      background: rgba(0, 0, 0, 0.16);
-      border: 1px solid rgba(255, 255, 255, 0.055);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.028);
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .friend-card,
@@ -704,8 +726,8 @@
       padding: 13px 16px;
       border: 1px solid var(--stroke-strong);
       border-radius: 999px;
-      background: rgba(18, 20, 24, 0.92);
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+      background: rgba(20, 20, 23, 0.94);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
       color: var(--text);
       text-align: center;
       backdrop-filter: blur(16px);
@@ -793,7 +815,7 @@
     };
 
     function icon(name) {
-      return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || '') + '</svg>';
+      return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || '') + '</svg>';
     }
 
     function escapeHTML(value) {
