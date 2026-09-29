@@ -386,7 +386,7 @@ class SidebarController {
               </div>
             </div>
             <div class="slot-ready-indicator ${m.is_ready ? 'ready' : ''}">
-              ${m.is_ready ? '✓' : '...'}
+              ${m.is_ready ? '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg>' : '·'}
             </div>
           </div>
         `;
@@ -405,11 +405,11 @@ class SidebarController {
         <div class="lobby-status-banner">
           <div class="ls-top">
             <span class="ls-room-name">${room.title}</span>
-            <span class="ls-code-tag" id="sideCopyCodeBtn" title="Нажмите чтобы скопировать">${room.code} 📋</span>
+            <span class="ls-code-tag" id="sideCopyCodeBtn" title="Нажмите чтобы скопировать">${room.code} <svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
           </div>
           <div class="ls-info-row">
-            <span class="ls-pill">🎲 Сеттинг: ${room.setting}</span>
-            <span class="ls-pill">👥 Игроки: ${room.members.length}/${room.max_players}</span>
+            <span class="ls-pill"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"></circle></svg> Сеттинг: ${room.setting}</span>
+            <span class="ls-pill"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path></svg> Игроки: ${room.members.length}/${room.max_players}</span>
           </div>
         </div>
 
@@ -419,24 +419,24 @@ class SidebarController {
 
         <div class="lobby-actions-toolbar">
           <button class="btn-cs-ready ${isReady ? 'ready' : ''}" id="sideReadyBtn">
-            ${isReady ? '✓ ГОТОВ К ИГРЕ' : 'ГОТОВ'}
+            ${isReady ? '<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg> ГОТОВ К ИГРЕ' : 'ГОТОВ'}
           </button>
 
           ${isHost ? `
             <button class="btn-cs-start" id="sideStartGameBtn">
-              👑 ЗАПУСТИТЬ ПАРТИЮ
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg> ЗАПУСТИТЬ ПАРТИЮ
             </button>
           ` : ''}
 
           <div class="lobby-sub-actions">
             <button class="lobby-sub-btn" id="sideInviteFriendBtn">
-              ➕ Пригласить
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"></path></svg> Пригласить
             </button>
             <button class="lobby-sub-btn" id="sideCustomizeCharBtn">
-              🎭 Персонаж
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 7c0-1 1-2 2-2h14c1 0 2 1 2 2v4c0 5-4 9-9 9s-9-4-9-9z"></path><circle cx="9" cy="11" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15" cy="11" r="1.2" fill="currentColor" stroke="none"></circle></svg> Персонаж
             </button>
-            <button class="lobby-sub-btn" id="sideLeaveRoomBtn" style="color: #fca5a5;">
-              🚪 Выйти
+            <button class="lobby-sub-btn" id="sideLeaveRoomBtn" style="color: #e7b0b0;">
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg> Выйти
             </button>
           </div>
         </div>
@@ -577,16 +577,16 @@ class SidebarController {
             <div class="friend-actions">
               ${canInvite ? `
                 <button class="friend-action-btn invite-btn friend-invite-btn" data-friend-id="${f.id}" title="Пригласить в лобби">
-                  ➕
+                  <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"></path></svg>
                 </button>
               ` : ''}
               ${canJoin ? `
                 <button class="friend-action-btn invite-btn friend-join-btn" data-room-id="${f.currentRoom.id}" title="Присоединиться к лобби">
-                  🚪
+                  <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
                 </button>
               ` : ''}
               <button class="friend-action-btn friend-dm-btn" data-friend-id="${f.id}" title="Написать">
-                💬
+                <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"></path></svg>
               </button>
             </div>
           </div>
@@ -680,7 +680,7 @@ class SidebarController {
     if (!messages || messages.length === 0) {
       feed.innerHTML = `
         <div style="text-align: center; padding: 30px 10px; color: var(--text-dim); font-size: 12.5px;">
-          Начните диалог с ${this.activeDmFriend.display_name} 👋
+          Начните диалог с ${this.activeDmFriend.display_name}
         </div>
       `;
       return;

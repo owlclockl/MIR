@@ -58,8 +58,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 8px 16px;
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -70,7 +70,7 @@
 }
 .room-code-badge:hover {
   background: var(--cs-cyan);
-  color: #020617;
+  color: #0a0b0e;
 }
 
 /* Squad Podiums Grid */
@@ -98,8 +98,8 @@
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
 }
 .podium-card.ready-state {
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 .podium-card:hover {
   transform: translateY(-4px);
@@ -111,7 +111,7 @@
   top: 10px;
   right: 12px;
   color: var(--cs-gold);
-  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.8));
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.3));
 }
 
 .podium-avatar-wrap {
@@ -156,9 +156,9 @@
   gap: 6px;
 }
 .podium-status-pill.ready {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(255, 255, 255, 0.2);
+  color: #e6e7eb;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Empty Podium Card */
@@ -177,7 +177,7 @@
 }
 .podium-empty-card:hover {
   border-color: var(--cs-cyan);
-  background: rgba(56, 189, 248, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   transform: translateY(-4px);
 }
 .empty-card-plus {
@@ -235,7 +235,7 @@
 
 /* Scene Master Banner */
 .scene-banner {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+  background: linear-gradient(135deg, rgba(26, 27, 33, 0.9), rgba(17, 17, 20, 0.95));
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   padding: 24px;
@@ -253,7 +253,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--cs-amber), var(--cs-cyan), var(--cs-purple));
+  background: rgba(255, 255, 255, 0.14);
 }
 .scene-tag-row {
   display: flex;
@@ -290,8 +290,8 @@
 
 /* Master Narration Input Box (For DM) */
 .dm-master-panel {
-  background: rgba(245, 158, 11, 0.05);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-lg);
   padding: 16px;
   display: flex;
@@ -379,15 +379,15 @@
 
 /* Dice Roll Result Feed Item */
 .feed-msg-item.dice-item {
-  background: rgba(56, 189, 248, 0.05);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-lg);
   padding: 12px 16px;
 }
 .feed-msg-item.dice-item.crit-20 {
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.5);
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 .feed-msg-item.dice-item.crit-1 {
   background: rgba(239, 68, 68, 0.1);
@@ -399,14 +399,14 @@
   font-weight: 900;
   color: var(--cs-cyan);
   padding: 4px 10px;
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-md);
   display: inline-block;
   margin-top: 4px;
 }
 .dice-result-badge.crit-20 {
   color: var(--cs-gold);
-  background: rgba(251, 191, 36, 0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 .dice-result-badge.crit-1 {
   color: var(--cs-red);
@@ -465,13 +465,13 @@
   transform: translateY(-2px);
 }
 .dice-quick-btn.d20 {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(255, 255, 255, 0.3);
   color: var(--cs-cyan);
 }
 .dice-quick-btn.d20:hover {
   background: var(--cs-cyan);
-  color: #020617;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.5);
+  color: #0a0b0e;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 
 .dice-modifier-input {
@@ -550,12 +550,12 @@
 }
 .hp-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #34d399);
+  background: linear-gradient(90deg, #d5d7dd, #e6e7eb);
   border-radius: 999px;
   transition: width 300ms ease;
 }
-.hp-bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); }
-.hp-bar-fill.mid { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.hp-bar-fill.low { background: linear-gradient(90deg, #e07a7a, #e79a9a); }
+.hp-bar-fill.mid { background: linear-gradient(90deg, #d5d7dd, #e6e7eb); }
 
 .hp-controls-row {
   display: flex;

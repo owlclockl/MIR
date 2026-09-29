@@ -13,13 +13,21 @@
 <body>
 
   <div id="app">
+    <!-- Fixed settings gear — always top-left corner -->
+    <button class="corner-settings-btn" id="settingsBtn" title="Настройки" aria-label="Настройки">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+    </button>
+
     <!-- ================= Top Navigation Header ================= -->
     <header class="top-header">
       <div class="header-left">
         <div class="logo-brand" id="logoBrand" title="На главную">
           <div class="logo-icon">M</div>
           <span class="logo-text">МИР</span>
-          <span class="logo-badge">RPG</span>
+          
         </div>
 
         <nav class="nav-links">
@@ -83,13 +91,7 @@
           <div class="notif-badge" id="headerNotifBadge" style="display: none;">0</div>
         </button>
 
-        <!-- Settings Gear Button -->
-        <button class="header-icon-btn" id="settingsBtn" title="Настройки">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </button>
+        <!-- Settings moved to fixed top-left corner (see #settingsBtn) -->
       </div>
     </header>
 
@@ -101,54 +103,72 @@
 
         <!-- Screen 1: Main Menu -->
         <div class="menu-screen" id="screenMenu">
-          <div class="hero-section">
-            <h1 class="hero-title">МИР</h1>
-            <p class="hero-subtitle">Настольная ролевая игра с Мастером и онлайн-лобби</p>
-          </div>
-
-          <div class="hero-actions">
-            <!-- Master Role Button -->
-            <button class="role-card-btn master" id="masterRoleBtn">
-              <div class="role-card-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/>
+          <div class="menu-center">
+            <div class="hero-section">
+              <div class="hero-mark">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+                  <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2"></polygon>
+                  <path d="M12 22V12"></path><path d="M21 7l-9 5-9-5"></path>
                 </svg>
               </div>
-              <div class="role-card-content">
-                <div class="role-card-title">Мастер (Ведущий)</div>
-                <div class="role-card-desc">Создать лобби, настроить сюжет и управлять партией</div>
-              </div>
-              <svg class="role-card-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
+              <h1 class="hero-title">МИР</h1>
+              <p class="hero-subtitle">Настольная ролевая игра с Мастером и онлайн-лобби</p>
+            </div>
 
-            <!-- Player Role Button -->
-            <button class="role-card-btn player" id="playerRoleBtn">
-              <div class="role-card-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            <div class="hero-actions">
+              <!-- Master Role Button -->
+              <button class="role-card-btn master" id="masterRoleBtn">
+                <span class="role-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 18h16"></path>
+                    <path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path>
+                  </svg>
+                </span>
+                <span class="role-card-content">
+                  <span class="role-card-title">Мастер</span>
+                  <span class="role-card-desc">Создать лобби и вести партию</span>
+                </span>
+                <svg class="role-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
                 </svg>
-              </div>
-              <div class="role-card-content">
-                <div class="role-card-title">Игрок (Авантюрист)</div>
-                <div class="role-card-desc">Найти открытую комнату или подключиться по коду</div>
-              </div>
-              <svg class="role-card-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
+              </button>
+
+              <!-- Player Role Button -->
+              <button class="role-card-btn player" id="playerRoleBtn">
+                <span class="role-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                  </svg>
+                </span>
+                <span class="role-card-content">
+                  <span class="role-card-title">Игрок</span>
+                  <span class="role-card-desc">Найти комнату или войти по коду</span>
+                </span>
+                <svg class="role-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </button>
+
+              <!-- Join by code (centered, minimal) -->
+              <form class="menu-join-row" id="menuJoinForm">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <input type="text" id="menuJoinInput" placeholder="Код комнаты · MIR-XXXX" maxlength="10" />
+                <button type="submit" id="menuJoinBtn">Войти</button>
+              </form>
+            </div>
           </div>
 
           <div class="menu-footer-stats">
             <div class="stat-pill">
               <div class="dot"></div>
-              <span>Сервер онлайн · WebSockets 2.0</span>
+              <span>Сервер онлайн</span>
             </div>
-            <span>v0.2 · CS2 Social Hub</span>
+            <span>v0.2</span>
           </div>
         </div>
 
@@ -185,8 +205,8 @@
 
             <div style="display: flex; gap: 12px; align-items: center;">
               <button class="btn-cs-ready" id="stageReadyBtn" style="width: 200px;">ГОТОВ</button>
-              <button class="btn-cs-start" id="stageStartBtn" style="width: 220px; display: none;">👑 НАЧАТЬ ИГРУ</button>
-              <button class="btn-secondary" id="stageLeaveBtn" style="color: #fca5a5;">🚪 Выйти</button>
+              <button class="btn-cs-start" id="stageStartBtn" style="width: 220px; display: none;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>НАЧАТЬ ИГРУ</span></button>
+              <button class="btn-secondary" id="stageLeaveBtn" style="color: #e7b0b0;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg><span>Выйти</span></button>
             </div>
           </div>
         </div>
@@ -198,8 +218,8 @@
               <!-- Scene Master Banner -->
               <div class="scene-banner">
                 <div class="scene-tag-row">
-                  <span class="scene-loc-tag" id="gameSceneLoc">📍 Локация</span>
-                  <span class="scene-atmosphere" id="gameSceneAtm">✨ Атмосфера</span>
+                  <span class="scene-loc-tag" id="gameSceneLoc"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span>Локация</span></span>
+                  <span class="scene-atmosphere" id="gameSceneAtm"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"></path></svg><span>Атмосфера</span></span>
                 </div>
                 <h2 class="scene-title" id="gameSceneTitle">Заглавие текущей сцены</h2>
                 <p class="scene-desc" id="gameSceneDesc">Описание происходящего в текущем эпизоде...</p>
@@ -208,7 +228,7 @@
               <!-- Master DM Control Panel (Visible to Master) -->
               <div class="dm-master-panel" id="dmMasterPanel" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div class="dm-panel-title">👑 Панель Ведущего (Мастера)</div>
+                  <div class="dm-panel-title"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg><span>Панель Ведущего</span></div>
                   <button class="btn-secondary btn-sm" id="dmEditSceneBtn">Редактировать сцену</button>
                 </div>
                 <form id="dmBroadcastForm" class="dm-input-row">
@@ -233,7 +253,7 @@
               <!-- Dice Roller Dock Bar -->
               <div class="dice-dock-bar">
                 <div class="dice-buttons-set">
-                  <button class="dice-quick-btn d20" data-dice="d20">🎲 d20</button>
+                  <button class="dice-quick-btn d20" data-dice="d20"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"></circle></svg><span>d20</span></button>
                   <button class="dice-quick-btn" data-dice="d12">d12</button>
                   <button class="dice-quick-btn" data-dice="d10">d10</button>
                   <button class="dice-quick-btn" data-dice="d8">d8</button>
@@ -306,7 +326,7 @@
             <div class="sidebar-view-pane" id="sidePane-dms" style="display: none; flex-direction: column; height: 100%; width: 100%;">
               <div class="dm-chat-container">
                 <div class="dm-top-bar">
-                  <button class="btn-secondary btn-sm" id="dmBackBtn" style="padding: 4px 8px;">← Назад</button>
+                  <button class="btn-secondary btn-sm" id="dmBackBtn" style="padding: 4px 8px;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M15 18l-6-6 6-6"></path></svg><span>Назад</span></button>
                   <div id="dmPartnerAvatar"></div>
                   <span style="font-size: 13.5px; font-weight: 700; color: #fff;" id="dmPartnerName">Друг</span>
                 </div>
@@ -371,8 +391,8 @@
   <div class="modal-overlay" id="authOverlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Вход в МИР RPG</h3>
-        <button class="modal-close-btn" id="authCloseBtn">✕</button>
+        <h3>Вход в МИР</h3>
+        <button class="modal-close-btn" id="authCloseBtn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
 
       <div class="modal-tabs">
@@ -416,7 +436,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Статус в профиле</label>
-            <input type="text" id="regCustomStatus" placeholder="Готов к рейду в 20:00 🐉" value="Готов к новым приключениям! 🎲" />
+            <input type="text" id="regCustomStatus" placeholder="Готов к рейду в 20:00" value="Готов к новым приключениям!" />
           </div>
           <div class="form-group">
             <label class="form-label">Выберите аватар</label>
@@ -446,7 +466,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>Мой Профиль</h3>
-        <button class="modal-close-btn" id="profileCloseBtn">✕</button>
+        <button class="modal-close-btn" id="profileCloseBtn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <form id="profileForm" class="modal-body">
         <div style="display: flex; align-items: center; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle);">
@@ -496,8 +516,8 @@
   <div class="modal-overlay" id="createRoomOverlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>👑 Создать новую игру (Мастер)</h3>
-        <button class="modal-close-btn">✕</button>
+        <h3>Создать новую игру (Мастер)</h3>
+        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <form id="createRoomForm" class="modal-body">
         <div class="form-group">
@@ -512,10 +532,10 @@
           <div class="form-group">
             <label class="form-label">Сеттинг</label>
             <select id="crSetting">
-              <option value="Фэнтези">Фэнтези (D&D / Магия)</option>
-              <option value="Киберпанк">Киберпанк (Неон / Корпорации)</option>
-              <option value="Мистика">Мистика / Хоррор</option>
-              <option value="Космос">Космос / Науч-поп</option>
+              <option value="Фэнтези">Фэнтези · магия</option>
+              <option value="Киберпанк">Киберпанк · корпорации</option>
+              <option value="Мистика">Мистика · хоррор</option>
+              <option value="Космос">Космос · sci-fi</option>
               <option value="Авторский">Авторский мир</option>
             </select>
           </div>
@@ -524,7 +544,7 @@
             <select id="crMaxPlayers">
               <option value="3">3 игрока</option>
               <option value="4">4 игрока</option>
-              <option value="5" selected>5 игроков (Стандарт CS2)</option>
+              <option value="5" selected>5 игроков (стандарт)</option>
               <option value="6">6 игроков</option>
               <option value="8">8 игроков</option>
             </select>
@@ -552,7 +572,7 @@
     <div class="modal-card" style="width: min(680px, 100%);">
       <div class="modal-header">
         <h3>Открытые комнаты и партии</h3>
-        <button class="modal-close-btn">✕</button>
+        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <div class="modal-body">
         <div id="publicRoomsList"></div>
@@ -564,8 +584,8 @@
   <div class="modal-overlay" id="charCustomizeOverlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>🎭 Настройка персонажа</h3>
-        <button class="modal-close-btn">✕</button>
+        <h3>Настройка персонажа</h3>
+        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <form id="charCustomizeForm" class="modal-body">
         <div class="form-group">
@@ -590,7 +610,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>Редактировать сцену</h3>
-        <button class="modal-close-btn">✕</button>
+        <button class="modal-close-btn"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <form id="editSceneForm" class="modal-body">
         <div class="form-group">
@@ -619,7 +639,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>Настройки</h3>
-        <button class="modal-close-btn" id="closeSettings">✕</button>
+        <button class="modal-close-btn" id="closeSettings"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
       </div>
       <div class="modal-body">
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">

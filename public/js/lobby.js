@@ -35,6 +35,14 @@ class LobbyController {
       }
     });
 
+    // Join by code from the centered main-menu field
+    document.getElementById('menuJoinForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.sounds.playClick();
+      const code = document.getElementById('menuJoinInput').value.trim();
+      if (code) this.joinByCode(code);
+    });
+
     // Create Room Form Submit
     document.getElementById('createRoomForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -286,7 +294,7 @@ class LobbyController {
     const readyBtn = document.getElementById('stageReadyBtn');
     if (readyBtn) {
       readyBtn.classList.toggle('ready', isReady);
-      readyBtn.textContent = isReady ? '✓ ГОТОВ К ИГРЕ' : 'ГОТОВИТЬСЯ (ГОТОВ)';
+      readyBtn.innerHTML = isReady ? `<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg><span>ГОТОВ К ИГРЕ</span>` : '<span>ГОТОВ</span>';
     }
 
     const startBtn = document.getElementById('stageStartBtn');
@@ -311,7 +319,7 @@ class LobbyController {
         const isMaster = m.role === 'master' || m.user_id === room.host_user_id;
         html += `
           <div class="podium-card ${m.is_ready ? 'ready-state' : ''}" data-user-id="${m.user_id}">
-            ${isMaster ? '<div class="podium-crown" title="Мастер/Хост">👑</div>' : ''}
+            ${isMaster ? `<div class="podium-crown" title="Мастер/Хост"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg></div>` : ''}
             <div class="podium-avatar-wrap">
               ${window.renderAvatar(m.avatar, m.avatar_frame, 80)}
             </div>
@@ -320,7 +328,7 @@ class LobbyController {
               <div class="podium-char-class">${m.character_class || 'Авантюрист'} (HP: ${m.hp})</div>
             </div>
             <div class="podium-status-pill ${m.is_ready ? 'ready' : ''}">
-              ${m.is_ready ? '✓ ГОТОВ' : 'НЕ ГОТОВ'}
+              ${m.is_ready ? 'ГОТОВ' : 'НЕ ГОТОВ'}
             </div>
           </div>
         `;

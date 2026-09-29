@@ -160,6 +160,10 @@ class App {
   navigateTo(screen) {
     this.currentScreen = screen;
 
+    // Body state class (used by CSS to keep the menu chrome minimal)
+    document.body.classList.remove('screen-menu', 'screen-lobby', 'screen-game');
+    document.body.classList.add(`screen-${screen}`);
+
     // Toggle Nav Buttons Active
     document.querySelectorAll('.nav-btn').forEach(btn => {
       const s = btn.getAttribute('data-screen');

@@ -16,8 +16,8 @@ const AvatarIcons = {
       <!-- Shadow face -->
       <path d="M32 50 C32 68 40 76 50 76 C60 76 68 68 68 50 C58 48 42 48 32 50 Z" fill="#0f0728"/>
       <!-- Glowing Eyes -->
-      <ellipse cx="42" cy="56" rx="4" ry="2.5" fill="#a855f7" />
-      <ellipse cx="58" cy="56" rx="4" ry="2.5" fill="#a855f7" />
+      <ellipse cx="42" cy="56" rx="4" ry="2.5" fill="#d5d7dd" />
+      <ellipse cx="58" cy="56" rx="4" ry="2.5" fill="#d5d7dd" />
       <circle cx="42" cy="56" r="1.5" fill="#ffffff" />
       <circle cx="58" cy="56" r="1.5" fill="#ffffff" />
       <!-- Beard/Rune -->
@@ -30,7 +30,7 @@ const AvatarIcons = {
     <svg viewBox="0 0 100 100" class="avatar-svg">
       <defs>
         <radialGradient id="dragGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ef4444" stop-opacity="0.9"/>
+          <stop offset="0%" stop-color="#e07a7a" stop-opacity="0.9"/>
           <stop offset="100%" stop-color="#450a0a" stop-opacity="1"/>
         </radialGradient>
       </defs>
@@ -42,14 +42,14 @@ const AvatarIcons = {
       <path d="M36 34 L50 24 L64 34 L72 64 L50 86 L28 64 Z" fill="#991b1b"/>
       <path d="M40 48 L50 40 L60 48 L50 78 Z" fill="#7f1d1d"/>
       <!-- Reptile Eyes -->
-      <polygon points="34,44 44,48 36,52" fill="#fbbf24"/>
-      <polygon points="66,44 56,48 64,52" fill="#fbbf24"/>
+      <polygon points="34,44 44,48 36,52" fill="#e6e7eb"/>
+      <polygon points="66,44 56,48 64,52" fill="#e6e7eb"/>
       <line x1="39" y1="44" x2="39" y2="52" stroke="#451a03" stroke-width="2"/>
       <line x1="61" y1="44" x2="61" y2="52" stroke="#451a03" stroke-width="2"/>
       <!-- Nostrils / Fire -->
       <circle cx="46" cy="68" r="2" fill="#450a0a"/>
       <circle cx="54" cy="68" r="2" fill="#450a0a"/>
-      <path d="M46 72 Q50 82 54 72" stroke="#f59e0b" stroke-width="2" fill="none"/>
+      <path d="M46 72 Q50 82 54 72" stroke="#d5d7dd" stroke-width="2" fill="none"/>
     </svg>`,
 
   knight: `
@@ -62,13 +62,13 @@ const AvatarIcons = {
       </defs>
       <circle cx="50" cy="50" r="48" fill="url(#kniGlow)" />
       <!-- Plume -->
-      <path d="M48 8 C54 8 68 12 72 26 C64 22 56 22 48 24 Z" fill="#3b82f6"/>
+      <path d="M48 8 C54 8 68 12 72 26 C64 22 56 22 48 24 Z" fill="#d5d7dd"/>
       <!-- Helmet -->
       <path d="M28 36 C28 20 72 20 72 36 L74 68 C74 80 50 88 50 88 C50 88 26 80 26 68 Z" fill="#334155"/>
       <!-- Visor -->
       <path d="M30 44 L70 44 L66 60 L50 64 L34 60 Z" fill="#1e293b"/>
       <!-- Visor Slit -->
-      <rect x="36" y="49" width="28" height="4" rx="2" fill="#38bdf8"/>
+      <rect x="36" y="49" width="28" height="4" rx="2" fill="#e6e7eb"/>
       <!-- Rivets -->
       <circle cx="34" cy="38" r="2" fill="#94a3b8"/>
       <circle cx="66" cy="38" r="2" fill="#94a3b8"/>
@@ -79,7 +79,7 @@ const AvatarIcons = {
     <svg viewBox="0 0 100 100" class="avatar-svg">
       <defs>
         <radialGradient id="rogGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#10b981" stop-opacity="0.5"/>
+          <stop offset="0%" stop-color="#d5d7dd" stop-opacity="0.5"/>
           <stop offset="100%" stop-color="#022c22" stop-opacity="1"/>
         </radialGradient>
       </defs>
@@ -88,12 +88,12 @@ const AvatarIcons = {
       <path d="M50 16 C30 16 22 36 22 64 C36 78 64 78 78 64 C78 36 70 16 50 16 Z" fill="#064e3b"/>
       <path d="M28 46 C36 44 44 44 50 48 C56 44 64 44 72 46 C74 64 68 76 50 82 C32 76 26 64 28 46 Z" fill="#022c22"/>
       <!-- Eyes slit -->
-      <ellipse cx="40" cy="48" rx="5" ry="2.5" fill="#34d399"/>
-      <ellipse cx="60" cy="48" rx="5" ry="2.5" fill="#34d399"/>
+      <ellipse cx="40" cy="48" rx="5" ry="2.5" fill="#e6e7eb"/>
+      <ellipse cx="60" cy="48" rx="5" ry="2.5" fill="#e6e7eb"/>
       <circle cx="40" cy="48" r="1.5" fill="#ffffff"/>
       <circle cx="60" cy="48" r="1.5" fill="#ffffff"/>
       <!-- Dagger icon on mask -->
-      <polygon points="50,60 52,68 50,72 48,68" fill="#10b981"/>
+      <polygon points="50,60 52,68 50,72 48,68" fill="#d5d7dd"/>
     </svg>`,
 
   sorceress: `
@@ -147,7 +147,7 @@ const AvatarIcons = {
     <svg viewBox="0 0 100 100" class="avatar-svg">
       <defs>
         <radialGradient id="cybGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.8"/>
+          <stop offset="0%" stop-color="#c9cbd3" stop-opacity="0.8"/>
           <stop offset="100%" stop-color="#083344" stop-opacity="1"/>
         </radialGradient>
       </defs>
@@ -158,7 +158,7 @@ const AvatarIcons = {
       <!-- Oni Cyber Mask -->
       <path d="M30 48 L70 48 L66 80 L50 88 L34 80 Z" fill="#1e293b"/>
       <!-- Glowing Neon Visor -->
-      <polygon points="34,54 66,54 62,62 38,62" fill="#06b6d4"/>
+      <polygon points="34,54 66,54 62,62 38,62" fill="#c9cbd3"/>
       <!-- Cyber Teeth / Grid -->
       <line x1="42" y1="72" x2="42" y2="78" stroke="#22d3ee" stroke-width="2"/>
       <line x1="50" y1="72" x2="50" y2="78" stroke="#22d3ee" stroke-width="2"/>
@@ -182,13 +182,13 @@ const AvatarIcons = {
       <!-- Face -->
       <path d="M36 40 C36 62 44 72 50 72 C56 72 64 62 64 40 Z" fill="#fef3c7"/>
       <!-- Emerald Eyes -->
-      <ellipse cx="43" cy="50" rx="3.5" ry="2.5" fill="#059669"/>
-      <ellipse cx="57" cy="50" rx="3.5" ry="2.5" fill="#059669"/>
+      <ellipse cx="43" cy="50" rx="3.5" ry="2.5" fill="#9ea1ab"/>
+      <ellipse cx="57" cy="50" rx="3.5" ry="2.5" fill="#9ea1ab"/>
       <circle cx="44" cy="49" r="1" fill="#fff"/>
       <circle cx="58" cy="49" r="1" fill="#fff"/>
       <!-- Circlet -->
-      <path d="M34 34 Q50 38 66 34" stroke="#10b981" stroke-width="2.5" fill="none"/>
-      <polygon points="50,32 53,37 50,40 47,37" fill="#34d399"/>
+      <path d="M34 34 Q50 38 66 34" stroke="#d5d7dd" stroke-width="2.5" fill="none"/>
+      <polygon points="50,32 53,37 50,40 47,37" fill="#e6e7eb"/>
     </svg>`,
 
   necro: `
@@ -219,7 +219,7 @@ const AvatarIcons = {
     <svg viewBox="0 0 100 100" class="avatar-svg">
       <defs>
         <radialGradient id="dwfGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#d97706" stop-opacity="0.8"/>
+          <stop offset="0%" stop-color="#9ea1ab" stop-opacity="0.8"/>
           <stop offset="100%" stop-color="#451a03" stop-opacity="1"/>
         </radialGradient>
       </defs>
@@ -232,13 +232,13 @@ const AvatarIcons = {
       <circle cx="50" cy="48" r="16" fill="#fcd34d"/>
       <circle cx="44" cy="44" r="2.5" fill="#27272a"/>
       <circle cx="56" cy="44" r="2.5" fill="#27272a"/>
-      <ellipse cx="50" cy="50" rx="5" ry="4" fill="#f59e0b"/>
+      <ellipse cx="50" cy="50" rx="5" ry="4" fill="#d5d7dd"/>
       <!-- Magnificent Braided Beard -->
       <path d="M28 52 C28 82 40 92 50 92 C60 92 72 82 72 52 C64 56 36 56 28 52 Z" fill="#b45309"/>
       <line x1="44" y1="58" x2="44" y2="86" stroke="#92400e" stroke-width="2.5"/>
       <line x1="56" y1="58" x2="56" y2="86" stroke="#92400e" stroke-width="2.5"/>
       <!-- Beard Ring -->
-      <rect x="46" y="82" width="8" height="4" fill="#fbbf24"/>
+      <rect x="46" y="82" width="8" height="4" fill="#e6e7eb"/>
     </svg>`,
 
   hunter: `
@@ -251,7 +251,7 @@ const AvatarIcons = {
       </defs>
       <circle cx="50" cy="50" r="48" fill="url(#huntGlow)" />
       <!-- Feather & Hat -->
-      <path d="M60 10 Q74 14 78 28 Q66 22 56 20 Z" fill="#dc2626"/>
+      <path d="M60 10 Q74 14 78 28 Q66 22 56 20 Z" fill="#c96a6a"/>
       <path d="M24 38 C32 20 68 20 76 38 L84 46 L16 46 Z" fill="#365314"/>
       <!-- Face & Scarf -->
       <circle cx="50" cy="50" r="16" fill="#fed7aa"/>
@@ -264,7 +264,7 @@ const AvatarIcons = {
     <svg viewBox="0 0 100 100" class="avatar-svg">
       <defs>
         <radialGradient id="artGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#0284c7" stop-opacity="0.8"/>
+          <stop offset="0%" stop-color="#9ea1ab" stop-opacity="0.8"/>
           <stop offset="100%" stop-color="#082f49" stop-opacity="1"/>
         </radialGradient>
       </defs>
@@ -272,15 +272,15 @@ const AvatarIcons = {
       <!-- Leather Cap -->
       <path d="M28 36 C28 20 72 20 72 36 L74 52 L26 52 Z" fill="#78350f"/>
       <!-- Steampunk Goggles -->
-      <circle cx="38" cy="44" r="10" fill="#d97706" stroke="#b45309" stroke-width="2"/>
-      <circle cx="62" cy="44" r="10" fill="#d97706" stroke="#b45309" stroke-width="2"/>
-      <circle cx="38" cy="44" r="7" fill="#38bdf8"/>
-      <circle cx="62" cy="44" r="7" fill="#38bdf8"/>
+      <circle cx="38" cy="44" r="10" fill="#9ea1ab" stroke="#b45309" stroke-width="2"/>
+      <circle cx="62" cy="44" r="10" fill="#9ea1ab" stroke="#b45309" stroke-width="2"/>
+      <circle cx="38" cy="44" r="7" fill="#e6e7eb"/>
+      <circle cx="62" cy="44" r="7" fill="#e6e7eb"/>
       <circle cx="36" cy="42" r="2.5" fill="#ffffff"/>
       <circle cx="60" cy="42" r="2.5" fill="#ffffff"/>
       <line x1="48" y1="44" x2="52" y2="44" stroke="#78350f" stroke-width="4"/>
       <!-- Smirk & Gear -->
-      <circle cx="50" cy="74" r="8" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,2"/>
+      <circle cx="50" cy="74" r="8" fill="none" stroke="#d5d7dd" stroke-width="2" stroke-dasharray="3,2"/>
     </svg>`
 };
 

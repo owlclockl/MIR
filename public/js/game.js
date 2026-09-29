@@ -147,8 +147,10 @@ class GameController {
     // Render Scene Banner
     document.getElementById('gameSceneTitle').textContent = scene.title || room.title;
     document.getElementById('gameSceneDesc').textContent = scene.description;
-    document.getElementById('gameSceneLoc').textContent = `📍 ${scene.location || 'Локация'}`;
-    document.getElementById('gameSceneAtm').textContent = `✨ ${scene.atmosphere || 'Спокойная обстановка'}`;
+    document.getElementById('gameSceneLoc').innerHTML = `<svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span></span>`;
+    document.getElementById('gameSceneLoc').querySelector('span').textContent = scene.location || 'Локация';
+    document.getElementById('gameSceneAtm').innerHTML = `<svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"></path></svg><span></span>`;
+    document.getElementById('gameSceneAtm').querySelector('span').textContent = scene.atmosphere || 'Спокойная обстановка';
 
     // Master narration box visibility
     const isMaster = user && room.host_user_id === user.id;
@@ -267,11 +269,11 @@ class GameController {
       `;
     } else if (msg.type === 'story') {
       item.className = 'feed-msg-item story-item';
-      item.style.cssText = 'background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--cs-amber); padding: 12px 16px; border-radius: var(--radius-md);';
+      item.style.cssText = 'background: rgba(255, 255, 255, 0.08); border-left: 3px solid var(--cs-amber); padding: 12px 16px; border-radius: var(--radius-md);';
       item.innerHTML = `
         <div class="feed-msg-content">
           <div class="feed-msg-head">
-            <span style="font-weight: 800; color: var(--cs-amber);">👑 ПОВЕСТВОВАНИЕ МАСТЕРА:</span>
+            <span style="font-weight: 800; color: var(--cs-amber);"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 18h16"></path><path d="M4 15l-1.2-8L8 11l4-6 4 6 5.2-4-1.2 8z"></path></svg> ПОВЕСТВОВАНИЕ МАСТЕРА:</span>
             <span class="feed-time">${timeStr}</span>
           </div>
           <div class="feed-text" style="font-style: italic; color: #fde68a;">${msg.content}</div>
