@@ -1,0 +1,1577 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MIR — меню игры</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08090b;
+      --bg-soft: #0d0f12;
+      --surface: rgba(18, 20, 24, 0.86);
+      --surface-solid: #121418;
+      --surface-2: #181b20;
+      --stroke: rgba(255, 255, 255, 0.08);
+      --stroke-strong: rgba(255, 255, 255, 0.14);
+      --text: #f4f5f6;
+      --muted: #a8adb5;
+      --subtle: #707781;
+      --white: #ffffff;
+      --danger: #ff6b6b;
+      --ok: #66e3a6;
+      --warn: #d9d9d9;
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+      --ease: cubic-bezier(.2, .7, .2, 1);
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.075), transparent 28%),
+        radial-gradient(circle at 78% 70%, rgba(255, 255, 255, 0.045), transparent 30%),
+        linear-gradient(135deg, #060709 0%, #101217 48%, #090a0d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 68px 68px;
+      mask-image: radial-gradient(circle at 50% 42%, black, transparent 72%);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid rgba(255, 255, 255, 0.65);
+      outline-offset: 3px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+      transform: none !important;
+    }
+
+    .app {
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .settings-button {
+      position: fixed;
+      z-index: 50;
+      top: 24px;
+      left: 24px;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--stroke);
+      border-radius: 50%;
+      background: rgba(18, 20, 24, 0.78);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(18px);
+      transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+    }
+
+    .settings-button:hover {
+      transform: translateY(-1px) rotate(16deg);
+      border-color: var(--stroke-strong);
+      background: rgba(28, 31, 37, 0.9);
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .page-center {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+    }
+
+    .auth-card,
+    .center-card,
+    .modal-card,
+    .lobby-sidebar {
+      border: 1px solid var(--stroke);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+    }
+
+    .auth-card {
+      width: min(430px, 100%);
+      border-radius: var(--radius-xl);
+      padding: 32px;
+    }
+
+    .brand {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      margin-bottom: 26px;
+      text-align: center;
+    }
+
+    .brand-mark {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--stroke-strong);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.03));
+      letter-spacing: -0.05em;
+      font-weight: 800;
+    }
+
+    .brand h1,
+    .main-title {
+      margin: 0;
+      letter-spacing: -0.07em;
+      line-height: .9;
+    }
+
+    .brand h1 {
+      font-size: clamp(38px, 8vw, 64px);
+    }
+
+    .brand p,
+    .main-subtitle,
+    .muted,
+    .empty-text {
+      color: var(--muted);
+    }
+
+    .brand p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 5px;
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      margin-bottom: 20px;
+    }
+
+    .tab-button {
+      height: 40px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      transition: color .18s var(--ease), background .18s var(--ease);
+    }
+
+    .tab-button.active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.105);
+    }
+
+    .form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--subtle);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+
+    .input {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--text);
+      padding: 0 14px;
+      transition: border-color .18s var(--ease), background .18s var(--ease);
+    }
+
+    .input::placeholder {
+      color: rgba(168, 173, 181, 0.55);
+    }
+
+    .input:focus {
+      border-color: rgba(255, 255, 255, 0.24);
+      background: rgba(255, 255, 255, 0.07);
+      outline: none;
+    }
+
+    .primary-button,
+    .ghost-button,
+    .tiny-button,
+    .main-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: var(--radius-md);
+      transition: transform .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease), opacity .18s var(--ease);
+      user-select: none;
+    }
+
+    .primary-button {
+      min-height: 50px;
+      background: var(--white);
+      color: #0b0c0f;
+      font-weight: 700;
+    }
+
+    .primary-button:hover,
+    .main-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .ghost-button {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+    }
+
+    .ghost-button:hover {
+      border-color: var(--stroke-strong);
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.065);
+    }
+
+    .tiny-button {
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tiny-button:hover {
+      border-color: var(--stroke-strong);
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .tiny-button.danger:hover {
+      border-color: rgba(255, 107, 107, 0.35);
+      color: var(--danger);
+    }
+
+    .hint {
+      margin: 12px 0 0;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .game-layout {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 382px 32px 32px;
+    }
+
+    .center-card {
+      width: min(520px, calc(100vw - 64px));
+      min-height: 500px;
+      border-radius: var(--radius-xl);
+      padding: 44px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .main-title {
+      font-size: clamp(64px, 11vw, 118px);
+      font-weight: 850;
+    }
+
+    .main-subtitle {
+      margin: 12px 0 34px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .main-actions {
+      width: min(330px, 100%);
+      display: grid;
+      gap: 12px;
+    }
+
+    .main-button {
+      min-height: 66px;
+      padding: 0 20px;
+      border: 1px solid var(--stroke-strong);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.115), rgba(255, 255, 255, 0.045));
+      color: var(--text);
+      font-weight: 760;
+      letter-spacing: -0.02em;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+    }
+
+    .main-button.secondary {
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--muted);
+      box-shadow: none;
+    }
+
+    .main-button.secondary:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.075);
+    }
+
+    .session-note {
+      margin-top: 22px;
+      color: var(--subtle);
+      font-size: 12px;
+    }
+
+    .lobby-sidebar {
+      position: fixed;
+      z-index: 20;
+      top: 16px;
+      right: 16px;
+      width: 342px;
+      max-width: calc(100vw - 32px);
+      height: calc(100vh - 32px);
+      border-radius: 24px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .sidebar-head,
+    .section-head,
+    .row,
+    .profile-row,
+    .room-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-head {
+      justify-content: space-between;
+    }
+
+    .sidebar-title {
+      display: grid;
+      gap: 2px;
+    }
+
+    .sidebar-title strong,
+    .section-head strong {
+      font-size: 14px;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-title span,
+    .section-head span,
+    .small {
+      color: var(--subtle);
+      font-size: 12px;
+    }
+
+    .profile-card,
+    .section,
+    .room-card {
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .profile-card {
+      padding: 12px;
+    }
+
+    .profile-row {
+      justify-content: space-between;
+    }
+
+    .profile-main {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background:
+        radial-gradient(circle at 30% 24%, rgba(255,255,255,.38), transparent 26%),
+        linear-gradient(145deg, hsl(var(--hue) 12% 38%), hsl(var(--hue) 10% 18%));
+      color: white;
+      font-weight: 780;
+      text-transform: uppercase;
+      overflow: hidden;
+    }
+
+    .avatar.small-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      position: absolute;
+      right: -1px;
+      bottom: -1px;
+      width: 11px;
+      height: 11px;
+      border: 2px solid var(--surface-solid);
+      border-radius: 50%;
+      background: var(--subtle);
+    }
+
+    .status-dot.online {
+      background: var(--ok);
+    }
+
+    .name-stack {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+      text-align: left;
+    }
+
+    .name-stack strong,
+    .name-stack span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .name-stack strong {
+      font-size: 14px;
+    }
+
+    .name-stack span {
+      color: var(--subtle);
+      font-size: 12px;
+    }
+
+    .section {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .section-head {
+      justify-content: space-between;
+    }
+
+    .sidebar-scroll {
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      gap: 12px;
+      padding-right: 2px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar,
+    .modal-body::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-thumb,
+    .modal-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.13);
+      border-radius: 999px;
+    }
+
+    .friend-card,
+    .invite-card,
+    .request-card,
+    .room-card {
+      padding: 10px;
+      border-radius: 15px;
+      background: rgba(0, 0, 0, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.055);
+    }
+
+    .friend-card,
+    .invite-card,
+    .request-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .friend-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .friend-form .input {
+      min-height: 38px;
+      border-radius: 999px;
+      font-size: 13px;
+    }
+
+    .empty-text {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .room-card {
+      display: grid;
+      gap: 9px;
+    }
+
+    .room-line {
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .room-badge {
+      padding: 5px 8px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.055);
+      border: 1px solid var(--stroke);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .modal-layer {
+      position: fixed;
+      z-index: 80;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.58);
+      backdrop-filter: blur(10px);
+    }
+
+    .modal-card {
+      width: min(560px, 100%);
+      max-height: min(720px, calc(100vh - 48px));
+      border-radius: var(--radius-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 22px 22px 14px;
+      border-bottom: 1px solid var(--stroke);
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.04em;
+    }
+
+    .modal-body {
+      overflow: auto;
+      padding: 18px 22px 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .rule-box {
+      padding: 14px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .rule-box strong {
+      color: var(--text);
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 0;
+    }
+
+    .switch {
+      width: 48px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 3px;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .switch.active {
+      justify-content: flex-end;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .switch::before {
+      content: "";
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--text);
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 120;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      min-width: min(420px, calc(100vw - 32px));
+      padding: 13px 16px;
+      border: 1px solid var(--stroke-strong);
+      border-radius: 999px;
+      background: rgba(18, 20, 24, 0.92);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 920px) {
+      .game-layout {
+        min-height: auto;
+        padding: 96px 16px 24px;
+        place-items: start center;
+      }
+
+      .center-card {
+        min-height: 420px;
+        padding: 34px 24px;
+      }
+
+      .lobby-sidebar {
+        position: relative;
+        inset: auto;
+        width: min(520px, calc(100vw - 32px));
+        height: auto;
+        max-height: none;
+        margin: 0 auto 24px;
+      }
+
+      .app.game-active {
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Правило проекта: не добавлять лишние функции, экраны или декор без прямого запроса владельца. -->
+  <main id="app" class="app" aria-live="polite"></main>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script>
+    'use strict';
+
+    const STORAGE_KEY = 'mir.game.state.v1';
+    const SESSION_KEY = 'mir.game.session.v1';
+    const SETTINGS_KEY = 'mir.game.settings.v1';
+    const ACTIVE_LIMIT_MS = 5 * 60 * 1000;
+
+    const ui = {
+      authMode: 'login',
+      modal: null,
+      toastTimer: null
+    };
+
+    const app = document.getElementById('app');
+    const modalRoot = document.getElementById('modal-root');
+    const toastRoot = document.getElementById('toast-root');
+
+    const iconPaths = {
+      gear: '<path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2.06 2.06 0 0 1-2.91 2.91l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2.1 2.1 0 0 1-4.2 0v-.06A1.7 1.7 0 0 0 8.4 19.4a1.7 1.7 0 0 0-1.88.34l-.04.04a2.06 2.06 0 0 1-2.91-2.91l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2.1 2.1 0 0 1 0-4.2h.06A1.7 1.7 0 0 0 4.6 8.4a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2.06 2.06 0 0 1 2.91-2.91l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2.1 2.1 0 0 1 4.2 0v.06A1.7 1.7 0 0 0 15.6 4.6a1.7 1.7 0 0 0 1.88-.34l.04-.04a2.06 2.06 0 0 1 2.91 2.91l-.04.04A1.7 1.7 0 0 0 19.4 9c.24.38.6.72 1 .9.34.15.72.2 1.1.2H21a2.1 2.1 0 0 1 0 4.2h-.06A1.7 1.7 0 0 0 19.4 15Z"/>',
+      crown: '<path d="m3 7 4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7Z"/>',
+      play: '<path d="M8 5v14l11-7L8 5Z"/>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      userPlus: '<path d="M15 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+      mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2Z"/><path d="m22 6-10 7L2 6"/>',
+      door: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/>',
+      logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+      plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+      search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+      shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>'
+    };
+
+    function icon(name) {
+      return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || '') + '</svg>';
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      })[char]);
+    }
+
+    function now() {
+      return Date.now();
+    }
+
+    function uid(prefix) {
+      if (window.crypto && crypto.randomUUID) {
+        return prefix + '-' + crypto.randomUUID();
+      }
+      return prefix + '-' + Math.random().toString(36).slice(2) + '-' + now().toString(36);
+    }
+
+    function getDefaultStore() {
+      return {
+        version: 1,
+        users: {},
+        friendships: [],
+        friendRequests: [],
+        rooms: {}
+      };
+    }
+
+    function loadStore() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return getDefaultStore();
+        const parsed = JSON.parse(raw);
+        return {
+          ...getDefaultStore(),
+          ...parsed,
+          users: parsed.users || {},
+          friendships: Array.isArray(parsed.friendships) ? parsed.friendships : [],
+          friendRequests: Array.isArray(parsed.friendRequests) ? parsed.friendRequests : [],
+          rooms: parsed.rooms || {}
+        };
+      } catch (error) {
+        console.warn('Store reset after parse error:', error);
+        return getDefaultStore();
+      }
+    }
+
+    function saveStore(store) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    }
+
+    function loadSettings() {
+      try {
+        return { reduceMotion: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+      } catch {
+        return { reduceMotion: false };
+      }
+    }
+
+    function saveSettings(settings) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      document.documentElement.style.scrollBehavior = settings.reduceMotion ? 'auto' : '';
+    }
+
+    function getSessionUserId() {
+      return localStorage.getItem(SESSION_KEY);
+    }
+
+    function setSessionUserId(userId) {
+      localStorage.setItem(SESSION_KEY, userId);
+    }
+
+    function clearSession() {
+      localStorage.removeItem(SESSION_KEY);
+    }
+
+    function normalizeLogin(login) {
+      return String(login || '').trim().toLowerCase().replace(/\s+/g, '');
+    }
+
+    function getInitials(name) {
+      const cleaned = String(name || 'M').trim();
+      const parts = cleaned.split(/\s+/).filter(Boolean);
+      if (parts.length > 1) return (parts[0][0] + parts[1][0]).slice(0, 2).toUpperCase();
+      return cleaned.slice(0, 2).toUpperCase();
+    }
+
+    function getAvatarHue(seed) {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i += 1) hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      return Math.abs(hash) % 360;
+    }
+
+    function fallbackHash(text) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return ((h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0'));
+    }
+
+    async function hashPassword(password, salt) {
+      const text = salt + ':' + password;
+      if (window.crypto && crypto.subtle && window.TextEncoder) {
+        const bytes = new TextEncoder().encode(text);
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+      return fallbackHash(text);
+    }
+
+    function currentUser(store = loadStore()) {
+      return store.users[getSessionUserId()] || null;
+    }
+
+    function isOnline(user) {
+      return Boolean(user && (now() - Number(user.lastActive || 0) < ACTIVE_LIMIT_MS));
+    }
+
+    function getFriends(store, userId) {
+      return store.friendships
+        .filter(link => link.userA === userId || link.userB === userId)
+        .map(link => store.users[link.userA === userId ? link.userB : link.userA])
+        .filter(Boolean)
+        .sort((a, b) => Number(isOnline(b)) - Number(isOnline(a)) || a.displayName.localeCompare(b.displayName, 'ru'));
+    }
+
+    function areFriends(store, a, b) {
+      return store.friendships.some(link => (link.userA === a && link.userB === b) || (link.userA === b && link.userB === a));
+    }
+
+    function getIncomingFriendRequests(store, userId) {
+      return store.friendRequests.filter(request => request.toId === userId && request.status === 'pending');
+    }
+
+    function getOutgoingFriendRequests(store, userId) {
+      return store.friendRequests.filter(request => request.fromId === userId && request.status === 'pending');
+    }
+
+    function getOpenRooms(store) {
+      return Object.values(store.rooms).filter(room => room.status === 'open');
+    }
+
+    function getCurrentRoom(store, userId) {
+      return getOpenRooms(store)
+        .filter(room => room.members.includes(userId))
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null;
+    }
+
+    function getIncomingRoomInvites(store, userId) {
+      return getOpenRooms(store)
+        .flatMap(room => (room.invites || [])
+          .filter(invite => invite.toId === userId && invite.status === 'pending')
+          .map(invite => ({ ...invite, room })));
+    }
+
+    function markActive() {
+      const store = loadStore();
+      const user = currentUser(store);
+      if (!user) return;
+      user.lastActive = now();
+      saveStore(store);
+    }
+
+    function showToast(message) {
+      toastRoot.innerHTML = '<div class="toast" role="status">' + escapeHTML(message) + '</div>';
+      clearTimeout(ui.toastTimer);
+      ui.toastTimer = setTimeout(() => {
+        toastRoot.innerHTML = '';
+      }, 2800);
+    }
+
+    function setModal(name) {
+      ui.modal = name;
+      render();
+    }
+
+    function closeModal() {
+      ui.modal = null;
+      render();
+    }
+
+    async function registerAccount(form) {
+      const login = normalizeLogin(form.login.value);
+      const displayName = String(form.displayName.value || '').trim();
+      const password = String(form.password.value || '');
+      if (login.length < 3) return showToast('Логин должен быть от 3 символов.');
+      if (!/^[a-zа-яё0-9_.-]+$/i.test(login)) return showToast('В логине можно использовать буквы, цифры, точку, подчёркивание и дефис.');
+      if (password.length < 6) return showToast('Пароль должен быть от 6 символов.');
+
+      const store = loadStore();
+      const loginExists = Object.values(store.users).some(user => user.login === login);
+      if (loginExists) return showToast('Такой логин уже занят.');
+
+      const salt = uid('salt');
+      const user = {
+        id: uid('user'),
+        login,
+        displayName: displayName || login,
+        passwordHash: await hashPassword(password, salt),
+        salt,
+        avatarHue: getAvatarHue(login),
+        createdAt: now(),
+        lastActive: now()
+      };
+      store.users[user.id] = user;
+      saveStore(store);
+      setSessionUserId(user.id);
+      showToast('Аккаунт создан.');
+      render();
+    }
+
+    async function loginAccount(form) {
+      const login = normalizeLogin(form.login.value);
+      const password = String(form.password.value || '');
+      const store = loadStore();
+      const user = Object.values(store.users).find(item => item.login === login);
+      if (!user) return showToast('Аккаунт не найден.');
+      const hash = await hashPassword(password, user.salt);
+      if (hash !== user.passwordHash) return showToast('Неверный пароль.');
+      user.lastActive = now();
+      saveStore(store);
+      setSessionUserId(user.id);
+      showToast('Вход выполнен.');
+      render();
+    }
+
+    function logoutAccount() {
+      clearSession();
+      ui.modal = null;
+      showToast('Вы вышли из аккаунта.');
+      render();
+    }
+
+    function addFriend(login) {
+      const friendLogin = normalizeLogin(login);
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return;
+      const target = Object.values(store.users).find(user => user.login === friendLogin);
+      if (!target) return showToast('Пользователь не найден.');
+      if (target.id === me.id) return showToast('Нельзя добавить себя.');
+      if (areFriends(store, me.id, target.id)) return showToast('Этот игрок уже в друзьях.');
+      const pending = store.friendRequests.some(request => request.status === 'pending' && (
+        (request.fromId === me.id && request.toId === target.id) ||
+        (request.fromId === target.id && request.toId === me.id)
+      ));
+      if (pending) return showToast('Заявка уже ожидает ответа.');
+      store.friendRequests.push({
+        id: uid('friend-request'),
+        fromId: me.id,
+        toId: target.id,
+        status: 'pending',
+        createdAt: now()
+      });
+      saveStore(store);
+      showToast('Заявка отправлена.');
+      render();
+    }
+
+    function acceptFriendRequest(requestId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const request = store.friendRequests.find(item => item.id === requestId && item.toId === me?.id && item.status === 'pending');
+      if (!request) return showToast('Заявка не найдена.');
+      request.status = 'accepted';
+      if (!areFriends(store, request.fromId, request.toId)) {
+        store.friendships.push({ id: uid('friendship'), userA: request.fromId, userB: request.toId, createdAt: now() });
+      }
+      saveStore(store);
+      showToast('Друг добавлен.');
+      render();
+    }
+
+    function declineFriendRequest(requestId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const request = store.friendRequests.find(item => item.id === requestId && item.toId === me?.id && item.status === 'pending');
+      if (!request) return;
+      request.status = 'declined';
+      saveStore(store);
+      showToast('Заявка отклонена.');
+      render();
+    }
+
+    function leaveCurrentRooms(store, userId) {
+      getOpenRooms(store).forEach(room => {
+        if (!room.members.includes(userId)) return;
+        if (room.ownerId === userId) {
+          room.status = 'closed';
+          room.updatedAt = now();
+          return;
+        }
+        room.members = room.members.filter(memberId => memberId !== userId);
+        room.updatedAt = now();
+      });
+    }
+
+    function createMasterRoom() {
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return;
+      leaveCurrentRooms(store, me.id);
+      const room = {
+        id: uid('room'),
+        name: 'Комната ' + me.displayName,
+        ownerId: me.id,
+        role: 'master',
+        status: 'open',
+        members: [me.id],
+        invites: [],
+        createdAt: now(),
+        updatedAt: now()
+      };
+      store.rooms[room.id] = room;
+      saveStore(store);
+      showToast('Комната мастера создана. Пригласите друзей справа.');
+      render();
+    }
+
+    function closeCurrentRoom() {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me?.id);
+      if (!room) return;
+      if (room.ownerId === me.id) {
+        room.status = 'closed';
+      } else {
+        room.members = room.members.filter(memberId => memberId !== me.id);
+      }
+      room.updatedAt = now();
+      saveStore(store);
+      showToast(room.ownerId === me.id ? 'Комната закрыта.' : 'Вы вышли из комнаты.');
+      render();
+    }
+
+    function inviteFriend(friendId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me?.id);
+      if (!me || !room) return showToast('Сначала создайте комнату мастера.');
+      if (!areFriends(store, me.id, friendId)) return showToast('Можно приглашать только друзей.');
+      if (room.members.includes(friendId)) return showToast('Игрок уже в комнате.');
+      const existing = (room.invites || []).some(invite => invite.toId === friendId && invite.status === 'pending');
+      if (existing) return showToast('Приглашение уже отправлено.');
+      room.invites = room.invites || [];
+      room.invites.push({
+        id: uid('room-invite'),
+        roomId: room.id,
+        fromId: me.id,
+        toId: friendId,
+        status: 'pending',
+        createdAt: now()
+      });
+      room.updatedAt = now();
+      saveStore(store);
+      showToast('Приглашение отправлено.');
+      render();
+    }
+
+    function acceptRoomInvite(inviteId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const target = getIncomingRoomInvites(store, me?.id).find(invite => invite.id === inviteId);
+      if (!target) return showToast('Приглашение не найдено.');
+      leaveCurrentRooms(store, me.id);
+      const room = store.rooms[target.room.id];
+      const invite = room.invites.find(item => item.id === inviteId);
+      invite.status = 'accepted';
+      if (!room.members.includes(me.id)) room.members.push(me.id);
+      room.updatedAt = now();
+      saveStore(store);
+      ui.modal = null;
+      showToast('Вы вошли в комнату.');
+      render();
+    }
+
+    function declineRoomInvite(inviteId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const target = getIncomingRoomInvites(store, me?.id).find(invite => invite.id === inviteId);
+      if (!target) return;
+      const room = store.rooms[target.room.id];
+      const invite = room.invites.find(item => item.id === inviteId);
+      invite.status = 'declined';
+      room.updatedAt = now();
+      saveStore(store);
+      showToast('Приглашение отклонено.');
+      render();
+    }
+
+    function renderAuth() {
+      app.className = 'app';
+      app.innerHTML = `
+        <button class="settings-button" type="button" data-action="open-settings" aria-label="Настройки">${icon('gear')}</button>
+        <section class="page-center">
+          <div class="auth-card">
+            <div class="brand" aria-label="MIR">
+              <div class="brand-mark">M</div>
+              <h1>MIR</h1>
+              <p>минималистичное меню игры</p>
+            </div>
+            <div class="auth-tabs" role="tablist" aria-label="Аккаунт">
+              <button class="tab-button ${ui.authMode === 'login' ? 'active' : ''}" type="button" data-action="auth-mode" data-mode="login">Вход</button>
+              <button class="tab-button ${ui.authMode === 'register' ? 'active' : ''}" type="button" data-action="auth-mode" data-mode="register">Создать</button>
+            </div>
+            ${ui.authMode === 'login' ? renderLoginForm() : renderRegisterForm()}
+            <p class="hint">Аккаунты, друзья, комнаты и приглашения сохраняются локально в браузере.</p>
+          </div>
+        </section>
+      `;
+      renderModal();
+    }
+
+    function renderLoginForm() {
+      return `
+        <form class="form" data-form="login">
+          <div class="field">
+            <label for="login-name">Логин</label>
+            <input class="input" id="login-name" name="login" autocomplete="username" placeholder="например, master" required>
+          </div>
+          <div class="field">
+            <label for="login-password">Пароль</label>
+            <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="минимум 6 символов" required>
+          </div>
+          <button class="primary-button" type="submit">${icon('door')} Войти</button>
+        </form>
+      `;
+    }
+
+    function renderRegisterForm() {
+      return `
+        <form class="form" data-form="register">
+          <div class="field">
+            <label for="register-login">Логин</label>
+            <input class="input" id="register-login" name="login" autocomplete="username" placeholder="уникальный логин" required>
+          </div>
+          <div class="field">
+            <label for="register-name">Имя</label>
+            <input class="input" id="register-name" name="displayName" autocomplete="nickname" placeholder="как показывать в лобби">
+          </div>
+          <div class="field">
+            <label for="register-password">Пароль</label>
+            <input class="input" id="register-password" name="password" type="password" autocomplete="new-password" placeholder="минимум 6 символов" required>
+          </div>
+          <button class="primary-button" type="submit">${icon('userPlus')} Создать аккаунт</button>
+        </form>
+      `;
+    }
+
+    function renderGame() {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me.id);
+      const friends = getFriends(store, me.id);
+      const incomingInvites = getIncomingRoomInvites(store, me.id);
+      app.className = 'app game-active';
+      app.innerHTML = `
+        <button class="settings-button" type="button" data-action="open-settings" aria-label="Настройки">${icon('gear')}</button>
+        <section class="game-layout" aria-label="Главное меню">
+          <div class="center-card">
+            <h1 class="main-title">MIR</h1>
+            <p class="main-subtitle">Главные действия находятся в центре. Интерфейс тёмный, спокойный и без лишнего шума.</p>
+            <div class="main-actions">
+              <button class="main-button" type="button" data-action="create-master-room">${icon('crown')} Мастер</button>
+              <button class="main-button secondary" type="button" data-action="open-player">${icon('play')} Игрок</button>
+            </div>
+            <div class="session-note">Аккаунт: ${escapeHTML(me.displayName)} · ${room ? 'в комнате' : 'без активной комнаты'}</div>
+          </div>
+        </section>
+        ${renderLobby(store, me, friends, room, incomingInvites)}
+      `;
+      renderModal();
+    }
+
+    function renderLobby(store, me, friends, room, incomingInvites) {
+      const incomingFriendRequests = getIncomingFriendRequests(store, me.id);
+      const outgoingFriendRequests = getOutgoingFriendRequests(store, me.id);
+      return `
+        <aside class="lobby-sidebar" aria-label="Лобби друзей">
+          <div class="sidebar-head">
+            <div class="sidebar-title">
+              <strong>Лобби</strong>
+              <span>друзья и приглашения</span>
+            </div>
+            <button class="tiny-button danger" type="button" data-action="logout" title="Выйти">${icon('logout')} Выйти</button>
+          </div>
+
+          <div class="profile-card">
+            <div class="profile-row">
+              <div class="profile-main">
+                ${renderAvatar(me, true)}
+                <div class="name-stack">
+                  <strong>${escapeHTML(me.displayName)}</strong>
+                  <span>@${escapeHTML(me.login)}</span>
+                </div>
+              </div>
+              <span class="room-badge">online</span>
+            </div>
+          </div>
+
+          <div class="sidebar-scroll">
+            <section class="section" aria-label="Текущая комната">
+              <div class="section-head">
+                <strong>Комната</strong>
+                ${room ? '<span>' + room.members.length + ' участник(а)</span>' : '<span>нет</span>'}
+              </div>
+              ${room ? renderRoomCard(store, room, me.id) : '<p class="empty-text">Нажмите «Мастер», чтобы создать комнату и пригласить друзей.</p>'}
+            </section>
+
+            <section class="section" aria-label="Добавить друга">
+              <div class="section-head">
+                <strong>Добавить друга</strong>
+                <span>по логину</span>
+              </div>
+              <form class="friend-form" data-form="add-friend">
+                <input class="input" name="login" placeholder="логин игрока" aria-label="Логин игрока" required>
+                <button class="tiny-button" type="submit">${icon('plus')} Добавить</button>
+              </form>
+            </section>
+
+            ${incomingFriendRequests.length ? renderFriendRequests(store, incomingFriendRequests) : ''}
+            ${incomingInvites.length ? renderRoomInvites(store, incomingInvites) : ''}
+
+            <section class="section" aria-label="Друзья">
+              <div class="section-head">
+                <strong>Друзья</strong>
+                <span>${friends.length}</span>
+              </div>
+              ${friends.length ? friends.map(friend => renderFriendCard(friend, room)).join('') : '<p class="empty-text">Список пуст. Создайте второй аккаунт, отправьте заявку по логину и примите её.</p>'}
+              ${outgoingFriendRequests.length ? '<p class="empty-text">Ожидают ответа: ' + outgoingFriendRequests.map(req => '@' + escapeHTML(store.users[req.toId]?.login || 'unknown')).join(', ') + '</p>' : ''}
+            </section>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderAvatar(user, online) {
+      return `
+        <div class="avatar${online ? '' : ' small-avatar'}" style="--hue:${Number(user.avatarHue || 0)}">
+          ${escapeHTML(getInitials(user.displayName || user.login))}
+          <span class="status-dot ${isOnline(user) ? 'online' : ''}" aria-label="${isOnline(user) ? 'online' : 'offline'}"></span>
+        </div>
+      `;
+    }
+
+    function renderRoomCard(store, room, currentUserId) {
+      const owner = store.users[room.ownerId];
+      const members = room.members.map(id => store.users[id]).filter(Boolean);
+      const isOwner = room.ownerId === currentUserId;
+      return `
+        <div class="room-card">
+          <div class="room-line">
+            <div class="name-stack">
+              <strong>${escapeHTML(room.name)}</strong>
+              <span>мастер: ${escapeHTML(owner?.displayName || 'unknown')}</span>
+            </div>
+            <span class="room-badge">${isOwner ? 'master' : 'player'}</span>
+          </div>
+          <div class="row" aria-label="Участники">
+            ${members.map(member => renderAvatar(member, false)).join('')}
+          </div>
+          <button class="tiny-button danger" type="button" data-action="close-room">${icon('x')} ${isOwner ? 'Закрыть' : 'Выйти'}</button>
+        </div>
+      `;
+    }
+
+    function renderFriendCard(friend, room) {
+      const canInvite = Boolean(room && !room.members.includes(friend.id));
+      return `
+        <article class="friend-card">
+          <div class="profile-row">
+            <div class="profile-main">
+              ${renderAvatar(friend, false)}
+              <div class="name-stack">
+                <strong>${escapeHTML(friend.displayName)}</strong>
+                <span>${isOnline(friend) ? 'online' : 'offline'} · @${escapeHTML(friend.login)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="tiny-button" type="button" data-action="invite-friend" data-friend-id="${escapeHTML(friend.id)}" ${canInvite ? '' : 'disabled'}>${icon('mail')} Пригласить</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderFriendRequests(store, requests) {
+      return `
+        <section class="section" aria-label="Заявки в друзья">
+          <div class="section-head">
+            <strong>Заявки</strong>
+            <span>${requests.length}</span>
+          </div>
+          ${requests.map(request => {
+            const from = store.users[request.fromId];
+            return `
+              <article class="request-card">
+                <div class="profile-row">
+                  <div class="profile-main">
+                    ${from ? renderAvatar(from, false) : ''}
+                    <div class="name-stack">
+                      <strong>${escapeHTML(from?.displayName || 'Игрок')}</strong>
+                      <span>хочет добавить вас</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <button class="tiny-button" type="button" data-action="accept-friend" data-request-id="${escapeHTML(request.id)}">${icon('check')} Принять</button>
+                  <button class="tiny-button danger" type="button" data-action="decline-friend" data-request-id="${escapeHTML(request.id)}">${icon('x')} Отклонить</button>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    function renderRoomInvites(store, invites) {
+      return `
+        <section class="section" aria-label="Приглашения в комнаты">
+          <div class="section-head">
+            <strong>Приглашения</strong>
+            <span>${invites.length}</span>
+          </div>
+          ${invites.map(invite => {
+            const from = store.users[invite.fromId];
+            return `
+              <article class="invite-card">
+                <div class="profile-row">
+                  <div class="profile-main">
+                    ${from ? renderAvatar(from, false) : ''}
+                    <div class="name-stack">
+                      <strong>${escapeHTML(invite.room.name)}</strong>
+                      <span>от ${escapeHTML(from?.displayName || 'игрока')}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <button class="tiny-button" type="button" data-action="accept-room" data-invite-id="${escapeHTML(invite.id)}">${icon('check')} Войти</button>
+                  <button class="tiny-button danger" type="button" data-action="decline-room" data-invite-id="${escapeHTML(invite.id)}">${icon('x')} Нет</button>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    function renderModal() {
+      if (!ui.modal) {
+        modalRoot.innerHTML = '';
+        return;
+      }
+      if (ui.modal === 'settings') return renderSettingsModal();
+      if (ui.modal === 'player') return renderPlayerModal();
+    }
+
+    function modalFrame(title, body) {
+      modalRoot.innerHTML = `
+        <div class="modal-layer" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}" data-action="modal-backdrop">
+          <section class="modal-card">
+            <header class="modal-head">
+              <h2>${escapeHTML(title)}</h2>
+              <button class="tiny-button" type="button" data-action="close-modal" aria-label="Закрыть">${icon('x')}</button>
+            </header>
+            <div class="modal-body">${body}</div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderSettingsModal() {
+      const settings = loadSettings();
+      modalFrame('Настройки', `
+        <div class="rule-box">
+          <strong>Правило проекта:</strong> не добавлять лишние функции, экраны, эффекты или декор без прямого запроса. Сохранять минимализм, тёмные серые/белые тона и понятную структуру.
+        </div>
+        <div class="switch-row">
+          <div class="name-stack">
+            <strong>Снизить анимации</strong>
+            <span>оставляет интерфейс спокойным и удобным</span>
+          </div>
+          <button class="switch ${settings.reduceMotion ? 'active' : ''}" type="button" data-action="toggle-motion" aria-label="Снизить анимации"></button>
+        </div>
+      `);
+    }
+
+    function renderPlayerModal() {
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return closeModal();
+      const invites = getIncomingRoomInvites(store, me.id);
+      const ownRoom = getCurrentRoom(store, me.id);
+      modalFrame('Игрок', `
+        <div class="rule-box">
+          Режим игрока показывает только реальные приглашения в комнаты. Публичных демо-комнат здесь нет.
+        </div>
+        ${ownRoom ? renderRoomCard(store, ownRoom, me.id) : ''}
+        ${invites.length ? renderRoomInvites(store, invites) : '<p class="empty-text">Приглашений пока нет. Когда друг создаст комнату и пригласит вас, она появится здесь и справа в лобби.</p>'}
+      `);
+    }
+
+    function render() {
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) {
+        renderAuth();
+      } else {
+        renderGame();
+      }
+    }
+
+    document.addEventListener('click', event => {
+      const actionElement = event.target.closest('[data-action]');
+      if (!actionElement) return;
+      const action = actionElement.dataset.action;
+
+      if (action === 'modal-backdrop' && event.target === actionElement) closeModal();
+      if (action === 'open-settings') setModal('settings');
+      if (action === 'close-modal') closeModal();
+      if (action === 'auth-mode') {
+        ui.authMode = actionElement.dataset.mode || 'login';
+        render();
+      }
+      if (action === 'logout') logoutAccount();
+      if (action === 'create-master-room') createMasterRoom();
+      if (action === 'open-player') setModal('player');
+      if (action === 'close-room') closeCurrentRoom();
+      if (action === 'invite-friend') inviteFriend(actionElement.dataset.friendId);
+      if (action === 'accept-friend') acceptFriendRequest(actionElement.dataset.requestId);
+      if (action === 'decline-friend') declineFriendRequest(actionElement.dataset.requestId);
+      if (action === 'accept-room') acceptRoomInvite(actionElement.dataset.inviteId);
+      if (action === 'decline-room') declineRoomInvite(actionElement.dataset.inviteId);
+      if (action === 'toggle-motion') {
+        const settings = loadSettings();
+        settings.reduceMotion = !settings.reduceMotion;
+        saveSettings(settings);
+        render();
+      }
+    });
+
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      const formName = form.dataset.form;
+      if (!formName) return;
+      event.preventDefault();
+      if (formName === 'login') loginAccount(form);
+      if (formName === 'register') registerAccount(form);
+      if (formName === 'add-friend') {
+        addFriend(form.login.value);
+        form.reset();
+      }
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && ui.modal) closeModal();
+    });
+
+    window.addEventListener('storage', event => {
+      if ([STORAGE_KEY, SESSION_KEY, SETTINGS_KEY].includes(event.key)) render();
+    });
+
+    setInterval(markActive, 45 * 1000);
+    saveSettings(loadSettings());
+    markActive();
+    render();
+  </script>
+</body>
+</html>
