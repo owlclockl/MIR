@@ -24,7 +24,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 // ==========================================
 // Map<userId, Set<WebSocket>>
 const userSockets = new Map();
-// Map<userId, { status: 'online'|'away'|'in_lobby'|'in_game', lastSeen: number, currentRoomId: string|null }>
+// Map<userId, { status: 'online'|'away'|'in_lobby', lastSeen: number, currentRoomId: string|null }>
 const userPresence = new Map();
 
 // Helper to get online status
@@ -127,18 +127,10 @@ function getRoomFullDetails(roomId) {
     ORDER BY rm.slot_index ASC
   `).all(room.id);
 
-  let parsedGameState = {};
-  try {
-    parsedGameState = JSON.parse(room.game_state || '{}');
-  } catch (e) {
-    parsedGameState = {};
-  }
-
   return {
     ...room,
     host,
-    members,
-    gameState: parsedGameState
+    members
   };
 }
 
@@ -502,7 +494,7 @@ app.get('/api/rooms', optionalAuth, (req, res) => {
 
 app.post('/api/rooms', authMiddleware, (req, res) => {
   const user = req.user;
-  let { title, description, setting, max_players, privacy, password, role, character_name, character_class } = req.body;
+  let { title, description, setting, max_players, privacy, password, role } = req.body;
 
   title = (title && title.trim()) || `Партия ${user.display_name}`;
   setting = setting || 'fantasy';
@@ -515,33 +507,16 @@ app.post('/api/rooms', authMiddleware, (req, res) => {
   const roomId = 'room_' + uuidv4().replace(/-/g, '').slice(0, 12);
   const now = Date.now();
 
-  const initialGameState = {
-    scene: {
-      title: title,
-      description: description || 'Добро пожаловать в игру! Мастер готовит описание первой локации...',
-      location: 'Стартовая локация',
-      atmosphere: 'Напряженная тишина перед великим приключением',
-      notes: 'Скрытые заметки Мастера доступны только ведущему.',
-      combatActive: false
-    },
-    log: [
-      { id: uuidv4(), type: 'system', text: `Комната создана Мастером ${user.display_name}`, time: now }
-    ]
-  };
-
   db.prepare(`
-    INSERT INTO rooms (id, code, title, description, host_user_id, setting, max_players, privacy, password, status, game_state, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_lobby', ?, ?, ?)
-  `).run(roomId, code, title, description || '', user.id, setting, max_players, privacy, password || '', JSON.stringify(initialGameState), now, now);
+    INSERT INTO rooms (id, code, title, description, host_user_id, setting, max_players, privacy, password, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_lobby', ?, ?)
+  `).run(roomId, code, title, description || '', user.id, setting, max_players, privacy, password || '', now, now);
 
   // Add host as slot 0
-  const charName = character_name || (role === 'master' ? `${user.display_name} (Мастер)` : user.display_name);
-  const charClass = character_class || (role === 'master' ? 'Ведущий' : 'Авантюрист');
-
   db.prepare(`
-    INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, character_name, character_class, hp, max_hp, joined_at)
-    VALUES (?, ?, ?, 0, ?, 1, ?, ?, 20, 20, ?)
-  `).run(uuidv4(), roomId, user.id, role, charName, charClass, now);
+    INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, joined_at)
+    VALUES (?, ?, ?, 0, ?, 1, ?)
+  `).run(uuidv4(), roomId, user.id, role, now);
 
   // Update presence
   userPresence.set(user.id, { status: 'in_lobby', currentRoomId: roomId });
@@ -560,7 +535,7 @@ app.get('/api/rooms/:idOrCode', optionalAuth, (req, res) => {
 app.post('/api/rooms/:id/join', authMiddleware, (req, res) => {
   const user = req.user;
   const roomId = req.params.id;
-  const { password, character_name, character_class, role } = req.body;
+  const { password, role } = req.body;
 
   const room = db.prepare('SELECT * FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
   if (!room) return res.status(404).json({ error: 'Комната не найдена' });
@@ -583,17 +558,15 @@ app.post('/api/rooms/:id/join', authMiddleware, (req, res) => {
     let nextSlot = 0;
     while (takenSlots.has(nextSlot)) nextSlot++;
 
-    const charName = character_name || user.display_name;
-    const charClass = character_class || 'Искатель приключений';
     const memberRole = role || (room.host_user_id === user.id ? 'master' : 'player');
 
     db.prepare(`
-      INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, character_name, character_class, hp, max_hp, joined_at)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 20, 20, ?)
-    `).run(uuidv4(), room.id, user.id, nextSlot, memberRole, charName, charClass, Date.now());
+      INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, joined_at)
+      VALUES (?, ?, ?, ?, ?, 0, ?)
+    `).run(uuidv4(), room.id, user.id, nextSlot, memberRole, Date.now());
   }
 
-  userPresence.set(user.id, { status: room.status === 'in_game' ? 'in_game' : 'in_lobby', currentRoomId: room.id });
+  userPresence.set(user.id, { status: 'in_lobby', currentRoomId: room.id });
   broadcastPresenceToFriends(user.id);
 
   const roomDetails = getRoomFullDetails(room.id);
@@ -693,74 +666,6 @@ app.post('/api/rooms/:id/kick', authMiddleware, (req, res) => {
   res.json({ room: roomDetails });
 });
 
-app.post('/api/rooms/:id/start', authMiddleware, (req, res) => {
-  const user = req.user;
-  const roomId = req.params.id;
-
-  const room = db.prepare('SELECT * FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  if (room.host_user_id !== user.id) {
-    return res.status(403).json({ error: 'Только Мастер может запустить сессию' });
-  }
-
-  db.prepare("UPDATE rooms SET status = 'in_game', updated_at = ? WHERE id = ?").run(Date.now(), room.id);
-
-  // Increment games_played / games_mastered
-  db.prepare('UPDATE users SET games_mastered = games_mastered + 1, games_played = games_played + 1 WHERE id = ?').run(user.id);
-  const otherMembers = db.prepare('SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ?').all(room.id, user.id);
-  for (const m of otherMembers) {
-    db.prepare('UPDATE users SET games_played = games_played + 1 WHERE id = ?').run(m.user_id);
-    userPresence.set(m.user_id, { status: 'in_game', currentRoomId: room.id });
-    broadcastPresenceToFriends(m.user_id);
-  }
-
-  userPresence.set(user.id, { status: 'in_game', currentRoomId: room.id });
-  broadcastPresenceToFriends(user.id);
-
-  const roomDetails = getRoomFullDetails(room.id);
-  broadcastToRoom(room.id, {
-    type: 'game_started',
-    room: roomDetails
-  });
-
-  res.json({ room: roomDetails });
-});
-
-app.post('/api/rooms/:id/update-char', authMiddleware, (req, res) => {
-  const user = req.user;
-  const roomId = req.params.id;
-  const { character_name, character_class, hp, max_hp, role } = req.body;
-
-  const room = db.prepare('SELECT id FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  const member = db.prepare('SELECT * FROM room_members WHERE room_id = ? AND user_id = ?').get(room.id, user.id);
-  if (!member) return res.status(400).json({ error: 'Вы не состоите в этой комнате' });
-
-  const nextName = character_name !== undefined ? character_name : member.character_name;
-  const nextClass = character_class !== undefined ? character_class : member.character_class;
-  const nextHp = hp !== undefined ? hp : member.hp;
-  const nextMaxHp = max_hp !== undefined ? max_hp : member.max_hp;
-  const nextRole = role !== undefined ? role : member.role;
-
-  db.prepare(`
-    UPDATE room_members
-    SET character_name = ?, character_class = ?, hp = ?, max_hp = ?, role = ?
-    WHERE id = ?
-  `).run(nextName, nextClass, nextHp, nextMaxHp, nextRole, member.id);
-
-  const roomDetails = getRoomFullDetails(room.id);
-  broadcastToRoom(room.id, {
-    type: 'room_char_updated',
-    userId: user.id,
-    room: roomDetails
-  });
-
-  res.json({ room: roomDetails });
-});
-
-// 4. Invites
 app.get('/api/invites', authMiddleware, (req, res) => {
   const invites = db.prepare(`
     SELECT ri.id, ri.status, ri.created_at, r.id as room_id, r.code as room_code, r.title as room_title, r.setting, r.status as room_status,
@@ -830,9 +735,9 @@ app.post('/api/rooms/:id/invite', authMiddleware, (req, res) => {
         const botUser = db.prepare('SELECT * FROM users WHERE id = ?').get(friendId);
         if (botUser) {
           db.prepare(`
-            INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, character_name, character_class, hp, max_hp, joined_at)
-            VALUES (?, ?, ?, ?, 'player', 1, ?, ?, 20, 20, ?)
-          `).run(uuidv4(), room.id, botUser.id, nextSlot, botUser.display_name, 'Искатель приключений', Date.now());
+            INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, joined_at)
+            VALUES (?, ?, ?, ?, 'player', 1, ?)
+          `).run(uuidv4(), room.id, botUser.id, nextSlot, Date.now());
 
           db.prepare("UPDATE room_invites SET status = 'accepted' WHERE id = ?").run(inviteId);
 
@@ -843,40 +748,6 @@ app.post('/api/rooms/:id/invite', authMiddleware, (req, res) => {
             room: updatedRoom
           });
 
-          // Send greeting message in room chat
-          const msgId = uuidv4();
-          const greetings = [
-            'Салют! Готов к приключениям, что замышляем? ⚔️',
-            'Привет всем! Я в деле, меч уже наточен!',
-            'Приветствую! Магия готова к бою 🔮',
-            'Йоу! Наконец-то собрались, начинаем? 🎲'
-          ];
-          const greetText = greetings[Math.floor(Math.random() * greetings.length)];
-
-          db.prepare(`
-            INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-            VALUES (?, 'room_lobby', ?, ?, NULL, ?, '{}', ?)
-          `).run(msgId, room.id, botUser.id, greetText, Date.now());
-
-          broadcastToRoom(room.id, {
-            type: 'room_message',
-            message: {
-              id: msgId,
-              type: 'room_lobby',
-              room_id: room.id,
-              from_user: {
-                id: botUser.id,
-                username: botUser.username,
-                display_name: botUser.display_name,
-                avatar: botUser.avatar,
-                avatar_frame: botUser.avatar_frame,
-                role_title: botUser.role_title
-              },
-              content: greetText,
-              extra_data: {},
-              created_at: Date.now()
-            }
-          });
         }
       }
     }, 2200);
@@ -909,12 +780,12 @@ app.post('/api/invites/respond', authMiddleware, (req, res) => {
       while (takenSlots.has(nextSlot)) nextSlot++;
 
       db.prepare(`
-        INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, character_name, character_class, hp, max_hp, joined_at)
-        VALUES (?, ?, ?, ?, 'player', 0, ?, 'Искатель приключений', 20, 20, ?)
-      `).run(uuidv4(), room.id, user.id, nextSlot, user.display_name, Date.now());
+        INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, joined_at)
+        VALUES (?, ?, ?, ?, 'player', 0, ?)
+      `).run(uuidv4(), room.id, user.id, nextSlot, Date.now());
     }
 
-    userPresence.set(user.id, { status: room.status === 'in_game' ? 'in_game' : 'in_lobby', currentRoomId: room.id });
+    userPresence.set(user.id, { status: 'in_lobby', currentRoomId: room.id });
     broadcastPresenceToFriends(user.id);
 
     const roomDetails = getRoomFullDetails(room.id);
@@ -932,314 +803,6 @@ app.post('/api/invites/respond', authMiddleware, (req, res) => {
 });
 
 // 5. In-Game Session, Chat & Dice
-app.get('/api/rooms/:id/messages', authMiddleware, (req, res) => {
-  const roomId = req.params.id;
-  const room = db.prepare('SELECT id FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  const messages = db.prepare(`
-    SELECT m.*, u.username, u.display_name, u.avatar, u.avatar_frame, u.role_title
-    FROM messages m
-    JOIN users u ON u.id = m.from_user_id
-    WHERE m.room_id = ?
-    ORDER BY m.created_at ASC
-    LIMIT 100
-  `).all(room.id);
-
-  const formatted = messages.map(m => {
-    let extra = {};
-    try { extra = JSON.parse(m.extra_data || '{}'); } catch(e){}
-    return {
-      id: m.id,
-      type: m.type,
-      room_id: m.room_id,
-      from_user: {
-        id: m.from_user_id,
-        username: m.username,
-        display_name: m.display_name,
-        avatar: m.avatar,
-        avatar_frame: m.avatar_frame,
-        role_title: m.role_title
-      },
-      content: m.content,
-      extra_data: extra,
-      created_at: m.created_at
-    };
-  });
-
-  res.json({ messages: formatted });
-});
-
-app.post('/api/rooms/:id/messages', authMiddleware, (req, res) => {
-  const user = req.user;
-  const roomId = req.params.id;
-  const { content, type, extra_data } = req.body;
-
-  if (!content || !content.trim()) return res.status(400).json({ error: 'Сообщение не может быть пустым' });
-
-  const room = db.prepare('SELECT id FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  const msgId = uuidv4();
-  const now = Date.now();
-  const msgType = type || (room.status === 'in_game' ? 'room_game' : 'room_lobby');
-  const extraStr = JSON.stringify(extra_data || {});
-
-  db.prepare(`
-    INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-    VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
-  `).run(msgId, msgType, room.id, user.id, content.trim(), extraStr, now);
-
-  const msgPayload = {
-    id: msgId,
-    type: msgType,
-    room_id: room.id,
-    from_user: {
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      avatar: user.avatar,
-      avatar_frame: user.avatar_frame,
-      role_title: user.role_title
-    },
-    content: content.trim(),
-    extra_data: extra_data || {},
-    created_at: now
-  };
-
-  broadcastToRoom(room.id, {
-    type: 'room_message',
-    message: msgPayload
-  });
-
-  res.json({ message: msgPayload });
-});
-
-app.post('/api/rooms/:id/roll', authMiddleware, (req, res) => {
-  const user = req.user;
-  const roomId = req.params.id;
-  let { diceType, count, modifier, reason } = req.body;
-
-  diceType = diceType || 'd20';
-  count = Math.min(10, Math.max(1, parseInt(count) || 1));
-  modifier = parseInt(modifier) || 0;
-  reason = reason ? reason.trim() : 'Бросок кубика';
-
-  const sidesMap = { 'd4': 4, 'd6': 6, 'd8': 8, 'd10': 10, 'd12': 12, 'd20': 20, 'd100': 100 };
-  const sides = sidesMap[diceType] || 20;
-
-  const rolls = [];
-  let sum = 0;
-  for (let i = 0; i < count; i++) {
-    const val = Math.floor(Math.random() * sides) + 1;
-    rolls.push(val);
-    sum += val;
-  }
-  const total = sum + modifier;
-
-  const isCriticalSuccess = diceType === 'd20' && count === 1 && rolls[0] === 20;
-  const isCriticalFail = diceType === 'd20' && count === 1 && rolls[0] === 1;
-
-  let textResult = `${user.display_name} бросает ${count}${diceType}${modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''} [${reason}]: `;
-  textResult += `( ${rolls.join(' + ')} )`;
-  if (modifier !== 0) textResult += ` ${modifier > 0 ? '+' : ''}${modifier}`;
-  textResult += ` = **${total}**`;
-  if (isCriticalSuccess) textResult += ' 🎉 КРИТИЧЕСКИЙ УСПЕХ (НАТ 20)!';
-  if (isCriticalFail) textResult += ' 💀 КРИТИЧЕСКИЙ ПРОВАЛ (1)!';
-
-  const room = db.prepare('SELECT id, status FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  const msgId = uuidv4();
-  const now = Date.now();
-  const extra_data = {
-    diceType, count, modifier, reason, rolls, total,
-    isCriticalSuccess, isCriticalFail
-  };
-
-  db.prepare(`
-    INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-    VALUES (?, 'dice', ?, ?, NULL, ?, ?, ?)
-  `).run(msgId, room.id, user.id, textResult, JSON.stringify(extra_data), now);
-
-  const msgPayload = {
-    id: msgId,
-    type: 'dice',
-    room_id: room.id,
-    from_user: {
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      avatar: user.avatar,
-      avatar_frame: user.avatar_frame,
-      role_title: user.role_title
-    },
-    content: textResult,
-    extra_data,
-    created_at: now
-  };
-
-  broadcastToRoom(room.id, {
-    type: 'room_message',
-    message: msgPayload
-  });
-
-  res.json({ roll: extra_data, message: msgPayload });
-});
-
-app.post('/api/rooms/:id/game-state', authMiddleware, (req, res) => {
-  const user = req.user;
-  const roomId = req.params.id;
-  const { scene, combatActive, broadcastStoryText } = req.body;
-
-  const room = db.prepare('SELECT * FROM rooms WHERE id = ? OR code = ?').get(roomId, roomId);
-  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
-
-  if (room.host_user_id !== user.id) {
-    return res.status(403).json({ error: 'Только Мастер может обновлять состояние сцены' });
-  }
-
-  let currentState = {};
-  try { currentState = JSON.parse(room.game_state || '{}'); } catch(e){}
-
-  if (scene) {
-    currentState.scene = {
-      ...(currentState.scene || {}),
-      ...scene
-    };
-  }
-
-  if (combatActive !== undefined) {
-    currentState.combatActive = combatActive;
-  }
-
-  const now = Date.now();
-  if (broadcastStoryText && broadcastStoryText.trim()) {
-    currentState.log = currentState.log || [];
-    currentState.log.push({
-      id: uuidv4(),
-      type: 'story',
-      text: broadcastStoryText.trim(),
-      time: now
-    });
-
-    // Also add to messages
-    const msgId = uuidv4();
-    db.prepare(`
-      INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-      VALUES (?, 'story', ?, ?, NULL, ?, '{}', ?)
-    `).run(msgId, room.id, user.id, broadcastStoryText.trim(), now);
-  }
-
-  db.prepare('UPDATE rooms SET game_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(currentState), now, room.id);
-
-  const roomDetails = getRoomFullDetails(room.id);
-  broadcastToRoom(room.id, {
-    type: 'game_state_updated',
-    room: roomDetails,
-    storyText: broadcastStoryText || null
-  });
-
-  res.json({ room: roomDetails });
-});
-
-// 6. Direct Messages with Friends
-app.get('/api/messages/direct/:friendId', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const friendId = req.params.friendId;
-
-  const messages = db.prepare(`
-    SELECT m.*, u.username, u.display_name, u.avatar, u.avatar_frame
-    FROM messages m
-    JOIN users u ON u.id = m.from_user_id
-    WHERE m.type = 'direct' AND (
-      (m.from_user_id = ? AND m.to_user_id = ?) OR
-      (m.from_user_id = ? AND m.to_user_id = ?)
-    )
-    ORDER BY m.created_at ASC
-    LIMIT 60
-  `).all(userId, friendId, friendId, userId);
-
-  res.json({ messages });
-});
-
-app.post('/api/messages/direct/:friendId', authMiddleware, (req, res) => {
-  const user = req.user;
-  const friendId = req.params.friendId;
-  const { content } = req.body;
-
-  if (!content || !content.trim()) return res.status(400).json({ error: 'Текст сообщения не может быть пустым' });
-
-  const friend = db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(friendId);
-  if (!friend) return res.status(404).json({ error: 'Пользователь не найден' });
-
-  const msgId = uuidv4();
-  const now = Date.now();
-
-  db.prepare(`
-    INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-    VALUES (?, 'direct', NULL, ?, ?, ?, '{}', ?)
-  `).run(msgId, user.id, friend.id, content.trim(), now);
-
-  const msgPayload = {
-    id: msgId,
-    type: 'direct',
-    from_user: {
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      avatar: user.avatar,
-      avatar_frame: user.avatar_frame
-    },
-    to_user_id: friend.id,
-    content: content.trim(),
-    created_at: now
-  };
-
-  sendToUser(friend.id, {
-    type: 'direct_message',
-    message: msgPayload
-  });
-
-  // If friend is a demo bot/character, reply automatically after 1.5 seconds!
-  if (friendId.startsWith('usr_')) {
-    setTimeout(() => {
-      const botReplies = [
-        'Да, я на связи! Зови в лобби, как будешь собирать пати.',
-        'Отлично, я как раз готов сыграть!',
-        'Понял тебя. Кидай инвайт в комнату!',
-        'Ха-ха, договорились! Беру своего любимого мага.'
-      ];
-      const botText = botReplies[Math.floor(Math.random() * botReplies.length)];
-      const botMsgId = uuidv4();
-      const botNow = Date.now();
-
-      db.prepare(`
-        INSERT INTO messages (id, type, room_id, from_user_id, to_user_id, content, extra_data, created_at)
-        VALUES (?, 'direct', NULL, ?, ?, ?, '{}', ?)
-      `).run(botMsgId, friend.id, user.id, botText, botNow);
-
-      sendToUser(user.id, {
-        type: 'direct_message',
-        message: {
-          id: botMsgId,
-          type: 'direct',
-          from_user: {
-            id: friend.id,
-            display_name: friend.display_name,
-            avatar: friend.avatar || 'sorceress'
-          },
-          to_user_id: user.id,
-          content: botText,
-          created_at: botNow
-        }
-      });
-    }, 1500);
-  }
-
-  res.json({ message: msgPayload });
-});
-
 // ==========================================
 // WEBSOCKET HANDLERS
 // ==========================================

@@ -64,7 +64,6 @@ db.exec(`
     privacy TEXT DEFAULT 'public',
     password TEXT DEFAULT '',
     status TEXT DEFAULT 'in_lobby',
-    game_state TEXT DEFAULT '{}',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (host_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -77,10 +76,6 @@ db.exec(`
     slot_index INTEGER NOT NULL,
     role TEXT DEFAULT 'player',
     is_ready INTEGER DEFAULT 0,
-    character_name TEXT DEFAULT '',
-    character_class TEXT DEFAULT '',
-    hp INTEGER DEFAULT 20,
-    max_hp INTEGER DEFAULT 20,
     joined_at INTEGER NOT NULL,
     UNIQUE(room_id, user_id),
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
@@ -99,24 +94,11 @@ db.exec(`
     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    room_id TEXT,
-    from_user_id TEXT NOT NULL,
-    to_user_id TEXT,
-    content TEXT NOT NULL,
-    extra_data TEXT DEFAULT '{}',
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
   CREATE INDEX IF NOT EXISTS idx_users_tag ON users(username, tag);
   CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
   CREATE INDEX IF NOT EXISTS idx_room_members_room ON room_members(room_id);
   CREATE INDEX IF NOT EXISTS idx_room_invites_to ON room_invites(to_user_id, status);
   CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests(to_user_id, status);
-  CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id);
 `);
 
 // Preset Avatar SVGs / Identifiers
@@ -143,7 +125,7 @@ function seedDemoData() {
       email: 'alex@mir.rpg',
       avatar: 'dragon',
       avatar_frame: 'mythic',
-      custom_status: 'Мастерю кампанию "Врата Вечности" 🎲',
+      custom_status: 'Мастерю кампанию "Врата Вечности"',
       role_title: 'Гранд-Мастер',
       games_played: 42,
       games_mastered: 35
@@ -156,7 +138,7 @@ function seedDemoData() {
       email: 'elena@mir.rpg',
       avatar: 'sorceress',
       avatar_frame: 'neon',
-      custom_status: 'Изучаю древние свитки огня 🔥',
+      custom_status: 'Изучаю древние свитки огня',
       role_title: 'Архимаг',
       games_played: 28,
       games_mastered: 6
@@ -169,7 +151,7 @@ function seedDemoData() {
       email: 'viktor@mir.rpg',
       avatar: 'knight',
       avatar_frame: 'gold',
-      custom_status: 'Щит наготове, зовите в пати! ⚔️',
+      custom_status: 'Щит наготове, зовите в пати!',
       role_title: 'Паладин Ордена',
       games_played: 19,
       games_mastered: 2
@@ -182,7 +164,7 @@ function seedDemoData() {
       email: 'kate@mir.rpg',
       avatar: 'rogue',
       avatar_frame: 'crimson',
-      custom_status: 'Криты по 20d6 из невидимости 🗡️',
+      custom_status: 'Криты по 20d6 из невидимости',
       role_title: 'Теневой Клинок',
       games_played: 31,
       games_mastered: 8
@@ -195,7 +177,7 @@ function seedDemoData() {
       email: 'misha@mir.rpg',
       avatar: 'elf',
       avatar_frame: 'cyber',
-      custom_status: 'Бросаю харизму на всё, что движется 🪕',
+      custom_status: 'Бросаю харизму на всё, что движется',
       role_title: 'Маэстро Вдохновения',
       games_played: 24,
       games_mastered: 4
@@ -230,47 +212,25 @@ function seedDemoData() {
   const demoRoomId = 'room_demo_01';
   const demoRoomCode = 'MIR-7777';
   const insertRoom = db.prepare(`
-    INSERT INTO rooms (id, code, title, description, host_user_id, setting, max_players, privacy, status, game_state, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO rooms (id, code, title, description, host_user_id, setting, max_players, privacy, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
-  const initialGameState = {
-    scene: {
-      title: 'Таверна «Пьяный Дракон»',
-      description: 'За окном бушует гроза. В камине потрескивают смолистые дубовые поленья. За угловым столом сидит загадочный путник в капюшоне, держа в руках свиток с королевской печатью.',
-      location: 'Перекресток Семи Дорог',
-      atmosphere: 'Уютно, но в воздухе витает тревога',
-      notes: 'Игроки должны узнать у трактирщика о пропавшем караване.',
-      combatActive: false
-    },
-    log: [
-      { id: '1', type: 'system', text: 'Мастер Александр начал подготовку партии.', time: now - 360000 },
-      { id: '2', type: 'story', text: 'Добро пожаловать в мир Авалон! Дождь не прекращается третьи сутки.', time: now - 300000 }
-    ]
-  };
-
   insertRoom.run(
     demoRoomId, demoRoomCode, 'Хроники Авалона: Тайна Каравана',
     'Классическое приключение для 4-5 героев. Нужен танк и хилер!',
     'usr_master_alex', 'fantasy', 5, 'public', 'in_lobby',
-    JSON.stringify(initialGameState), now - 600000, now - 600000
+    now - 600000, now - 600000
   );
 
   // Add demo host to the room
   const insertMember = db.prepare(`
-    INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, character_name, character_class, hp, max_hp, joined_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO room_members (id, room_id, user_id, slot_index, role, is_ready, joined_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  insertMember.run(
-    uuidv4(), demoRoomId, 'usr_master_alex', 0, 'master', 1,
-    'Александр (Мастер)', 'Ведущий', 100, 100, now - 600000
-  );
-
-  insertMember.run(
-    uuidv4(), demoRoomId, 'usr_elena_mage', 1, 'player', 1,
-    'Эланора Звездочет', 'Боевой Маг (Огонь)', 24, 24, now - 500000
-  );
+  insertMember.run(uuidv4(), demoRoomId, 'usr_master_alex', 0, 'master', 1, now - 600000);
+  insertMember.run(uuidv4(), demoRoomId, 'usr_elena_mage', 1, 'player', 1, now - 500000);
 
   console.log('Seeded demo users and initial demo room successfully.');
 }

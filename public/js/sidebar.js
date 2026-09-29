@@ -3,13 +3,12 @@
  */
 class SidebarController {
   constructor() {
-    this.activeTab = 'lobby'; // 'lobby' | 'friends' | 'invites' | 'dms'
+    this.activeTab = 'lobby'; // 'lobby' | 'friends' | 'invites'
     this.isOpen = true;
     this.friends = [];
     this.invites = [];
     this.friendRequests = { incoming: [], outgoing: [] };
-    this.activeDmFriend = null;
-    this.friendFilter = 'all'; // 'all' | 'online' | 'ingame'
+    this.friendFilter = 'all'; // 'all' | 'online' | 'inlobby'
     this.init();
   }
 
@@ -22,7 +21,6 @@ class SidebarController {
     // Dock Button Clicks
     document.querySelectorAll('.dock-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         const tab = btn.getAttribute('data-tab');
         if (this.isOpen && this.activeTab === tab) {
           this.toggleSidebar(false);
@@ -35,14 +33,12 @@ class SidebarController {
 
     // Drawer Close Button
     document.getElementById('sidebarCloseBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.toggleSidebar(false);
     });
 
     // Friend Filters
     document.querySelectorAll('.friend-filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        window.sounds.playClick();
         document.querySelectorAll('.friend-filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.friendFilter = btn.getAttribute('data-filter');
@@ -57,31 +53,7 @@ class SidebarController {
 
     // Add Friend Form
     document.getElementById('addFriendBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.promptAddFriend();
-    });
-
-    // DM Send Form
-    document.getElementById('dmSendForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('dmInput');
-      const text = input.value.trim();
-      if (!text || !this.activeDmFriend) return;
-      window.sounds.playClick();
-      input.value = '';
-
-      try {
-        const res = await window.api.sendDirectMessage(this.activeDmFriend.id, text);
-        this.appendDmMessage(res.message, true);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-
-    // Back to Friends from DM
-    document.getElementById('dmBackBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      this.switchTab('friends');
     });
 
     // Auth Change -> reload friends & invites
@@ -113,7 +85,6 @@ class SidebarController {
     // Incoming Room Invite
     window.api.on('room_invite', (data) => {
       if (!data || !data.invite) return;
-      window.sounds.playInvite();
       this.invites.unshift(data.invite);
       this.renderInvites();
       this.updateDockBadges();
@@ -125,7 +96,6 @@ class SidebarController {
     // Incoming Friend Request
     window.api.on('friend_request', (data) => {
       if (!data || !data.request) return;
-      window.sounds.playInvite();
       this.friendRequests.incoming.unshift(data.request);
       this.renderInvites();
       this.updateDockBadges();
@@ -139,30 +109,12 @@ class SidebarController {
 
     // Friend Request Accepted
     window.api.on('friend_request_accepted', (data) => {
-      window.sounds.playReady();
       this.refreshFriends();
       window.app.showToast('Новый друг!', `${data.user.display_name} принял ваш запрос!`, 'info');
     });
 
-    // Direct Message Received
-    window.api.on('direct_message', (data) => {
-      if (!data || !data.message) return;
-      window.sounds.playInvite();
-
-      if (this.activeTab === 'dms' && this.activeDmFriend && this.activeDmFriend.id === data.message.from_user.id) {
-        this.appendDmMessage(data.message, false);
-      } else {
-        window.app.showToast(
-          `Сообщение от ${data.message.from_user.display_name}`,
-          data.message.content,
-          'info'
-        );
-      }
-    });
-
     // Room update events
     window.api.on('room_member_joined', (data) => {
-      window.sounds.playJoin();
       if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
         window.api.currentRoom = data.room;
         this.renderLobby();
@@ -177,33 +129,14 @@ class SidebarController {
     });
 
     window.api.on('room_ready_changed', (data) => {
-      window.sounds.playReady();
       if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
         window.api.currentRoom = data.room;
-        this.renderLobby();
-      }
-    });
-
-    window.api.on('room_char_updated', (data) => {
-      if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
-        window.api.currentRoom = data.room;
-        this.renderLobby();
-      }
-    });
-
-    window.api.on('game_started', (data) => {
-      window.sounds.playGameStart();
-      if (window.api.currentRoom && data.room && window.api.currentRoom.id === data.room.id) {
-        window.api.currentRoom = data.room;
-        window.app.navigateTo('game');
         this.renderLobby();
       }
     });
 
     window.api.on('room_kicked', (data) => {
-      window.sounds.playCritFail();
       window.api.currentRoom = null;
-      window.app.navigateTo('menu');
       window.app.showToast('Исключение', `Вы были исключены из комнаты ${data.room.title}`, 'info');
       this.renderLobby();
     });
@@ -267,8 +200,7 @@ class SidebarController {
     const titles = {
       lobby: 'Лобби / Группа',
       friends: 'Друзья',
-      invites: 'Приглашения',
-      dms: this.activeDmFriend ? this.activeDmFriend.display_name : 'Личные сообщения'
+      invites: 'Приглашения'
     };
     if (titleEl) titleEl.textContent = titles[tab] || 'Панель';
 
@@ -342,11 +274,9 @@ class SidebarController {
       `;
 
       document.getElementById('sideCreateRoomBtn')?.addEventListener('click', () => {
-        window.sounds.playClick();
         window.lobbyController.openCreateModal();
       });
       document.getElementById('sideBrowseRoomsBtn')?.addEventListener('click', () => {
-        window.sounds.playClick();
         window.lobbyController.openBrowseModal();
       });
       return;
@@ -380,13 +310,9 @@ class SidebarController {
                 <span class="slot-user-name">${m.display_name}</span>
                 <span class="slot-role-badge ${isMaster ? 'master' : 'player'}">${isMaster ? 'Мастер' : 'Игрок'}</span>
               </div>
-              <div class="slot-char-row">
-                <span>${m.character_class || 'Авантюрист'}</span>
-                <span class="slot-hp-indicator">HP: ${m.hp}/${m.max_hp}</span>
-              </div>
             </div>
             <div class="slot-ready-indicator ${m.is_ready ? 'ready' : ''}">
-              ${m.is_ready ? '✓' : '...'}
+              ${m.is_ready ? '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg>' : '·'}
             </div>
           </div>
         `;
@@ -405,11 +331,11 @@ class SidebarController {
         <div class="lobby-status-banner">
           <div class="ls-top">
             <span class="ls-room-name">${room.title}</span>
-            <span class="ls-code-tag" id="sideCopyCodeBtn" title="Нажмите чтобы скопировать">${room.code} 📋</span>
+            <span class="ls-code-tag" id="sideCopyCodeBtn" title="Нажмите чтобы скопировать">${room.code} <svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
           </div>
           <div class="ls-info-row">
-            <span class="ls-pill">🎲 Сеттинг: ${room.setting}</span>
-            <span class="ls-pill">👥 Игроки: ${room.members.length}/${room.max_players}</span>
+            <span class="ls-pill"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"></circle></svg> Сеттинг: ${room.setting}</span>
+            <span class="ls-pill"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path></svg> Игроки: ${room.members.length}/${room.max_players}</span>
           </div>
         </div>
 
@@ -419,24 +345,16 @@ class SidebarController {
 
         <div class="lobby-actions-toolbar">
           <button class="btn-cs-ready ${isReady ? 'ready' : ''}" id="sideReadyBtn">
-            ${isReady ? '✓ ГОТОВ К ИГРЕ' : 'ГОТОВ'}
+            ${isReady ? '<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6L9 17l-5-5"></path></svg> ГОТОВ К ИГРЕ' : 'ГОТОВ'}
           </button>
 
-          ${isHost ? `
-            <button class="btn-cs-start" id="sideStartGameBtn">
-              👑 ЗАПУСТИТЬ ПАРТИЮ
-            </button>
-          ` : ''}
 
           <div class="lobby-sub-actions">
             <button class="lobby-sub-btn" id="sideInviteFriendBtn">
-              ➕ Пригласить
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"></path></svg> Пригласить
             </button>
-            <button class="lobby-sub-btn" id="sideCustomizeCharBtn">
-              🎭 Персонаж
-            </button>
-            <button class="lobby-sub-btn" id="sideLeaveRoomBtn" style="color: #fca5a5;">
-              🚪 Выйти
+            <button class="lobby-sub-btn" id="sideLeaveRoomBtn" style="color: #e7b0b0;">
+              <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg> Выйти
             </button>
           </div>
         </div>
@@ -445,13 +363,11 @@ class SidebarController {
 
     // Event Bindings
     document.getElementById('sideCopyCodeBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       navigator.clipboard?.writeText(room.code);
       window.app.showToast('Скопировано', `Код комнаты ${room.code} скопирован в буфер!`, 'info');
     });
 
     document.getElementById('sideReadyBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.setReady(room.id, !isReady);
       } catch (err) {
@@ -459,30 +375,15 @@ class SidebarController {
       }
     });
 
-    document.getElementById('sideStartGameBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
-      try {
-        await window.api.startGame(room.id);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
 
     document.getElementById('sideInviteFriendBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
       this.switchTab('friends');
     });
 
-    document.getElementById('sideCustomizeCharBtn')?.addEventListener('click', () => {
-      window.sounds.playClick();
-      window.lobbyController.openCharCustomizeModal();
-    });
 
     document.getElementById('sideLeaveRoomBtn')?.addEventListener('click', async () => {
-      window.sounds.playClick();
       try {
         await window.api.leaveRoom(room.id);
-        window.app.navigateTo('menu');
         this.renderLobby();
       } catch (err) {
         alert(err.message);
@@ -491,7 +392,6 @@ class SidebarController {
 
     container.querySelectorAll('.lobby-empty-slot').forEach(el => {
       el.addEventListener('click', () => {
-        window.sounds.playClick();
         this.switchTab('friends');
       });
     });
@@ -525,8 +425,8 @@ class SidebarController {
 
     if (this.friendFilter === 'online') {
       filtered = filtered.filter(f => f.isOnline);
-    } else if (this.friendFilter === 'ingame') {
-      filtered = filtered.filter(f => f.status === 'in_game' || f.status === 'in_lobby');
+    } else if (this.friendFilter === 'inlobby') {
+      filtered = filtered.filter(f => f.status === 'in_lobby');
     }
 
     if (filtered.length === 0) {
@@ -539,14 +439,14 @@ class SidebarController {
     }
 
     // Group by status
-    const inGameOrLobby = filtered.filter(f => f.status === 'in_game' || f.status === 'in_lobby');
-    const online = filtered.filter(f => f.isOnline && f.status !== 'in_game' && f.status !== 'in_lobby');
+    const inLobby = filtered.filter(f => f.status === 'in_lobby');
+    const online = filtered.filter(f => f.isOnline && f.status !== 'in_lobby');
     const offline = filtered.filter(f => !f.isOnline);
 
     const renderGroup = (title, list) => {
       if (list.length === 0) return '';
       const items = list.map(f => {
-        const canInvite = window.api.currentRoom && f.isOnline && f.status !== 'in_game';
+        const canInvite = window.api.currentRoom && f.isOnline;
         const canJoin = f.currentRoom && (!window.api.currentRoom || window.api.currentRoom.id !== f.currentRoom.id);
         
         let statusText = 'В сети';
@@ -554,9 +454,6 @@ class SidebarController {
         if (f.status === 'in_lobby') {
           statusText = f.currentRoom ? `В лобби: ${f.currentRoom.title}` : 'В лобби МИР';
           statusClass = 'in_lobby';
-        } else if (f.status === 'in_game') {
-          statusText = f.currentRoom ? `В игре: ${f.currentRoom.title}` : 'В партии';
-          statusClass = 'in_game';
         } else if (!f.isOnline) {
           statusText = 'Не в сети';
           statusClass = 'offline';
@@ -577,17 +474,14 @@ class SidebarController {
             <div class="friend-actions">
               ${canInvite ? `
                 <button class="friend-action-btn invite-btn friend-invite-btn" data-friend-id="${f.id}" title="Пригласить в лобби">
-                  ➕
+                  <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"></path></svg>
                 </button>
               ` : ''}
               ${canJoin ? `
                 <button class="friend-action-btn invite-btn friend-join-btn" data-room-id="${f.currentRoom.id}" title="Присоединиться к лобби">
-                  🚪
+                  <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
                 </button>
               ` : ''}
-              <button class="friend-action-btn friend-dm-btn" data-friend-id="${f.id}" title="Написать">
-                💬
-              </button>
             </div>
           </div>
         `;
@@ -602,7 +496,7 @@ class SidebarController {
     };
 
     container.innerHTML = `
-      ${renderGroup('В игре и в лобби', inGameOrLobby)}
+      ${renderGroup('В лобби', inLobby)}
       ${renderGroup('В сети', online)}
       ${renderGroup('Не в сети', offline)}
     `;
@@ -611,7 +505,6 @@ class SidebarController {
     container.querySelectorAll('.friend-invite-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        window.sounds.playClick();
         const friendId = btn.getAttribute('data-friend-id');
         if (window.api.currentRoom) {
           try {
@@ -627,11 +520,9 @@ class SidebarController {
     container.querySelectorAll('.friend-join-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        window.sounds.playClick();
         const roomId = btn.getAttribute('data-room-id');
         try {
           await window.api.joinRoom(roomId);
-          window.app.navigateTo('lobby');
           this.switchTab('lobby');
         } catch (err) {
           alert(err.message);
@@ -639,80 +530,6 @@ class SidebarController {
       });
     });
 
-    container.querySelectorAll('.friend-dm-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.sounds.playClick();
-        const friendId = btn.getAttribute('data-friend-id');
-        const friend = this.friends.find(f => f.id === friendId);
-        if (friend) {
-          this.openDirectChat(friend);
-        }
-      });
-    });
-  }
-
-  // ================= Direct Messages =================
-  async openDirectChat(friend) {
-    this.activeDmFriend = friend;
-    this.switchTab('dms');
-
-    const nameEl = document.getElementById('dmPartnerName');
-    const avWrap = document.getElementById('dmPartnerAvatar');
-    if (nameEl) nameEl.textContent = friend.display_name;
-    if (avWrap) avWrap.innerHTML = window.renderAvatar(friend.avatar, friend.avatar_frame, 32);
-
-    const feed = document.getElementById('dmFeed');
-    if (feed) feed.innerHTML = '<div style="text-align: center; color: var(--text-dim);">Загрузка сообщений...</div>';
-
-    try {
-      const messages = await window.api.getDirectMessages(friend.id);
-      this.renderDmMessages(messages);
-    } catch (e) {
-      if (feed) feed.innerHTML = '<div style="color: var(--cs-red);">Ошибка загрузки истории</div>';
-    }
-  }
-
-  renderDmMessages(messages) {
-    const feed = document.getElementById('dmFeed');
-    if (!feed) return;
-
-    if (!messages || messages.length === 0) {
-      feed.innerHTML = `
-        <div style="text-align: center; padding: 30px 10px; color: var(--text-dim); font-size: 12.5px;">
-          Начните диалог с ${this.activeDmFriend.display_name} 👋
-        </div>
-      `;
-      return;
-    }
-
-    feed.innerHTML = messages.map(m => {
-      const isOutgoing = m.from_user.id === window.api.currentUser?.id;
-      const timeStr = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="dm-bubble ${isOutgoing ? 'outgoing' : 'incoming'}">
-          <div>${m.content}</div>
-          <div class="dm-time">${timeStr}</div>
-        </div>
-      `;
-    }).join('');
-
-    feed.scrollTop = feed.scrollHeight;
-  }
-
-  appendDmMessage(msg, isOutgoing) {
-    const feed = document.getElementById('dmFeed');
-    if (!feed) return;
-    const timeStr = new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const bubble = document.createElement('div');
-    bubble.className = `dm-bubble ${isOutgoing ? 'outgoing' : 'incoming'}`;
-    bubble.innerHTML = `
-      <div>${msg.content}</div>
-      <div class="dm-time">${timeStr}</div>
-    `;
-    feed.appendChild(bubble);
-    feed.scrollTop = feed.scrollHeight;
   }
 
   // ================= Render Invites & Notifications =================
@@ -786,14 +603,12 @@ class SidebarController {
     // Bind invite buttons
     container.querySelectorAll('.accept-invite-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-invite-id');
         try {
-          const res = await window.api.respondInvite(id, 'accept');
+          await window.api.respondInvite(id, 'accept');
           this.invites = this.invites.filter(i => i.id !== id);
           this.renderInvites();
           this.updateDockBadges();
-          window.app.navigateTo('lobby');
           this.switchTab('lobby');
         } catch (err) {
           alert(err.message);
@@ -803,7 +618,6 @@ class SidebarController {
 
     container.querySelectorAll('.decline-invite-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-invite-id');
         try {
           await window.api.respondInvite(id, 'decline');
@@ -817,7 +631,6 @@ class SidebarController {
     // Bind friend request buttons
     container.querySelectorAll('.accept-req-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-request-id');
         try {
           await window.api.respondFriendRequest(id, 'accept');
@@ -832,7 +645,6 @@ class SidebarController {
 
     container.querySelectorAll('.decline-req-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        window.sounds.playClick();
         const id = btn.getAttribute('data-request-id');
         try {
           await window.api.respondFriendRequest(id, 'decline');
@@ -847,7 +659,6 @@ class SidebarController {
     const target = prompt('Введите Никнейм#Тег друга (например ElenaArcana#2048):');
     if (target && target.trim()) {
       window.api.sendFriendRequest(target.trim()).then(res => {
-        window.sounds.playReady();
         window.app.showToast('Запрос отправлен', res.message, 'info');
         this.refreshFriendRequests();
       }).catch(err => {
