@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0e0e10" />
+<title>МИР</title>
+<style>
+  /* ============ Дизайн-токены ============ */
+  :root {
+    --bg:           #0e0e10;
+    --bg-elevated:  #16161a;
+    --bg-hover:     #1d1d22;
+    --border:       rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.16);
+    --text:         #ececef;
+    --text-dim:     #8b8b93;
+    --text-faint:   #55555c;
+    --radius:       14px;
+    --transition:   160ms cubic-bezier(.4, 0, .2, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* Едва заметный градиент, чтобы фон не был плоским */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% -10%, rgba(255,255,255,0.045), transparent 65%);
+    pointer-events: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--text-dim);
+    outline-offset: 3px;
+    border-radius: var(--radius);
+  }
+
+  svg { display: block; flex-shrink: 0; }
+
+  /* ============ Кнопка настроек (левый верхний угол) ============ */
+  .settings-btn {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: max(16px, env(safe-area-inset-left));
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: var(--text-dim);
+    transition: color var(--transition), background var(--transition),
+                border-color var(--transition), transform var(--transition);
+    border: 1px solid transparent;
+    z-index: 10;
+  }
+
+  .settings-btn:hover {
+    color: var(--text);
+    background: var(--bg-elevated);
+    border-color: var(--border);
+  }
+
+  .settings-btn:active { transform: scale(0.94); }
+
+  .settings-btn svg { transition: transform 400ms cubic-bezier(.4, 0, .2, 1); }
+  .settings-btn:hover svg { transform: rotate(60deg); }
+
+  /* ============ Центральный блок меню ============ */
+  .menu {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    padding: 24px;
+  }
+
+  .brand {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .brand h1 {
+    font-size: clamp(44px, 9vw, 64px);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    margin-right: -0.22em; /* компенсация трекинга для точного центра */
+    line-height: 1;
+  }
+
+  .brand p {
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+
+  /* ============ Кнопки ролей ============ */
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(340px, 100%);
+  }
+
+  .role-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 18px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: left;
+    transition: background var(--transition), border-color var(--transition),
+                transform var(--transition);
+  }
+
+  .role-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+  }
+
+  .role-btn:active { transform: scale(0.985); }
+
+  .role-btn .icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: color var(--transition);
+  }
+
+  .role-btn:hover .icon { color: var(--text); }
+
+  .role-btn .label { flex: 1; min-width: 0; }
+
+  .role-btn .title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .role-btn .desc {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+
+  .role-btn .chevron {
+    color: var(--text-faint);
+    transition: color var(--transition), transform var(--transition);
+  }
+
+  .role-btn:hover .chevron {
+    color: var(--text-dim);
+    transform: translateX(3px);
+  }
+
+  /* ============ Версия ============ */
+  .version {
+    position: fixed;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    pointer-events: none;
+  }
+
+  /* ============ Модалка настроек ============ */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition), visibility var(--transition);
+  }
+
+  .overlay.open { opacity: 1; visibility: visible; }
+
+  .modal {
+    width: min(400px, 100%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 8px;
+    transform: translateY(10px) scale(0.98);
+    transition: transform var(--transition);
+  }
+
+  .overlay.open .modal { transform: none; }
+
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+  }
+
+  .modal-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .close-btn {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    color: var(--text-dim);
+    transition: color var(--transition), background var(--transition);
+  }
+
+  .close-btn:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border-radius: 12px;
+    transition: background var(--transition);
+  }
+
+  .setting-row:hover { background: rgba(255, 255, 255, 0.03); }
+
+  .setting-row .s-icon { color: var(--text-dim); }
+
+  .setting-row .s-label {
+    flex: 1;
+    font-size: 14px;
+  }
+
+  /* Переключатель */
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 23px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid var(--border);
+    transition: background var(--transition), border-color var(--transition);
+  }
+
+  .toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: transform var(--transition), background var(--transition);
+  }
+
+  .toggle[aria-checked="true"] {
+    background: var(--text);
+    border-color: var(--text);
+  }
+
+  .toggle[aria-checked="true"]::after {
+    transform: translateX(17px);
+    background: var(--bg);
+  }
+
+  .toggle:focus-visible {
+    outline: 2px solid var(--text-dim);
+    outline-offset: 2px;
+    border-radius: 999px;
+  }
+
+  .modal-foot {
+    padding: 10px 16px 12px;
+    font-size: 11.5px;
+    color: var(--text-faint);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Настройки — левый верхний угол -->
+  <button class="settings-btn" id="settingsBtn" aria-label="Настройки" aria-haspopup="dialog">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+
+  <!-- Центральное меню -->
+  <main class="menu">
+    <div class="brand">
+      <h1>МИР</h1>
+      <p>Ролевая игра с ведущим</p>
+    </div>
+
+    <nav class="actions" aria-label="Выбор роли">
+      <button class="role-btn" id="masterBtn">
+        <span class="icon">
+          <!-- Корона — мастер -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 17l1.5-9 4.5 4 3-6.5L15 12l4.5-4L21 17z"/>
+            <path d="M4 20h16"/>
+          </svg>
+        </span>
+        <span class="label">
+          <span class="title">Мастер</span>
+          <span class="desc" style="display:block">Создать игру и вести партию</span>
+        </span>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+
+      <button class="role-btn" id="playerBtn">
+        <span class="icon">
+          <!-- Человек — игрок -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>
+          </svg>
+        </span>
+        <span class="label">
+          <span class="title">Игрок</span>
+          <span class="desc" style="display:block">Присоединиться по коду комнаты</span>
+        </span>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+    </nav>
+  </main>
+
+  <div class="version">v0.1 · альфа</div>
+
+  <!-- Модалка настроек -->
+  <div class="overlay" id="settingsOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="settingsTitle">Настройки</h2>
+        <button class="close-btn" id="closeSettings" aria-label="Закрыть">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <svg class="s-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4z"/>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+          <path d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/>
+        </svg>
+        <span class="s-label">Звук</span>
+        <button class="toggle" id="soundToggle" role="switch" aria-checked="true" aria-label="Звук"></button>
+      </div>
+
+      <div class="setting-row">
+        <svg class="s-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V6l10-2v12"/>
+          <circle cx="6.5" cy="18" r="2.5"/>
+          <circle cx="16.5" cy="16" r="2.5"/>
+        </svg>
+        <span class="s-label">Музыка</span>
+        <button class="toggle" id="musicToggle" role="switch" aria-checked="true" aria-label="Музыка"></button>
+      </div>
+
+      <div class="setting-row">
+        <svg class="s-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+        <span class="s-label">Полноэкранный режим</span>
+        <button class="toggle" id="fullscreenToggle" role="switch" aria-checked="false" aria-label="Полноэкранный режим"></button>
+      </div>
+
+      <div class="modal-foot">МИР · v0.1</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---------- Настройки: хранение ---------- */
+  const SETTINGS_KEY = "mir.settings";
+
+  const defaults = { sound: true, music: true };
+
+  const settings = (() => {
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
+    catch { return { ...defaults }; }
+  })();
+
+  const saveSettings = () => {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+  };
+
+  /* ---------- Модалка ---------- */
+  const overlay      = document.getElementById("settingsOverlay");
+  const settingsBtn  = document.getElementById("settingsBtn");
+  const closeBtn     = document.getElementById("closeSettings");
+
+  const openSettings  = () => { overlay.classList.add("open"); closeBtn.focus(); };
+  const closeSettings = () => { overlay.classList.remove("open"); settingsBtn.focus(); };
+
+  settingsBtn.addEventListener("click", openSettings);
+  closeBtn.addEventListener("click", closeSettings);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSettings(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("open")) closeSettings();
+  });
+
+  /* ---------- Переключатели ---------- */
+  const bindToggle = (id, key, onChange) => {
+    const el = document.getElementById(id);
+    if (key) el.setAttribute("aria-checked", String(settings[key]));
+    el.addEventListener("click", () => {
+      const next = el.getAttribute("aria-checked") !== "true";
+      el.setAttribute("aria-checked", String(next));
+      if (key) { settings[key] = next; saveSettings(); }
+      if (onChange) onChange(next);
+    });
+    return el;
+  };
+
+  bindToggle("soundToggle", "sound");
+  bindToggle("musicToggle", "music");
+
+  /* Полноэкранный режим — не сохраняем, отражаем реальное состояние */
+  const fsToggle = bindToggle("fullscreenToggle", null, (on) => {
+    if (on) document.documentElement.requestFullscreen?.().catch(() => {});
+    else if (document.fullscreenElement) document.exitFullscreen?.();
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    fsToggle.setAttribute("aria-checked", String(!!document.fullscreenElement));
+  });
+
+  /* ---------- Кнопки ролей (экраны подключим следующим шагом) ---------- */
+  document.getElementById("masterBtn").addEventListener("click", () => {
+    console.log("Роль: Мастер — экран создания игры (скоро)");
+  });
+
+  document.getElementById("playerBtn").addEventListener("click", () => {
+    console.log("Роль: Игрок — экран входа по коду (скоро)");
+  });
+})();
+</script>
+</body>
+</html>
