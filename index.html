@@ -1,0 +1,1897 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MIR — меню игры</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <style>
+    /* ==========================================================================
+       MIR — единая дизайн-система.
+
+       Палитра, радиусы, типографика и размеры элементов повторяют тёмную тему
+       arena.ai. Любой новый элемент интерфейса собирается ТОЛЬКО из токенов и
+       классов ниже — новых цветов и радиусов не вводим.
+
+       Правило проекта: ничего лишнего. Не добавлять функции, экраны, эффекты и
+       декор без прямого запроса. Подробности — в PROJECT_RULES.md.
+       ========================================================================== */
+
+    /* --- Шрифты -------------------------------------------------------------
+       Basel Grotesk и Martina Plantijn — шрифты arena.ai, в них только латиница.
+       Кириллицу закрывает Inter: он стоит вторым и в самом шрифтовом стеке
+       arena.ai, поэтому русский текст остаётся в той же типографической логике,
+       а не падает в системный шрифт. */
+
+    @font-face {
+      font-family: "Basel Grotesk";
+      src: url("fonts/basel-grotesk-regular.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Basel Grotesk";
+      src: url("fonts/basel-grotesk-book.woff2") format("woff2");
+      font-weight: 450;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Basel Grotesk";
+      src: url("fonts/basel-grotesk-medium.woff2") format("woff2");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Basel Grotesk";
+      src: url("fonts/basel-grotesk-bold.woff2") format("woff2");
+      font-weight: 600 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Inter";
+      src: url("fonts/inter-cyrillic-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+      unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+    }
+
+    @font-face {
+      font-family: "Inter";
+      src: url("fonts/inter-cyrillic-500-normal.woff2") format("woff2");
+      font-weight: 450 500;
+      font-style: normal;
+      font-display: swap;
+      unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+    }
+
+    @font-face {
+      font-family: "Inter";
+      src: url("fonts/inter-cyrillic-600-normal.woff2") format("woff2");
+      font-weight: 600 700;
+      font-style: normal;
+      font-display: swap;
+      unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+    }
+
+    @font-face {
+      font-family: "Martina Plantijn";
+      src: url("fonts/martina-plantijn-light.woff2") format("woff2");
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Martina Plantijn";
+      src: url("fonts/martina-plantijn-light-italic.woff2") format("woff2");
+      font-weight: 300;
+      font-style: italic;
+      font-display: swap;
+    }
+
+    /* --- Токены -------------------------------------------------------------- */
+
+    :root {
+      color-scheme: dark;
+
+      /* Поверхности: тёплый графит, как в тёмной теме arena.ai */
+      --surface-primary: #252523;
+      --surface-secondary: #2c2b28;
+      --surface-tertiary: #1b1a19;
+      --surface-floating: #221f1b;
+      --surface-hover: rgba(244, 240, 235, .05);
+
+      /* Границы */
+      --border-faint: #413d39;
+      --border-medium: #524c47;
+      --border-strong: #5f5a54;
+
+      /* Текст */
+      --text-primary: #f4f0eb;
+      --text-secondary: #e7e1da;
+      --text-tertiary: #c7c2bc;
+      --text-muted: #938d84;
+      --text-faint: #6f6960;
+
+      /* Действия */
+      --cta: #fcfaf8;
+      --cta-hover: #f4f0eb;
+      --cta-active: #eae6e1;
+      --on-cta: #252523;
+      --surface-secondary-hover: #3a3733;
+
+      /* Статусы: цвет только функциональный, декоративного цвета в макете нет */
+      --positive: #41be4b;
+      --negative: #f25550;
+
+      /* Радиусы (шкала arena.ai: 4 / 6 / 8 / 12 / pill) */
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-pill: 9999px;
+
+      /* Тени — минимальные, только для всплывающих слоёв */
+      --shadow-panel: 0 1px 2px rgba(0, 0, 0, .28);
+      --shadow-modal: 0 16px 48px rgba(0, 0, 0, .55);
+
+      /* Прочее */
+      --ease: cubic-bezier(.16, 1, .3, 1);
+      --speed: .16s;
+      --font: "Basel Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --serif: "Martina Plantijn", ui-serif, Georgia, "Times New Roman", serif;
+
+      --lobby-width: 320px;
+      --lobby-gap: 16px;
+    }
+
+    /* --- База ---------------------------------------------------------------- */
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      background: var(--surface-primary);
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.45;
+      letter-spacing: -.005em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    button,
+    input {
+      font: inherit;
+      letter-spacing: inherit;
+      color: inherit;
+    }
+
+    button {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .4;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--border-strong);
+      outline-offset: 2px;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    /* --- Иконки: только линейные SVG, одна толщина штриха ------------------- */
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      stroke-width: 1.5;
+    }
+
+    .icon-lg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* --- Кнопки -------------------------------------------------------------- */
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 32px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      user-select: none;
+      transition: background var(--speed) var(--ease),
+                  border-color var(--speed) var(--ease),
+                  color var(--speed) var(--ease);
+    }
+
+    .btn-lg {
+      height: 44px;
+      padding: 0 18px;
+      font-size: 14.5px;
+      border-radius: var(--radius-md);
+    }
+
+    .btn-sm {
+      height: 28px;
+      padding: 0 10px;
+      font-size: 12.5px;
+    }
+
+    .btn-block {
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--cta);
+      border-color: var(--cta);
+      color: var(--on-cta);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--cta-hover);
+      border-color: var(--cta-hover);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      background: var(--cta-active);
+      border-color: var(--cta-active);
+    }
+
+    .btn-secondary {
+      background: var(--surface-secondary);
+      border-color: var(--border-faint);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--surface-secondary-hover);
+      border-color: var(--border-medium);
+      color: var(--text-primary);
+    }
+
+    .btn-danger {
+      background: transparent;
+      border-color: var(--border-faint);
+      color: var(--text-tertiary);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: var(--border-medium);
+      color: var(--negative);
+    }
+
+    /* Квадратные кнопки-иконки */
+    .icon-btn {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      transition: background var(--speed) var(--ease),
+                  border-color var(--speed) var(--ease),
+                  color var(--speed) var(--ease);
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+
+    .icon-btn-sm {
+      width: 28px;
+      height: 28px;
+    }
+
+    .icon-btn-bordered {
+      border-color: var(--border-faint);
+      background: var(--surface-tertiary);
+      color: var(--text-tertiary);
+    }
+
+    .icon-btn-bordered:hover:not(:disabled) {
+      background: var(--surface-secondary);
+      border-color: var(--border-medium);
+      color: var(--text-primary);
+    }
+
+    .icon-btn-danger:hover:not(:disabled) {
+      color: var(--negative);
+    }
+
+    /* Шестерёнка настроек — строго левый верхний угол экрана */
+    .settings-btn {
+      position: fixed;
+      z-index: 60;
+      top: var(--lobby-gap);
+      left: var(--lobby-gap);
+      width: 36px;
+      height: 36px;
+    }
+
+    /* --- Поля ввода ---------------------------------------------------------- */
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field-label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .input {
+      width: 100%;
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-sm);
+      background: var(--surface-tertiary);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: border-color var(--speed) var(--ease);
+    }
+
+    .input::placeholder {
+      color: var(--text-faint);
+    }
+
+    .input:focus {
+      border-color: var(--border-strong);
+      outline: none;
+    }
+
+    .input-sm {
+      height: 32px;
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    /* --- Вкладки ------------------------------------------------------------- */
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-md);
+      background: var(--surface-tertiary);
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      transition: background var(--speed) var(--ease), color var(--speed) var(--ease);
+    }
+
+    .tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .tab[aria-selected="true"] {
+      background: var(--surface-secondary);
+      color: var(--text-primary);
+    }
+
+    /* --- Экран входа --------------------------------------------------------- */
+
+    .auth-stage {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .auth-card {
+      width: min(380px, 100%);
+      padding: 28px 24px 22px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-lg);
+      background: var(--surface-secondary);
+      box-shadow: var(--shadow-panel);
+      display: grid;
+      gap: 18px;
+    }
+
+    .auth-head {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .auth-caption {
+      max-width: 260px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .form .btn-lg {
+      margin-top: 2px;
+    }
+
+    .auth-note {
+      color: var(--text-faint);
+      font-size: 11.5px;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    /* --- Бренд --------------------------------------------------------------- */
+
+    .brand {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      color: var(--text-primary);
+    }
+
+    .wordmark {
+      font-family: var(--serif);
+      font-weight: 300;
+      line-height: 1;
+      color: var(--text-primary);
+    }
+
+    .wordmark-sm {
+      font-size: 28px;
+      letter-spacing: .16em;
+      text-indent: .16em;
+    }
+
+    .wordmark-lg {
+      font-size: clamp(44px, 6vw, 56px);
+      letter-spacing: .18em;
+      text-indent: .18em;
+    }
+
+    /* --- Главное меню: строго по центру экрана ------------------------------- */
+
+    .menu-stage {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .menu {
+      width: min(300px, 100%);
+      display: grid;
+      justify-items: center;
+      gap: 0;
+      text-align: center;
+    }
+
+    .menu-caption {
+      margin-top: 18px;
+      max-width: 280px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .menu-actions {
+      width: 100%;
+      margin-top: 28px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .menu-meta {
+      margin-top: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+
+    .menu-meta b {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* --- Лобби справа (аватарки и приглашения, как в CS2) -------------------- */
+
+    .lobby {
+      position: fixed;
+      z-index: 40;
+      top: var(--lobby-gap);
+      right: var(--lobby-gap);
+      width: var(--lobby-width);
+      height: calc(100vh - var(--lobby-gap) * 2);
+      height: calc(100dvh - var(--lobby-gap) * 2);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-lg);
+      background: var(--surface-secondary);
+      box-shadow: var(--shadow-panel);
+      overflow: hidden;
+    }
+
+    .lobby-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 12px 12px 14px;
+      border-bottom: 1px solid var(--border-faint);
+    }
+
+    .lobby-head h2 {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+    }
+
+    .lobby-head p {
+      color: var(--text-faint);
+      font-size: 11.5px;
+    }
+
+    .lobby-me {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-faint);
+    }
+
+    .lobby-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 6px 8px 12px;
+    }
+
+    .lobby-scroll::-webkit-scrollbar,
+    .modal-body::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .lobby-scroll::-webkit-scrollbar-track,
+    .modal-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .lobby-scroll::-webkit-scrollbar-thumb,
+    .modal-body::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: var(--radius-pill);
+      background: var(--border-medium);
+      background-clip: content-box;
+    }
+
+    /* Плоские секции: заголовок-метка + строки, без вложенных рамок */
+    .block + .block {
+      margin-top: 14px;
+    }
+
+    .block-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 6px 6px;
+    }
+
+    .block-head span:first-child {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .block-count {
+      color: var(--text-faint);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .block-empty {
+      padding: 2px 6px 6px;
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 6px 6px 6px 6px;
+      border-radius: var(--radius-md);
+      transition: background var(--speed) var(--ease);
+    }
+
+    .row:hover {
+      background: var(--surface-hover);
+    }
+
+    .row.is-offline .avatar,
+    .row.is-offline .row-text {
+      opacity: .55;
+    }
+
+    .row-text {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      gap: 1px;
+      text-align: left;
+    }
+
+    .row-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .row-sub {
+      font-size: 11.5px;
+      color: var(--text-faint);
+    }
+
+    .row-title,
+    .row-sub {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex: 0 0 auto;
+    }
+
+    /* --- Аватар -------------------------------------------------------------- */
+
+    .avatar {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-sm);
+      background: var(--surface-tertiary);
+      color: var(--text-tertiary);
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+
+    .avatar-lg {
+      width: 36px;
+      height: 36px;
+      font-size: 12.5px;
+    }
+
+    .avatar-dot {
+      position: absolute;
+      right: -3px;
+      bottom: -3px;
+      width: 9px;
+      height: 9px;
+      border: 2px solid var(--surface-secondary);
+      border-radius: var(--radius-pill);
+      background: var(--text-faint);
+    }
+
+    .avatar-dot.is-online {
+      background: var(--positive);
+    }
+
+    .avatar-stack {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 2px 6px 4px;
+    }
+
+    /* --- Метка/пилюля -------------------------------------------------------- */
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 20px;
+      padding: 0 7px;
+      flex: 0 0 auto;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-xs);
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-pill);
+      background: var(--positive);
+    }
+
+    /* --- Карточка комнаты ---------------------------------------------------- */
+
+    .room {
+      padding: 10px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-md);
+      background: var(--surface-tertiary);
+      display: grid;
+      gap: 10px;
+    }
+
+    .room-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .room-name {
+      min-width: 0;
+      display: grid;
+      gap: 1px;
+      text-align: left;
+    }
+
+    .room-name strong {
+      font-size: 13px;
+      font-weight: 500;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .room-name span {
+      color: var(--text-faint);
+      font-size: 11.5px;
+    }
+
+    .room .avatar-stack {
+      padding: 0;
+    }
+
+    .room .avatar-dot {
+      border-color: var(--surface-tertiary);
+    }
+
+    .add-friend {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      padding: 0 6px 4px;
+    }
+
+    /* --- Модальные окна ------------------------------------------------------ */
+
+    .modal-layer {
+      position: fixed;
+      z-index: 90;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(12, 11, 10, .66);
+    }
+
+    .modal {
+      width: min(440px, 100%);
+      max-height: min(640px, calc(100vh - 48px));
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-lg);
+      background: var(--surface-floating);
+      box-shadow: var(--shadow-modal);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 12px 12px 16px;
+      border-bottom: 1px solid var(--border-faint);
+    }
+
+    .modal-head h2 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+    }
+
+    .modal-head h2 .icon {
+      color: var(--text-muted);
+    }
+
+    .modal-body {
+      overflow-y: auto;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .note {
+      padding: 11px 12px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-md);
+      background: var(--surface-tertiary);
+      color: var(--text-muted);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .note b {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .setting-row .row-text {
+      text-align: left;
+    }
+
+    .switch {
+      width: 40px;
+      height: 24px;
+      flex: 0 0 auto;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-pill);
+      background: var(--surface-tertiary);
+      transition: background var(--speed) var(--ease), border-color var(--speed) var(--ease);
+    }
+
+    .switch::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: var(--radius-pill);
+      background: var(--text-faint);
+      transition: transform var(--speed) var(--ease), background var(--speed) var(--ease);
+    }
+
+    .switch[aria-checked="true"] {
+      background: var(--cta);
+      border-color: var(--cta);
+    }
+
+    .switch[aria-checked="true"]::before {
+      background: var(--on-cta);
+      transform: translateX(16px);
+    }
+
+    /* --- Уведомление --------------------------------------------------------- */
+
+    .toast {
+      position: fixed;
+      z-index: 120;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      max-width: calc(100vw - 32px);
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      border: 1px solid var(--border-faint);
+      border-radius: var(--radius-md);
+      background: var(--surface-floating);
+      box-shadow: var(--shadow-modal);
+      color: var(--text-secondary);
+      font-size: 13px;
+      animation: toast-in .18s var(--ease);
+    }
+
+    .toast .icon {
+      color: var(--text-muted);
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translate(-50%, 8px); }
+      to   { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    /* --- Адаптив -------------------------------------------------------------
+       Меню центрируется по экрану целиком. Когда ширины перестаёт хватать,
+       центр смещается в свободную зону, а затем лобби переносится под меню. */
+
+    @media (max-width: 1080px) {
+      .menu-stage {
+        padding-right: calc(var(--lobby-width) + var(--lobby-gap) * 2 + 8px);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .menu-stage {
+        min-height: 0;
+        padding: 76px 16px 20px;
+      }
+
+      .lobby {
+        position: static;
+        width: min(420px, 100%);
+        height: auto;
+        max-height: none;
+        margin: 0 auto 24px;
+      }
+
+      .lobby-scroll {
+        overflow: visible;
+      }
+
+      .app-game {
+        display: flex;
+        flex-direction: column;
+        min-height: 100dvh;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+
+    html.is-calm *,
+    html.is-calm *::before,
+    html.is-calm *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
+  </style>
+</head>
+<body>
+  <main id="app" aria-live="polite"></main>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script>
+    'use strict';
+
+    /* ==========================================================================
+       MIR — меню, аккаунты, друзья, комнаты и приглашения.
+       Всё работает без сервера: данные лежат в localStorage этого браузера.
+
+       ПРАВИЛО ПРОЕКТА: не добавлять сюда функции, экраны и эффекты, которых
+       не просили. Сначала запрос — потом код. См. PROJECT_RULES.md.
+       ========================================================================== */
+
+    const STORAGE_KEY = 'mir.game.state.v1';
+    const SESSION_KEY = 'mir.game.session.v1';
+    const SETTINGS_KEY = 'mir.game.settings.v1';
+    const ACTIVE_LIMIT_MS = 5 * 60 * 1000;
+
+    const ui = { authMode: 'login', modal: null, toastTimer: null };
+
+    const app = document.getElementById('app');
+    const modalRoot = document.getElementById('modal-root');
+    const toastRoot = document.getElementById('toast-root');
+
+    /* --- Иконки: один линейный набор, один штрих ---------------------------- */
+
+    const iconPaths = {
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+      crown: '<path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 11.34A2 2 0 0 1 17.21 19H6.79a2 2 0 0 1-1.94-1.64L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/><path d="M5 21h14"/>',
+      play: '<path d="M6.5 4.3a1 1 0 0 1 1.5-.87l11 7.7a1 1 0 0 1 0 1.74l-11 7.7a1 1 0 0 1-1.5-.87z"/>',
+      login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>',
+      logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+      userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+      user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+      send: '<path d="M14.54 21.69a.5.5 0 0 0 .93-.03l6.5-19a.5.5 0 0 0-.63-.63l-19 6.5a.5.5 0 0 0-.03.93l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+      plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+      doorExit: '<path d="M13 21h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6"/><path d="m8 17-5-5 5-5"/><path d="M3 12h12"/>',
+      info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'
+    };
+
+    function icon(name, extraClass = '') {
+      const cls = 'icon' + (extraClass ? ' ' + extraClass : '');
+      return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || '') + '</svg>';
+    }
+
+    /* Знак бренда: тот же контур, что в logo.svg */
+    function brandMark(size = 28) {
+      return '<svg class="brand-mark" width="' + size + '" height="' + size + '" viewBox="0 0 32 32" ' +
+        'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="1" y="1" width="30" height="30" rx="8" stroke-width="1.25" opacity=".5"/>' +
+        '<path d="M9 22V10l7 6.4 7-6.4v12" stroke-width="1.5"/>' +
+        '</svg>';
+    }
+
+    /* --- Утилиты -------------------------------------------------------------- */
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      })[char]);
+    }
+
+    function now() {
+      return Date.now();
+    }
+
+    function uid(prefix) {
+      if (window.crypto && crypto.randomUUID) return prefix + '-' + crypto.randomUUID();
+      return prefix + '-' + Math.random().toString(36).slice(2) + '-' + now().toString(36);
+    }
+
+    function plural(count, forms) {
+      const n = Math.abs(count) % 100;
+      const n1 = n % 10;
+      if (n > 10 && n < 20) return forms[2];
+      if (n1 > 1 && n1 < 5) return forms[1];
+      if (n1 === 1) return forms[0];
+      return forms[2];
+    }
+
+    /* --- Хранилище ------------------------------------------------------------ */
+
+    function getDefaultStore() {
+      return { version: 1, users: {}, friendships: [], friendRequests: [], rooms: {} };
+    }
+
+    function loadStore() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return getDefaultStore();
+        const parsed = JSON.parse(raw);
+        return {
+          ...getDefaultStore(),
+          ...parsed,
+          users: parsed.users || {},
+          friendships: Array.isArray(parsed.friendships) ? parsed.friendships : [],
+          friendRequests: Array.isArray(parsed.friendRequests) ? parsed.friendRequests : [],
+          rooms: parsed.rooms || {}
+        };
+      } catch (error) {
+        console.warn('Хранилище сброшено после ошибки разбора:', error);
+        return getDefaultStore();
+      }
+    }
+
+    function saveStore(store) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    }
+
+    function loadSettings() {
+      try {
+        return { reduceMotion: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+      } catch {
+        return { reduceMotion: false };
+      }
+    }
+
+    function applySettings(settings) {
+      document.documentElement.classList.toggle('is-calm', Boolean(settings.reduceMotion));
+    }
+
+    function saveSettings(settings) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      applySettings(settings);
+    }
+
+    function getSessionUserId() {
+      return localStorage.getItem(SESSION_KEY);
+    }
+
+    function setSessionUserId(userId) {
+      localStorage.setItem(SESSION_KEY, userId);
+    }
+
+    function clearSession() {
+      localStorage.removeItem(SESSION_KEY);
+    }
+
+    /* --- Аккаунты ------------------------------------------------------------- */
+
+    function normalizeLogin(login) {
+      return String(login || '').trim().toLowerCase().replace(/\s+/g, '');
+    }
+
+    function getInitials(name) {
+      const cleaned = String(name || 'M').trim();
+      const parts = cleaned.split(/\s+/).filter(Boolean);
+      if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return cleaned.slice(0, 2).toUpperCase();
+    }
+
+    function fallbackHash(text) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+    }
+
+    async function hashPassword(password, salt) {
+      const text = salt + ':' + password;
+      if (window.crypto && crypto.subtle && window.TextEncoder) {
+        const bytes = new TextEncoder().encode(text);
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      return fallbackHash(text);
+    }
+
+    function currentUser(store = loadStore()) {
+      return store.users[getSessionUserId()] || null;
+    }
+
+    function isOnline(user) {
+      return Boolean(user && now() - Number(user.lastActive || 0) < ACTIVE_LIMIT_MS);
+    }
+
+    function markActive() {
+      const store = loadStore();
+      const user = currentUser(store);
+      if (!user) return;
+      user.lastActive = now();
+      saveStore(store);
+    }
+
+    /* --- Друзья и комнаты ----------------------------------------------------- */
+
+    function getFriends(store, userId) {
+      return store.friendships
+        .filter(link => link.userA === userId || link.userB === userId)
+        .map(link => store.users[link.userA === userId ? link.userB : link.userA])
+        .filter(Boolean)
+        .sort((a, b) => Number(isOnline(b)) - Number(isOnline(a)) ||
+          a.displayName.localeCompare(b.displayName, 'ru'));
+    }
+
+    function areFriends(store, a, b) {
+      return store.friendships.some(link =>
+        (link.userA === a && link.userB === b) || (link.userA === b && link.userB === a));
+    }
+
+    function getIncomingFriendRequests(store, userId) {
+      return store.friendRequests.filter(r => r.toId === userId && r.status === 'pending');
+    }
+
+    function getOutgoingFriendRequests(store, userId) {
+      return store.friendRequests.filter(r => r.fromId === userId && r.status === 'pending');
+    }
+
+    function getOpenRooms(store) {
+      return Object.values(store.rooms).filter(room => room.status === 'open');
+    }
+
+    function getCurrentRoom(store, userId) {
+      return getOpenRooms(store)
+        .filter(room => room.members.includes(userId))
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null;
+    }
+
+    function getIncomingRoomInvites(store, userId) {
+      return getOpenRooms(store).flatMap(room => (room.invites || [])
+        .filter(invite => invite.toId === userId && invite.status === 'pending')
+        .map(invite => ({ ...invite, room })));
+    }
+
+    /* --- Обратная связь ------------------------------------------------------- */
+
+    function showToast(message) {
+      toastRoot.innerHTML = '<div class="toast" role="status">' + icon('info') +
+        '<span>' + escapeHTML(message) + '</span></div>';
+      clearTimeout(ui.toastTimer);
+      ui.toastTimer = setTimeout(() => { toastRoot.innerHTML = ''; }, 2800);
+    }
+
+    function setModal(name) {
+      ui.modal = name;
+      render();
+    }
+
+    function closeModal() {
+      ui.modal = null;
+      render();
+    }
+
+    /* --- Действия ------------------------------------------------------------- */
+
+    async function registerAccount(form) {
+      const login = normalizeLogin(form.login.value);
+      const displayName = String(form.displayName.value || '').trim();
+      const password = String(form.password.value || '');
+      if (login.length < 3) return showToast('Логин — от 3 символов.');
+      if (!/^[a-zа-яё0-9_.-]+$/i.test(login)) return showToast('В логине: буквы, цифры, точка, дефис, подчёркивание.');
+      if (password.length < 6) return showToast('Пароль — от 6 символов.');
+
+      const store = loadStore();
+      if (Object.values(store.users).some(user => user.login === login)) {
+        return showToast('Такой логин уже занят.');
+      }
+
+      const salt = uid('salt');
+      const user = {
+        id: uid('user'),
+        login,
+        displayName: displayName || login,
+        passwordHash: await hashPassword(password, salt),
+        salt,
+        createdAt: now(),
+        lastActive: now()
+      };
+      store.users[user.id] = user;
+      saveStore(store);
+      setSessionUserId(user.id);
+      showToast('Аккаунт создан.');
+      render();
+    }
+
+    async function loginAccount(form) {
+      const login = normalizeLogin(form.login.value);
+      const password = String(form.password.value || '');
+      const store = loadStore();
+      const user = Object.values(store.users).find(item => item.login === login);
+      if (!user) return showToast('Аккаунт не найден.');
+      if (await hashPassword(password, user.salt) !== user.passwordHash) return showToast('Неверный пароль.');
+      user.lastActive = now();
+      saveStore(store);
+      setSessionUserId(user.id);
+      render();
+    }
+
+    function logoutAccount() {
+      clearSession();
+      ui.modal = null;
+      ui.authMode = 'login';
+      showToast('Вы вышли из аккаунта.');
+      render();
+    }
+
+    function addFriend(login) {
+      const friendLogin = normalizeLogin(login);
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return;
+      const target = Object.values(store.users).find(user => user.login === friendLogin);
+      if (!target) return showToast('Игрок с таким логином не найден.');
+      if (target.id === me.id) return showToast('Нельзя добавить себя.');
+      if (areFriends(store, me.id, target.id)) return showToast('Уже в друзьях.');
+      const pending = store.friendRequests.some(r => r.status === 'pending' && (
+        (r.fromId === me.id && r.toId === target.id) || (r.fromId === target.id && r.toId === me.id)));
+      if (pending) return showToast('Заявка уже ждёт ответа.');
+      store.friendRequests.push({
+        id: uid('friend-request'), fromId: me.id, toId: target.id, status: 'pending', createdAt: now()
+      });
+      saveStore(store);
+      showToast('Заявка отправлена.');
+      render();
+    }
+
+    function acceptFriendRequest(requestId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const request = store.friendRequests.find(r => r.id === requestId && r.toId === me?.id && r.status === 'pending');
+      if (!request) return showToast('Заявка не найдена.');
+      request.status = 'accepted';
+      if (!areFriends(store, request.fromId, request.toId)) {
+        store.friendships.push({ id: uid('friendship'), userA: request.fromId, userB: request.toId, createdAt: now() });
+      }
+      saveStore(store);
+      showToast('Друг добавлен.');
+      render();
+    }
+
+    function declineFriendRequest(requestId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const request = store.friendRequests.find(r => r.id === requestId && r.toId === me?.id && r.status === 'pending');
+      if (!request) return;
+      request.status = 'declined';
+      saveStore(store);
+      showToast('Заявка отклонена.');
+      render();
+    }
+
+    function leaveCurrentRooms(store, userId) {
+      getOpenRooms(store).forEach(room => {
+        if (!room.members.includes(userId)) return;
+        if (room.ownerId === userId) {
+          room.status = 'closed';
+        } else {
+          room.members = room.members.filter(id => id !== userId);
+        }
+        room.updatedAt = now();
+      });
+    }
+
+    function createMasterRoom() {
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return;
+      leaveCurrentRooms(store, me.id);
+      const room = {
+        id: uid('room'),
+        name: 'Комната ' + me.displayName,
+        ownerId: me.id,
+        role: 'master',
+        status: 'open',
+        members: [me.id],
+        invites: [],
+        createdAt: now(),
+        updatedAt: now()
+      };
+      store.rooms[room.id] = room;
+      saveStore(store);
+      showToast('Комната создана. Пригласите друзей справа.');
+      render();
+    }
+
+    function closeCurrentRoom() {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me?.id);
+      if (!room) return;
+      const isOwner = room.ownerId === me.id;
+      if (isOwner) {
+        room.status = 'closed';
+      } else {
+        room.members = room.members.filter(id => id !== me.id);
+      }
+      room.updatedAt = now();
+      saveStore(store);
+      showToast(isOwner ? 'Комната закрыта.' : 'Вы вышли из комнаты.');
+      render();
+    }
+
+    function inviteFriend(friendId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me?.id);
+      if (!me || !room) return showToast('Сначала создайте комнату кнопкой «Мастер».');
+      if (!areFriends(store, me.id, friendId)) return showToast('Приглашать можно только друзей.');
+      if (room.members.includes(friendId)) return showToast('Игрок уже в комнате.');
+      if ((room.invites || []).some(i => i.toId === friendId && i.status === 'pending')) {
+        return showToast('Приглашение уже отправлено.');
+      }
+      room.invites = room.invites || [];
+      room.invites.push({
+        id: uid('room-invite'), roomId: room.id, fromId: me.id, toId: friendId, status: 'pending', createdAt: now()
+      });
+      room.updatedAt = now();
+      saveStore(store);
+      showToast('Приглашение отправлено.');
+      render();
+    }
+
+    function acceptRoomInvite(inviteId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const target = getIncomingRoomInvites(store, me?.id).find(i => i.id === inviteId);
+      if (!target) return showToast('Приглашение не найдено.');
+      leaveCurrentRooms(store, me.id);
+      const room = store.rooms[target.room.id];
+      room.invites.find(i => i.id === inviteId).status = 'accepted';
+      if (!room.members.includes(me.id)) room.members.push(me.id);
+      room.updatedAt = now();
+      saveStore(store);
+      ui.modal = null;
+      showToast('Вы вошли в комнату.');
+      render();
+    }
+
+    function declineRoomInvite(inviteId) {
+      const store = loadStore();
+      const me = currentUser(store);
+      const target = getIncomingRoomInvites(store, me?.id).find(i => i.id === inviteId);
+      if (!target) return;
+      const room = store.rooms[target.room.id];
+      room.invites.find(i => i.id === inviteId).status = 'declined';
+      room.updatedAt = now();
+      saveStore(store);
+      showToast('Приглашение отклонено.');
+      render();
+    }
+
+    /* --- Экран входа ---------------------------------------------------------- */
+
+    function renderAuth() {
+      app.className = '';
+      app.innerHTML = `
+        <button class="icon-btn icon-btn-bordered settings-btn" type="button" data-action="open-settings"
+                aria-label="Настройки" title="Настройки">${icon('gear', 'icon-lg')}</button>
+        <section class="auth-stage">
+          <div class="auth-card">
+            <div class="auth-head">
+              <div class="brand">
+                ${brandMark(30)}
+                <h1 class="wordmark wordmark-sm">MIR</h1>
+              </div>
+              <p class="auth-caption">Войдите, чтобы собирать комнаты и звать друзей.</p>
+            </div>
+            <div class="tabs" role="tablist" aria-label="Аккаунт">
+              <button class="tab" type="button" role="tab" data-action="auth-mode" data-mode="login"
+                      aria-selected="${ui.authMode === 'login'}">${icon('login')} Вход</button>
+              <button class="tab" type="button" role="tab" data-action="auth-mode" data-mode="register"
+                      aria-selected="${ui.authMode === 'register'}">${icon('userPlus')} Регистрация</button>
+            </div>
+            ${ui.authMode === 'login' ? renderLoginForm() : renderRegisterForm()}
+            <p class="auth-note">Аккаунты, друзья и комнаты хранятся локально в этом браузере.</p>
+          </div>
+        </section>
+      `;
+      renderModal();
+    }
+
+    function renderLoginForm() {
+      return `
+        <form class="form" data-form="login">
+          <div class="field">
+            <label class="field-label" for="login-name">Логин</label>
+            <input class="input" id="login-name" name="login" autocomplete="username"
+                   placeholder="например, master" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="login-password">Пароль</label>
+            <input class="input" id="login-password" name="password" type="password"
+                   autocomplete="current-password" placeholder="от 6 символов" required>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
+        </form>
+      `;
+    }
+
+    function renderRegisterForm() {
+      return `
+        <form class="form" data-form="register">
+          <div class="field">
+            <label class="field-label" for="register-login">Логин</label>
+            <input class="input" id="register-login" name="login" autocomplete="username"
+                   placeholder="по нему вас найдут друзья" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="register-name">Имя</label>
+            <input class="input" id="register-name" name="displayName" autocomplete="nickname"
+                   placeholder="как показывать в лобби">
+          </div>
+          <div class="field">
+            <label class="field-label" for="register-password">Пароль</label>
+            <input class="input" id="register-password" name="password" type="password"
+                   autocomplete="new-password" placeholder="от 6 символов" required>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Создать аккаунт</button>
+        </form>
+      `;
+    }
+
+    /* --- Главное меню --------------------------------------------------------- */
+
+    function renderGame() {
+      const store = loadStore();
+      const me = currentUser(store);
+      const room = getCurrentRoom(store, me.id);
+      const friends = getFriends(store, me.id);
+      const invites = getIncomingRoomInvites(store, me.id);
+
+      app.className = 'app-game';
+      app.innerHTML = `
+        <button class="icon-btn icon-btn-bordered settings-btn" type="button" data-action="open-settings"
+                aria-label="Настройки" title="Настройки">${icon('gear', 'icon-lg')}</button>
+        <section class="menu-stage" aria-label="Главное меню">
+          <div class="menu">
+            <div class="brand">
+              ${brandMark(40)}
+              <h1 class="wordmark wordmark-lg">MIR</h1>
+            </div>
+            <p class="menu-caption">Создайте комнату как мастер или войдите по приглашению.</p>
+            <div class="menu-actions">
+              <button class="btn btn-primary btn-lg btn-block" type="button"
+                      data-action="create-master-room">${icon('crown')} Мастер</button>
+              <button class="btn btn-secondary btn-lg btn-block" type="button"
+                      data-action="open-player">${icon('play')} Игрок</button>
+            </div>
+            <p class="menu-meta">${icon('user')} <b>${escapeHTML(me.displayName)}</b><span>·</span><span>${room ? (room.ownerId === me.id ? 'комната создана' : 'в комнате') : 'комнаты нет'}</span></p>
+          </div>
+        </section>
+        ${renderLobby(store, me, friends, room, invites)}
+      `;
+      renderModal();
+    }
+
+    /* --- Лобби справа --------------------------------------------------------- */
+
+    function renderLobby(store, me, friends, room, roomInvites) {
+      const friendRequests = getIncomingFriendRequests(store, me.id);
+      const outgoing = getOutgoingFriendRequests(store, me.id);
+      const onlineCount = friends.filter(isOnline).length;
+
+      return `
+        <aside class="lobby" aria-label="Лобби">
+          <header class="lobby-head">
+            <div>
+              <h2>Лобби</h2>
+              <p>Друзья и приглашения</p>
+            </div>
+            <button class="icon-btn icon-btn-danger" type="button" data-action="logout"
+                    aria-label="Выйти из аккаунта" title="Выйти из аккаунта">${icon('doorExit')}</button>
+          </header>
+
+          <div class="lobby-me">
+            ${renderAvatar(me, 'avatar-lg')}
+            <div class="row-text">
+              <span class="row-title">${escapeHTML(me.displayName)}</span>
+              <span class="row-sub">@${escapeHTML(me.login)}</span>
+            </div>
+            <span class="pill"><i class="pill-dot"></i>В сети</span>
+          </div>
+
+          <div class="lobby-scroll">
+            <section class="block" aria-label="Комната">
+              <div class="block-head">
+                <span>Комната</span>
+                ${room ? '<span class="block-count">' + room.members.length + ' ' + plural(room.members.length, ['участник', 'участника', 'участников']) + '</span>' : ''}
+              </div>
+              ${room
+                ? renderRoomCard(store, room, me.id)
+                : '<p class="block-empty">Пока нет. Нажмите «Мастер», чтобы создать комнату.</p>'}
+            </section>
+
+            ${friendRequests.length ? renderFriendRequests(store, friendRequests) : ''}
+            ${roomInvites.length ? renderRoomInvites(store, roomInvites) : ''}
+
+            <section class="block" aria-label="Друзья">
+              <div class="block-head">
+                <span>Друзья</span>
+                ${friends.length ? '<span class="block-count" title="В сети: ' + onlineCount + ' из ' + friends.length + '">' + onlineCount + ' / ' + friends.length + '</span>' : ''}
+              </div>
+              <form class="add-friend" data-form="add-friend">
+                <input class="input input-sm" name="login" placeholder="Логин игрока"
+                       aria-label="Логин игрока" required>
+                <button class="icon-btn icon-btn-bordered" type="submit"
+                        aria-label="Отправить заявку" title="Отправить заявку">${icon('userPlus')}</button>
+              </form>
+              ${friends.length
+                ? friends.map(friend => renderFriendRow(friend, room)).join('')
+                : '<p class="block-empty">Никого нет. Добавьте игрока по логину.</p>'}
+              ${outgoing.length
+                ? '<p class="block-empty">Ждут ответа: ' +
+                  outgoing.map(r => '@' + escapeHTML(store.users[r.toId]?.login || '—')).join(', ') + '</p>'
+                : ''}
+            </section>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderAvatar(user, extraClass = '') {
+      return `
+        <span class="avatar ${extraClass}" aria-hidden="true">${escapeHTML(getInitials(user.displayName || user.login))}
+          <i class="avatar-dot${isOnline(user) ? ' is-online' : ''}"></i>
+        </span>
+      `;
+    }
+
+    function renderRoomCard(store, room, meId) {
+      const owner = store.users[room.ownerId];
+      const members = room.members.map(id => store.users[id]).filter(Boolean);
+      const isOwner = room.ownerId === meId;
+      return `
+        <div class="room">
+          <div class="room-top">
+            <div class="room-name">
+              <strong>${escapeHTML(room.name)}</strong>
+              <span>Мастер: ${escapeHTML(owner?.displayName || '—')}</span>
+            </div>
+            <span class="pill">${isOwner ? 'Мастер' : 'Игрок'}</span>
+          </div>
+          <div class="avatar-stack" aria-label="Участники">
+            ${members.map(member => renderAvatar(member)).join('')}
+          </div>
+          <button class="btn btn-danger btn-sm btn-block" type="button" data-action="close-room">
+            ${isOwner ? 'Закрыть комнату' : 'Выйти из комнаты'}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderFriendRow(friend, room) {
+      const canInvite = Boolean(room && !room.members.includes(friend.id));
+      const online = isOnline(friend);
+      return `
+        <div class="row${online ? '' : ' is-offline'}">
+          ${renderAvatar(friend)}
+          <span class="row-text">
+            <span class="row-title">${escapeHTML(friend.displayName)}</span>
+            <span class="row-sub">@${escapeHTML(friend.login)}</span>
+          </span>
+          <span class="row-actions">
+            <button class="icon-btn icon-btn-sm" type="button" data-action="invite-friend"
+                    data-friend-id="${escapeHTML(friend.id)}" ${canInvite ? '' : 'disabled'}
+                    aria-label="Пригласить в комнату" title="Пригласить в комнату">${icon('send')}</button>
+          </span>
+        </div>
+      `;
+    }
+
+    function renderFriendRequests(store, requests) {
+      return `
+        <section class="block" aria-label="Заявки в друзья">
+          <div class="block-head">
+            <span>Заявки в друзья</span>
+            <span class="block-count">${requests.length}</span>
+          </div>
+          ${requests.map(request => {
+            const from = store.users[request.fromId];
+            return `
+              <div class="row">
+                ${from ? renderAvatar(from) : ''}
+                <span class="row-text">
+                  <span class="row-title">${escapeHTML(from?.displayName || 'Игрок')}</span>
+                  <span class="row-sub">Хочет добавить в друзья</span>
+                </span>
+                <span class="row-actions">
+                  <button class="icon-btn icon-btn-sm" type="button" data-action="accept-friend"
+                          data-request-id="${escapeHTML(request.id)}"
+                          aria-label="Принять" title="Принять">${icon('check')}</button>
+                  <button class="icon-btn icon-btn-sm icon-btn-danger" type="button" data-action="decline-friend"
+                          data-request-id="${escapeHTML(request.id)}"
+                          aria-label="Отклонить" title="Отклонить">${icon('x')}</button>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    function renderRoomInvites(store, invites) {
+      return `
+        <section class="block" aria-label="Приглашения в комнату">
+          <div class="block-head">
+            <span>Приглашения</span>
+            <span class="block-count">${invites.length}</span>
+          </div>
+          ${invites.map(invite => {
+            const from = store.users[invite.fromId];
+            return `
+              <div class="row">
+                ${from ? renderAvatar(from) : ''}
+                <span class="row-text">
+                  <span class="row-title">${escapeHTML(invite.room.name)}</span>
+                  <span class="row-sub">От ${escapeHTML(from?.displayName || 'игрока')}</span>
+                </span>
+                <span class="row-actions">
+                  <button class="icon-btn icon-btn-sm" type="button" data-action="accept-room"
+                          data-invite-id="${escapeHTML(invite.id)}"
+                          aria-label="Войти в комнату" title="Войти в комнату">${icon('check')}</button>
+                  <button class="icon-btn icon-btn-sm icon-btn-danger" type="button" data-action="decline-room"
+                          data-invite-id="${escapeHTML(invite.id)}"
+                          aria-label="Отклонить" title="Отклонить">${icon('x')}</button>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    /* --- Модальные окна ------------------------------------------------------- */
+
+    function renderModal() {
+      if (!ui.modal) {
+        modalRoot.innerHTML = '';
+        return;
+      }
+      if (ui.modal === 'settings') return renderSettingsModal();
+      if (ui.modal === 'player') return renderPlayerModal();
+    }
+
+    function modalFrame(title, body, headIcon) {
+      modalRoot.innerHTML = `
+        <div class="modal-layer" role="dialog" aria-modal="true"
+             aria-label="${escapeHTML(title)}" data-action="modal-backdrop">
+          <section class="modal">
+            <header class="modal-head">
+              <h2>${headIcon || ''}${escapeHTML(title)}</h2>
+              <button class="icon-btn" type="button" data-action="close-modal"
+                      aria-label="Закрыть" title="Закрыть">${icon('x')}</button>
+            </header>
+            <div class="modal-body">${body}</div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderSettingsModal() {
+      const settings = loadSettings();
+      modalFrame('Настройки', `
+        <div class="setting-row">
+          <span class="row-text">
+            <span class="row-title">Меньше анимации</span>
+            <span class="row-sub">Отключает переходы и плавные появления</span>
+          </span>
+          <button class="switch" type="button" role="switch"
+                  aria-checked="${settings.reduceMotion}" data-action="toggle-motion"
+                  aria-label="Меньше анимации"></button>
+        </div>
+        <p class="note"><b>Правило проекта.</b> Не добавлять в игру ничего, что не было запрошено:
+          ни функций, ни экранов, ни эффектов, ни декора. Дизайн остаётся минималистичным —
+          тёмно-серые тона, белый текст, линейные SVG-иконки.</p>
+      `, icon('gear'));
+    }
+
+    function renderPlayerModal() {
+      const store = loadStore();
+      const me = currentUser(store);
+      if (!me) return closeModal();
+      const invites = getIncomingRoomInvites(store, me.id);
+      const room = getCurrentRoom(store, me.id);
+      modalFrame('Игрок', `
+        ${room ? renderRoomCard(store, room, me.id) : ''}
+        ${invites.length
+          ? renderRoomInvites(store, invites)
+          : '<p class="note">Приглашения появятся здесь и в лобби справа, как только друг создаст комнату и позовёт вас.</p>'}
+      `, icon('play'));
+    }
+
+    /* --- Рендер и события ----------------------------------------------------- */
+
+    function render() {
+      if (currentUser()) {
+        renderGame();
+      } else {
+        renderAuth();
+      }
+    }
+
+    document.addEventListener('click', event => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+
+      if (action === 'modal-backdrop') {
+        if (event.target === target) closeModal();
+        return;
+      }
+      if (action === 'open-settings') setModal('settings');
+      if (action === 'close-modal') closeModal();
+      if (action === 'auth-mode') {
+        ui.authMode = target.dataset.mode || 'login';
+        render();
+      }
+      if (action === 'logout') logoutAccount();
+      if (action === 'create-master-room') createMasterRoom();
+      if (action === 'open-player') setModal('player');
+      if (action === 'close-room') closeCurrentRoom();
+      if (action === 'invite-friend') inviteFriend(target.dataset.friendId);
+      if (action === 'accept-friend') acceptFriendRequest(target.dataset.requestId);
+      if (action === 'decline-friend') declineFriendRequest(target.dataset.requestId);
+      if (action === 'accept-room') acceptRoomInvite(target.dataset.inviteId);
+      if (action === 'decline-room') declineRoomInvite(target.dataset.inviteId);
+      if (action === 'toggle-motion') {
+        const settings = loadSettings();
+        settings.reduceMotion = !settings.reduceMotion;
+        saveSettings(settings);
+        render();
+      }
+    });
+
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.dataset.form) return;
+      event.preventDefault();
+      if (form.dataset.form === 'login') loginAccount(form);
+      if (form.dataset.form === 'register') registerAccount(form);
+      if (form.dataset.form === 'add-friend') {
+        addFriend(form.login.value);
+        form.reset();
+      }
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && ui.modal) closeModal();
+    });
+
+    window.addEventListener('storage', event => {
+      if ([STORAGE_KEY, SESSION_KEY, SETTINGS_KEY].includes(event.key)) render();
+    });
+
+    setInterval(markActive, 45 * 1000);
+    applySettings(loadSettings());
+    markActive();
+    render();
+  </script>
+</body>
+</html>
