@@ -14,7 +14,9 @@
     "icons": "node icons.mjs",
     "serve": "node serve.mjs",
     "share": "vite build && node serve.mjs",
-    "share:public": "vite build && node serve.mjs --public"
+    "share:public": "vite build && node serve.mjs --public",
+    "doctor": "node doctor.mjs",
+    "logs": "node -e \"import('node:fs').then(fs => console.log(fs.readFileSync('logs/mir-server.log','utf8')))\""
   },
   "devDependencies": {
     "vite": "^7.1.9"

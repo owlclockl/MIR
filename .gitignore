@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-app/
+logs/
 *.exe
 *.apk
 data/
