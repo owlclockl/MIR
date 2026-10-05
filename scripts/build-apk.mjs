@@ -17,6 +17,17 @@
 // Ключ подписи сохраняется в data/apk-signing-key.json и переиспользуется:
 // иначе каждая сборка подписывалась бы новым ключом и обновление поверх уже
 // установленной игры падало бы с «Приложение не установлено».
+//
+// Логи. Каждый запуск пишет подробный протокол в logs/apk-build.log: что
+// собиралось, какие получились размеры, смещения и хеши, какие проверки
+// прошли и чем именно закончилась неудачная. Предыдущий протокол остаётся
+// рядом как apk-build.prev.log. Собранный файл дополнительно разбирается
+// обратно (ZIP → манифест → DEX → ARSC → подписи) — в журнал попадает не
+// замысел сборщика, а то, что реально лежит в APK.
+//
+// Если APK не запускается на телефоне, разбор того же файла в любой момент
+// повторяет `npm run apk:doctor`, а сама игра внутри APK при падении
+// показывает стек ошибки прямо на экране и пишет его в logcat под тегом MIR.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,9 +35,17 @@ import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import './lib/root.mjs';
 import { buildSingleHtml } from './build-single.mjs';
+import { createLogger, human, sha256 } from './lib/log.mjs';
+import { ANDROID_THEMES } from './lib/apk-read.mjs';
+import { auditApk } from './lib/apk-audit.mjs';
+import { injectDiagnostics } from './lib/web-diagnostics.mjs';
+
+const log = createLogger('apk-build', { title: 'Сборка Android-приложения MIR.apk' });
 
 const PACKAGE = 'com.mir.game';
 const LABEL = 'MIR';
+/* Тег в системном журнале Android: `adb logcat -s MIR` покажет только нас. */
+const LOG_TAG = 'MIR';
 const MIN_SDK = 21;
 const TARGET_SDK = 34;
 const KEY_FILE = join('data', 'apk-signing-key.json');
@@ -61,6 +80,20 @@ function uleb128(value) {
   return Buffer.from(out);
 }
 
+/** Знаковый leb128 — нужен в списке обработчиков исключений DEX. */
+function sleb128(value) {
+  const out = [];
+  let v = value | 0;
+  for (;;) {
+    const byte = v & 0x7f;
+    v >>= 7;
+    const done = (v === 0 && !(byte & 0x40)) || (v === -1 && byte & 0x40);
+    out.push(done ? byte : byte | 0x80);
+    if (done) break;
+  }
+  return Buffer.from(out);
+}
+
 function adler32(buf) {
   let a = 1;
   let b = 0;
@@ -90,21 +123,36 @@ function crc32(buf) {
 /* ============================================================
    1. classes.dex
    ------------------------------------------------------------
-   Генерируем ровно один класс:
+   Генерируем ровно один класс. Он не просто открывает WebView, но и
+   рассказывает о себе в системный журнал (logcat, тег MIR), а любую
+   ошибку запуска показывает прямо на экране телефона — иначе Android
+   покажет «Приложение остановлено» и настоящая причина останется
+   только в logcat, до которого без компьютера не добраться.
 
      package com.mir.game;
      public class MainActivity extends android.app.Activity {
        public MainActivity() { super(); }
        protected void onCreate(Bundle b) {
-         super.onCreate(b);
-         WebView w = new WebView(this);
-         WebSettings s = w.getSettings();
-         s.setJavaScriptEnabled(true);
-         s.setDomStorageEnabled(true);
-         s.setAllowFileAccess(true);
-         w.setWebViewClient(new WebViewClient());
-         setContentView(w);
-         w.loadUrl("file:///android_asset/mir.html");
+         Log.i("MIR", "onCreate: старт, сборка 0.3.0");
+         try {
+           super.onCreate(b);
+           WebView w = new WebView(this);
+           WebSettings s = w.getSettings();
+           s.setJavaScriptEnabled(true);
+           s.setDomStorageEnabled(true);
+           s.setAllowFileAccess(true);
+           w.setWebViewClient(new WebViewClient());
+           setContentView(w);
+           w.loadUrl("file:///android_asset/mir.html");
+           Log.i("MIR", "onCreate: WebView создан, загружаю mir.html");
+         } catch (Throwable t) {
+           String trace = Log.getStackTraceString(t);
+           Log.e("MIR", trace);
+           TextView tv = new TextView(this);
+           tv.setTextIsSelectable(true);
+           tv.setText("MIR не запустился. Покажите этот текст разработчику:\n\n" + trace);
+           setContentView(tv);
+         }
        }
      }
    ============================================================ */
@@ -115,8 +163,16 @@ function buildDex() {
   const WEBVIEW = 'Landroid/webkit/WebView;';
   const SETTINGS = 'Landroid/webkit/WebSettings;';
   const CLIENT = 'Landroid/webkit/WebViewClient;';
+  const LOG = 'Landroid/util/Log;';
+  const TEXTVIEW = 'Landroid/widget/TextView;';
+  const THROWABLE = 'Ljava/lang/Throwable;';
+  const STRING = 'Ljava/lang/String;';
+  const CHARSEQ = 'Ljava/lang/CharSequence;';
   const SOURCE_FILE = 'MainActivity.java';
   const START_URL = 'file:///android_asset/mir.html';
+  const BOOT_MSG = `onCreate: start, MIR ${VERSION_NAME} (${VERSION_CODE})`;
+  const READY_MSG = 'onCreate: WebView created, loading assets/mir.html';
+  const CRASH_PREFIX = 'MIR не запустился. Покажите этот экран разработчику:\n\n';
 
   const ref = (cls, name, params, ret) => ({ cls, name, params, ret });
 
@@ -127,11 +183,18 @@ function buildDex() {
     wvInit: ref(WEBVIEW, '<init>', ['Landroid/content/Context;'], 'V'),
     wvGetSettings: ref(WEBVIEW, 'getSettings', [], SETTINGS),
     wvSetClient: ref(WEBVIEW, 'setWebViewClient', [CLIENT], 'V'),
-    wvLoadUrl: ref(WEBVIEW, 'loadUrl', ['Ljava/lang/String;'], 'V'),
+    wvLoadUrl: ref(WEBVIEW, 'loadUrl', [STRING], 'V'),
     setJs: ref(SETTINGS, 'setJavaScriptEnabled', ['Z'], 'V'),
     setDom: ref(SETTINGS, 'setDomStorageEnabled', ['Z'], 'V'),
     setFiles: ref(SETTINGS, 'setAllowFileAccess', ['Z'], 'V'),
     clientInit: ref(CLIENT, '<init>', [], 'V'),
+    logI: ref(LOG, 'i', [STRING, STRING], 'I'),
+    logE: ref(LOG, 'e', [STRING, STRING], 'I'),
+    logTrace: ref(LOG, 'getStackTraceString', [THROWABLE], STRING),
+    strConcat: ref(STRING, 'concat', [STRING], STRING),
+    tvInit: ref(TEXTVIEW, '<init>', ['Landroid/content/Context;'], 'V'),
+    tvSetText: ref(TEXTVIEW, 'setText', [CHARSEQ], 'V'),
+    tvSelectable: ref(TEXTVIEW, 'setTextIsSelectable', ['Z'], 'V'),
     ownInit: ref(CLASS, '<init>', [], 'V'),
     ownOnCreate: ref(CLASS, 'onCreate', ['Landroid/os/Bundle;'], 'V'),
   };
@@ -144,8 +207,7 @@ function buildDex() {
     typeSet.add(m.ret);
     for (const p of m.params) typeSet.add(p);
   }
-  typeSet.add(WEBVIEW);
-  typeSet.add(CLIENT);
+  for (const t of [WEBVIEW, CLIENT, TEXTVIEW, THROWABLE, STRING, CHARSEQ, LOG]) typeSet.add(t);
   const types = [...typeSet].sort();
   const typeIdx = new Map(types.map((t, i) => [t, i]));
 
@@ -153,7 +215,7 @@ function buildDex() {
   const shortyChar = (t) => (t.startsWith('L') || t.startsWith('[') ? 'L' : t);
   const shortyOf = (m) => shortyChar(m.ret) + m.params.map(shortyChar).join('');
 
-  const stringSet = new Set([...types, SOURCE_FILE, START_URL]);
+  const stringSet = new Set([...types, SOURCE_FILE, START_URL, LOG_TAG, BOOT_MSG, READY_MSG, CRASH_PREFIX]);
   for (const m of methodRefs) {
     stringSet.add(m.name);
     stringSet.add(shortyOf(m));
@@ -199,10 +261,13 @@ function buildDex() {
     const4: 0x12,
     newInstance: 0x22,
     moveResultObject: 0x0c,
+    moveException: 0x0d,
+    goto: 0x28,
     returnVoid: 0x0e,
     invokeVirtual: 0x6e,
     invokeSuper: 0x6f,
     invokeDirect: 0x70,
+    invokeStatic: 0x71,
   };
 
   const invoke = (op, method, regs) => {
@@ -221,7 +286,17 @@ function buildDex() {
   // onCreate(Bundle): registers=7, ins=2 → p0 = v5 (this), p1 = v6 (bundle)
   const THIS = 5;
   const BUNDLE = 6;
-  const onCreateCode = [
+
+  /* Перед try: отметка в logcat, что активность вообще стартовала.
+     Если в журнале телефона нет этой строки — Android не дошёл даже до
+     запуска активности (не установилось, не распознался манифест). */
+  const prologue = [
+    (0 << 8) | OP.constString, strIdx.get(LOG_TAG),            // const-string v0, "MIR"
+    (1 << 8) | OP.constString, strIdx.get(BOOT_MSG),           // const-string v1, "onCreate: start…"
+    ...invoke(OP.invokeStatic, M.logI, [0, 1]),                // Log.i(v0, v1)
+  ];
+
+  const guarded = [
     ...invoke(OP.invokeSuper, M.superOnCreate, [THIS, BUNDLE]),
     (0 << 8) | OP.newInstance, typeIdx.get(WEBVIEW),            // new-instance v0, WebView
     ...invoke(OP.invokeDirect, M.wvInit, [0, THIS]),            // new WebView(this)
@@ -237,23 +312,85 @@ function buildDex() {
     ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 0]),
     (4 << 8) | OP.constString, strIdx.get(START_URL),           // const-string v4, url
     ...invoke(OP.invokeVirtual, M.wvLoadUrl, [0, 4]),
+    (0 << 8) | OP.constString, strIdx.get(LOG_TAG),             // const-string v0, "MIR"
+    (1 << 8) | OP.constString, strIdx.get(READY_MSG),           // const-string v1, "…created"
+    ...invoke(OP.invokeStatic, M.logI, [0, 1]),                 // Log.i(v0, v1)
+  ];
+
+  /* Обработчик: стек ошибки уходит и в logcat, и на экран телефона. */
+  const handler = [
+    (0 << 8) | OP.moveException,                                // move-exception v0
+    ...invoke(OP.invokeStatic, M.logTrace, [0]),                // Log.getStackTraceString(v0)
+    (1 << 8) | OP.moveResultObject,                             // move-result-object v1 (текст стека)
+    (2 << 8) | OP.constString, strIdx.get(LOG_TAG),             // const-string v2, "MIR"
+    ...invoke(OP.invokeStatic, M.logE, [2, 1]),                 // Log.e("MIR", стек)
+    (2 << 8) | OP.constString, strIdx.get(CRASH_PREFIX),        // const-string v2, пояснение
+    ...invoke(OP.invokeVirtual, M.strConcat, [2, 1]),           // пояснение + стек
+    (1 << 8) | OP.moveResultObject,                             // move-result-object v1
+    (3 << 8) | OP.newInstance, typeIdx.get(TEXTVIEW),           // new-instance v3, TextView
+    ...invoke(OP.invokeDirect, M.tvInit, [3, THIS]),            // new TextView(this)
+    (1 << 12) | (4 << 8) | OP.const4,                           // const/4 v4, 1
+    ...invoke(OP.invokeVirtual, M.tvSelectable, [3, 4]),        // текст можно выделить и скопировать
+    ...invoke(OP.invokeVirtual, M.tvSetText, [3, 1]),           // tv.setText(пояснение + стек)
+    ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 3]),   // показать вместо игры
+  ];
+
+  /* Раскладка: пролог, try-блок, goto через обработчик, обработчик, return. */
+  const tryStart = prologue.length;
+  const tryLength = guarded.length;
+  const gotoAddr = tryStart + tryLength;
+  const handlerAddr = gotoAddr + 1;
+  const doneAddr = handlerAddr + handler.length;
+  const gotoDelta = doneAddr - gotoAddr;
+  if (gotoDelta > 127) throw new Error('build-apk: обработчик ошибки не помещается в короткий goto');
+
+  const onCreateCode = [
+    ...prologue,
+    ...guarded,
+    (gotoDelta << 8) | OP.goto,
+    ...handler,
     OP.returnVoid,
   ];
 
-  function codeItem(registers, ins, outs, units) {
-    const body = Buffer.alloc(16 + units.length * 2);
-    body.writeUInt16LE(registers, 0);
-    body.writeUInt16LE(ins, 2);
-    body.writeUInt16LE(outs, 4);
-    body.writeUInt16LE(0, 6); // tries_size
-    body.writeUInt32LE(0, 8); // debug_info_off
-    body.writeUInt32LE(units.length, 12);
-    units.forEach((unit, i) => body.writeUInt16LE(unit & 0xffff, 16 + i * 2));
-    return body;
+  /* try_item + encoded_catch_handler_list: один обработчик на Throwable. */
+  const catchList = Buffer.concat([
+    uleb128(1), // размер списка
+    Buffer.concat([sleb128(1), uleb128(typeIdx.get(THROWABLE)), uleb128(handlerAddr)]),
+  ]);
+  const tryItem = Buffer.alloc(8);
+  tryItem.writeUInt32LE(tryStart, 0);
+  tryItem.writeUInt16LE(tryLength, 4);
+  tryItem.writeUInt16LE(1, 6); // смещение обработчика внутри списка (после uleb размера)
+
+  function codeItem(registers, ins, outs, units, tries = null) {
+    const head = Buffer.alloc(16 + units.length * 2);
+    head.writeUInt16LE(registers, 0);
+    head.writeUInt16LE(ins, 2);
+    head.writeUInt16LE(outs, 4);
+    head.writeUInt16LE(tries ? 1 : 0, 6);
+    head.writeUInt32LE(0, 8); // debug_info_off
+    head.writeUInt32LE(units.length, 12);
+    units.forEach((unit, i) => head.writeUInt16LE(unit & 0xffff, 16 + i * 2));
+    if (!tries) return head;
+    /* try_item-ы должны начинаться с чётного смещения внутри code_item. */
+    const padding = units.length % 2 ? Buffer.alloc(2) : Buffer.alloc(0);
+    return Buffer.concat([head, padding, tries.item, tries.list]);
   }
 
   const codeInit = codeItem(1, 1, 1, initCode);
-  const codeOnCreate = codeItem(7, 2, 2, onCreateCode);
+  const codeOnCreate = codeItem(7, 2, 2, onCreateCode, { item: tryItem, list: catchList });
+
+  /* Сведения для журнала сборки: по ним видно, что именно попало в DEX. */
+  const report = {
+    types,
+    strings,
+    methods: methods.map((m) => `${m.cls}->${m.name}(${m.params.join('')})${m.ret}`),
+    onCreateUnits: onCreateCode.length,
+    tryStart,
+    tryLength,
+    handlerAddr,
+    doneAddr,
+  };
 
   /* --- список типов для прототипов с параметрами ------------------- */
   const typeListChunks = [];
@@ -416,7 +553,25 @@ function buildDex() {
   crypto.createHash('sha1').update(dex.subarray(32)).digest().copy(dex, 12);
   dex.writeUInt32LE(adler32(dex.subarray(12)), 8);
 
-  return dex;
+  report.layout = {
+    headerSize,
+    stringIdsOff,
+    typeIdsOff,
+    protoIdsOff,
+    methodIdsOff,
+    classDefsOff,
+    dataOff,
+    typeListsOff,
+    codeInitOff,
+    codeOnCreateOff,
+    stringDataStart,
+    classDataOff,
+    mapOff,
+    fileSize,
+  };
+  report.mapItems = mapItems;
+
+  return { dex, report };
 }
 
 /* ============================================================
@@ -779,10 +934,29 @@ function derOid(oid) {
 const OID_SHA256 = derSeq(derOid('2.16.840.1.101.3.4.2.1'), derNull());
 const OID_SHA256_RSA = derSeq(derOid('1.2.840.113549.1.1.11'), derNull());
 
+/* Серийный номер сертификата: положительное целое в минимальной записи DER.
+
+   Здесь легко промахнуться, и промах стоит дорого. Раньше номер собирался
+   как `[0x00, ...8 случайных байт]`. Ведущий ноль в DER допустим только
+   тогда, когда без него старший бит сделал бы число отрицательным. Если
+   первый случайный байт оказывался меньше 0x80 (а это половина сборок),
+   получалась запрещённая «не минимальная» запись. Такой сертификат
+   спокойно читают нестрогие разборщики (androguard, apksigtool), но
+   отвергают строгие — OpenSSL, Rust-овый cryptography и, что важнее всего,
+   BoringSSL внутри Android. Телефон при установке отвечал «Приложение не
+   установлено» / INSTALL_PARSE_FAILED_NO_CERTIFICATES, а сборщик при этом
+   рапортовал об успехе. */
+function serialNumber() {
+  const bytes = crypto.randomBytes(8);
+  bytes[0] &= 0x7f; // положительное число — ведущий ноль не нужен
+  if (bytes[0] === 0) bytes[0] = 1; // и не нулевой, иначе запись снова не минимальна
+  return derInt(bytes);
+}
+
 function makeCertificate(keys) {
   const rdn = (oid, value) => derSet(derSeq(derOid(oid), derUtf8(value)));
   const name = derSeq(rdn('2.5.4.6', 'RU'), rdn('2.5.4.10', 'MIR'), rdn('2.5.4.3', 'The civilization of the sages'));
-  const serial = derInt(Buffer.from([0x00, ...crypto.randomBytes(8)]));
+  const serial = serialNumber();
   const validity = derSeq(derUtcTime('200101000000Z'), derUtcTime('491231235959Z'));
   const spki = keys.publicKey.export({ type: 'spki', format: 'der' });
 
@@ -799,32 +973,54 @@ function makeCertificate(keys) {
   return derSeq(tbs, OID_SHA256_RSA, der(0x03, Buffer.concat([Buffer.from([0]), signature])));
 }
 
-function loadOrCreateKey() {
-  if (existsSync(KEY_FILE)) {
-    const saved = JSON.parse(readFileSync(KEY_FILE, 'utf8'));
-    return {
-      privateKey: crypto.createPrivateKey(saved.privateKey),
-      certificate: Buffer.from(saved.certificate, 'base64'),
-      fresh: false,
-    };
-  }
-
-  const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const certificate = makeCertificate(keys);
+/** Сохраняет ключ и сертификат в data/apk-signing-key.json. */
+function saveKey(privateKey, certificate) {
   mkdirSync('data', { recursive: true });
   writeFileSync(
     KEY_FILE,
     JSON.stringify(
       {
         note: 'Ключ подписи MIR.apk. Не удаляйте: без него обновление поверх установленной игры не поставится.',
-        privateKey: keys.privateKey.export({ type: 'pkcs8', format: 'pem' }),
+        privateKey: privateKey.export({ type: 'pkcs8', format: 'pem' }),
         certificate: certificate.toString('base64'),
       },
       null,
       2,
     ),
   );
-  return { privateKey: keys.privateKey, certificate, fresh: true };
+}
+
+/**
+ * Берёт сохранённый ключ подписи или создаёт новый.
+ *
+ * Сохранённый сертификат обязательно проверяется строгим разборщиком X.509:
+ * ключи, созданные прежними версиями сборщика, содержали неминимальный
+ * серийный номер, и Android отказывался ставить такой пакет. Если
+ * сертификат не читается — он перевыпускается тем же ключом, а сборка
+ * честно пишет об этом в журнал.
+ */
+function loadOrCreateKey() {
+  if (existsSync(KEY_FILE)) {
+    const saved = JSON.parse(readFileSync(KEY_FILE, 'utf8'));
+    const privateKey = crypto.createPrivateKey(saved.privateKey);
+    const certificate = Buffer.from(saved.certificate, 'base64');
+    try {
+      /* Строгий разбор: тот же путь, которым идёт Android при установке. */
+      const parsed = new crypto.X509Certificate(certificate);
+      if (!parsed.publicKey.equals(crypto.createPublicKey(privateKey)))
+        throw new Error('открытый ключ в сертификате не совпадает с закрытым');
+      return { privateKey, certificate, fresh: false, renewed: false };
+    } catch (err) {
+      const renewedCert = makeCertificate({ privateKey, publicKey: crypto.createPublicKey(privateKey) });
+      saveKey(privateKey, renewedCert);
+      return { privateKey, certificate: renewedCert, fresh: false, renewed: true, reason: err.message };
+    }
+  }
+
+  const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const certificate = makeCertificate(keys);
+  saveKey(keys.privateKey, certificate);
+  return { privateKey: keys.privateKey, certificate, fresh: true, renewed: false };
 }
 
 /* ============================================================
@@ -1279,55 +1475,212 @@ function findLocalEntry(apk, wanted) {
 }
 
 /* ============================================================
-   9. Сборка
+   9. Сборка: каждый шаг с протоколом в logs/apk-build.log
    ============================================================ */
 
-console.log('--- Сборка MIR для Android (.apk) ---');
+console.log('============================================================');
+console.log('  MIR — сборка Android-приложения (.apk)');
+console.log('============================================================');
 
-const html = await buildSingleHtml();
-const icon = readFileSync(existsSync('public/icons/icon-512.png') ? 'public/icons/icon-512.png' : 'public/icons/icon-192.png');
+const BUILT_AT = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-const dex = buildDex();
-const dexProblems = verifyDex(dex);
-if (dexProblems.length) {
-  console.error('\n✗ Самопроверка classes.dex не прошла:');
-  for (const p of dexProblems) console.error(`    • ${p}`);
+try {
+  /* --- 1. Исходники ------------------------------------------------ */
+  log.section('1. Окружение и исходники');
+  log.detail('Node', process.version);
+  log.detail('Платформа', `${process.platform} ${process.arch}`);
+  log.detail('Версия игры', `${VERSION_NAME} (код ${VERSION_CODE})`);
+  for (const file of ['index.html', 'src/main.js', 'package.json', 'public/icons/icon-512.png']) {
+    log.check(existsSync(file), `на месте ${file}`, { fail: 'без этого файла сборка не имеет смысла' });
+  }
+
+  log.step('Собираю однофайловую версию игры (vite build + инлайн)');
+  const startSingle = Date.now();
+  const rawHtml = await buildSingleHtml();
+  log.ok(`mir.html собран за ${((Date.now() - startSingle) / 1000).toFixed(1)} с — ${human(Buffer.byteLength(rawHtml))}`);
+  log.check(rawHtml.includes('<script'), 'в mir.html есть код игры', { fail: 'в WebView будет пустая страница' });
+  log.check(!rawHtml.includes('<script type="module"'), 'скрипт не модульный', {
+    fail: 'модульные скрипты не работают по file:// — WebView покажет чёрный экран',
+  });
+
+  log.step('Встраиваю экранный журнал ошибок для телефона');
+  const diag = injectDiagnostics(rawHtml, { version: VERSION_NAME, built: BUILT_AT });
+  log.check(diag.inserted, 'диагностика встроена в <body>', {
+    fail: diag.reason ?? 'ошибку внутри WebView будет не увидеть',
+  });
+  const html = diag.html;
+  log.detail('Размер страницы с диагностикой', human(Buffer.byteLength(html)));
+
+  const iconFile = existsSync('public/icons/icon-512.png') ? 'public/icons/icon-512.png' : 'public/icons/icon-192.png';
+  const icon = readFileSync(iconFile);
+  log.detail('Иконка', `${iconFile}, ${human(icon.length)}`);
+
+  /* --- 2. classes.dex ---------------------------------------------- */
+  log.section('2. Байт-код classes.dex');
+  const { dex, report } = buildDex();
+  log.detail('Размер DEX', human(dex.length));
+  log.detail('Типов', report.types.length);
+  log.detail('Строк', report.strings.length);
+  log.detail('Методов', report.methods.length);
+  log.raw(`Типы: ${report.types.join(', ')}`);
+  log.raw(`Методы:\n  ${report.methods.join('\n  ')}`);
+  log.raw(`Строки: ${report.strings.map((s) => JSON.stringify(s)).join(', ')}`);
+  log.raw(`Раскладка файла: ${JSON.stringify(report.layout, null, 2)}`);
+  log.raw(
+    `onCreate: ${report.onCreateUnits} 16-битных слов, try с ${report.tryStart} по ${report.tryStart + report.tryLength}, ` +
+      `обработчик на ${report.handlerAddr}, выход на ${report.doneAddr}`,
+  );
+  log.blob('classes.dex', dex);
+
+  const dexProblems = verifyDex(dex);
+  for (const problem of dexProblems) log.fail(problem, 'это же проверяет верификатор ART при установке');
+  log.check(dexProblems.length === 0, 'самопроверка DEX пройдена', {
+    fail: 'собирать APK дальше нельзя: приложение упадёт при запуске',
+  });
+  if (dexProblems.length) throw new Error('DEX собран неверно — подробности выше');
+
+  /* --- 3. AndroidManifest.xml -------------------------------------- */
+  log.section('3. AndroidManifest.xml');
+  const manifestBin = buildManifest();
+  log.blob('AndroidManifest.xml', manifestBin);
+  log.detail('minSdk / targetSdk', `${MIN_SDK} / ${TARGET_SDK}`);
+  log.detail('Тема', `0x${THEME_RES_ID.toString(16)} (${ANDROID_THEMES[THEME_RES_ID] ?? 'неизвестная'})`);
+  log.check(Boolean(ANDROID_THEMES[THEME_RES_ID]), 'тема активности — известный системный стиль', {
+    fail: 'ссылка на несуществующий стиль роняет активность при запуске',
+  });
+
+  /* --- 4. resources.arsc ------------------------------------------- */
+  log.section('4. Таблица ресурсов');
+  const ICON_PATH = 'res/mipmap/ic_launcher.png';
+  const arscBin = buildArsc(ICON_PATH);
+  log.blob('resources.arsc', arscBin);
+  log.detail('Иконка', `@mipmap/ic_launcher = 0x${ICON_RES_ID.toString(16)} → ${ICON_PATH}`);
+
+  /* --- 5. Ключ подписи --------------------------------------------- */
+  log.section('5. Ключ подписи');
+  const key = loadOrCreateKey();
+  log.detail('Файл ключа', KEY_FILE);
+  log.info(key.fresh ? `создан новый ключ (${KEY_FILE}) — не удаляйте его` : `использую сохранённый ключ из ${KEY_FILE}`);
+  if (key.fresh) {
+    log.warn(
+      'ключ создан заново',
+      'если игра уже стоит на телефоне, обновление поверх не встанет — сначала удалите старую версию',
+    );
+  }
+  if (key.renewed) {
+    log.warn(
+      `сохранённый сертификат был некорректным (${key.reason}) и перевыпущен тем же ключом`,
+      'такой пакет Android ставить отказывался; если старая версия всё же стоит на телефоне — удалите её перед установкой',
+    );
+  }
+
+  /* Сертификат обязан читаться строгим разборщиком: на телефоне его
+     разбирает BoringSSL, и он не прощает вольностей в DER. */
+  let certOk = false;
+  try {
+    const x509 = new crypto.X509Certificate(key.certificate);
+    certOk = true;
+    log.detail('Сертификат', x509.subject.replace(/\n/g, ', '));
+    log.detail('Серийный номер', x509.serialNumber);
+    log.detail('Действителен', `${x509.validFrom} — ${x509.validTo}`);
+    log.detail('Отпечаток SHA-256', sha256(key.certificate));
+    log.check(
+      x509.publicKey.equals(crypto.createPublicKey(key.privateKey)),
+      'открытый ключ сертификата совпадает с ключом подписи',
+      { fail: 'apksigner и Android ответят «public key mismatch» — пакет не установится' },
+    );
+    log.check(Date.parse(x509.validTo) > Date.now(), 'сертификат не просрочен', {
+      fail: 'просроченный сертификат = «Приложение не установлено»',
+    });
+  } catch (err) {
+    log.fail(
+      `сертификат не разбирается строгим X.509: ${err.message}`,
+      'ровно так его читает Android при установке — пакет будет отвергнут с INSTALL_PARSE_FAILED_NO_CERTIFICATES',
+    );
+  }
+  log.check(certOk, 'сертификат подписи корректен по DER', {
+    fail: 'удалите data/apk-signing-key.json и соберите заново',
+  });
+
+  /* --- 6. Упаковка -------------------------------------------------- */
+  log.section('6. Упаковка и подпись');
+  const payload = [
+    { path: 'AndroidManifest.xml', data: manifestBin },
+    { path: 'classes.dex', data: dex },
+    { path: 'resources.arsc', data: arscBin, stored: true },
+    { path: ICON_PATH, data: icon, stored: true },
+    { path: 'assets/mir.html', data: Buffer.from(html, 'utf8') },
+  ];
+  log.table(
+    payload.map((p) => ({ 'файл': p.path, 'размер': human(p.data.length), 'сжатие': p.stored ? 'нет (STORED)' : 'deflate' })),
+  );
+
+  log.step('Считаю дайджесты для подписи v1 (JAR)');
+  const signatureFiles = buildV1Signature(payload, key);
+  for (const file of signatureFiles) log.detail(file.path, human(file.data.length));
+
+  log.step('Собираю ZIP с выравниванием несжатых файлов');
+  const zipParts = buildZip([...payload, ...signatureFiles]);
+  log.detail('Тело архива', human(zipParts.body.length));
+  log.detail('Центральный каталог', human(zipParts.central.length));
+
+  log.step('Подписываю по схеме v2 (APK Signature Scheme v2)');
+  const apk = signV2(zipParts, key);
+  log.detail('Итоговый размер', human(apk.length));
+
+  const problems = verifyApk(apk);
+  for (const problem of problems) log.fail(problem, 'пакет в таком виде Android не примет');
+  log.check(problems.length === 0, 'быстрая самопроверка APK пройдена', { fail: 'файл не записан' });
+  if (problems.length) throw new Error('APK собран неверно — подробности выше');
+
+  /* --- 7. Запись ---------------------------------------------------- */
+  log.section('7. Запись файлов');
+  if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
+  writeFileSync(join('dist-app', 'MIR.apk'), apk);
+  writeFileSync('MIR.apk', apk);
+  log.ok(`MIR.apk записан (${human(apk.length)}), копия в dist-app/MIR.apk`);
+  log.detail('SHA-256 файла', sha256(apk));
+
+  /* --- 8. Полный разбор того, что реально записалось ---------------- */
+  log.section('8. Проверка записанного файла');
+  log.info('Файл читается с диска заново и разбирается так же, как его читает Android.');
+  const written = readFileSync('MIR.apk');
+  log.check(written.equals(apk), 'записанный файл побайтово совпадает с собранным', {
+    fail: 'диск или антивирус испортили файл при записи',
+  });
+  const info = auditApk(written, log, { prefix: '8.' });
+
+  /* --- Итог --------------------------------------------------------- */
+  const ok = log.problems.length === 0;
+  console.log('');
+  console.log('============================================================');
+  if (ok) {
+    console.log('  ✓ Android-приложение собрано, подписано и проверено');
+    console.log(`     MIR.apk — ${human(apk.length)}, версия ${info.versionName} (${info.versionCode})`);
+    console.log(`     Пакет ${info.package}, minSdk ${info.minSdk}, targetSdk ${info.targetSdk}`);
+    console.log(`     Подпись: v1 + v2, ключ ${info.signature?.keyType ?? '?'} ${info.signature?.keyBits ?? ''} бит`);
+    console.log('');
+    console.log('  Установка: перекиньте MIR.apk на телефон (Telegram, USB, диск),');
+    console.log('  откройте и разрешите установку из этого источника.');
+    console.log('');
+    console.log('  Если на телефоне что-то пойдёт не так — ошибка будет видна:');
+    console.log('    • падение приложения показывается прямо на экране телефона;');
+    console.log('    • чёрный экран через 6 секунд сам превращается в отчёт;');
+    console.log('    • разбор этого же файла повторяет команда npm run apk:doctor.');
+  } else {
+    console.log('  ✗ Сборка APK завершилась с ошибками — файл использовать нельзя');
+  }
+  console.log('============================================================');
+
+  log.finish();
+  process.exit(ok ? 0 : 1);
+} catch (err) {
+  log.error(err, 'сборка APK');
+  console.log('');
+  console.log('============================================================');
+  console.log('  ✗ СБОРКА APK НЕ УДАЛАСЬ');
+  console.log('  Причина записана выше и целиком — в журнале.');
+  console.log('============================================================');
+  log.finish();
   process.exit(1);
 }
-
-const ICON_PATH = 'res/mipmap/ic_launcher.png';
-const payload = [
-  { path: 'AndroidManifest.xml', data: buildManifest() },
-  { path: 'classes.dex', data: dex },
-  { path: 'resources.arsc', data: buildArsc(ICON_PATH), stored: true },
-  { path: ICON_PATH, data: icon, stored: true },
-  { path: 'assets/mir.html', data: Buffer.from(html, 'utf8') },
-];
-
-const key = loadOrCreateKey();
-const signatureFiles = buildV1Signature(payload, key);
-const zip = buildZip([...payload, ...signatureFiles]);
-const apk = signV2(zip, key);
-
-const problems = verifyApk(apk);
-if (problems.length) {
-  console.error('\n✗ Самопроверка APK не прошла:');
-  for (const p of problems) console.error(`    • ${p}`);
-  process.exit(1);
-}
-
-if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
-writeFileSync(join('dist-app', 'MIR.apk'), apk);
-writeFileSync('MIR.apk', apk);
-
-console.log('');
-console.log('✓ Android-приложение собрано и подписано (v1 + v2):');
-console.log('    MIR.apk  (копия: dist-app/MIR.apk)');
-console.log(`    Размер: ${(apk.length / 1024).toFixed(1)} КБ, версия ${VERSION_NAME} (${VERSION_CODE})`);
-console.log(`    minSdk ${MIN_SDK} (Android 5.0), targetSdk ${TARGET_SDK} (Android 14)`);
-if (key.fresh) console.log(`    Создан ключ подписи: ${KEY_FILE} — не удаляйте его, иначе обновления не встанут.`);
-console.log('    Проверено: подпись v2, дайджесты v1, выравнивание resources.arsc.');
-console.log('');
-console.log('    Установка: перекиньте MIR.apk на телефон (Telegram, USB, диск),');
-console.log('    откройте и разрешите установку из этого источника.');
-console.log('');
