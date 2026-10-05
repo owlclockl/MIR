@@ -3,7 +3,7 @@
    для статики. Запросы к API хаба (/api/) не кэшируются никогда —
    там живые данные. */
 
-const CACHE = 'mir-app-v1';
+const CACHE = 'mir-app-v2';
 const PRECACHE = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

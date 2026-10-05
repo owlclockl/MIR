@@ -4,6 +4,6 @@ dist-app/
 logs/
 *.exe
 *.apk
-data/
+/data/
 .DS_Store
 *.log

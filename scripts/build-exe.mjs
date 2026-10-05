@@ -1,10 +1,10 @@
 // Сборка Windows-установщика MIR-Setup.exe.
-// Запуск: node build-exe.mjs
+// Запуск: npm run build:exe
 //
 // Как это работает:
 //   1. собираем сайт (vite) и упаковываем папку dist/ во внутренний архив;
 //   2. делаем app.ico из PNG-иконок;
-//   3. компилируем tools/win/MirSetup.cs штатным csc.exe из .NET Framework
+//   3. компилируем scripts/win/MirSetup.cs штатным csc.exe из .NET Framework
 //      (есть на любой Windows 10/11) и вшиваем архив + иконку как ресурсы;
 //   4. проверяем, что получился настоящий PE-файл для Windows.
 //
@@ -17,10 +17,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import zlib from 'node:zlib';
+import './lib/root.mjs';
 import { buildSingleHtml } from './build-single.mjs';
 
 const OUT_DIR = 'dist-app';
-const CS_SOURCE = join('tools', 'win', 'MirSetup.cs');
+const CS_SOURCE = join('scripts', 'win', 'MirSetup.cs');
 
 console.log('--- Сборка MIR для Windows (.exe) ---');
 

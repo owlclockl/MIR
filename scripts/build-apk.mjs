@@ -1,5 +1,5 @@
 // Сборка Android-приложения (MIR.apk) без Android SDK, Java и интернета.
-// Запуск: node build-apk.mjs
+// Запуск: npm run build:apk
 //
 // Что внутри APK:
 //   AndroidManifest.xml — бинарный AXML (minSdk 21, targetSdk 34);
@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
+import './lib/root.mjs';
 import { buildSingleHtml } from './build-single.mjs';
 
 const PACKAGE = 'com.mir.game';

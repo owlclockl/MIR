@@ -2,9 +2,10 @@
 // рисует фирменный знак (кольцо, точка, риски) попиксельно с 4×
 // суперсэмплингом и кодирует PNG через встроенный node:zlib.
 //
-// Запуск: node icons.mjs
+// Запуск: npm run icons
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
+import { fromRoot } from './lib/root.mjs';
 
 /* ---------- мини-PNG-кодировщик ---------------------------- */
 
@@ -121,7 +122,7 @@ const renderSigil = (size, { scale, bg, fg }) => {
 
 /* ---------- генерация набора -------------------------------- */
 
-mkdirSync(new URL('./public/icons/', import.meta.url), { recursive: true });
+mkdirSync(fromRoot('public', 'icons'), { recursive: true });
 
 const targets = [
   ['icon-192.png', 192, {}],
@@ -137,7 +138,7 @@ for (const [name, size, opts] of targets) {
     bg: '#0b0b0d',
     fg: '#ededf0',
   });
-  writeFileSync(new URL(`./public/icons/${name}`, import.meta.url), encodePng(size, rgba));
+  writeFileSync(fromRoot('public', 'icons', name), encodePng(size, rgba));
   console.log(`icons/${name} — ${size}×${size}`);
 }
 console.log('Готово. Иконки лежат в public/icons/.');

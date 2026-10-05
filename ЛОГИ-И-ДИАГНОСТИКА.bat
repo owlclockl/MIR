@@ -14,7 +14,7 @@ if errorlevel 1 goto :nonode
 
 echo Запускаю самодиагностику системы, портов и сети...
 echo.
-node doctor.mjs
+node scripts\doctor.mjs
 if errorlevel 1 goto :fail
 
 echo.

@@ -28,9 +28,9 @@ import { networkInterfaces } from 'node:os';
 import { spawn } from 'node:child_process';
 import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream';
-import { fileURLToPath } from 'node:url';
+import { fromRoot } from '../scripts/lib/root.mjs';
 import { createHub } from './hub.mjs';
-import { checkDns, explainDns } from './tools/net-check.mjs';
+import { checkDns, explainDns } from '../scripts/lib/net-check.mjs';
 
 const MIME = {
   '.webmanifest': 'application/manifest+json',
@@ -174,7 +174,7 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 /* ---------- хаб общих аккаунтов ---------- */
 
 const hub = args.hub
-  ? createHub({ dbFile: fileURLToPath(new URL('./data/mir-hub.json', import.meta.url)) })
+  ? createHub({ dbFile: fromRoot('data', 'mir-hub.json') })
   : null;
 
 /* ---------- сервер ---------- */
@@ -339,7 +339,7 @@ function onReady(port) {
   const lan = lanAddresses();
   const name = (() => {
     try {
-      return JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).name;
+      return JSON.parse(readFileSync(fromRoot('package.json'), 'utf8')).name;
     } catch {
       return 'сайт';
     }

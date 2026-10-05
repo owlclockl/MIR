@@ -64,3 +64,13 @@ export const apiRespond = (requestId, accept) => call('POST', '/api/respond', { 
 export const apiRemoveFriend = (friendId) => call('POST', '/api/friend/remove', { friendId });
 export const apiUseCode = (code) => call('POST', '/api/invite/use', { code });
 export const apiRegen = () => call('POST', '/api/invite/regen', {});
+
+/* ---------- сигналинг P2P -----------------------------------
+   Через хаб ходят только offer/answer/ICE и запасной relay-канал.
+   Входящие берём длинным опросом: запрос висит до первого сигнала,
+   поэтому соединение поднимается почти мгновенно, а нагрузки нет. */
+
+export const apiSignal = (batch) => call('POST', '/api/p2p/signal', { batch }, { timeout: 10_000 });
+
+export const apiInbox = ({ wait = true } = {}) =>
+  call('GET', `/api/p2p/inbox${wait ? '?wait=1' : ''}`, null, { timeout: wait ? 30_000 : 8000 });
