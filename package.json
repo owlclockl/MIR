@@ -7,7 +7,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "single": "node build-single.mjs"
+    "single": "node build-single.mjs",
+    "serve": "node serve.mjs",
+    "share": "vite build && node serve.mjs",
+    "share:public": "vite build && node serve.mjs --public"
   },
   "devDependencies": {
     "vite": "^7.1.9"

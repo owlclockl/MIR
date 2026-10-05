@@ -1,24 +1,132 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="Inter, Arial, sans-serif">
+<title>The civilization of the sages — главное меню</title>
 <defs>
- <radialGradient id="bg"><stop stop-color="#29292c"/><stop offset=".42" stop-color="#151517"/><stop offset="1" stop-color="#09090a"/></radialGradient>
- <linearGradient id="fade"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".13"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
- <pattern id="grid" width="58" height="58" patternUnits="userSpaceOnUse"><path d="M58 0H0V58" fill="none" stroke="#fff" stroke-opacity=".025"/></pattern>
+  <radialGradient id="stageBg" cx="50%" cy="50%" r="68%">
+    <stop offset="0" stop-color="#242428"/><stop offset=".44" stop-color="#151517"/><stop offset="1" stop-color="#0a0a0b"/>
+  </radialGradient>
+  <radialGradient id="vignette" cx="50%" cy="50%" r="62%">
+    <stop offset=".42" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/>
+  </radialGradient>
+  <radialGradient id="gridMask" cx="50%" cy="50%" r="68%">
+    <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/>
+  </radialGradient>
+  <linearGradient id="beam"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".38" stop-color="#fff" stop-opacity=".11"/><stop offset=".62" stop-color="#fff" stop-opacity=".11"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="accentL"><stop stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".18"/></linearGradient>
+  <linearGradient id="accentR"><stop stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="playAccent"><stop stop-color="#ededf0" stop-opacity="0"/><stop offset=".22" stop-color="#ededf0"/><stop offset=".78" stop-color="#ededf0"/><stop offset="1" stop-color="#ededf0" stop-opacity="0"/></linearGradient>
+  <pattern id="grid" width="58" height="58" patternUnits="userSpaceOnUse"><path d="M58 0H0V58" fill="none" stroke="#fff" stroke-opacity=".02"/></pattern>
+  <mask id="gridFade"><rect y="78" width="1136" height="780" fill="url(#gridMask)"/></mask>
+  <clipPath id="stageClip"><rect y="78" width="1136" height="780"/></clipPath>
+  <g id="icoSigil" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/>
+    <path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>
+  </g>
+  <g id="icoGear" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+    <path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </g>
+  <g id="icoUserPlus" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>
+  </g>
+  <g id="icoUsers" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </g>
+  <path id="icoChevron" d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
 </defs>
-<rect width="1440" height="900" fill="#09090a"/><rect y="76" width="1154" height="824" fill="url(#bg)"/><rect y="76" width="1154" height="824" fill="url(#grid)"/>
-<circle cx="577" cy="463" r="270" fill="none" stroke="#fff" stroke-opacity=".045"/><path d="M100 700 1050 250M260 0l580 900" stroke="url(#fade)"/>
-<!-- top bar --> <rect width="1440" height="76" fill="#0c0c0e"/><path d="M0 75.5H1440" stroke="#fff" stroke-opacity=".1"/>
-<!-- settings --> <rect x="22" y="17" width="42" height="42" fill="#fff" fill-opacity=".025" stroke="#fff" stroke-opacity=".1"/>
-<g transform="translate(43 38)" fill="none" stroke="#aaaab0" stroke-width="1.8"><circle r="5"/><circle r="9" stroke-dasharray="4 3"/></g>
-<!-- brand --> <rect x="78" y="24" width="28" height="28" fill="#e7e7e9"/><text x="92" y="43" font-family="Arial" font-size="12" font-weight="700" text-anchor="middle" fill="#111">M</text><text x="117" y="43" font-family="Arial" font-size="14" font-weight="700" letter-spacing="4" fill="#ddd">MIR</text>
-<!-- play --> <rect x="636" width="168" height="76" fill="#fff" fill-opacity=".045"/><path d="M636 0v76M804 0v76" stroke="#fff" stroke-opacity=".09"/><path d="m675 31 13 8-13 8Z" fill="none" stroke="#f5f5f6" stroke-width="1.8"/><text x="739" y="43" font-family="Arial" font-size="12" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#f5f5f6">ИГРАТЬ</text><rect x="691" y="74" width="58" height="2" fill="#fff"/>
-<!-- online/profile --> <circle cx="1162" cy="38" r="3" fill="#b8d3c1"/><text x="1173" y="42" font-family="Arial" font-size="10" letter-spacing="1" fill="#85858d">В СЕТИ</text><rect x="1242" y="21" width="34" height="34" fill="#b8b8bc"/><text x="1259" y="42" text-anchor="middle" font-family="Arial" font-size="10" font-weight="700" fill="#161618">MI</text><text x="1287" y="36" font-family="Arial" font-size="11" font-weight="700" fill="#ddd">Игрок</text><text x="1287" y="49" font-family="Arial" font-size="9" fill="#74747b">Уровень 12</text>
-<!-- hero --> <text x="577" y="381" font-family="Arial" font-size="9" font-weight="700" letter-spacing="4" text-anchor="middle" fill="#6d6d74">ТАКТИЧЕСКИЙ ПРОТОКОЛ</text><text x="565" y="522" font-family="Arial" font-size="150" font-weight="500" letter-spacing="-12" text-anchor="middle" fill="#f4f4f5">MIR</text><text x="577" y="575" font-family="Arial" font-size="11" letter-spacing="3" text-anchor="middle" fill="#77777d">ТИШИНА — ТОЖЕ ОРУЖИЕ.</text>
-<!-- friends panel --> <rect x="1154" y="76" width="286" height="824" fill="#101012" fill-opacity=".96"/><path d="M1154 76v824M1154 154h286" stroke="#fff" stroke-opacity=".1"/>
-<text x="1175" y="106" font-family="Arial" font-size="9" font-weight="700" letter-spacing="2.5" fill="#6d6d74">СООБЩЕСТВО</text><text x="1175" y="132" font-family="Arial" font-size="14" font-weight="700" fill="#eee">Друзья</text><text x="1233" y="132" font-family="Arial" font-size="10" fill="#626269">2 / 3</text><rect x="1383" y="97" width="36" height="36" fill="#fff" fill-opacity=".025" stroke="#fff" stroke-opacity=".1"/><path d="M1401 106v17m-8-8h16" stroke="#aaa"/>
-<!-- friend rows -->
-<g font-family="Arial"><g transform="translate(1175 178)"><rect width="34" height="34" fill="#3b3b3f"/><text x="17" y="21" font-size="10" font-weight="700" text-anchor="middle" fill="#aaa">AK</text><text x="46" y="14" font-size="11" font-weight="700" fill="#ddd">AKIRA</text><text x="46" y="29" font-size="9" fill="#74747b">В игре</text><circle cx="236" cy="17" r="3" fill="#acccb7"/></g>
-<g transform="translate(1175 232)"><rect width="34" height="34" fill="#c1c1c4"/><text x="17" y="21" font-size="10" font-weight="700" text-anchor="middle" fill="#171719">NV</text><text x="46" y="14" font-size="11" font-weight="700" fill="#ddd">NOVA</text><text x="46" y="29" font-size="9" fill="#74747b">В меню</text><circle cx="236" cy="17" r="3" fill="#acccb7"/></g>
-<g transform="translate(1175 286)"><rect width="34" height="34" fill="#3b3b3f"/><text x="17" y="21" font-size="10" font-weight="700" text-anchor="middle" fill="#aaa">GR</text><text x="46" y="14" font-size="11" font-weight="700" fill="#ddd">GREY</text><text x="46" y="29" font-size="9" fill="#74747b">Не в сети</text><circle cx="236" cy="17" r="3" fill="#434348"/></g></g>
-<rect x="1164" y="835" width="266" height="45" fill="#fff" fill-opacity=".02" stroke="#fff" stroke-opacity=".1"/><text x="1200" y="862" font-family="Arial" font-size="10" font-weight="700" letter-spacing="1" fill="#8c8c93">ВСЕ ДРУЗЬЯ</text><path d="m1405 852 6 6-6 6" fill="none" stroke="#888"/>
-<text x="20" y="881" font-family="Arial" font-size="8" letter-spacing="1" fill="#48484e">ВЕРСИЯ 0.1.0</text><text x="1126" y="881" font-family="Arial" font-size="8" letter-spacing="1" text-anchor="end" fill="#48484e">© 2026 MIR</text>
+
+<rect width="1440" height="900" fill="#08080a"/>
+
+<!-- сцена -->
+<rect y="78" width="1136" height="780" fill="url(#stageBg)"/>
+<rect y="78" width="1136" height="780" fill="url(#grid)" mask="url(#gridFade)"/>
+<g clip-path="url(#stageClip)">
+  <circle cx="568" cy="468" r="240" fill="none" stroke="#fff" stroke-opacity=".04"/>
+  <circle cx="568" cy="468" r="390" fill="none" stroke="#fff" stroke-opacity=".025"/>
+  <rect x="-284" y="467.5" width="1704" height="1" fill="url(#beam)" transform="rotate(-24 568 468)"/>
+  <rect x="-284" y="467.5" width="1704" height="1" fill="url(#beam)" opacity=".4" transform="rotate(62 568 468)"/>
+</g>
+<rect y="78" width="1136" height="780" fill="url(#vignette)"/>
+
+<!-- заголовок -->
+<g text-anchor="middle">
+  <text x="568" y="359" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">ТАКТИЧЕСКИЙ ПРОТОКОЛ</text>
+  <g font-family="Manrope, Arial, sans-serif" font-size="73.6" font-weight="500" letter-spacing="-2.58">
+    <text x="568" y="455" fill="#ededf0">The civilization</text>
+    <text x="568" y="527" fill="#b6b6be">of the sages</text>
+  </g>
+  <text x="568" y="581" font-size="11" letter-spacing="2.2" fill="#8b8b94">ТИШИНА — ТОЖЕ ОРУЖИЕ.</text>
+</g>
+<rect x="387" y="576" width="64" height="1" fill="url(#accentL)"/>
+<rect x="685" y="576" width="64" height="1" fill="url(#accentR)"/>
+
+<!-- подвал -->
+<text x="26" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.1.0</text>
+<text x="1110" y="876" font-size="10" letter-spacing="1.6" text-anchor="end" fill="#55555d">© 2026 THE CIVILIZATION OF THE SAGES</text>
+
+<!-- верхняя панель -->
+<rect width="1136" height="78" fill="#0a0a0c"/>
+<path d="M0 77.5h1136" stroke="#fff" stroke-opacity=".08"/>
+
+<rect x="26" y="18.5" width="40" height="40" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<g transform="translate(37 29.5)" color="#8b8b94"><use href="#icoGear"/></g>
+
+<rect x="80" y="21.5" width="34" height="34" fill="#e9e9ec"/>
+<g transform="translate(87 28.5)" color="#0b0b0d"><use href="#icoSigil"/></g>
+<g font-family="Manrope, Arial, sans-serif" font-size="10" font-weight="700" letter-spacing="2">
+  <text x="126" y="35" fill="#b6b6be">THE CIVILIZATION</text>
+  <text x="126" y="49" fill="#65656e">OF THE SAGES</text>
+</g>
+
+<rect x="482.5" width="171" height="77" fill="#fff" fill-opacity=".042"/>
+<path d="M482.5 0v77M653.5 0v77" stroke="#fff" stroke-opacity=".08"/>
+<rect x="542.5" y="75" width="51" height="2" fill="url(#playAccent)" opacity=".32"/>
+<path d="m530 32.8 11.2 5.7-11.2 5.7Z" fill="#ededf0"/>
+<text x="554.5" y="42.5" font-family="Manrope, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2.2" fill="#ededf0">ИГРАТЬ</text>
+
+<rect x="859" y="24.5" width="86" height="28" fill="none" stroke="#fff" stroke-opacity=".08"/>
+<circle cx="874.5" cy="38.5" r="3.5" fill="#c2d9c9"/>
+<text x="886" y="42" font-size="10" font-weight="500" letter-spacing="1.4" fill="#8b8b94">В СЕТИ</text>
+<rect x="957" y="25.5" width="1" height="26" fill="#fff" fill-opacity=".08"/>
+
+<rect x="976" y="21.5" width="34" height="34" fill="#b9b9be"/>
+<text x="993" y="42" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#16161a">ИГ</text>
+<text x="1021" y="36" font-size="12.5" font-weight="600" fill="#ededf0">Игрок</text>
+<text x="1021" y="50" font-size="10" fill="#65656e">Уровень 12</text>
+<g transform="translate(1086 31)" color="#65656e"><use href="#icoChevron" transform="scale(.625)"/></g>
+
+<!-- панель друзей -->
+<rect x="1136" width="304" height="900" fill="#0c0c0e"/>
+<path d="M1136.5 0v900M1137 77.5h303" stroke="#fff" stroke-opacity=".08"/>
+
+<text x="1155" y="29" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">СООБЩЕСТВО</text>
+<text x="1155" y="54" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="700" fill="#ededf0">Друзья</text>
+<text x="1219" y="54" font-size="11" font-weight="500" letter-spacing=".88" fill="#65656e">2 / 3</text>
+<rect x="1388" y="21.5" width="34" height="34" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<g transform="translate(1397 30.5)" color="#8b8b94"><use href="#icoUserPlus" transform="scale(.667)"/></g>
+
+<g font-size="12.5" font-weight="600">
+  <rect x="1158" y="99" width="32" height="32" fill="#c3c3c7"/>
+  <text x="1174" y="119" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#16161a">AK</text>
+  <text x="1202" y="112" fill="#ededf0">AKIRA</text>
+  <text x="1202" y="127" font-size="10" font-weight="400" fill="#65656e">В игре</text>
+  <circle cx="1415.5" cy="115" r="3.5" fill="#c2d9c9"/>
+
+  <rect x="1158" y="155" width="32" height="32" fill="#313136"/>
+  <text x="1174" y="175" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">NV</text>
+  <text x="1202" y="168" fill="#ededf0">NOVA</text>
+  <text x="1202" y="183" font-size="10" font-weight="400" fill="#65656e">В меню</text>
+  <circle cx="1415.5" cy="171" r="2.8" fill="none" stroke="#c2d9c9" stroke-width="1.5"/>
+
+  <rect x="1158" y="211" width="32" height="32" fill="#313136"/>
+  <text x="1174" y="231" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#65656e">GR</text>
+  <text x="1202" y="224" fill="#65656e">GREY</text>
+  <text x="1202" y="239" font-size="10" font-weight="400" fill="#65656e">Не в сети</text>
+  <circle cx="1415.5" cy="227" r="3.5" fill="#3b3b41"/>
+</g>
+
+<path d="M1137 833.5h303" stroke="#fff" stroke-opacity=".08"/>
+<rect x="1147" y="844" width="283" height="46" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<g transform="translate(1159 858)" color="#8b8b94"><use href="#icoUsers" transform="scale(.75)"/></g>
+<text x="1190" y="871" font-size="10" font-weight="700" letter-spacing="1.4" fill="#8b8b94">ВСЕ ДРУЗЬЯ</text>
+<g transform="translate(1407 859.5)" color="#65656e"><use href="#icoChevron" transform="scale(.625)"/></g>
 </svg>
