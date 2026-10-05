@@ -10,6 +10,7 @@
     "single": "node scripts/build-single.mjs",
     "build:exe": "node scripts/build-exe.mjs",
     "build:apk": "node scripts/build-apk.mjs",
+    "apk:doctor": "node scripts/apk-doctor.mjs",
     "build:all": "node scripts/build-all.mjs",
     "icons": "node scripts/icons.mjs",
     "serve": "node server/serve.mjs",

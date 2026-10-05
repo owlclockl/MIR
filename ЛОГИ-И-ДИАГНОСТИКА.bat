@@ -17,14 +17,33 @@ echo.
 node scripts\doctor.mjs
 if errorlevel 1 goto :fail
 
+if not exist "MIR.apk" goto :noapk
 echo.
 echo ============================================================
-echo   ОТЧЁТ УСПЕШНО СФОРМИРОВАН!
-echo   1. Отчёт автоматически скопирован в буфер обмена.
-echo   2. Файл отчёта: logs\diagnostic-report.txt
-echo   3. Журнал логов: logs\mir-server.log
-echo   
-echo   Просто откройте чат с разработчиком и нажмите Ctrl+V!
+echo   Разбираю собранный MIR.apk
+echo   (почему он может не ставиться или не запускаться)
+echo ============================================================
+echo.
+node scripts\apk-doctor.mjs
+if exist "logs\apk-report.txt" start notepad "logs\apk-report.txt"
+goto :report
+
+:noapk
+echo.
+echo   MIR.apk не найден — разбор Android-приложения пропущен.
+echo   Собрать: СБОРКА.bat, пункт [3].
+
+:report
+echo.
+echo ============================================================
+echo   ОТЧЁТЫ СФОРМИРОВАНЫ!
+echo     logs\diagnostic-report.txt  — система, сеть, порты
+echo     logs\apk-report.txt         — разбор MIR.apk
+echo     logs\apk-build.log          — протокол последней сборки APK
+echo     logs\apk-doctor.log         — полный разбор APK по байтам
+echo     logs\mir-server.log         — журнал сервера
+echo.
+echo   Последний отчёт уже в буфере обмена — Ctrl+V в чат разработчику.
 echo ============================================================
 echo.
 
