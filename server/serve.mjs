@@ -295,7 +295,10 @@ function log(req, status, started) {
   const mark = status >= 400 ? '×' : '·';
   const path = (req.url || '/').slice(0, 60);
   const duration = Date.now() - started;
-  console.log(`  ${mark} ${status}  ${path}  ${duration}ms`);
+  /* Метод в строке обязателен: 404 GET /api/invite/use («нет такого
+     метода») и 404 POST /api/invite/use («код не найден») — два
+     совершенно разных диагноза. */
+  console.log(`  ${mark} ${status}  ${req.method} ${path}  ${duration}ms`);
   if (status >= 400) {
     logToFile('warn', 'http', `${status} ${req.method} ${path} (${duration}ms)`);
   }
