@@ -28,8 +28,8 @@
   <g id="icoUserPlus" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>
   </g>
-  <g id="icoUsers" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  <g id="icoCopy" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13"/><rect x="5" y="5" width="13" height="13"/>
   </g>
   <path id="icoChevron" d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
 </defs>
@@ -60,7 +60,7 @@
 <rect x="685" y="576" width="64" height="1" fill="url(#accentR)"/>
 
 <!-- подвал -->
-<text x="26" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.1.0</text>
+<text x="26" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.3.0</text>
 <text x="1110" y="876" font-size="10" letter-spacing="1.6" text-anchor="end" fill="#55555d">© 2026 THE CIVILIZATION OF THE SAGES</text>
 
 <!-- верхняя панель -->
@@ -89,10 +89,10 @@
 <rect x="957" y="25.5" width="1" height="26" fill="#fff" fill-opacity=".08"/>
 
 <rect x="976" y="21.5" width="34" height="34" fill="#b9b9be"/>
-<text x="993" y="42" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#16161a">ИГ</text>
-<text x="1021" y="36" font-size="12.5" font-weight="600" fill="#ededf0">Игрок</text>
-<text x="1021" y="50" font-size="10" fill="#65656e">Уровень 12</text>
-<g transform="translate(1086 31)" color="#65656e"><use href="#icoChevron" transform="scale(.625)"/></g>
+<text x="993" y="42" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#16161a">AK</text>
+<text x="1021" y="36" font-size="12.5" font-weight="600" fill="#ededf0">AKIRA</text>
+<text x="1021" y="50" font-size="10" fill="#65656e">С нами с 05.10.2026</text>
+<g transform="translate(1110 31)" color="#65656e"><use href="#icoChevron" transform="scale(.625)"/></g>
 
 <!-- панель друзей -->
 <rect x="1136" width="304" height="900" fill="#0c0c0e"/>
@@ -100,33 +100,44 @@
 
 <text x="1155" y="29" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">СООБЩЕСТВО</text>
 <text x="1155" y="54" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="700" fill="#ededf0">Друзья</text>
-<text x="1219" y="54" font-size="11" font-weight="500" letter-spacing=".88" fill="#65656e">2 / 3</text>
+<text x="1219" y="54" font-size="11" font-weight="500" letter-spacing=".88" fill="#65656e">1 / 2</text>
 <rect x="1388" y="21.5" width="34" height="34" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
 <g transform="translate(1397 30.5)" color="#8b8b94"><use href="#icoUserPlus" transform="scale(.667)"/></g>
+<rect x="1414" y="15" width="16" height="16" fill="#c2d9c9"/>
+<text x="1422" y="26.5" font-size="9" font-weight="700" text-anchor="middle" fill="#0b0b0d">1</text>
 
+<!-- входящая заявка -->
+<rect x="1147" y="88" width="283" height="86" fill="#c2d9c9" fill-opacity=".09" stroke="#c2d9c9" stroke-opacity=".32"/>
+<text x="1159" y="106" font-size="10" font-weight="700" letter-spacing="1.8" fill="#c2d9c9">ЗАЯВКИ · 1</text>
+<rect x="1154" y="115" width="269" height="50" fill="#101013" stroke="#fff" stroke-opacity=".08"/>
+<rect x="1162" y="124" width="32" height="32" fill="#313136"/>
+<text x="1178" y="144" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">NV</text>
+<text x="1202" y="137" font-size="12.5" font-weight="600" fill="#ededf0">NOVA</text>
+<text x="1202" y="152" font-size="10" fill="#65656e">Хочет добавить вас</text>
+<rect x="1351" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
+<path d="m1359 148 5 5 9-11" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1387" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
+<path d="m1395 141 14 14m0-14-14 14" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round"/>
+
+<!-- друзья -->
 <g font-size="12.5" font-weight="600">
-  <rect x="1158" y="99" width="32" height="32" fill="#c3c3c7"/>
-  <text x="1174" y="119" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#16161a">AK</text>
-  <text x="1202" y="112" fill="#ededf0">AKIRA</text>
-  <text x="1202" y="127" font-size="10" font-weight="400" fill="#65656e">В игре</text>
-  <circle cx="1415.5" cy="115" r="3.5" fill="#c2d9c9"/>
+  <rect x="1158" y="195" width="32" height="32" fill="#313136"/>
+  <text x="1174" y="215" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">FO</text>
+  <text x="1202" y="208" fill="#ededf0">FOX</text>
+  <text x="1202" y="223" font-size="10" font-weight="400" fill="#65656e">В меню</text>
+  <circle cx="1415.5" cy="211" r="3.5" fill="#c2d9c9"/>
 
-  <rect x="1158" y="155" width="32" height="32" fill="#313136"/>
-  <text x="1174" y="175" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">NV</text>
-  <text x="1202" y="168" fill="#ededf0">NOVA</text>
-  <text x="1202" y="183" font-size="10" font-weight="400" fill="#65656e">В меню</text>
-  <circle cx="1415.5" cy="171" r="2.8" fill="none" stroke="#c2d9c9" stroke-width="1.5"/>
-
-  <rect x="1158" y="211" width="32" height="32" fill="#313136"/>
-  <text x="1174" y="231" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#65656e">GR</text>
-  <text x="1202" y="224" fill="#65656e">GREY</text>
-  <text x="1202" y="239" font-size="10" font-weight="400" fill="#65656e">Не в сети</text>
-  <circle cx="1415.5" cy="227" r="3.5" fill="#3b3b41"/>
+  <rect x="1158" y="251" width="32" height="32" fill="#313136"/>
+  <text x="1174" y="271" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#65656e">GR</text>
+  <text x="1202" y="264" fill="#65656e">GREY</text>
+  <text x="1202" y="279" font-size="10" font-weight="400" fill="#65656e">Не в сети</text>
+  <circle cx="1415.5" cy="267" r="3.5" fill="#3b3b41"/>
 </g>
 
+<!-- подвал панели: мой код -->
 <path d="M1137 833.5h303" stroke="#fff" stroke-opacity=".08"/>
-<rect x="1147" y="844" width="283" height="46" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-<g transform="translate(1159 858)" color="#8b8b94"><use href="#icoUsers" transform="scale(.75)"/></g>
-<text x="1190" y="871" font-size="10" font-weight="700" letter-spacing="1.4" fill="#8b8b94">ВСЕ ДРУЗЬЯ</text>
-<g transform="translate(1407 859.5)" color="#65656e"><use href="#icoChevron" transform="scale(.625)"/></g>
+<text x="1147" y="852" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">МОЙ КОД-ПРИГЛАШЕНИЕ</text>
+<rect x="1147" y="860" width="283" height="30" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<text x="1159" y="880" font-size="15" letter-spacing="2.7" fill="#c2d9c9" font-family="Menlo, Consolas, monospace">K7QX-2NAD</text>
+<g transform="translate(1401 867)" color="#8b8b94"><use href="#icoCopy" transform="scale(.667)"/></g>
 </svg>
