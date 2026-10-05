@@ -10,6 +10,7 @@ import { get as httpsGet } from 'node:https';
 import { resolve, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { promises as dns } from 'node:dns';
+import { checkDns, explainDns, CLOUDFLARE_SRV } from './tools/net-check.mjs';
 
 console.log('============================================================');
 console.log('   MIR — Диагностика системы, сети и туннелей (Doctor)    ');
@@ -105,6 +106,50 @@ for (const p of [4173, 4174, 8080]) {
 
 // 4. Проверка интернета и DNS
 add('\n--- 4. ИНТЕРНЕТ И DNS ---');
+add('  Имена разрешаются двумя разными путями, и ломаются они независимо:');
+add('  системный (им живут браузер и Node) и прямой запрос к DNS-серверу');
+add('  по UDP:53 (им живёт cloudflared). Проверяем оба.');
+add('');
+
+const dnsReport = await checkDns();
+add(`  DNS-серверы системы: ${dnsReport.servers.join(', ') || 'не заданы'}`);
+add(
+  dnsReport.lookup.ok
+    ? `  [OK] Системное разрешение имён (getaddrinfo): cloudflare.com → ${dnsReport.lookup.value.address}`
+    : `  [FAIL] Системное разрешение имён не работает: ${dnsReport.lookup.error}`,
+);
+add(
+  dnsReport.resolve4.ok
+    ? `  [OK] Прямой запрос к DNS-серверу (A-запись): ${dnsReport.resolve4.value.slice(0, 2).join(', ')}`
+    : `  [FAIL] Прямой запрос к DNS-серверу не проходит: ${dnsReport.resolve4.error}`,
+);
+add(
+  dnsReport.srv.ok
+    ? `  [OK] SRV-запись Cloudflare (${CLOUDFLARE_SRV}): получено записей — ${dnsReport.srv.value.length}`
+    : `  [FAIL] SRV-запись Cloudflare не отдаётся: ${dnsReport.srv.error}`,
+);
+add(
+  dnsReport.srvPublic.ok
+    ? '  [OK] Та же SRV-запись через 1.1.1.1 отвечает'
+    : `  [FAIL] Та же SRV-запись через 1.1.1.1 тоже молчит: ${dnsReport.srvPublic.error}`,
+);
+add(
+  dnsReport.cloudflareWillWork
+    ? '  [OK] Cloudflare Tunnel сможет запуститься.'
+    : '  [!] Cloudflare Tunnel не запустится: без SRV-записи он не знает, куда подключаться.',
+);
+
+for (const adapter of dnsReport.adapters)
+  add(`  [!] Подозрительный адаптер: ${adapter.name} (${adapter.address}) — ${adapter.reason}`);
+
+const dnsAdvice = explainDns(dnsReport);
+if (dnsAdvice.length) {
+  add('');
+  for (const line of dnsAdvice) add(`  ${line}`);
+}
+
+add('');
+add('  Проверка отдельных адресов:');
 const domains = ['cloudflare.com', 'trycloudflare.com', 'loca.lt', 'github.com'];
 for (const d of domains) {
   try {
@@ -173,6 +218,10 @@ add('  2. Если друзья играют через интернет:');
 add('     • Запустите пункт [2] в ИГРАТЬ-С-ДРУЗЬЯМИ.bat.');
 add('     • НЕ ЗАКРЫВАЙТЕ черное окно консоли во время игры — ссылка работает, пока окно открыто!');
 add('     • Включена автозащита: протокол HTTP/2 и фоновое восстановление туннеля.');
+if (!dnsReport.cloudflareWillWork) {
+  add('     • Сейчас Cloudflare недоступен из-за DNS (см. раздел 4). Сервер сам');
+  add('       перейдёт на localtunnel, а проще всего — выключить VPN или прокси.');
+}
 add('  3. Если вы хотите отправить этот отчёт разработчику:');
 add('     Отчёт уже автоматически скопирован в буфер обмена! Просто нажмите Ctrl+V в чате.');
 add('============================================================\n');

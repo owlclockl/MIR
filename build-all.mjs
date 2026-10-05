@@ -1,5 +1,9 @@
 // Полная сборка всех форматов: Web, Windows (.exe) и Android (.apk).
 // Запуск: node build-all.mjs
+//
+// Каждый формат собирается отдельным процессом. Если один не получился
+// (например, на компьютере нет компилятора C# для .exe), остальные всё
+// равно собираются — в конце печатается честный итог.
 
 import { spawnSync } from 'node:child_process';
 
@@ -8,22 +12,35 @@ console.log('  MIR — The civilization of the sages');
 console.log('  Сборка всех форматов (Web + Windows .exe + Android .apk)');
 console.log('============================================================\n');
 
-console.log('[1/3] Сборка веб-версии (dist/ и mir.html)...');
-const r1 = spawnSync('node', ['build-single.mjs'], { stdio: 'inherit' });
-if (r1.status !== 0) process.exit(r1.status || 1);
+const steps = [
+  { title: 'веб-версия (dist/ и mir.html)', script: 'build-single.mjs', result: 'mir.html и папка dist/' },
+  { title: 'Windows — установщик .exe', script: 'build-exe.mjs', result: 'MIR-Setup.exe' },
+  { title: 'Android — приложение .apk', script: 'build-apk.mjs', result: 'MIR.apk' },
+];
 
-console.log('\n[2/3] Сборка Windows приложения (.exe установщик)...');
-const r2 = spawnSync('node', ['build-exe.mjs'], { stdio: 'inherit' });
-if (r2.status !== 0) process.exit(r2.status || 1);
+const done = [];
 
-console.log('\n[3/3] Сборка Android приложения (.apk установщик)...');
-const r3 = spawnSync('node', ['build-apk.mjs'], { stdio: 'inherit' });
-if (r3.status !== 0) process.exit(r3.status || 1);
+steps.forEach((step, index) => {
+  console.log(`\n[${index + 1}/${steps.length}] ${step.title}…`);
+  const run = spawnSync('node', [step.script], { stdio: 'inherit' });
+  done.push({ ...step, ok: run.status === 0 });
+});
+
+const failed = done.filter((step) => !step.ok);
 
 console.log('\n============================================================');
-console.log('  ВСЕ СБОРКИ УСПЕШНО ЗАВЕРШЕНЫ!');
-console.log('  Файлы для отправки друзьям:');
-console.log('    • Windows:  MIR-Setup.exe  (или dist-app/MIR-Setup.exe)');
-console.log('    • Android:  MIR.apk        (или dist-app/MIR.apk)');
-console.log('    • Браузер:  mir.html       (или папка dist/)');
+if (failed.length === 0) {
+  console.log('  ВСЕ СБОРКИ УСПЕШНО ЗАВЕРШЕНЫ!');
+  console.log('  Файлы для отправки друзьям:');
+  console.log('    • Windows:  MIR-Setup.exe  (или dist-app/MIR-Setup.exe)');
+  console.log('    • Android:  MIR.apk        (или dist-app/MIR.apk)');
+  console.log('    • Браузер:  mir.html       (или папка dist/)');
+} else {
+  console.log('  ИТОГ СБОРКИ');
+  for (const step of done) console.log(`    ${step.ok ? '✓' : '✗'}  ${step.title} — ${step.result}`);
+  console.log('');
+  console.log('  Что не собралось — смотрите сообщения выше: там написана причина.');
+}
 console.log('============================================================\n');
+
+process.exit(failed.length ? 1 : 0);

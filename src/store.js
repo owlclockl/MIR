@@ -27,11 +27,65 @@ const NAME_RE = /^[A-Za-zА-Яа-яЁё0-9_-]{3,16}$/;
 const NAME_RULE =
   'Имя: 3–16 символов — буквы, цифры, дефис и подчёркивание, без пробелов.';
 
-/* ---------- низкий уровень (localStorage) ------------------- */
+/* ---------- низкий уровень (хранилище) ----------------------
+   localStorage доступен не всегда: Firefox и Safari бросают
+   SecurityError, если страница открыта по file://, приватные окна
+   умеют отдавать переполненную квоту, а блокировка «сторонних
+   данных» может отключить хранилище целиком. Любое обращение
+   поэтому идёт через storage: если браузер отказал — работаем в
+   памяти вкладки. Игра продолжается, но аккаунты не переживут
+   перезагрузку страницы, и об этом честно сообщает интерфейс. */
+
+const memoryStore = new Map();
+let persistent = null;
+
+try {
+  const probe = 'mir:probe';
+  globalThis.localStorage.setItem(probe, '1');
+  globalThis.localStorage.removeItem(probe);
+  persistent = globalThis.localStorage;
+} catch {
+  persistent = null;
+}
+
+const storage = {
+  getItem(key) {
+    if (persistent) {
+      try {
+        return persistent.getItem(key);
+      } catch {
+        persistent = null;
+      }
+    }
+    return memoryStore.has(key) ? memoryStore.get(key) : null;
+  },
+  setItem(key, value) {
+    memoryStore.set(key, value);
+    if (!persistent) return;
+    try {
+      persistent.setItem(key, value);
+    } catch {
+      /* Квота кончилась или хранилище закрыли на ходу — дальше в памяти. */
+      persistent = null;
+    }
+  },
+  removeItem(key) {
+    memoryStore.delete(key);
+    if (!persistent) return;
+    try {
+      persistent.removeItem(key);
+    } catch {
+      persistent = null;
+    }
+  },
+};
+
+/** Переживут ли аккаунты перезагрузку страницы. */
+export const storagePersists = () => persistent !== null;
 
 const readJSON = (key, fallback) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -39,7 +93,7 @@ const readJSON = (key, fallback) => {
 };
 
 const writeJSON = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
+  storage.setItem(key, JSON.stringify(value));
 };
 
 const randomHex = (bytes) => {
@@ -464,7 +518,7 @@ export const initBackend = async () => {
         await remote.fetchState();
       } catch {
         /* Токен протух (хаб переустановили) — считаем себя гостем. */
-        localStorage.removeItem(KEYS.session);
+        storage.removeItem(KEYS.session);
       }
     }
     notify();
@@ -483,7 +537,7 @@ export const refreshRemote = async () => {
     notify();
   } catch (error) {
     if (error?.status === 401) {
-      localStorage.removeItem(KEYS.session);
+      storage.removeItem(KEYS.session);
       notify();
     }
     /* Сетевые сбои молча пропускаем — следующий опрос подтянет. */
@@ -569,7 +623,7 @@ export const login = async (name, password) => {
 
 export const logout = () => {
   markOffline();
-  localStorage.removeItem(KEYS.session);
+  storage.removeItem(KEYS.session);
   notify();
 };
 

@@ -1,468 +1,236 @@
-// Сборка приложения для Windows (.exe установщик).
+// Сборка Windows-установщика MIR-Setup.exe.
 // Запуск: node build-exe.mjs
 //
-// Генерирует автономный исполняемый установщик MIR-Setup.exe,
-// который можно отправить другу (Telegram, Discord, флешка)
-// и запустить/установить на любой Windows ПК в один клик.
+// Как это работает:
+//   1. собираем сайт (vite) и упаковываем папку dist/ во внутренний архив;
+//   2. делаем app.ico из PNG-иконок;
+//   3. компилируем tools/win/MirSetup.cs штатным csc.exe из .NET Framework
+//      (есть на любой Windows 10/11) и вшиваем архив + иконку как ресурсы;
+//   4. проверяем, что получился настоящий PE-файл для Windows.
+//
+// Если компилятора нет — сборка честно падает с инструкцией. Раньше здесь был
+// «запасной PE-генератор», который писал 8 КБ заголовков без кода: Windows на
+// такой файл отвечает «Это приложение не может быть запущено на вашем ПК».
+// Лучше понятная ошибка, чем сломанный exe.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { build } from 'vite';
+import zlib from 'node:zlib';
+import { buildSingleHtml } from './build-single.mjs';
+
+const OUT_DIR = 'dist-app';
+const CS_SOURCE = join('tools', 'win', 'MirSetup.cs');
 
 console.log('--- Сборка MIR для Windows (.exe) ---');
 
-// 1. Убеждаемся, что mir.html собран
-await build({ logLevel: 'warn' });
+/* ---------- 1. свежая сборка сайта -------------------------------- */
 
-let html = readFileSync(join('dist', 'index.html'), 'utf8');
-html = html.replace(
-  /<script type="module" crossorigin src="\/(assets\/[^"]+\.js)"><\/script>/,
-  (match, path) => {
-    const js = readFileSync(join('dist', path), 'utf8').replaceAll('</script', '<\\/script');
-    return `<script type="module">\n${js}\n    </script>`;
-  },
-);
-html = html.replace(
-  /<link rel="stylesheet" crossorigin href="\/(assets\/[^"]+\.css)" ?\/?>/,
-  (match, path) => `<style>\n${readFileSync(join('dist', path), 'utf8')}\n    </style>`,
-);
-writeFileSync('mir.html', html);
+await buildSingleHtml();
 
-// 2. Создаем app.ico из PNG если его нет
-function makeIco(pngBuffers) {
-  const count = pngBuffers.length;
-  const header = Buffer.alloc(6 + count * 16);
-  header.writeUInt16LE(0, 0); // reserved
-  header.writeUInt16LE(1, 2); // type 1 = icon
-  header.writeUInt16LE(count, 4);
+/* ---------- 2. архив с сайтом ------------------------------------- */
 
-  let offset = 6 + count * 16;
-  for (let i = 0; i < count; i++) {
-    const png = pngBuffers[i];
-    const entryOffset = 6 + i * 16;
-    header.writeUInt8(png.width >= 256 ? 0 : png.width, entryOffset + 0);
-    header.writeUInt8(png.height >= 256 ? 0 : png.height, entryOffset + 1);
-    header.writeUInt8(0, entryOffset + 2);
-    header.writeUInt8(0, entryOffset + 3);
-    header.writeUInt16LE(1, entryOffset + 4); // planes
-    header.writeUInt16LE(32, entryOffset + 6); // bpp
-    header.writeUInt32LE(png.data.length, entryOffset + 8);
-    header.writeUInt32LE(offset, entryOffset + 12);
-    offset += png.data.length;
+function collectFiles(dir, base = dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...collectFiles(full, base));
+    else out.push({ path: relative(base, full).split(sep).join('/'), data: readFileSync(full) });
   }
-  return Buffer.concat([header, ...pngBuffers.map((p) => p.data)]);
+  return out;
 }
 
-const icon192 = existsSync('public/icons/icon-192.png') ? readFileSync('public/icons/icon-192.png') : null;
-const icon512 = existsSync('public/icons/icon-512.png') ? readFileSync('public/icons/icon-512.png') : null;
+if (!existsSync('dist')) throw new Error('build-exe: нет папки dist — сборка сайта не удалась.');
 
-if (icon192) {
-  const icoBuffers = [{ width: 192, height: 192, data: icon192 }];
-  if (icon512) icoBuffers.push({ width: 0, height: 0, data: icon512 });
-  writeFileSync('public/icons/app.ico', makeIco(icoBuffers));
+const siteFiles = collectFiles('dist');
+if (!siteFiles.some((f) => f.path === 'index.html'))
+  throw new Error('build-exe: в dist нет index.html.');
+
+/* Формат: [uint32 count] { [uint16 len][path][uint32 raw][uint32 packed][deflate] } */
+function packSite(files) {
+  const chunks = [Buffer.alloc(4)];
+  chunks[0].writeUInt32LE(files.length, 0);
+  for (const file of files) {
+    const name = Buffer.from(file.path, 'utf8');
+    const packed = zlib.deflateRawSync(file.data, { level: 9 });
+    const head = Buffer.alloc(2 + name.length + 8);
+    head.writeUInt16LE(name.length, 0);
+    name.copy(head, 2);
+    head.writeUInt32LE(file.data.length, 2 + name.length);
+    head.writeUInt32LE(packed.length, 6 + name.length);
+    chunks.push(head, packed);
+  }
+  return Buffer.concat(chunks);
 }
 
-// 3. Исходный код C# GUI Установщика в фирменном стиле MIR
-const CS_SOURCE = `using System;
-using System.IO;
-using System.Diagnostics;
-using System.Windows.Forms;
-using System.Drawing;
-using System.Reflection;
-using System.Text;
+mkdirSync(OUT_DIR, { recursive: true });
+const sitePack = packSite(siteFiles);
+const sitePackPath = join(OUT_DIR, 'site.mirpak');
+writeFileSync(sitePackPath, sitePack);
 
-namespace MIR {
-    public class InstallerForm : Form {
-        public InstallerForm() {
-            this.Text = "MIR — The civilization of the sages";
-            this.Size = new Size(540, 390);
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(8, 8, 10);
-            this.ForeColor = Color.FromArgb(237, 237, 240);
-            this.Font = new Font("Segoe UI", 10);
-            this.ShowIcon = true;
+/* ---------- 3. иконка приложения ----------------------------------- */
 
-            try {
-                byte[] iconBytes = GetEmbeddedIcon();
-                if (iconBytes != null && iconBytes.Length > 0) {
-                    using (MemoryStream ms = new MemoryStream(iconBytes)) {
-                        this.Icon = new Icon(ms);
-                    }
-                }
-            } catch { }
+function makeIco(entries) {
+  const header = Buffer.alloc(6 + entries.length * 16);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2); // тип 1 — иконка
+  header.writeUInt16LE(entries.length, 4);
 
-            // Title
-            Label lblTitle = new Label();
-            lblTitle.Text = "THE CIVILIZATION\\nOF THE SAGES";
-            lblTitle.Font = new Font("Segoe UI", 16, FontStyle.Bold);
-            lblTitle.ForeColor = Color.FromArgb(237, 237, 240);
-            lblTitle.Location = new Point(32, 24);
-            lblTitle.Size = new Size(460, 56);
-            this.Controls.Add(lblTitle);
+  let offset = header.length;
+  entries.forEach((entry, i) => {
+    const at = 6 + i * 16;
+    header.writeUInt8(entry.size >= 256 ? 0 : entry.size, at);
+    header.writeUInt8(entry.size >= 256 ? 0 : entry.size, at + 1);
+    header.writeUInt8(0, at + 2); // палитра
+    header.writeUInt8(0, at + 3);
+    header.writeUInt16LE(1, at + 4); // плоскости
+    header.writeUInt16LE(32, at + 6); // бит на пиксель
+    header.writeUInt32LE(entry.data.length, at + 8);
+    header.writeUInt32LE(offset, at + 12);
+    offset += entry.data.length;
+  });
 
-            Label lblSubtitle = new Label();
-            lblSubtitle.Text = "Установка игры на компьютер";
-            lblSubtitle.ForeColor = Color.FromArgb(139, 139, 148);
-            lblSubtitle.Location = new Point(34, 88);
-            lblSubtitle.Size = new Size(460, 24);
-            this.Controls.Add(lblSubtitle);
-
-            // Install Button
-            Button btnInstall = new Button();
-            btnInstall.Text = "УСТАНОВИТЬ НА КОМПЬЮТЕР";
-            btnInstall.Location = new Point(32, 130);
-            btnInstall.Size = new Size(460, 48);
-            btnInstall.BackColor = Color.FromArgb(237, 237, 240);
-            btnInstall.ForeColor = Color.FromArgb(8, 8, 10);
-            btnInstall.FlatStyle = FlatStyle.Flat;
-            btnInstall.FlatAppearance.BorderSize = 0;
-            btnInstall.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            btnInstall.Cursor = Cursors.Hand;
-            btnInstall.Click += (s, e) => { DoInstall(true); };
-            this.Controls.Add(btnInstall);
-
-            Label lblInstallDesc = new Label();
-            lblInstallDesc.Text = "• Создаст ярлыки на рабочем столе и в меню «Пуск»\\n• Автономный запуск в отдельном окне без браузерной строки";
-            lblInstallDesc.ForeColor = Color.FromArgb(113, 113, 122);
-            lblInstallDesc.Font = new Font("Segoe UI", 9);
-            lblInstallDesc.Location = new Point(34, 186);
-            lblInstallDesc.Size = new Size(460, 36);
-            this.Controls.Add(lblInstallDesc);
-
-            // Run Portable Button
-            Button btnPortable = new Button();
-            btnPortable.Text = "Запустить без установки (портативно)";
-            btnPortable.Location = new Point(32, 236);
-            btnPortable.Size = new Size(460, 40);
-            btnPortable.BackColor = Color.FromArgb(20, 20, 24);
-            btnPortable.ForeColor = Color.FromArgb(161, 161, 170);
-            btnPortable.FlatStyle = FlatStyle.Flat;
-            btnPortable.FlatAppearance.BorderColor = Color.FromArgb(39, 39, 42);
-            btnPortable.Cursor = Cursors.Hand;
-            btnPortable.Click += (s, e) => { DoInstall(false); };
-            this.Controls.Add(btnPortable);
-
-            // Footer note
-            Label lblFooter = new Label();
-            lblFooter.Text = "Версия 0.3.0 • Полная поддержка офлайн-игры и хаба";
-            lblFooter.ForeColor = Color.FromArgb(82, 82, 91);
-            lblFooter.Font = new Font("Segoe UI", 8);
-            lblFooter.Location = new Point(34, 300);
-            lblFooter.Size = new Size(460, 20);
-            this.Controls.Add(lblFooter);
-        }
-
-        public void DoInstall(bool createShortcuts) {
-            try {
-                string targetDir = createShortcuts
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MIR")
-                    : Path.Combine(Path.GetTempPath(), "MIR_Game");
-
-                Directory.CreateDirectory(targetDir);
-                string htmlPath = Path.Combine(targetDir, "mir.html");
-                string iconPath = Path.Combine(targetDir, "app.ico");
-                string vbsLauncher = Path.Combine(targetDir, "launch.vbs");
-
-                // Extract embedded html
-                byte[] htmlBytes = GetEmbeddedPayload();
-                File.WriteAllBytes(htmlPath, htmlBytes);
-
-                // Extract icon
-                byte[] iconBytes = GetEmbeddedIcon();
-                if (iconBytes != null && iconBytes.Length > 0) {
-                    File.WriteAllBytes(iconPath, iconBytes);
-                }
-
-                // Launcher VBS (opens without black console window)
-                string vbsCode = "Set WshShell = CreateObject(\\"WScript.Shell\\")\\r\\n" +
-                    "userData = \\"" + targetDir.Replace("\\\\", "\\\\\\\\") + "\\\\Profile\\"\\r\\n" +
-                    "htmlFile = \\"" + htmlPath.Replace("\\\\", "\\\\\\\\") + "\\"\\r\\n" +
-                    "cmd = \\"msedge.exe --user-data-dir=\\"\"\" & userData & \"\"\" --no-first-run --app=\\\"\"file:///\"\" & htmlFile & \"\"\"\\"\\r\\n" +
-                    "On Error Resume Next\\r\\n" +
-                    "WshShell.Run cmd, 1, False\\r\\n" +
-                    "If Err.Number <> 0 Then\\r\\n" +
-                    "  WshShell.Run \\"cmd /c start \\"\"\\\"\" & htmlFile, 0, False\\r\\n" +
-                    "End If\\r\\n";
-                File.WriteAllText(vbsLauncher, vbsCode);
-
-                if (createShortcuts) {
-                    string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "MIR.lnk");
-                    CreateShortcut(desktopLnk, vbsLauncher, targetDir, iconPath, "MIR — The civilization of the sages");
-
-                    string startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
-                    string startMenuLnk = Path.Combine(startMenuDir, "MIR.lnk");
-                    CreateShortcut(startMenuLnk, vbsLauncher, targetDir, iconPath, "MIR — The civilization of the sages");
-                }
-
-                // Launch game now
-                LaunchGame(htmlPath, targetDir);
-
-                if (createShortcuts) {
-                    MessageBox.Show(
-                        "MIR успешно установлен!\\n\\nЯрлык добавлен на рабочий стол и в меню «Пуск».\\nПриятной игры!",
-                        "Установка завершена",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
-                }
-                Application.Exit();
-            } catch (Exception ex) {
-                MessageBox.Show("Ошибка: " + ex.Message, "Ошибка установки", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LaunchGame(string htmlPath, string targetDir) {
-            try {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "msedge.exe";
-                psi.Arguments = string.Format("--user-data-dir=\\"{0}\\\\Profile\\" --no-first-run --app=\\"file:///{1}\\"", targetDir, htmlPath.Replace('\\\\', '/'));
-                psi.UseShellExecute = true;
-                Process.Start(psi);
-            } catch {
-                Process.Start(htmlPath);
-            }
-        }
-
-        private void CreateShortcut(string shortcutPath, string targetPath, string workingDir, string iconPath, string desc) {
-            try {
-                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
-                dynamic shell = Activator.CreateInstance(shellType);
-                dynamic shortcut = shell.CreateShortcut(shortcutPath);
-                shortcut.TargetPath = "wscript.exe";
-                shortcut.Arguments = "\\"" + targetPath + "\\"";
-                shortcut.WorkingDirectory = workingDir;
-                shortcut.WindowStyle = 1;
-                shortcut.Description = desc;
-                if (File.Exists(iconPath)) {
-                    shortcut.IconLocation = iconPath + ",0";
-                }
-                shortcut.Save();
-            } catch { }
-        }
-
-        private byte[] GetEmbeddedPayload() {
-            string exePath = Assembly.GetExecutingAssembly().Location;
-            byte[] allBytes = File.ReadAllBytes(exePath);
-            byte[] marker = Encoding.ASCII.GetBytes("---MIR-PAYLOAD-START---");
-            byte[] endMarker = Encoding.ASCII.GetBytes("---MIR-PAYLOAD-END---");
-            int idx = IndexOf(allBytes, marker);
-            if (idx >= 0) {
-                int start = idx + marker.Length;
-                int endIdx = IndexOf(allBytes, endMarker);
-                int len = (endIdx > start) ? (endIdx - start) : (allBytes.Length - start);
-                byte[] payload = new byte[len];
-                Array.Copy(allBytes, start, payload, 0, len);
-                return payload;
-            }
-            throw new Exception("Game payload not found inside installer.");
-        }
-
-        private byte[] GetEmbeddedIcon() {
-            try {
-                string exePath = Assembly.GetExecutingAssembly().Location;
-                byte[] allBytes = File.ReadAllBytes(exePath);
-                byte[] marker = Encoding.ASCII.GetBytes("---MIR-ICON-START---");
-                byte[] endMarker = Encoding.ASCII.GetBytes("---MIR-ICON-END---");
-                int idx = IndexOf(allBytes, marker);
-                if (idx >= 0) {
-                    int start = idx + marker.Length;
-                    int endIdx = IndexOf(allBytes, endMarker);
-                    int len = (endIdx > start) ? (endIdx - start) : (allBytes.Length - start);
-                    byte[] payload = new byte[len];
-                    Array.Copy(allBytes, start, payload, 0, len);
-                    return payload;
-                }
-            } catch { }
-            return new byte[0];
-        }
-
-        private int IndexOf(byte[] source, byte[] pattern) {
-            for (int i = 0; i <= source.Length - pattern.Length; i++) {
-                bool match = true;
-                for (int j = 0; j < pattern.Length; j++) {
-                    if (source[i + j] != pattern[j]) { match = false; break; }
-                }
-                if (match) return i;
-            }
-            return -1;
-        }
-
-        [STAThread]
-        static void Main(string[] args) {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            if (args.Length > 0 && args[0] == "--silent-install") {
-                InstallerForm f = new InstallerForm();
-                f.DoInstall(true);
-            } else if (args.Length > 0 && args[0] == "--portable") {
-                InstallerForm f = new InstallerForm();
-                f.DoInstall(false);
-            } else {
-                Application.Run(new InstallerForm());
-            }
-        }
-    }
+  return Buffer.concat([header, ...entries.map((e) => e.data)]);
 }
-`;
 
-// 4. Поиск компилятора C# (csc.exe или dotnet)
-function findCsc() {
+const iconEntries = [];
+if (existsSync('public/icons/icon-192.png'))
+  iconEntries.push({ size: 192, data: readFileSync('public/icons/icon-192.png') });
+if (existsSync('public/icons/icon-512.png'))
+  iconEntries.push({ size: 256, data: readFileSync('public/icons/icon-512.png') });
+
+const icoPath = join(OUT_DIR, 'app.ico');
+if (iconEntries.length) writeFileSync(icoPath, makeIco(iconEntries));
+
+/* ---------- 4. компилятор C# ---------------------------------------- */
+
+function findCompiler() {
   if (process.platform === 'win32') {
+    const root = process.env.SystemRoot || 'C:\\Windows';
     const candidates = [
-      'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe',
-      'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe',
+      `${root}\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe`,
+      `${root}\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe`,
     ];
-    for (const c of candidates) {
-      if (existsSync(c)) return c;
-    }
+    for (const candidate of candidates) if (existsSync(candidate)) return candidate;
   }
-  const whichCsc = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['csc'], { encoding: 'utf8' });
-  if (whichCsc.status === 0 && whichCsc.stdout.trim()) {
-    return whichCsc.stdout.trim().split(/\r?\n/)[0];
+  for (const name of ['csc', 'mcs']) {
+    const probe = spawnSync(process.platform === 'win32' ? 'where' : 'which', [name], { encoding: 'utf8' });
+    if (probe.status === 0 && probe.stdout.trim()) return probe.stdout.trim().split(/\r?\n/)[0];
   }
   return null;
 }
 
-// 5. Создание папки dist-app
-if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
-
-const htmlData = readFileSync('mir.html');
-const icoData = existsSync('public/icons/app.ico') ? readFileSync('public/icons/app.ico') : Buffer.alloc(0);
-
-const cscPath = findCsc();
-let compiledExe = null;
-
-if (cscPath) {
-  console.log(`Использую компилятор C#: ${cscPath}`);
-  writeFileSync('dist-app/Installer.cs', CS_SOURCE, 'utf8');
-
-  const args = [
-    '/target:winexe',
-    '/out:dist-app/stub.exe',
-    '/optimize+',
-    '/reference:System.Windows.Forms.dll',
-    '/reference:System.Drawing.dll',
-    '/reference:Microsoft.CSharp.dll',
-  ];
-  if (existsSync('public/icons/app.ico')) {
-    args.push('/win32icon:public/icons/app.ico');
-  }
-  args.push('dist-app/Installer.cs');
-
-  const res = spawnSync(cscPath, args, { encoding: 'utf8' });
-  if (res.status === 0 && existsSync('dist-app/stub.exe')) {
-    compiledExe = readFileSync('dist-app/stub.exe');
-  } else {
-    console.warn('Компиляция csc завершилась с ошибкой, использую встроенный PE-генератор.');
-  }
+const compiler = findCompiler();
+if (!compiler) {
+  console.error('');
+  console.error('✗ Не найден компилятор C# (csc.exe).');
+  console.error('');
+  console.error('  Он входит в .NET Framework и обычно уже есть в Windows 10/11:');
+  console.error('    C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe');
+  console.error('  Если файла нет — поставьте .NET Framework 4.8:');
+  console.error('    https://dotnet.microsoft.com/download/dotnet-framework/net48');
+  console.error('');
+  console.error('  Веб-версия при этом уже собрана: dist\\ и mir.html.');
+  console.error('');
+  process.exit(1);
 }
 
-// 6. Если csc недоступен (например на Linux/Mac), используем универсальный PE-генератор
-if (!compiledExe) {
-  // Универсальный самораспаковывающийся Win32 PE GUI установщик
-  // Создаем чистый PE32+ исполняемый файл с заголовками и оверлеем
-  const peStub = Buffer.alloc(8192);
+/* csc.exe определяет кодировку исходника по BOM: без него русские строки
+   превратятся в кракозябры. Поэтому компилируем копию с BOM. */
+const sourceWithBom = join(OUT_DIR, 'MirSetup.cs');
+writeFileSync(sourceWithBom, '\uFEFF' + readFileSync(CS_SOURCE, 'utf8'), 'utf8');
 
-  // DOS Header (0x00 - 0x40)
-  peStub.write('MZ', 0, 2, 'ascii');
-  peStub.writeUInt16LE(0x0090, 2);
-  peStub.writeUInt32LE(0x00000080, 0x3c); // e_lfanew = 0x80
+/* Манифест: asInvoker — чтобы Windows не считала файл с «Setup» в имени
+   установщиком и не просила права администратора (мы ставим игру в папку
+   пользователя); dpiAware — чтобы окно не было размытым на HiDPI-экранах. */
+const manifestPath = join(OUT_DIR, 'MirSetup.manifest');
+writeFileSync(
+  manifestPath,
+  `<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="0.3.0.0" name="MIR.Setup" type="win32" />
+  <description>MIR — The civilization of the sages</description>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}" />
+    </application>
+  </compatibility>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+    </windowsSettings>
+  </application>
+</assembly>
+`,
+  'utf8',
+);
 
-  // PE Header (0x80)
-  peStub.write('PE\0\0', 0x80, 4, 'ascii');
-  peStub.writeUInt16LE(0x014c, 0x84); // Machine: i386 (CLR AnyCPU)
-  peStub.writeUInt16LE(3, 0x86); // NumberOfSections
-  peStub.writeUInt32LE(Math.floor(Date.now() / 1000), 0x88);
-  peStub.writeUInt32LE(0, 0x8c);
-  peStub.writeUInt32LE(0, 0x90);
-  peStub.writeUInt16LE(0x00e0, 0x94); // SizeOfOptionalHeader
-  peStub.writeUInt16LE(0x0102, 0x96); // Characteristics: EXECUTABLE_IMAGE | 32BIT_MACHINE
+const exePath = join(OUT_DIR, 'MIR-Setup.exe');
+const args = [
+  '/nologo',
+  '/target:winexe',
+  '/platform:anycpu',
+  '/optimize+',
+  `/out:${exePath}`,
+  '/reference:System.dll',
+  '/reference:System.Drawing.dll',
+  '/reference:System.Windows.Forms.dll',
+  `/resource:${sitePackPath},mir.site`,
+  `/win32manifest:${manifestPath}`,
+];
+if (existsSync(icoPath)) {
+  args.push(`/resource:${icoPath},mir.icon`);
+  args.push(`/win32icon:${icoPath}`);
+}
+args.push(sourceWithBom);
 
-  // Optional Header
-  peStub.writeUInt16LE(0x010b, 0x98); // Magic: PE32
-  peStub.writeUInt8(6, 0x9a); // MajorLinkerVersion
-  peStub.writeUInt8(0, 0x9b);
-  peStub.writeUInt32LE(0x00000600, 0x9c); // SizeOfCode
-  peStub.writeUInt32LE(0x00000800, 0xa0); // SizeOfInitializedData
-  peStub.writeUInt32LE(0x00000000, 0xa4);
-  peStub.writeUInt32LE(0x00002000, 0xa8); // AddressOfEntryPoint
-  peStub.writeUInt32LE(0x00002000, 0xac); // BaseOfCode
-  peStub.writeUInt32LE(0x00004000, 0xb0); // BaseOfData
-  peStub.writeUInt32LE(0x00400000, 0xb4); // ImageBase
-  peStub.writeUInt32LE(0x00002000, 0xb8); // SectionAlignment
-  peStub.writeUInt32LE(0x00000200, 0xbc); // FileAlignment
-  peStub.writeUInt16LE(4, 0xc0); // MajorOSVersion
-  peStub.writeUInt16LE(0, 0xc2);
-  peStub.writeUInt16LE(0, 0xc4);
-  peStub.writeUInt16LE(0, 0xc6);
-  peStub.writeUInt16LE(4, 0xc8); // MajorSubsystemVersion
-  peStub.writeUInt16LE(0, 0xca);
-  peStub.writeUInt32LE(0, 0xcc);
-  peStub.writeUInt32LE(0x00008000, 0xd0); // SizeOfImage
-  peStub.writeUInt32LE(0x00000200, 0xd4); // SizeOfHeaders
-  peStub.writeUInt32LE(0, 0xd8); // CheckSum
-  peStub.writeUInt16LE(2, 0xdc); // Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI (2)
-  peStub.writeUInt16LE(0x8540, 0xde); // DllCharacteristics
-  peStub.writeUInt32LE(0x00100000, 0xe0); // SizeOfStackReserve
-  peStub.writeUInt32LE(0x00001000, 0xe4); // SizeOfStackCommit
-  peStub.writeUInt32LE(0x00100000, 0xe8); // SizeOfHeapReserve
-  peStub.writeUInt32LE(0x00001000, 0xec); // SizeOfHeapCommit
-  peStub.writeUInt32LE(0, 0xf0);
-  peStub.writeUInt32LE(16, 0xf4); // NumberOfRvaAndSizes
+console.log(`Компилирую установщик: ${compiler}`);
+const build = spawnSync(compiler, args, { encoding: 'utf8' });
+const compilerOutput = `${build.stdout || ''}${build.stderr || ''}`.trim();
+if (compilerOutput) console.log(compilerOutput);
 
-  // Section Headers
-  // 1. .text (Code)
-  peStub.write('.text\0\0\0', 0x178, 8, 'ascii');
-  peStub.writeUInt32LE(0x00000600, 0x180); // VirtualSize
-  peStub.writeUInt32LE(0x00002000, 0x184); // VirtualAddress
-  peStub.writeUInt32LE(0x00000600, 0x188); // SizeOfRawData
-  peStub.writeUInt32LE(0x00000200, 0x18c); // PointerToRawData
-  peStub.writeUInt32LE(0x60000020, 0x19c); // Characteristics: CODE | EXECUTE | READ
-
-  // 2. .rsrc (Resources)
-  peStub.write('.rsrc\0\0\0', 0x1a0, 8, 'ascii');
-  peStub.writeUInt32LE(0x00000600, 0x1a8);
-  peStub.writeUInt32LE(0x00004000, 0x1ac);
-  peStub.writeUInt32LE(0x00000600, 0x1b0);
-  peStub.writeUInt32LE(0x00000800, 0x1b4);
-  peStub.writeUInt32LE(0x40000040, 0x1c4); // INITIALIZED_DATA | READ
-
-  // 3. .reloc
-  peStub.write('.reloc\0\0', 0x1c8, 8, 'ascii');
-  peStub.writeUInt32LE(0x00000200, 0x1d0);
-  peStub.writeUInt32LE(0x00006000, 0x1d4);
-  peStub.writeUInt32LE(0x00000200, 0x1d8);
-  peStub.writeUInt32LE(0x00000e00, 0x1dc);
-  peStub.writeUInt32LE(0x42000040, 0x1ec);
-
-  compiledExe = peStub;
+if (build.status !== 0 || !existsSync(exePath)) {
+  console.error('');
+  console.error('✗ Компиляция установщика не удалась — смотрите сообщения компилятора выше.');
+  process.exit(1);
 }
 
-// 7. Сборка финального MIR-Setup.exe с полезной нагрузкой
-const payloadMarker = Buffer.from('---MIR-PAYLOAD-START---', 'ascii');
-const payloadEndMarker = Buffer.from('---MIR-PAYLOAD-END---', 'ascii');
-const iconMarker = Buffer.from('---MIR-ICON-START---', 'ascii');
-const iconEndMarker = Buffer.from('---MIR-ICON-END---', 'ascii');
+/* ---------- 5. проверка результата ----------------------------------- */
 
-const finalExe = Buffer.concat([
-  compiledExe,
-  payloadMarker,
-  htmlData,
-  payloadEndMarker,
-  iconMarker,
-  icoData,
-  iconEndMarker,
-]);
+const exe = readFileSync(exePath);
+const problems = [];
+if (exe.subarray(0, 2).toString('ascii') !== 'MZ') problems.push('нет сигнатуры MZ — это не Windows-приложение');
+const peOffset = exe.readUInt32LE(0x3c);
+if (exe.subarray(peOffset, peOffset + 4).toString('binary') !== 'PE\0\0') problems.push('нет заголовка PE');
+if (exe.length < 20 * 1024) problems.push(`подозрительно маленький файл (${exe.length} байт)`);
+if (!exe.includes(Buffer.from('mir.site', 'ascii'))) problems.push('в exe не видно ресурса с сайтом');
 
-writeFileSync('dist-app/MIR-Setup.exe', finalExe);
-writeFileSync('MIR-Setup.exe', finalExe);
+if (problems.length) {
+  console.error('');
+  console.error('✗ Самопроверка установщика не прошла:');
+  for (const problem of problems) console.error(`    • ${problem}`);
+  process.exit(1);
+}
+
+writeFileSync('MIR-Setup.exe', exe);
 
 console.log('');
-console.log('✓ Windows установщик (.exe) успешно собран:');
-console.log('    dist-app/MIR-Setup.exe  (и копия в корне: MIR-Setup.exe)');
-console.log(`    Размер: ${(finalExe.length / 1024).toFixed(1)} КБ`);
-console.log('    Установка: запустите файл двойным кликом на Windows — появится красивое меню установки.');
+console.log('✓ Windows-установщик собран:');
+console.log('    MIR-Setup.exe  (копия: dist-app/MIR-Setup.exe)');
+console.log(`    Размер: ${(exe.length / 1024).toFixed(1)} КБ, внутри ${siteFiles.length} файлов игры`);
+console.log('    Проверено: настоящий PE-файл, ресурсы на месте.');
+console.log('');
+console.log('    Файл можно просто переслать другу (Telegram, Discord, флешка).');
+console.log('    При первом запуске Windows SmartScreen покажет синее окно:');
+console.log('    «Подробнее» → «Выполнить в любом случае» — так бывает у любой');
+console.log('    программы без платной цифровой подписи.');
 console.log('');

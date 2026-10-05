@@ -1,35 +1,64 @@
-// Сборка приложения для Android (.apk).
+// Сборка Android-приложения (MIR.apk) без Android SDK, Java и интернета.
 // Запуск: node build-apk.mjs
 //
-// Генерирует полностью готовый и подписанный Android APK (MIR.apk),
-// который можно сразу передать на телефон (Telegram, WhatsApp, USB)
-// и установить в один клик. Работает автономно без Android SDK.
+// Что внутри APK:
+//   AndroidManifest.xml — бинарный AXML (minSdk 21, targetSdk 34);
+//   classes.dex         — одна активность: полноэкранный WebView;
+//   resources.arsc      — таблица ресурсов с иконкой запуска;
+//   assets/mir.html     — сама игра одним файлом.
+//
+// Почему так, а не «просто zip»: Android отказывается ставить пакет, если
+//   • не объявлен targetSdkVersion ≥ 23 (Android 14) / ≥ 24 (Android 15);
+//   • пакет подписан только по схеме v1, а targetSdk ≥ 30 (Android 11+);
+//   • resources.arsc сжат или не выровнен по 4 байта (Android 11+).
+// Поэтому ниже руками собираются корректный DEX, AXML, ARSC, выравнивание
+// и две подписи сразу: v1 (JAR) и v2 (APK Signature Scheme v2).
+//
+// Ключ подписи сохраняется в data/apk-signing-key.json и переиспользуется:
+// иначе каждая сборка подписывалась бы новым ключом и обновление поверх уже
+// установленной игры падало бы с «Приложение не установлено».
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
-import { build } from 'vite';
+import { buildSingleHtml } from './build-single.mjs';
 
-// 1. Убеждаемся, что собраны mir.html и иконки
-console.log('--- Сборка MIR для Android (.apk) ---');
+const PACKAGE = 'com.mir.game';
+const LABEL = 'MIR';
+const MIN_SDK = 21;
+const TARGET_SDK = 34;
+const KEY_FILE = join('data', 'apk-signing-key.json');
 
-await build({ logLevel: 'warn' });
+const pkgJson = JSON.parse(readFileSync('package.json', 'utf8'));
+const VERSION_NAME = pkgJson.version ?? '0.0.0';
+const VERSION_CODE = VERSION_NAME.split('.')
+  .map((n) => Number.parseInt(n, 10) || 0)
+  .reduce((acc, n) => acc * 100 + n, 0) || 1;
 
-// Собираем однофайловый HTML для встраивания в APK
-let html = readFileSync(join('dist', 'index.html'), 'utf8');
-html = html.replace(
-  /<script type="module" crossorigin src="\/(assets\/[^"]+\.js)"><\/script>/,
-  (match, path) => {
-    const js = readFileSync(join('dist', path), 'utf8').replaceAll('</script', '<\\/script');
-    return `<script type="module">\n${js}\n    </script>`;
-  },
-);
-html = html.replace(
-  /<link rel="stylesheet" crossorigin href="\/(assets\/[^"]+\.css)" ?\/?>/,
-  (match, path) => `<style>\n${readFileSync(join('dist', path), 'utf8')}\n    </style>`,
-);
-writeFileSync('mir.html', html);
+/* ============================================================
+   Мелкие помощники
+   ============================================================ */
+
+const u32 = (v) => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(v >>> 0, 0);
+  return b;
+};
+
+const pad4 = (len) => (4 - (len % 4)) % 4;
+
+function uleb128(value) {
+  const out = [];
+  let v = value >>> 0;
+  do {
+    let byte = v & 0x7f;
+    v >>>= 7;
+    if (v !== 0) byte |= 0x80;
+    out.push(byte);
+  } while (v !== 0);
+  return Buffer.from(out);
+}
 
 function adler32(buf) {
   let a = 1;
@@ -41,341 +70,300 @@ function adler32(buf) {
   return ((b << 16) | a) >>> 0;
 }
 
-// Вспомогательные функции для DEX и AXML
-function uleb128(val) {
-  const res = [];
-  while (true) {
-    let b = val & 0x7f;
-    val >>= 7;
-    if (val !== 0) b |= 0x80;
-    res.push(b);
-    if (val === 0) break;
+const CRC_TABLE = (() => {
+  const table = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c;
   }
-  return Buffer.from(res);
+  return table;
+})();
+
+function crc32(buf) {
+  let crc = -1;
+  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 0xff];
+  return (crc ^ -1) >>> 0;
 }
 
-// Генератор classes.dex (Dalvik Activity + Fullscreen WebView)
-function generateDex() {
-  const strings = [
-    '<init>',
-    'Activity',
-    'Bundle',
-    'Context',
-    'I',
-    'Landroid/app/Activity;',
-    'Landroid/content/Context;',
-    'Landroid/os/Bundle;',
-    'Landroid/view/View;',
-    'Landroid/view/Window;',
-    'Landroid/webkit/WebSettings;',
-    'Landroid/webkit/WebView;',
-    'Landroid/webkit/WebViewClient;',
-    'Lcom/mir/game/MainActivity;',
-    'Ljava/lang/Object;',
-    'Ljava/lang/String;',
-    'MainActivity.java',
-    'V',
-    'VI',
-    'VII',
-    'VL',
-    'VLandroid/content/Context;',
-    'VLandroid/os/Bundle;',
-    'VLandroid/view/View;',
-    'VLandroid/webkit/WebViewClient;',
-    'VLjava/lang/String;',
-    'VZ',
-    'Z',
-    'ZI',
-    'file:///android_asset/mir.html',
-    'getSettings',
-    'getWindow',
-    'loadUrl',
-    'onCreate',
-    'requestWindowFeature',
-    'setAllowFileAccess',
-    'setContentView',
-    'setDatabaseEnabled',
-    'setDomStorageEnabled',
-    'setFlags',
-    'setJavaScriptEnabled',
-    'setWebViewClient',
-  ].sort();
+/* ============================================================
+   1. classes.dex
+   ------------------------------------------------------------
+   Генерируем ровно один класс:
 
-  const strMap = new Map(strings.map((s, i) => [s, i]));
+     package com.mir.game;
+     public class MainActivity extends android.app.Activity {
+       public MainActivity() { super(); }
+       protected void onCreate(Bundle b) {
+         super.onCreate(b);
+         WebView w = new WebView(this);
+         WebSettings s = w.getSettings();
+         s.setJavaScriptEnabled(true);
+         s.setDomStorageEnabled(true);
+         s.setAllowFileAccess(true);
+         w.setWebViewClient(new WebViewClient());
+         setContentView(w);
+         w.loadUrl("file:///android_asset/mir.html");
+       }
+     }
+   ============================================================ */
 
-  const types = [
-    'I',
-    'Landroid/app/Activity;',
-    'Landroid/content/Context;',
-    'Landroid/os/Bundle;',
-    'Landroid/view/View;',
-    'Landroid/view/Window;',
-    'Landroid/webkit/WebSettings;',
-    'Landroid/webkit/WebView;',
-    'Landroid/webkit/WebViewClient;',
-    'Lcom/mir/game/MainActivity;',
-    'Ljava/lang/Object;',
-    'Ljava/lang/String;',
-    'V',
-    'Z',
-  ].sort();
+function buildDex() {
+  const CLASS = 'Lcom/mir/game/MainActivity;';
+  const SUPER = 'Landroid/app/Activity;';
+  const WEBVIEW = 'Landroid/webkit/WebView;';
+  const SETTINGS = 'Landroid/webkit/WebSettings;';
+  const CLIENT = 'Landroid/webkit/WebViewClient;';
+  const SOURCE_FILE = 'MainActivity.java';
+  const START_URL = 'file:///android_asset/mir.html';
 
-  const typeMap = new Map(types.map((t, i) => [t, i]));
+  const ref = (cls, name, params, ret) => ({ cls, name, params, ret });
 
-  const rawProtos = [
-    { shorty: 'V', ret: 'V', params: [] },
-    { shorty: 'V', ret: 'V', params: ['Landroid/content/Context;'] },
-    { shorty: 'V', ret: 'V', params: ['Landroid/os/Bundle;'] },
-    { shorty: 'V', ret: 'V', params: ['Landroid/view/View;'] },
-    { shorty: 'V', ret: 'V', params: ['Landroid/webkit/WebViewClient;'] },
-    { shorty: 'V', ret: 'V', params: ['Ljava/lang/String;'] },
-    { shorty: 'V', ret: 'V', params: ['Z'] },
-    { shorty: 'VII', ret: 'V', params: ['I', 'I'] },
-    { shorty: 'ZI', ret: 'Z', params: ['I'] },
-    { shorty: 'VL', ret: 'Landroid/view/Window;', params: [] },
-    { shorty: 'VL', ret: 'Landroid/webkit/WebSettings;', params: [] },
-  ];
+  const M = {
+    superInit: ref(SUPER, '<init>', [], 'V'),
+    superOnCreate: ref(SUPER, 'onCreate', ['Landroid/os/Bundle;'], 'V'),
+    setContentView: ref(SUPER, 'setContentView', ['Landroid/view/View;'], 'V'),
+    wvInit: ref(WEBVIEW, '<init>', ['Landroid/content/Context;'], 'V'),
+    wvGetSettings: ref(WEBVIEW, 'getSettings', [], SETTINGS),
+    wvSetClient: ref(WEBVIEW, 'setWebViewClient', [CLIENT], 'V'),
+    wvLoadUrl: ref(WEBVIEW, 'loadUrl', ['Ljava/lang/String;'], 'V'),
+    setJs: ref(SETTINGS, 'setJavaScriptEnabled', ['Z'], 'V'),
+    setDom: ref(SETTINGS, 'setDomStorageEnabled', ['Z'], 'V'),
+    setFiles: ref(SETTINGS, 'setAllowFileAccess', ['Z'], 'V'),
+    clientInit: ref(CLIENT, '<init>', [], 'V'),
+    ownInit: ref(CLASS, '<init>', [], 'V'),
+    ownOnCreate: ref(CLASS, 'onCreate', ['Landroid/os/Bundle;'], 'V'),
+  };
+  const methodRefs = Object.values(M);
 
-  const protos = rawProtos.map((p) => ({
-    shortyIdx: strMap.get(p.shorty),
-    returnTypeIdx: typeMap.get(p.ret),
-    params: p.params.map((t) => typeMap.get(t)),
-  })).sort((a, b) => a.returnTypeIdx - b.returnTypeIdx || a.params.length - b.params.length);
-
-  const protoMap = new Map(protos.map((p, i) => [`${p.returnTypeIdx}:${p.params.join(',')}`, i]));
-
-  const rawMethods = [
-    { cls: 'Landroid/app/Activity;', ret: 'V', params: [], name: '<init>' },
-    { cls: 'Landroid/app/Activity;', ret: 'V', params: ['Landroid/os/Bundle;'], name: 'onCreate' },
-    { cls: 'Landroid/app/Activity;', ret: 'Z', params: ['I'], name: 'requestWindowFeature' },
-    { cls: 'Landroid/app/Activity;', ret: 'Landroid/view/Window;', params: [], name: 'getWindow' },
-    { cls: 'Landroid/app/Activity;', ret: 'V', params: ['Landroid/view/View;'], name: 'setContentView' },
-    { cls: 'Landroid/view/Window;', ret: 'V', params: ['I', 'I'], name: 'setFlags' },
-    { cls: 'Landroid/webkit/WebView;', ret: 'V', params: ['Landroid/content/Context;'], name: '<init>' },
-    { cls: 'Landroid/webkit/WebView;', ret: 'Landroid/webkit/WebSettings;', params: [], name: 'getSettings' },
-    { cls: 'Landroid/webkit/WebView;', ret: 'V', params: ['Landroid/webkit/WebViewClient;'], name: 'setWebViewClient' },
-    { cls: 'Landroid/webkit/WebView;', ret: 'V', params: ['Ljava/lang/String;'], name: 'loadUrl' },
-    { cls: 'Landroid/webkit/WebSettings;', ret: 'V', params: ['Z'], name: 'setJavaScriptEnabled' },
-    { cls: 'Landroid/webkit/WebSettings;', ret: 'V', params: ['Z'], name: 'setDomStorageEnabled' },
-    { cls: 'Landroid/webkit/WebSettings;', ret: 'V', params: ['Z'], name: 'setDatabaseEnabled' },
-    { cls: 'Landroid/webkit/WebSettings;', ret: 'V', params: ['Z'], name: 'setAllowFileAccess' },
-    { cls: 'Landroid/webkit/WebViewClient;', ret: 'V', params: [], name: '<init>' },
-    { cls: 'Lcom/mir/game/MainActivity;', ret: 'V', params: [], name: '<init>' },
-    { cls: 'Lcom/mir/game/MainActivity;', ret: 'V', params: ['Landroid/os/Bundle;'], name: 'onCreate' },
-  ];
-
-  const methods = rawMethods.map((m) => {
-    const pKey = `${typeMap.get(m.ret)}:${m.params.map((t) => typeMap.get(t)).join(',')}`;
-    return {
-      classIdx: typeMap.get(m.cls),
-      protoIdx: protoMap.get(pKey),
-      nameIdx: strMap.get(m.name),
-      cls: m.cls,
-      name: m.name,
-      pKey,
-    };
-  }).sort((a, b) => a.classIdx - b.classIdx || a.nameIdx - b.nameIdx || a.protoIdx - b.protoIdx);
-
-  function getMethodIdx(cls, name, ret, params) {
-    const pKey = `${typeMap.get(ret)}:${params.map((t) => typeMap.get(t)).join(',')}`;
-    return methods.findIndex((m) => m.cls === cls && m.name === name && m.pKey === pKey);
+  /* --- пул типов ------------------------------------------------ */
+  const typeSet = new Set([CLASS, SUPER, 'Ljava/lang/Object;']);
+  for (const m of methodRefs) {
+    typeSet.add(m.cls);
+    typeSet.add(m.ret);
+    for (const p of m.params) typeSet.add(p);
   }
+  typeSet.add(WEBVIEW);
+  typeSet.add(CLIENT);
+  const types = [...typeSet].sort();
+  const typeIdx = new Map(types.map((t, i) => [t, i]));
 
-  // Сборка Data-секции
-  const typeLists = [];
-  const protoParamOffs = [];
-  let typeListBuf = Buffer.alloc(0);
+  /* --- пул строк ------------------------------------------------- */
+  const shortyChar = (t) => (t.startsWith('L') || t.startsWith('[') ? 'L' : t);
+  const shortyOf = (m) => shortyChar(m.ret) + m.params.map(shortyChar).join('');
 
-  for (const p of protos) {
-    if (p.params.length === 0) {
-      protoParamOffs.push(0);
-    } else {
-      const pad = (4 - (typeListBuf.length % 4)) % 4;
-      if (pad > 0) typeListBuf = Buffer.concat([typeListBuf, Buffer.alloc(pad)]);
-      protoParamOffs.push(typeListBuf.length);
-      const b = Buffer.alloc(4 + p.params.length * 2);
-      b.writeUInt32LE(p.params.length, 0);
-      p.params.forEach((paramT, idx) => b.writeUInt16LE(paramT, 4 + idx * 2));
-      typeListBuf = Buffer.concat([typeListBuf, b]);
+  const stringSet = new Set([...types, SOURCE_FILE, START_URL]);
+  for (const m of methodRefs) {
+    stringSet.add(m.name);
+    stringSet.add(shortyOf(m));
+  }
+  const strings = [...stringSet].sort();
+  const strIdx = new Map(strings.map((s, i) => [s, i]));
+
+  /* --- прототипы ------------------------------------------------- */
+  const protoKey = (m) => `${m.ret}|${m.params.join(',')}`;
+  const protoMapRaw = new Map();
+  for (const m of methodRefs) {
+    if (!protoMapRaw.has(protoKey(m)))
+      protoMapRaw.set(protoKey(m), { ret: m.ret, params: m.params, shorty: shortyOf(m) });
+  }
+  const protos = [...protoMapRaw.values()].sort((a, b) => {
+    if (typeIdx.get(a.ret) !== typeIdx.get(b.ret)) return typeIdx.get(a.ret) - typeIdx.get(b.ret);
+    const len = Math.min(a.params.length, b.params.length);
+    for (let i = 0; i < len; i++) {
+      if (typeIdx.get(a.params[i]) !== typeIdx.get(b.params[i]))
+        return typeIdx.get(a.params[i]) - typeIdx.get(b.params[i]);
     }
-  }
-  const padTL = (4 - (typeListBuf.length % 4)) % 4;
-  if (padTL > 0) typeListBuf = Buffer.concat([typeListBuf, Buffer.alloc(padTL)]);
+    return a.params.length - b.params.length;
+  });
+  const protoIdx = new Map(protos.map((p, i) => [`${p.ret}|${p.params.join(',')}`, i]));
 
-  // Строковые данные
-  const strDataOffs = [];
-  let strDataBuf = Buffer.alloc(0);
+  /* --- методы ----------------------------------------------------- */
+  const methods = methodRefs
+    .map((m) => ({
+      ...m,
+      classIdx: typeIdx.get(m.cls),
+      nameIdx: strIdx.get(m.name),
+      protoIdx: protoIdx.get(protoKey(m)),
+    }))
+    .sort((a, b) => a.classIdx - b.classIdx || a.nameIdx - b.nameIdx || a.protoIdx - b.protoIdx);
+  const methodIdx = new Map(
+    methods.map((m, i) => [`${m.cls}|${m.name}|${protoKey(m)}`, i]),
+  );
+  const mi = (m) => methodIdx.get(`${m.cls}|${m.name}|${protoKey(m)}`);
+
+  /* --- байт-код ---------------------------------------------------- */
+  const OP = {
+    constString: 0x1a,
+    const4: 0x12,
+    newInstance: 0x22,
+    moveResultObject: 0x0c,
+    returnVoid: 0x0e,
+    invokeVirtual: 0x6e,
+    invokeSuper: 0x6f,
+    invokeDirect: 0x70,
+  };
+
+  const invoke = (op, method, regs) => {
+    const a = regs.length;
+    const g = a === 5 ? regs[4] : 0;
+    return [
+      (a << 12) | (g << 8) | op,
+      mi(method),
+      ((regs[3] ?? 0) << 12) | ((regs[2] ?? 0) << 8) | ((regs[1] ?? 0) << 4) | (regs[0] ?? 0),
+    ];
+  };
+
+  // MainActivity(): registers=1 (p0 = v0), super()
+  const initCode = [...invoke(OP.invokeDirect, M.superInit, [0]), OP.returnVoid];
+
+  // onCreate(Bundle): registers=7, ins=2 → p0 = v5 (this), p1 = v6 (bundle)
+  const THIS = 5;
+  const BUNDLE = 6;
+  const onCreateCode = [
+    ...invoke(OP.invokeSuper, M.superOnCreate, [THIS, BUNDLE]),
+    (0 << 8) | OP.newInstance, typeIdx.get(WEBVIEW),            // new-instance v0, WebView
+    ...invoke(OP.invokeDirect, M.wvInit, [0, THIS]),            // new WebView(this)
+    ...invoke(OP.invokeVirtual, M.wvGetSettings, [0]),          // w.getSettings()
+    (1 << 8) | OP.moveResultObject,                             // move-result-object v1
+    (1 << 12) | (2 << 8) | OP.const4,                           // const/4 v2, 1
+    ...invoke(OP.invokeVirtual, M.setJs, [1, 2]),
+    ...invoke(OP.invokeVirtual, M.setDom, [1, 2]),
+    ...invoke(OP.invokeVirtual, M.setFiles, [1, 2]),
+    (3 << 8) | OP.newInstance, typeIdx.get(CLIENT),             // new-instance v3, WebViewClient
+    ...invoke(OP.invokeDirect, M.clientInit, [3]),
+    ...invoke(OP.invokeVirtual, M.wvSetClient, [0, 3]),
+    ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 0]),
+    (4 << 8) | OP.constString, strIdx.get(START_URL),           // const-string v4, url
+    ...invoke(OP.invokeVirtual, M.wvLoadUrl, [0, 4]),
+    OP.returnVoid,
+  ];
+
+  function codeItem(registers, ins, outs, units) {
+    const body = Buffer.alloc(16 + units.length * 2);
+    body.writeUInt16LE(registers, 0);
+    body.writeUInt16LE(ins, 2);
+    body.writeUInt16LE(outs, 4);
+    body.writeUInt16LE(0, 6); // tries_size
+    body.writeUInt32LE(0, 8); // debug_info_off
+    body.writeUInt32LE(units.length, 12);
+    units.forEach((unit, i) => body.writeUInt16LE(unit & 0xffff, 16 + i * 2));
+    return body;
+  }
+
+  const codeInit = codeItem(1, 1, 1, initCode);
+  const codeOnCreate = codeItem(7, 2, 2, onCreateCode);
+
+  /* --- список типов для прототипов с параметрами ------------------- */
+  const typeListChunks = [];
+  const protoParamOff = new Array(protos.length).fill(0);
+  let typeListsLen = 0;
+  protos.forEach((p, i) => {
+    if (p.params.length === 0) return;
+    const padding = pad4(typeListsLen);
+    if (padding) {
+      typeListChunks.push(Buffer.alloc(padding));
+      typeListsLen += padding;
+    }
+    protoParamOff[i] = typeListsLen; // смещение внутри секции type_list
+    const buf = Buffer.alloc(4 + p.params.length * 2);
+    buf.writeUInt32LE(p.params.length, 0);
+    p.params.forEach((t, k) => buf.writeUInt16LE(typeIdx.get(t), 4 + k * 2));
+    typeListChunks.push(buf);
+    typeListsLen += buf.length;
+  });
+  const typeListCount = protoParamOff.filter((_, i) => protos[i].params.length > 0).length;
+  const typeListsBuf = Buffer.concat(typeListChunks);
+
+  /* --- строковые данные --------------------------------------------- */
+  const stringDataOff = [];
+  const stringDataChunks = [];
+  let stringDataLen = 0;
   for (const s of strings) {
-    strDataOffs.push(strDataBuf.length);
-    const uleb = uleb128(s.length);
-    const sBuf = Buffer.from(s, 'utf8');
-    strDataBuf = Buffer.concat([strDataBuf, uleb, sBuf, Buffer.from([0])]);
+    stringDataOff.push(stringDataLen);
+    const bytes = Buffer.from(s, 'utf8');
+    const chunk = Buffer.concat([uleb128(s.length), bytes, Buffer.from([0])]);
+    stringDataChunks.push(chunk);
+    stringDataLen += chunk.length;
   }
-  const padSD = (4 - (strDataBuf.length % 4)) % 4;
-  if (padSD > 0) strDataBuf = Buffer.concat([strDataBuf, Buffer.alloc(padSD)]);
+  const stringDataBuf = Buffer.concat(stringDataChunks);
 
-  // Инструкции Dalvik
-  const mActInit = getMethodIdx('Landroid/app/Activity;', '<init>', 'V', []);
-  const insnsInit = Buffer.alloc(8);
-  insnsInit.writeUInt16LE(0x1070, 0);
-  insnsInit.writeUInt16LE(mActInit, 2);
-  insnsInit.writeUInt16LE(0x0000, 4);
-  insnsInit.writeUInt16LE(0x000e, 6);
-
-  let codeInit = Buffer.alloc(16);
-  codeInit.writeUInt16LE(1, 0); // registers
-  codeInit.writeUInt16LE(1, 2); // ins
-  codeInit.writeUInt16LE(1, 4); // outs
-  codeInit.writeUInt16LE(0, 6); // tries
-  codeInit.writeUInt32LE(0, 8); // debug_info_off
-  codeInit.writeUInt32LE(insnsInit.length / 2, 12);
-  codeInit = Buffer.concat([codeInit, insnsInit]);
-  const padCI = (4 - (codeInit.length % 4)) % 4;
-  if (padCI > 0) codeInit = Buffer.concat([codeInit, Buffer.alloc(padCI)]);
-
-  const mActOnCreate = getMethodIdx('Landroid/app/Activity;', 'onCreate', 'V', ['Landroid/os/Bundle;']);
-  const mActReqFeat = getMethodIdx('Landroid/app/Activity;', 'requestWindowFeature', 'Z', ['I']);
-  const mActGetWin = getMethodIdx('Landroid/app/Activity;', 'getWindow', 'Landroid/view/Window;', []);
-  const mWinSetFlags = getMethodIdx('Landroid/view/Window;', 'setFlags', 'V', ['I', 'I']);
-  const tWebView = typeMap.get('Landroid/webkit/WebView;');
-  const mWvInit = getMethodIdx('Landroid/webkit/WebView;', '<init>', 'V', ['Landroid/content/Context;']);
-  const mWvGetSet = getMethodIdx('Landroid/webkit/WebView;', 'getSettings', 'Landroid/webkit/WebSettings;', []);
-  const mWsJs = getMethodIdx('Landroid/webkit/WebSettings;', 'setJavaScriptEnabled', 'V', ['Z']);
-  const mWsDom = getMethodIdx('Landroid/webkit/WebSettings;', 'setDomStorageEnabled', 'V', ['Z']);
-  const mWsDb = getMethodIdx('Landroid/webkit/WebSettings;', 'setDatabaseEnabled', 'V', ['Z']);
-  const mWsFile = getMethodIdx('Landroid/webkit/WebSettings;', 'setAllowFileAccess', 'V', ['Z']);
-  const tWvClient = typeMap.get('Landroid/webkit/WebViewClient;');
-  const mWvcInit = getMethodIdx('Landroid/webkit/WebViewClient;', '<init>', 'V', []);
-  const mWvSetClient = getMethodIdx('Landroid/webkit/WebViewClient;', '<init>', 'V', []);
-  const mWvSetClientActual = getMethodIdx('Landroid/webkit/WebView;', 'setWebViewClient', 'V', ['Landroid/webkit/WebViewClient;']);
-  const mActSetView = getMethodIdx('Landroid/app/Activity;', 'setContentView', 'V', ['Landroid/view/View;']);
-  const sUrl = strMap.get('file:///android_asset/mir.html');
-  const mWvLoadUrl = getMethodIdx('Landroid/webkit/WebView;', 'loadUrl', 'V', ['Ljava/lang/String;']);
-
-  const ocList = [
-    [0x206f, mActOnCreate, 0x0043],
-    [0x1012],
-    [0x206e, mActReqFeat, 0x0003],
-    [0x0013, 0x0400],
-    [0x106e, mActGetWin, 0x0003],
-    [0x010c],
-    [0x306e, mWinSetFlags, 0x0001],
-    [0x0022, tWebView],
-    [0x2070, mWvInit, 0x0030],
-    [0x106e, mWvGetSet, 0x0000],
-    [0x010c],
-    [0x1212],
-    [0x206e, mWsJs, 0x0021],
-    [0x206e, mWsDom, 0x0021],
-    [0x206e, mWsDb, 0x0021],
-    [0x206e, mWsFile, 0x0021],
-    [0x0222, tWvClient],
-    [0x1070, mWvcInit, 0x0002],
-    [0x206e, mWvSetClientActual, 0x0020],
-    [0x206e, mActSetView, 0x0003],
-    [0x011a, sUrl],
-    [0x206e, mWvLoadUrl, 0x0010],
-    [0x000e],
-  ];
-
-  const insnsOcBuf = Buffer.alloc(ocList.reduce((acc, row) => acc + row.length * 2, 0));
-  let insnsOcOff = 0;
-  for (const row of ocList) {
-    for (const val of row) {
-      insnsOcBuf.writeUInt16LE(val, insnsOcOff);
-      insnsOcOff += 2;
-    }
-  }
-
-  let codeOc = Buffer.alloc(16);
-  codeOc.writeUInt16LE(5, 0); // registers (v0..v2, p0=v3, p1=v4)
-  codeOc.writeUInt16LE(2, 2); // ins (p0, p1)
-  codeOc.writeUInt16LE(3, 4); // outs
-  codeOc.writeUInt16LE(0, 6); // tries
-  codeOc.writeUInt32LE(0, 8); // debug_info_off
-  codeOc.writeUInt32LE(insnsOcBuf.length / 2, 12);
-  codeOc = Buffer.concat([codeOc, insnsOcBuf]);
-  const padCO = (4 - (codeOc.length % 4)) % 4;
-  if (padCO > 0) codeOc = Buffer.concat([codeOc, Buffer.alloc(padCO)]);
-
-  // Заголовки и смещения
+  /* --- раскладка файла ---------------------------------------------- */
   const headerSize = 0x70;
-  const strIdsOff = headerSize;
-  const strIdsSize = strings.length;
-  const typeIdsOff = strIdsOff + strIdsSize * 4;
-  const typeIdsSize = types.length;
-  const protoIdsOff = typeIdsOff + typeIdsSize * 4;
-  const protoIdsSize = protos.length;
-  const fieldIdsOff = protoIdsOff + protoIdsSize * 12;
-  const fieldIdsSize = 0;
-  const methodIdsOff = fieldIdsOff;
-  const methodIdsSize = methods.length;
-  const classDefsOff = methodIdsOff + methodIdsSize * 8;
-  const classDefsSize = 1;
-  const dataOff = classDefsOff + classDefsSize * 32;
+  const stringIdsOff = headerSize;
+  const typeIdsOff = stringIdsOff + strings.length * 4;
+  const protoIdsOff = typeIdsOff + types.length * 4;
+  const methodIdsOff = protoIdsOff + protos.length * 12;
+  const classDefsOff = methodIdsOff + methods.length * 8;
+  const dataOff = classDefsOff + 32;
 
-  const tlStart = dataOff;
-  const strDataStart = tlStart + typeListBuf.length;
-  const codeInitStart = strDataStart + strDataBuf.length;
-  const codeOcStart = codeInitStart + codeInit.length;
-  const classDataStart = codeOcStart + codeOc.length;
+  let cursor = dataOff;
+  const typeListsOff = cursor;
+  cursor += typeListsBuf.length;
 
-  const mMainInit = getMethodIdx('Lcom/mir/game/MainActivity;', '<init>', 'V', []);
-  const mMainOc = getMethodIdx('Lcom/mir/game/MainActivity;', 'onCreate', 'V', ['Landroid/os/Bundle;']);
+  cursor += pad4(cursor);
+  const codeInitOff = cursor;
+  cursor += codeInit.length;
+  cursor += pad4(cursor);
+  const codeOnCreateOff = cursor;
+  cursor += codeOnCreate.length;
 
-  let classData = Buffer.concat([
-    uleb128(0), // static fields
-    uleb128(0), // instance fields
-    uleb128(1), // direct methods
-    uleb128(1), // virtual methods
-    uleb128(mMainInit),
+  const stringDataStart = cursor;
+  cursor += stringDataBuf.length;
+
+  const classDataOff = cursor;
+  const classDataBuf = Buffer.concat([
+    uleb128(0), // static_fields_size
+    uleb128(0), // instance_fields_size
+    uleb128(1), // direct_methods_size
+    uleb128(1), // virtual_methods_size
+    uleb128(mi(M.ownInit)),
     uleb128(0x10001), // ACC_PUBLIC | ACC_CONSTRUCTOR
-    uleb128(codeInitStart),
-    uleb128(mMainOc),
+    uleb128(codeInitOff),
+    uleb128(mi(M.ownOnCreate)),
     uleb128(0x0004), // ACC_PROTECTED
-    uleb128(codeOcStart),
+    uleb128(codeOnCreateOff),
   ]);
-  const padCD = (4 - (classData.length % 4)) % 4;
-  if (padCD > 0) classData = Buffer.concat([classData, Buffer.alloc(padCD)]);
+  cursor += classDataBuf.length;
 
-  const mapListStart = classDataStart + classData.length;
+  cursor += pad4(cursor);
+  const mapOff = cursor;
 
   const mapItems = [
     { type: 0x0000, size: 1, off: 0 },
-    { type: 0x0001, size: strIdsSize, off: strIdsOff },
-    { type: 0x0002, size: typeIdsSize, off: typeIdsOff },
-    { type: 0x0003, size: protoIdsSize, off: protoIdsOff },
-    { type: 0x0005, size: methodIdsSize, off: methodIdsOff },
-    { type: 0x0006, size: classDefsSize, off: classDefsOff },
-    { type: 0x1001, size: protoParamOffs.filter((p) => p !== 0).length, off: tlStart },
-    { type: 0x2002, size: strIdsSize, off: strDataStart },
-    { type: 0x2001, size: 2, off: codeInitStart },
-    { type: 0x2000, size: 1, off: classDataStart },
-    { type: 0x1000, size: 1, off: mapListStart },
-  ];
+    { type: 0x0001, size: strings.length, off: stringIdsOff },
+    { type: 0x0002, size: types.length, off: typeIdsOff },
+    { type: 0x0003, size: protos.length, off: protoIdsOff },
+    { type: 0x0005, size: methods.length, off: methodIdsOff },
+    { type: 0x0006, size: 1, off: classDefsOff },
+    { type: 0x1001, size: typeListCount, off: typeListsOff },
+    { type: 0x2001, size: 2, off: codeInitOff },
+    { type: 0x2002, size: strings.length, off: stringDataStart },
+    { type: 0x2000, size: 1, off: classDataOff },
+    { type: 0x1000, size: 1, off: mapOff },
+  ].filter((item) => item.size > 0);
+  mapItems.sort((a, b) => a.off - b.off);
 
-  const mapListBuf = Buffer.alloc(4 + mapItems.length * 12);
-  mapListBuf.writeUInt32LE(mapItems.length, 0);
-  mapItems.forEach((item, idx) => {
-    mapListBuf.writeUInt16LE(item.type, 4 + idx * 12);
-    mapListBuf.writeUInt16LE(0, 4 + idx * 12 + 2);
-    mapListBuf.writeUInt32LE(item.size, 4 + idx * 12 + 4);
-    mapListBuf.writeUInt32LE(item.off, 4 + idx * 12 + 8);
+  const mapBuf = Buffer.alloc(4 + mapItems.length * 12);
+  mapBuf.writeUInt32LE(mapItems.length, 0);
+  mapItems.forEach((item, i) => {
+    mapBuf.writeUInt16LE(item.type, 4 + i * 12);
+    mapBuf.writeUInt16LE(0, 6 + i * 12);
+    mapBuf.writeUInt32LE(item.size, 8 + i * 12);
+    mapBuf.writeUInt32LE(item.off, 12 + i * 12);
   });
+  cursor += mapBuf.length;
 
-  const totalDataSize = mapListStart + mapListBuf.length - dataOff;
-  const totalFileSize = dataOff + totalDataSize;
+  const fileSize = cursor;
+  const dex = Buffer.alloc(fileSize);
 
-  const dex = Buffer.alloc(totalFileSize);
-
-  // Таблицы ID
-  strDataOffs.forEach((off, i) => dex.writeUInt32LE(strDataStart + off, strIdsOff + i * 4));
-  types.forEach((t, i) => dex.writeUInt32LE(strMap.get(t), typeIdsOff + i * 4));
+  /* --- таблицы индексов --------------------------------------------- */
+  strings.forEach((_, i) => dex.writeUInt32LE(stringDataStart + stringDataOff[i], stringIdsOff + i * 4));
+  types.forEach((t, i) => dex.writeUInt32LE(strIdx.get(t), typeIdsOff + i * 4));
   protos.forEach((p, i) => {
-    const pOff = protoParamOffs[i] ? tlStart + protoParamOffs[i] : 0;
-    dex.writeUInt32LE(p.shortyIdx, protoIdsOff + i * 12);
-    dex.writeUInt32LE(p.returnTypeIdx, protoIdsOff + i * 12 + 4);
-    dex.writeUInt32LE(pOff, protoIdsOff + i * 12 + 8);
+    dex.writeUInt32LE(strIdx.get(p.shorty), protoIdsOff + i * 12);
+    dex.writeUInt32LE(typeIdx.get(p.ret), protoIdsOff + i * 12 + 4);
+    dex.writeUInt32LE(p.params.length ? typeListsOff + protoParamOff[i] : 0, protoIdsOff + i * 12 + 8);
   });
   methods.forEach((m, i) => {
     dex.writeUInt16LE(m.classIdx, methodIdsOff + i * 8);
@@ -383,695 +371,962 @@ function generateDex() {
     dex.writeUInt32LE(m.nameIdx, methodIdsOff + i * 8 + 4);
   });
 
-  // Class Def
-  const tMain = typeMap.get('Lcom/mir/game/MainActivity;');
-  const tAct = typeMap.get('Landroid/app/Activity;');
-  const sSource = strMap.get('MainActivity.java');
-  dex.writeUInt32LE(tMain, classDefsOff);
-  dex.writeUInt32LE(0x0001, classDefsOff + 4);
-  dex.writeUInt32LE(tAct, classDefsOff + 8);
-  dex.writeUInt32LE(0, classDefsOff + 12);
-  dex.writeUInt32LE(sSource, classDefsOff + 16);
-  dex.writeUInt32LE(0, classDefsOff + 20);
-  dex.writeUInt32LE(classDataStart, classDefsOff + 24);
-  dex.writeUInt32LE(0, classDefsOff + 28);
+  /* --- class_def_item ------------------------------------------------ */
+  dex.writeUInt32LE(typeIdx.get(CLASS), classDefsOff);
+  dex.writeUInt32LE(0x0001, classDefsOff + 4); // ACC_PUBLIC
+  dex.writeUInt32LE(typeIdx.get(SUPER), classDefsOff + 8);
+  dex.writeUInt32LE(0, classDefsOff + 12); // interfaces_off
+  dex.writeUInt32LE(strIdx.get(SOURCE_FILE), classDefsOff + 16);
+  dex.writeUInt32LE(0, classDefsOff + 20); // annotations_off
+  dex.writeUInt32LE(classDataOff, classDefsOff + 24);
+  dex.writeUInt32LE(0, classDefsOff + 28); // static_values_off
 
-  // Данные
-  typeListBuf.copy(dex, tlStart);
-  strDataBuf.copy(dex, strDataStart);
-  codeInit.copy(dex, codeInitStart);
-  codeOc.copy(dex, codeOcStart);
-  classData.copy(dex, classDataStart);
-  mapListBuf.copy(dex, mapListStart);
+  /* --- секция данных -------------------------------------------------- */
+  typeListsBuf.copy(dex, typeListsOff);
+  codeInit.copy(dex, codeInitOff);
+  codeOnCreate.copy(dex, codeOnCreateOff);
+  stringDataBuf.copy(dex, stringDataStart);
+  classDataBuf.copy(dex, classDataOff);
+  mapBuf.copy(dex, mapOff);
 
-  // Заголовок
-  dex.write('dex\n035\0', 0, 8, 'ascii');
-  dex.writeUInt32LE(totalFileSize, 32);
+  /* --- заголовок ------------------------------------------------------- */
+  dex.write('dex\n035\0', 0, 8, 'binary');
+  dex.writeUInt32LE(fileSize, 32);
   dex.writeUInt32LE(headerSize, 36);
-  dex.writeUInt32LE(0x12345678, 40);
-  dex.writeUInt32LE(mapListStart, 52);
-  dex.writeUInt32LE(strIdsSize, 56);
-  dex.writeUInt32LE(strIdsOff, 60);
-  dex.writeUInt32LE(typeIdsSize, 64);
+  dex.writeUInt32LE(0x12345678, 40); // endian_tag
+  dex.writeUInt32LE(0, 44); // link_size
+  dex.writeUInt32LE(0, 48); // link_off
+  dex.writeUInt32LE(mapOff, 52);
+  dex.writeUInt32LE(strings.length, 56);
+  dex.writeUInt32LE(stringIdsOff, 60);
+  dex.writeUInt32LE(types.length, 64);
   dex.writeUInt32LE(typeIdsOff, 68);
-  dex.writeUInt32LE(protoIdsSize, 72);
+  dex.writeUInt32LE(protos.length, 72);
   dex.writeUInt32LE(protoIdsOff, 76);
-  dex.writeUInt32LE(fieldIdsSize, 80);
-  dex.writeUInt32LE(fieldIdsOff, 84);
-  dex.writeUInt32LE(methodIdsSize, 88);
+  dex.writeUInt32LE(0, 80); // field_ids_size
+  dex.writeUInt32LE(0, 84); // field_ids_off (0, если размер 0)
+  dex.writeUInt32LE(methods.length, 88);
   dex.writeUInt32LE(methodIdsOff, 92);
-  dex.writeUInt32LE(classDefsSize, 96);
+  dex.writeUInt32LE(1, 96);
   dex.writeUInt32LE(classDefsOff, 100);
-  dex.writeUInt32LE(totalDataSize, 104);
+  dex.writeUInt32LE(fileSize - dataOff, 104);
   dex.writeUInt32LE(dataOff, 108);
 
-  const sha1 = crypto.createHash('sha1').update(dex.subarray(32)).digest();
-  sha1.copy(dex, 12);
-
-  const adler = adler32(dex.subarray(12));
-  dex.writeUInt32LE(adler >>> 0, 8);
+  crypto.createHash('sha1').update(dex.subarray(32)).digest().copy(dex, 12);
+  dex.writeUInt32LE(adler32(dex.subarray(12)), 8);
 
   return dex;
 }
 
-// Генератор AndroidManifest.xml (AXML)
-function generateAxml() {
-  const strings = [
-    'http://schemas.android.com/apk/res/android',
-    'android',
-    'manifest',
-    'package',
-    'versionCode',
-    'versionName',
-    'uses-permission',
-    'name',
-    'android.permission.INTERNET',
-    'android.permission.ACCESS_NETWORK_STATE',
-    'application',
-    'label',
-    'icon',
-    'hardwareAccelerated',
-    'allowBackup',
-    'supportsRtl',
-    'activity',
-    'com.mir.game.MainActivity',
-    'theme',
-    'configChanges',
-    'exported',
-    'intent-filter',
-    'action',
-    'android.intent.action.MAIN',
-    'category',
-    'android.intent.category.LAUNCHER',
-    'com.mir.game',
-    '0.3.0',
-    'MIR',
-    '@mipmap/ic_launcher',
-  ];
-  const strMap = new Map(strings.map((s, i) => [s, i]));
+/* ============================================================
+   2. Пул строк формата resources (используется в AXML и ARSC)
+   ============================================================ */
 
-  const resIds = new Array(strings.length).fill(0);
-  resIds[strMap.get('label')] = 0x01010001;
-  resIds[strMap.get('icon')] = 0x01010002;
-  resIds[strMap.get('name')] = 0x01010003;
-  resIds[strMap.get('theme')] = 0x01010000;
-  resIds[strMap.get('configChanges')] = 0x0101001f;
-  resIds[strMap.get('exported')] = 0x01010010;
-  resIds[strMap.get('versionCode')] = 0x0101021b;
-  resIds[strMap.get('versionName')] = 0x0101021c;
-  resIds[strMap.get('hardwareAccelerated')] = 0x010102d3;
-  resIds[strMap.get('allowBackup')] = 0x01010280;
-  resIds[strMap.get('supportsRtl')] = 0x010103af;
-
-  // Пул строк
+function stringPool(strings) {
   const offsets = [];
-  let strData = Buffer.alloc(0);
+  const chunks = [];
+  let len = 0;
   for (const s of strings) {
-    offsets.push(strData.length);
-    const sUtf16 = Buffer.from(s, 'utf16le');
-    const lenBuf = Buffer.alloc(2);
-    lenBuf.writeUInt16LE(s.length, 0);
-    strData = Buffer.concat([strData, lenBuf, sUtf16, Buffer.from([0, 0])]);
+    offsets.push(len);
+    const body = Buffer.from(s, 'utf16le');
+    const head = Buffer.alloc(2);
+    head.writeUInt16LE(s.length, 0);
+    const chunk = Buffer.concat([head, body, Buffer.from([0, 0])]);
+    chunks.push(chunk);
+    len += chunk.length;
   }
-  const padSD = (4 - (strData.length % 4)) % 4;
-  if (padSD > 0) strData = Buffer.concat([strData, Buffer.alloc(padSD)]);
+  let data = Buffer.concat(chunks);
+  const padding = pad4(data.length);
+  if (padding) data = Buffer.concat([data, Buffer.alloc(padding)]);
 
-  const spHeaderSize = 28;
-  const spOffsetsSize = strings.length * 4;
-  const spStringsStart = spHeaderSize + spOffsetsSize;
-  const spChunkSize = spStringsStart + strData.length;
+  const headerSize = 28;
+  const stringsStart = headerSize + strings.length * 4;
+  const size = stringsStart + data.length;
 
-  const spChunk = Buffer.alloc(spChunkSize);
-  spChunk.writeUInt16LE(0x0001, 0);
-  spChunk.writeUInt16LE(spHeaderSize, 2);
-  spChunk.writeUInt32LE(spChunkSize, 4);
-  spChunk.writeUInt32LE(strings.length, 8);
-  spChunk.writeUInt32LE(0, 12);
-  spChunk.writeUInt32LE(0, 16);
-  spChunk.writeUInt32LE(spStringsStart, 20);
-  spChunk.writeUInt32LE(0, 24);
+  const chunk = Buffer.alloc(size);
+  chunk.writeUInt16LE(0x0001, 0); // RES_STRING_POOL_TYPE
+  chunk.writeUInt16LE(headerSize, 2);
+  chunk.writeUInt32LE(size, 4);
+  chunk.writeUInt32LE(strings.length, 8);
+  chunk.writeUInt32LE(0, 12); // styleCount
+  chunk.writeUInt32LE(0, 16); // flags: UTF-16, не сортирован
+  chunk.writeUInt32LE(stringsStart, 20);
+  chunk.writeUInt32LE(0, 24); // stylesStart
+  offsets.forEach((off, i) => chunk.writeUInt32LE(off, headerSize + i * 4));
+  data.copy(chunk, stringsStart);
+  return chunk;
+}
 
-  offsets.forEach((off, i) => spChunk.writeUInt32LE(off, spHeaderSize + i * 4));
-  strData.copy(spChunk, spStringsStart);
+/* ============================================================
+   3. AndroidManifest.xml (бинарный AXML)
+   ============================================================ */
 
-  // Таблица ресурсов
-  const resMapChunk = Buffer.alloc(8 + resIds.length * 4);
-  resMapChunk.writeUInt16LE(0x0180, 0);
+const ATTR = {
+  theme: 0x01010000,
+  label: 0x01010001,
+  icon: 0x01010002,
+  name: 0x01010003,
+  exported: 0x01010010,
+  launchMode: 0x0101001d,
+  configChanges: 0x0101001f,
+  minSdkVersion: 0x0101020c,
+  versionCode: 0x0101021b,
+  versionName: 0x0101021c,
+  windowSoftInputMode: 0x0101022b,
+  targetSdkVersion: 0x01010270,
+  allowBackup: 0x01010280,
+  hardwareAccelerated: 0x010102d3,
+  supportsRtl: 0x010103af,
+  usesCleartextTraffic: 0x010104ec,
+};
+
+const VAL = {
+  reference: 0x01,
+  string: 0x03,
+  int: 0x10,
+  hex: 0x11,
+  boolean: 0x12,
+};
+
+const ANDROID_NS = 'http://schemas.android.com/apk/res/android';
+const ICON_RES_ID = 0x7f010000; // @mipmap/ic_launcher (см. generateArsc)
+const THEME_RES_ID = 0x0103022e; // @android:style/Theme.Material.NoActionBar
+
+function buildManifest() {
+  const str = (name, value) => ({ name, type: VAL.string, value });
+  const bool = (name, value) => ({ name, type: VAL.boolean, value: value ? 0xffffffff : 0 });
+  const int = (name, value) => ({ name, type: VAL.int, value });
+  const hex = (name, value) => ({ name, type: VAL.hex, value });
+  const refer = (name, value) => ({ name, type: VAL.reference, value });
+
+  // configChanges: keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize
+  const CONFIG_CHANGES = 0x10 | 0x20 | 0x80 | 0x400 | 0x0800 | 0x0200 | 0x2000;
+
+  const tree = {
+    tag: 'manifest',
+    plain: { package: PACKAGE },
+    attrs: [int('versionCode', VERSION_CODE), str('versionName', VERSION_NAME)],
+    children: [
+      { tag: 'uses-sdk', attrs: [int('minSdkVersion', MIN_SDK), int('targetSdkVersion', TARGET_SDK)] },
+      { tag: 'uses-permission', attrs: [str('name', 'android.permission.INTERNET')] },
+      { tag: 'uses-permission', attrs: [str('name', 'android.permission.ACCESS_NETWORK_STATE')] },
+      {
+        tag: 'application',
+        attrs: [
+          refer('theme', THEME_RES_ID),
+          str('label', LABEL),
+          refer('icon', ICON_RES_ID),
+          bool('allowBackup', true),
+          bool('hardwareAccelerated', true),
+          bool('supportsRtl', true),
+          bool('usesCleartextTraffic', true),
+        ],
+        children: [
+          {
+            tag: 'activity',
+            attrs: [
+              refer('theme', THEME_RES_ID),
+              str('name', `${PACKAGE}.MainActivity`),
+              bool('exported', true),
+              hex('launchMode', 1), // singleTop
+              hex('configChanges', CONFIG_CHANGES),
+              hex('windowSoftInputMode', 0x10), // adjustResize
+            ],
+            children: [
+              {
+                tag: 'intent-filter',
+                attrs: [],
+                children: [
+                  { tag: 'action', attrs: [str('name', 'android.intent.action.MAIN')] },
+                  { tag: 'category', attrs: [str('name', 'android.intent.category.LAUNCHER')] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  /* --- собираем пул строк: сначала имена атрибутов (в порядке resId) --- */
+  const attrNames = new Set();
+  const otherStrings = new Set();
+
+  const walk = (node) => {
+    for (const a of node.attrs ?? []) attrNames.add(a.name);
+    otherStrings.add(node.tag);
+    for (const [k, v] of Object.entries(node.plain ?? {})) {
+      otherStrings.add(k);
+      otherStrings.add(v);
+    }
+    for (const a of node.attrs ?? []) {
+      if (a.type === VAL.string) otherStrings.add(a.value);
+    }
+    for (const c of node.children ?? []) walk(c);
+  };
+  walk(tree);
+
+  const attrList = [...attrNames].sort((a, b) => ATTR[a] - ATTR[b]);
+  for (const a of attrList) {
+    if (ATTR[a] === undefined) throw new Error(`build-apk: неизвестный атрибут ${a}`);
+  }
+
+  const strings = [...attrList, 'android', ANDROID_NS, ...[...otherStrings].filter((s) => !attrList.includes(s))];
+  const uniqueStrings = [...new Set(strings)];
+  const sIdx = new Map(uniqueStrings.map((s, i) => [s, i]));
+
+  const poolChunk = stringPool(uniqueStrings);
+
+  const resMapChunk = Buffer.alloc(8 + attrList.length * 4);
+  resMapChunk.writeUInt16LE(0x0180, 0); // RES_XML_RESOURCE_MAP_TYPE
   resMapChunk.writeUInt16LE(8, 2);
   resMapChunk.writeUInt32LE(resMapChunk.length, 4);
-  resIds.forEach((rid, i) => resMapChunk.writeUInt32LE(rid, 8 + i * 4));
+  attrList.forEach((name, i) => resMapChunk.writeUInt32LE(ATTR[name], 8 + i * 4));
 
-  const nsUri = strMap.get('http://schemas.android.com/apk/res/android');
-  const nsPrefix = strMap.get('android');
+  /* --- узлы дерева --------------------------------------------------- */
+  const nsIdx = sIdx.get(ANDROID_NS);
+  const nodes = [];
 
-  let xmlBody = Buffer.alloc(24);
-  xmlBody.writeUInt16LE(0x0100, 0);
-  xmlBody.writeUInt16LE(16, 2);
-  xmlBody.writeUInt32LE(24, 4);
-  xmlBody.writeUInt32LE(1, 8);
-  xmlBody.writeUInt32LE(0xffffffff, 12);
-  xmlBody.writeUInt32LE(nsPrefix, 16);
-  xmlBody.writeUInt32LE(nsUri, 20);
+  const nsChunk = (type) => {
+    const buf = Buffer.alloc(24);
+    buf.writeUInt16LE(type, 0);
+    buf.writeUInt16LE(16, 2);
+    buf.writeUInt32LE(24, 4);
+    buf.writeUInt32LE(1, 8); // lineNumber
+    buf.writeUInt32LE(0xffffffff, 12); // comment
+    buf.writeUInt32LE(sIdx.get('android'), 16);
+    buf.writeUInt32LE(nsIdx, 20);
+    return buf;
+  };
 
-  function startElem(name, attrs) {
-    const attrBytes = Buffer.alloc(attrs.length * 20);
+  const emitElement = (node) => {
+    const plainAttrs = Object.entries(node.plain ?? {}).map(([k, v]) => ({
+      ns: 0xffffffff,
+      name: sIdx.get(k),
+      rawValue: sIdx.get(v),
+      type: VAL.string,
+      data: sIdx.get(v),
+    }));
+    const nsAttrs = (node.attrs ?? []).map((a) => ({
+      ns: nsIdx,
+      name: sIdx.get(a.name),
+      rawValue: a.type === VAL.string ? sIdx.get(a.value) : 0xffffffff,
+      type: a.type,
+      data: a.type === VAL.string ? sIdx.get(a.value) : a.value,
+    }));
+    const attrs = [...plainAttrs, ...nsAttrs];
+
+    const start = Buffer.alloc(36 + attrs.length * 20);
+    start.writeUInt16LE(0x0102, 0); // RES_XML_START_ELEMENT_TYPE
+    start.writeUInt16LE(16, 2);
+    start.writeUInt32LE(start.length, 4);
+    start.writeUInt32LE(1, 8); // lineNumber
+    start.writeUInt32LE(0xffffffff, 12); // comment
+    start.writeUInt32LE(0xffffffff, 16); // ns
+    start.writeUInt32LE(sIdx.get(node.tag), 20);
+    start.writeUInt16LE(20, 24); // attributeStart
+    start.writeUInt16LE(20, 26); // attributeSize
+    start.writeUInt16LE(attrs.length, 28);
+    start.writeUInt16LE(0, 30); // idIndex
+    start.writeUInt16LE(0, 32); // classIndex
+    start.writeUInt16LE(0, 34); // styleIndex
     attrs.forEach((a, i) => {
-      const off = i * 20;
-      attrBytes.writeUInt32LE(a.ns, off);
-      attrBytes.writeUInt32LE(a.name, off + 4);
-      attrBytes.writeUInt32LE(a.raw, off + 8);
-      attrBytes.writeUInt16LE(8, off + 12);
-      attrBytes.writeUInt8(0, off + 14);
-      attrBytes.writeUInt8(a.type, off + 15);
-      attrBytes.writeUInt32LE(a.val, off + 16);
+      const o = 36 + i * 20;
+      start.writeUInt32LE(a.ns, o);
+      start.writeUInt32LE(a.name, o + 4);
+      start.writeUInt32LE(a.rawValue, o + 8);
+      start.writeUInt16LE(8, o + 12); // size Res_value
+      start.writeUInt8(0, o + 14); // res0
+      start.writeUInt8(a.type, o + 15);
+      start.writeUInt32LE(a.data >>> 0, o + 16);
     });
+    nodes.push(start);
 
-    const chunkSize = 36 + attrBytes.length;
-    const elem = Buffer.alloc(36);
-    elem.writeUInt16LE(0x0102, 0);
-    elem.writeUInt16LE(16, 2);
-    elem.writeUInt32LE(chunkSize, 4);
-    elem.writeUInt32LE(1, 8);
-    elem.writeUInt32LE(0xffffffff, 12);
-    elem.writeUInt32LE(0xffffffff, 16);
-    elem.writeUInt32LE(strMap.get(name), 20);
-    elem.writeUInt16LE(0x0014, 24);
-    elem.writeUInt16LE(0x0014, 26);
-    elem.writeUInt16LE(attrs.length, 28);
-    elem.writeUInt16LE(0, 30);
-    elem.writeUInt16LE(0, 32);
-    elem.writeUInt16LE(0, 34);
+    for (const child of node.children ?? []) emitElement(child);
 
-    return Buffer.concat([elem, attrBytes]);
-  }
+    const end = Buffer.alloc(24);
+    end.writeUInt16LE(0x0103, 0); // RES_XML_END_ELEMENT_TYPE
+    end.writeUInt16LE(16, 2);
+    end.writeUInt32LE(24, 4);
+    end.writeUInt32LE(1, 8);
+    end.writeUInt32LE(0xffffffff, 12);
+    end.writeUInt32LE(0xffffffff, 16);
+    end.writeUInt32LE(sIdx.get(node.tag), 20);
+    nodes.push(end);
+  };
 
-  function endElem(name) {
-    const elem = Buffer.alloc(24);
-    elem.writeUInt16LE(0x0103, 0);
-    elem.writeUInt16LE(16, 2);
-    elem.writeUInt32LE(24, 4);
-    elem.writeUInt32LE(1, 8);
-    elem.writeUInt32LE(0xffffffff, 12);
-    elem.writeUInt32LE(0xffffffff, 16);
-    elem.writeUInt32LE(strMap.get(name), 20);
-    return elem;
-  }
+  nodes.push(nsChunk(0x0100)); // START_NAMESPACE
+  emitElement(tree);
+  nodes.push(nsChunk(0x0101)); // END_NAMESPACE
 
-  xmlBody = Buffer.concat([
-    xmlBody,
-    startElem('manifest', [
-      { ns: 0xffffffff, name: strMap.get('package'), raw: strMap.get('com.mir.game'), type: 0x03, val: strMap.get('com.mir.game') },
-      { ns: nsUri, name: strMap.get('versionCode'), raw: 0xffffffff, type: 0x10, val: 1 },
-      { ns: nsUri, name: strMap.get('versionName'), raw: strMap.get('0.3.0'), type: 0x03, val: strMap.get('0.3.0') },
-    ]),
-    startElem('uses-permission', [
-      { ns: nsUri, name: strMap.get('name'), raw: strMap.get('android.permission.INTERNET'), type: 0x03, val: strMap.get('android.permission.INTERNET') },
-    ]),
-    endElem('uses-permission'),
-    startElem('uses-permission', [
-      { ns: nsUri, name: strMap.get('name'), raw: strMap.get('android.permission.ACCESS_NETWORK_STATE'), type: 0x03, val: strMap.get('android.permission.ACCESS_NETWORK_STATE') },
-    ]),
-    endElem('uses-permission'),
-    startElem('application', [
-      { ns: nsUri, name: strMap.get('label'), raw: strMap.get('MIR'), type: 0x03, val: strMap.get('MIR') },
-      { ns: nsUri, name: strMap.get('icon'), raw: strMap.get('@mipmap/ic_launcher'), type: 0x01, val: 0x7f020000 },
-      { ns: nsUri, name: strMap.get('hardwareAccelerated'), raw: 0xffffffff, type: 0x12, val: 0xffffffff },
-      { ns: nsUri, name: strMap.get('allowBackup'), raw: 0xffffffff, type: 0x12, val: 0xffffffff },
-      { ns: nsUri, name: strMap.get('supportsRtl'), raw: 0xffffffff, type: 0x12, val: 0xffffffff },
-    ]),
-    startElem('activity', [
-      { ns: nsUri, name: strMap.get('name'), raw: strMap.get('com.mir.game.MainActivity'), type: 0x03, val: strMap.get('com.mir.game.MainActivity') },
-      { ns: nsUri, name: strMap.get('label'), raw: strMap.get('MIR'), type: 0x03, val: strMap.get('MIR') },
-      { ns: nsUri, name: strMap.get('theme'), raw: 0xffffffff, type: 0x01, val: 0x01030007 },
-      { ns: nsUri, name: strMap.get('configChanges'), raw: 0xffffffff, type: 0x11, val: 0x000004a0 },
-      { ns: nsUri, name: strMap.get('exported'), raw: 0xffffffff, type: 0x12, val: 0xffffffff },
-    ]),
-    startElem('intent-filter', []),
-    startElem('action', [
-      { ns: nsUri, name: strMap.get('name'), raw: strMap.get('android.intent.action.MAIN'), type: 0x03, val: strMap.get('android.intent.action.MAIN') },
-    ]),
-    endElem('action'),
-    startElem('category', [
-      { ns: nsUri, name: strMap.get('name'), raw: strMap.get('android.intent.category.LAUNCHER'), type: 0x03, val: strMap.get('android.intent.category.LAUNCHER') },
-    ]),
-    endElem('category'),
-    endElem('intent-filter'),
-    endElem('activity'),
-    endElem('application'),
-    endElem('manifest'),
-  ]);
-
-  const endNs = Buffer.alloc(24);
-  endNs.writeUInt16LE(0x0101, 0);
-  endNs.writeUInt16LE(16, 2);
-  endNs.writeUInt32LE(24, 4);
-  endNs.writeUInt32LE(1, 8);
-  endNs.writeUInt32LE(0xffffffff, 12);
-  endNs.writeUInt32LE(nsPrefix, 16);
-  endNs.writeUInt32LE(nsUri, 20);
-
-  xmlBody = Buffer.concat([xmlBody, endNs]);
-
-  const totalSize = 8 + spChunk.length + resMapChunk.length + xmlBody.length;
-  const axml = Buffer.alloc(totalSize);
-  axml.writeUInt16LE(0x0003, 0);
-  axml.writeUInt16LE(8, 2);
-  axml.writeUInt32LE(totalSize, 4);
-
-  spChunk.copy(axml, 8);
-  resMapChunk.copy(axml, 8 + spChunk.length);
-  xmlBody.copy(axml, 8 + spChunk.length + resMapChunk.length);
-
-  return axml;
+  const body = Buffer.concat([poolChunk, resMapChunk, ...nodes]);
+  const header = Buffer.alloc(8);
+  header.writeUInt16LE(0x0003, 0); // RES_XML_TYPE
+  header.writeUInt16LE(8, 2);
+  header.writeUInt32LE(8 + body.length, 4);
+  return Buffer.concat([header, body]);
 }
 
-// Генератор resources.arsc
-function generateArsc() {
-  const globalStrings = [
-    'MIR',
-    'res/mipmap-mdpi/ic_launcher.png',
-    'res/mipmap-hdpi/ic_launcher.png',
-    'res/mipmap-xhdpi/ic_launcher.png',
-    'res/mipmap-xxhdpi/ic_launcher.png',
-    'res/mipmap-xxxhdpi/ic_launcher.png',
-  ];
+/* ============================================================
+   4. resources.arsc — одна иконка @mipmap/ic_launcher (0x7f010000)
+   ============================================================ */
 
-  function makeSp(strings) {
-    const offsets = [];
-    let strData = Buffer.alloc(0);
-    for (const s of strings) {
-      offsets.push(strData.length);
-      const sUtf16 = Buffer.from(s, 'utf16le');
-      const lenBuf = Buffer.alloc(2);
-      lenBuf.writeUInt16LE(s.length, 0);
-      strData = Buffer.concat([strData, lenBuf, sUtf16, Buffer.from([0, 0])]);
-    }
-    const pad = (4 - (strData.length % 4)) % 4;
-    if (pad > 0) strData = Buffer.concat([strData, Buffer.alloc(pad)]);
+function buildArsc(iconPath) {
+  const globalPool = stringPool([iconPath]);
+  const typePool = stringPool(['mipmap']);
+  const keyPool = stringPool(['ic_launcher']);
 
-    const spHeaderSize = 28;
-    const spOffsetsSize = strings.length * 4;
-    const spStringsStart = spHeaderSize + spOffsetsSize;
-    const spChunkSize = spStringsStart + strData.length;
+  // ResTable_typeSpec
+  const typeSpec = Buffer.alloc(16 + 4);
+  typeSpec.writeUInt16LE(0x0202, 0);
+  typeSpec.writeUInt16LE(16, 2);
+  typeSpec.writeUInt32LE(typeSpec.length, 4);
+  typeSpec.writeUInt8(1, 8); // typeId = 1 → mipmap
+  typeSpec.writeUInt8(0, 9);
+  typeSpec.writeUInt16LE(0, 10);
+  typeSpec.writeUInt32LE(1, 12); // entryCount
+  typeSpec.writeUInt32LE(0, 16); // флаги конфигурации записи
 
-    const spChunk = Buffer.alloc(spChunkSize);
-    spChunk.writeUInt16LE(0x0001, 0);
-    spChunk.writeUInt16LE(spHeaderSize, 2);
-    spChunk.writeUInt32LE(spChunkSize, 4);
-    spChunk.writeUInt32LE(strings.length, 8);
-    spChunk.writeUInt32LE(0, 12);
-    spChunk.writeUInt32LE(0, 16);
-    spChunk.writeUInt32LE(spStringsStart, 20);
-    spChunk.writeUInt32LE(0, 24);
+  // ResTable_type (конфигурация по умолчанию)
+  const configSize = 64;
+  const typeHeaderSize = 20 + configSize;
+  const entry = Buffer.alloc(16);
+  entry.writeUInt16LE(8, 0); // size ResTable_entry
+  entry.writeUInt16LE(0, 2); // flags
+  entry.writeUInt32LE(0, 4); // key = "ic_launcher"
+  entry.writeUInt16LE(8, 8); // size Res_value
+  entry.writeUInt8(0, 10);
+  entry.writeUInt8(VAL.string, 11);
+  entry.writeUInt32LE(0, 12); // индекс строки в глобальном пуле
 
-    offsets.forEach((off, i) => spChunk.writeUInt32LE(off, spHeaderSize + i * 4));
-    strData.copy(spChunk, spStringsStart);
-    return spChunk;
-  }
+  const entriesStart = typeHeaderSize + 4;
+  const typeChunk = Buffer.alloc(entriesStart + entry.length);
+  typeChunk.writeUInt16LE(0x0201, 0);
+  typeChunk.writeUInt16LE(typeHeaderSize, 2);
+  typeChunk.writeUInt32LE(typeChunk.length, 4);
+  typeChunk.writeUInt8(1, 8); // typeId
+  typeChunk.writeUInt8(0, 9); // flags
+  typeChunk.writeUInt16LE(0, 10); // reserved
+  typeChunk.writeUInt32LE(1, 12); // entryCount
+  typeChunk.writeUInt32LE(entriesStart, 16);
+  typeChunk.writeUInt32LE(configSize, 20); // ResTable_config.size, остальное — нули
+  typeChunk.writeUInt32LE(0, typeHeaderSize); // смещение единственной записи
+  entry.copy(typeChunk, entriesStart);
 
-  const globalSp = makeSp(globalStrings);
-  const typeSp = makeSp(['attr', 'string', 'mipmap']);
-  const keySp = makeSp(['app_name', 'ic_launcher']);
+  const pkgHeaderSize = 288;
+  const pkgBody = Buffer.concat([typePool, keyPool, typeSpec, typeChunk]);
+  const pkgChunk = Buffer.alloc(pkgHeaderSize + pkgBody.length);
+  pkgChunk.writeUInt16LE(0x0200, 0);
+  pkgChunk.writeUInt16LE(pkgHeaderSize, 2);
+  pkgChunk.writeUInt32LE(pkgChunk.length, 4);
+  pkgChunk.writeUInt32LE(0x7f, 8); // id пакета
+  Buffer.from(PACKAGE, 'utf16le').copy(pkgChunk, 12); // name[128]
+  pkgChunk.writeUInt32LE(pkgHeaderSize, 268); // typeStrings
+  pkgChunk.writeUInt32LE(0, 272); // lastPublicType
+  pkgChunk.writeUInt32LE(pkgHeaderSize + typePool.length, 276); // keyStrings
+  pkgChunk.writeUInt32LE(0, 280); // lastPublicKey
+  pkgChunk.writeUInt32LE(0, 284); // typeIdOffset
+  pkgBody.copy(pkgChunk, pkgHeaderSize);
 
-  const pkgNameBuf = Buffer.alloc(256);
-  Buffer.from('com.mir.game', 'utf16le').copy(pkgNameBuf);
+  const header = Buffer.alloc(12);
+  header.writeUInt16LE(0x0002, 0); // RES_TABLE_TYPE
+  header.writeUInt16LE(12, 2);
+  header.writeUInt32LE(12 + globalPool.length + pkgChunk.length, 4);
+  header.writeUInt32LE(1, 8); // packageCount
 
-  const tsString = Buffer.alloc(24);
-  tsString.writeUInt16LE(0x0202, 0);
-  tsString.writeUInt16LE(16, 2);
-  tsString.writeUInt32LE(24, 4);
-  tsString.writeUInt8(2, 8); // id: 2 (string)
-  tsString.writeUInt32LE(1, 12); // count: 1
-
-  const tsMipmap = Buffer.alloc(24);
-  tsMipmap.writeUInt16LE(0x0202, 0);
-  tsMipmap.writeUInt16LE(16, 2);
-  tsMipmap.writeUInt32LE(24, 4);
-  tsMipmap.writeUInt8(3, 8); // id: 3 (mipmap)
-  tsMipmap.writeUInt32LE(1, 12); // count: 1
-
-  const config = Buffer.alloc(64);
-  config.writeUInt32LE(64, 0);
-
-  const entryStr = Buffer.alloc(16);
-  entryStr.writeUInt16LE(8, 0); // size
-  entryStr.writeUInt16LE(0, 2); // flags
-  entryStr.writeUInt32LE(0, 4); // key (app_name)
-  entryStr.writeUInt16LE(8, 8); // res_value size
-  entryStr.writeUInt8(0, 10);
-  entryStr.writeUInt8(0x03, 11); // STRING
-  entryStr.writeUInt32LE(0, 12); // data (MIR)
-
-  const typeStrHdrSize = 80;
-  const typeStrEntriesStart = typeStrHdrSize + 4;
-  const typeStrSize = typeStrEntriesStart + entryStr.length;
-
-  let typeStrChunk = Buffer.alloc(typeStrHdrSize);
-  typeStrChunk.writeUInt16LE(0x0201, 0);
-  typeStrChunk.writeUInt16LE(typeStrHdrSize, 2);
-  typeStrChunk.writeUInt32LE(typeStrSize, 4);
-  typeStrChunk.writeUInt8(2, 8);
-  typeStrChunk.writeUInt8(0, 9);
-  typeStrChunk.writeUInt16LE(0, 10);
-  typeStrChunk.writeUInt32LE(1, 12);
-  typeStrChunk.writeUInt32LE(typeStrEntriesStart, 16);
-  config.copy(typeStrChunk, 16);
-
-  const typeStrOffs = Buffer.alloc(4);
-  typeStrOffs.writeUInt32LE(0, 0);
-  typeStrChunk = Buffer.concat([typeStrChunk, typeStrOffs, entryStr]);
-
-  const entryMipmap = Buffer.alloc(16);
-  entryMipmap.writeUInt16LE(8, 0);
-  entryMipmap.writeUInt16LE(0, 2);
-  entryMipmap.writeUInt32LE(1, 4); // key (ic_launcher)
-  entryMipmap.writeUInt16LE(8, 8);
-  entryMipmap.writeUInt8(0, 10);
-  entryMipmap.writeUInt8(0x03, 11);
-  entryMipmap.writeUInt32LE(4, 12); // data (index 4 = xxhdpi)
-
-  const typeMipmapHdrSize = 80;
-  const typeMipmapEntriesStart = typeMipmapHdrSize + 4;
-  const typeMipmapSize = typeMipmapEntriesStart + entryMipmap.length;
-
-  let typeMipmapChunk = Buffer.alloc(typeMipmapHdrSize);
-  typeMipmapChunk.writeUInt16LE(0x0201, 0);
-  typeMipmapChunk.writeUInt16LE(typeMipmapHdrSize, 2);
-  typeMipmapChunk.writeUInt32LE(typeMipmapSize, 4);
-  typeMipmapChunk.writeUInt8(3, 8);
-  typeMipmapChunk.writeUInt8(0, 9);
-  typeMipmapChunk.writeUInt16LE(0, 10);
-  typeMipmapChunk.writeUInt32LE(1, 12);
-  typeMipmapChunk.writeUInt32LE(typeMipmapEntriesStart, 16);
-  config.copy(typeMipmapChunk, 16);
-
-  const typeMipmapOffs = Buffer.alloc(4);
-  typeMipmapOffs.writeUInt32LE(0, 0);
-  typeMipmapChunk = Buffer.concat([typeMipmapChunk, typeMipmapOffs, entryMipmap]);
-
-  const pkgHdrSize = 288;
-  const typeSpOffset = pkgHdrSize;
-  const keySpOffset = typeSpOffset + typeSp.length;
-
-  const pkgBody = Buffer.concat([
-    typeSp,
-    keySp,
-    tsString,
-    typeStrChunk,
-    tsMipmap,
-    typeMipmapChunk,
-  ]);
-
-  const pkgSize = pkgHdrSize + pkgBody.length;
-  const pkgChunkHdr = Buffer.alloc(pkgHdrSize);
-  pkgChunkHdr.writeUInt16LE(0x0200, 0);
-  pkgChunkHdr.writeUInt16LE(pkgHdrSize, 2);
-  pkgChunkHdr.writeUInt32LE(pkgSize, 4);
-  pkgChunkHdr.writeUInt32LE(0x7f, 8);
-  pkgNameBuf.copy(pkgChunkHdr, 12);
-  pkgChunkHdr.writeUInt32LE(typeSpOffset, 268);
-  pkgChunkHdr.writeUInt32LE(3, 272);
-  pkgChunkHdr.writeUInt32LE(keySpOffset, 276);
-  pkgChunkHdr.writeUInt32LE(2, 280);
-
-  const pkgChunk = Buffer.concat([pkgChunkHdr, pkgBody]);
-
-  const tblHdrSize = 12;
-  const tblSize = tblHdrSize + globalSp.length + pkgChunk.length;
-  const tblHdr = Buffer.alloc(tblHdrSize);
-  tblHdr.writeUInt16LE(0x0002, 0);
-  tblHdr.writeUInt16LE(tblHdrSize, 2);
-  tblHdr.writeUInt32LE(tblSize, 4);
-  tblHdr.writeUInt32LE(1, 8);
-
-  return Buffer.concat([tblHdr, globalSp, pkgChunk]);
+  return Buffer.concat([header, globalPool, pkgChunk]);
 }
 
-// Генератор подписи APK (PKCS#7 / JAR Signature Scheme v1)
-function createSignedApk(files) {
-  // files: array of { path: string, data: Buffer, uncompressed?: boolean }
-  const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+/* ============================================================
+   5. Ключ подписи (создаётся один раз и живёт в data/)
+   ============================================================ */
 
-  // 1. MANIFEST.MF
-  let manifestMf = 'Manifest-Version: 1.0\r\nCreated-By: 1.0 (MIR Game Studio)\r\n\r\n';
-  const fileDigests = new Map();
-
-  for (const file of files) {
-    const hash = crypto.createHash('sha256').update(file.data).digest('base64');
-    fileDigests.set(file.path, hash);
-    manifestMf += `Name: ${file.path}\r\nSHA-256-Digest: ${hash}\r\n\r\n`;
+function derLength(len) {
+  if (len < 0x80) return Buffer.from([len]);
+  const bytes = [];
+  let v = len;
+  while (v > 0) {
+    bytes.unshift(v & 0xff);
+    v >>= 8;
   }
-  const manifestMfBuf = Buffer.from(manifestMf, 'utf8');
+  return Buffer.from([0x80 | bytes.length, ...bytes]);
+}
+const der = (tag, content) => Buffer.concat([Buffer.from([tag]), derLength(content.length), content]);
+const derSeq = (...items) => der(0x30, Buffer.concat(items));
+const derSet = (...items) => der(0x31, Buffer.concat(items));
+const derInt = (buf) => der(0x02, Buffer.isBuffer(buf) ? buf : Buffer.from([buf]));
+const derNull = () => der(0x05, Buffer.alloc(0));
+const derUtf8 = (s) => der(0x0c, Buffer.from(s, 'utf8'));
+const derUtcTime = (s) => der(0x17, Buffer.from(s, 'ascii'));
 
-  // 2. CERT.SF
-  const manifestHash = crypto.createHash('sha256').update(manifestMfBuf).digest('base64');
-  let certSf = 'Signature-Version: 1.0\r\nCreated-By: 1.0 (MIR Game Studio)\r\n';
-  certSf += `SHA-256-Digest-Manifest: ${manifestHash}\r\n\r\n`;
-
-  for (const file of files) {
-    const entryData = `Name: ${file.path}\r\nSHA-256-Digest: ${fileDigests.get(file.path)}\r\n\r\n`;
-    const entryHash = crypto.createHash('sha256').update(Buffer.from(entryData, 'utf8')).digest('base64');
-    certSf += `Name: ${file.path}\r\nSHA-256-Digest: ${entryHash}\r\n\r\n`;
-  }
-  const certSfBuf = Buffer.from(certSf, 'utf8');
-
-  // 3. CERT.RSA (PKCS#7 SignedData)
-  function derLength(len) {
-    if (len < 128) return Buffer.from([len]);
-    const bytes = [];
-    let temp = len;
-    while (temp > 0) {
-      bytes.unshift(temp & 0xff);
-      temp >>= 8;
+function derOid(oid) {
+  const parts = oid.split('.').map(Number);
+  const bytes = [parts[0] * 40 + parts[1]];
+  for (let i = 2; i < parts.length; i++) {
+    let v = parts[i];
+    const enc = [v & 0x7f];
+    v >>>= 7;
+    while (v > 0) {
+      enc.unshift(0x80 | (v & 0x7f));
+      v >>>= 7;
     }
-    return Buffer.from([0x80 | bytes.length, ...bytes]);
+    bytes.push(...enc);
   }
-  function derTag(tag, content) {
-    return Buffer.concat([Buffer.from([tag]), derLength(content.length), content]);
-  }
-  function derSeq(...items) { return derTag(0x30, Buffer.concat(items)); }
-  function derSet(...items) { return derTag(0x31, Buffer.concat(items)); }
-  function derInt(val) {
-    if (typeof val === 'number') {
-      const buf = Buffer.alloc(val > 127 ? 2 : 1);
-      if (val > 127) { buf[0] = 0; buf[1] = val; }
-      else { buf[0] = val; }
-      return derTag(0x02, buf);
-    }
-    return derTag(0x02, val);
-  }
-  function derOctetString(buf) { return derTag(0x04, buf); }
-  function derPrintableString(str) { return derTag(0x13, Buffer.from(str, 'ascii')); }
-  function derUtcTime(date) {
-    const pad = (n) => String(n).padStart(2, '0');
-    const s = String(date.getUTCFullYear()).slice(2) + pad(date.getUTCMonth() + 1) + pad(date.getUTCDate()) + pad(date.getUTCHours()) + pad(date.getUTCMinutes()) + pad(date.getUTCSeconds()) + 'Z';
-    return derTag(0x17, Buffer.from(s, 'ascii'));
-  }
-  function derOid(oidStr) {
-    const parts = oidStr.split('.').map(Number);
-    const bytes = [parts[0] * 40 + parts[1]];
-    for (let i = 2; i < parts.length; i++) {
-      let v = parts[i];
-      const enc = [v & 0x7f];
-      v >>= 7;
-      while (v > 0) {
-        enc.unshift(0x80 | (v & 0x7f));
-        v >>= 7;
-      }
-      bytes.push(...enc);
-    }
-    return derTag(0x06, Buffer.from(bytes));
-  }
+  return der(0x06, Buffer.from(bytes));
+}
 
-  const sha256Oid = derOid('2.16.840.1.101.3.4.2.1');
-  const sha256WithRsa = derSeq(derOid('1.2.840.1.113549.1.1.11'), derTag(0x05, Buffer.alloc(0)));
-  const nullParam = derTag(0x05, Buffer.alloc(0));
+const OID_SHA256 = derSeq(derOid('2.16.840.1.101.3.4.2.1'), derNull());
+const OID_SHA256_RSA = derSeq(derOid('1.2.840.113549.1.1.11'), derNull());
 
-  const nameSeq = derSeq(
-    derSet(derSeq(derOid('2.5.4.6'), derPrintableString('RU'))),
-    derSet(derSeq(derOid('2.5.4.10'), derPrintableString('MIR Game'))),
-    derSet(derSeq(derOid('2.5.4.3'), derPrintableString('MIR'))),
-  );
+function makeCertificate(keys) {
+  const rdn = (oid, value) => derSet(derSeq(derOid(oid), derUtf8(value)));
+  const name = derSeq(rdn('2.5.4.6', 'RU'), rdn('2.5.4.10', 'MIR'), rdn('2.5.4.3', 'The civilization of the sages'));
+  const serial = derInt(Buffer.from([0x00, ...crypto.randomBytes(8)]));
+  const validity = derSeq(derUtcTime('200101000000Z'), derUtcTime('491231235959Z'));
+  const spki = keys.publicKey.export({ type: 'spki', format: 'der' });
 
-  const spkiDer = keys.publicKey.export({ type: 'spki', format: 'der' });
-  const serial = derInt(Buffer.from([0x01, 0x23, 0x45, 0x67]));
-  const validity = derSeq(derUtcTime(new Date(2025, 0, 1)), derUtcTime(new Date(2050, 0, 1)));
-
-  const tbsCert = derSeq(
-    derTag(0xa0, derInt(2)),
+  const tbs = derSeq(
+    der(0xa0, derInt(Buffer.from([2]))), // version v3
     serial,
-    sha256WithRsa,
-    nameSeq,
+    OID_SHA256_RSA,
+    name,
     validity,
-    nameSeq,
-    spkiDer,
+    name,
+    spki,
   );
+  const signature = crypto.sign('sha256', tbs, keys.privateKey);
+  return derSeq(tbs, OID_SHA256_RSA, der(0x03, Buffer.concat([Buffer.from([0]), signature])));
+}
 
-  const certSig = crypto.sign('SHA256', tbsCert, keys.privateKey);
-  const certSigBits = derTag(0x03, Buffer.concat([Buffer.from([0x00]), certSig]));
-  const x509Cert = derSeq(tbsCert, sha256WithRsa, certSigBits);
+function loadOrCreateKey() {
+  if (existsSync(KEY_FILE)) {
+    const saved = JSON.parse(readFileSync(KEY_FILE, 'utf8'));
+    return {
+      privateKey: crypto.createPrivateKey(saved.privateKey),
+      certificate: Buffer.from(saved.certificate, 'base64'),
+      fresh: false,
+    };
+  }
+
+  const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const certificate = makeCertificate(keys);
+  mkdirSync('data', { recursive: true });
+  writeFileSync(
+    KEY_FILE,
+    JSON.stringify(
+      {
+        note: 'Ключ подписи MIR.apk. Не удаляйте: без него обновление поверх установленной игры не поставится.',
+        privateKey: keys.privateKey.export({ type: 'pkcs8', format: 'pem' }),
+        certificate: certificate.toString('base64'),
+      },
+      null,
+      2,
+    ),
+  );
+  return { privateKey: keys.privateKey, certificate, fresh: true };
+}
+
+/* ============================================================
+   6. Подпись v1 (JAR) — META-INF/*
+   ============================================================ */
+
+function buildV1Signature(files, key) {
+  let manifestMf = 'Manifest-Version: 1.0\r\nCreated-By: MIR build-apk.mjs\r\n\r\n';
+  const sections = new Map();
+  for (const file of files) {
+    const digest = crypto.createHash('sha256').update(file.data).digest('base64');
+    const section = `Name: ${file.path}\r\nSHA-256-Digest: ${digest}\r\n\r\n`;
+    sections.set(file.path, section);
+    manifestMf += section;
+  }
+  const manifestBuf = Buffer.from(manifestMf, 'utf8');
+
+  let certSf = 'Signature-Version: 1.0\r\n';
+  certSf += 'Created-By: MIR build-apk.mjs\r\n';
+  /* Защита от отката на v1: см. «APK signature scheme v2 / Rollback protections». */
+  certSf += 'X-Android-APK-Signed: 2\r\n';
+  certSf += `SHA-256-Digest-Manifest: ${crypto.createHash('sha256').update(manifestBuf).digest('base64')}\r\n\r\n`;
+  for (const file of files) {
+    const sectionDigest = crypto
+      .createHash('sha256')
+      .update(Buffer.from(sections.get(file.path), 'utf8'))
+      .digest('base64');
+    certSf += `Name: ${file.path}\r\nSHA-256-Digest: ${sectionDigest}\r\n\r\n`;
+  }
+  const sfBuf = Buffer.from(certSf, 'utf8');
+
+  /* PKCS#7 SignedData (detached) над CERT.SF */
+  const issuerAndSerial = (() => {
+    /* Берём issuer и serial прямо из сертификата, чтобы они совпадали байт в байт. */
+    const certBody = parseDerChildren(key.certificate)[0].content; // tbs + algo + signature
+    const tbsBody = parseDerChildren(certBody)[0].content;
+    const tbs = parseDerChildren(tbsBody);
+    // tbs: [0] version, serial, sigAlg, issuer, validity, subject, spki...
+    const serial = tbs[1].raw;
+    const issuer = tbs[3].raw;
+    return derSeq(issuer, serial);
+  })();
 
   const signerInfo = derSeq(
-    derInt(1),
-    derSeq(nameSeq, serial),
-    derSeq(sha256Oid, nullParam),
-    sha256WithRsa,
-    derOctetString(crypto.sign('SHA256', certSfBuf, keys.privateKey)),
+    derInt(Buffer.from([1])),
+    issuerAndSerial,
+    OID_SHA256,
+    OID_SHA256_RSA,
+    der(0x04, crypto.sign('sha256', sfBuf, key.privateKey)),
   );
 
   const signedData = derSeq(
-    derInt(1),
-    derSet(derSeq(sha256Oid, nullParam)),
-    derSeq(derOid('1.2.840.1.113549.1.7.1')),
-    derTag(0xa0, x509Cert),
+    derInt(Buffer.from([1])),
+    derSet(OID_SHA256),
+    derSeq(derOid('1.2.840.113549.1.7.1')),
+    der(0xa0, key.certificate),
     derSet(signerInfo),
   );
 
-  const pkcs7 = derSeq(
-    derOid('1.2.840.1.113549.1.7.2'),
-    derTag(0xa0, signedData),
-  );
+  const pkcs7 = derSeq(derOid('1.2.840.113549.1.7.2'), der(0xa0, signedData));
 
-  // Добавляем служебные файлы подписи
-  const allFiles = [
-    ...files,
-    { path: 'META-INF/MANIFEST.MF', data: manifestMfBuf },
-    { path: 'META-INF/CERT.SF', data: certSfBuf },
+  return [
+    { path: 'META-INF/MANIFEST.MF', data: manifestBuf },
+    { path: 'META-INF/CERT.SF', data: sfBuf },
     { path: 'META-INF/CERT.RSA', data: pkcs7 },
   ];
-
-  // 4. Сборка ZIP архива с выравниванием (Zipalign 4-byte)
-  let zipBody = Buffer.alloc(0);
-  const cdEntries = [];
-
-  // CRC-32 таблица
-  function crc32(buf) {
-    let crc = 0 ^ -1;
-    for (let i = 0; i < buf.length; i++) {
-      crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xff];
-    }
-    return (crc ^ -1) >>> 0;
-  }
-  const crcTable = (() => {
-    let c;
-    const table = [];
-    for (let n = 0; n < 256; n++) {
-      c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      table[n] = c;
-    }
-    return table;
-  })();
-
-  for (const file of allFiles) {
-    const nameBuf = Buffer.from(file.path, 'utf8');
-    const isStored = file.uncompressed || file.path.endsWith('.arsc') || file.path.endsWith('.png');
-
-    let compData;
-    let method;
-    if (isStored) {
-      compData = file.data;
-      method = 0; // Stored
-    } else {
-      compData = zlib.deflateRawSync(file.data);
-      method = 8; // Deflate
-    }
-
-    const fileCrc = crc32(file.data);
-    const uncompressedSize = file.data.length;
-    const compressedSize = compData.length;
-
-    // Выравнивание для uncompressed файлов (4 байта)
-    let extra = Buffer.alloc(0);
-    if (isStored) {
-      const headerLen = 30 + nameBuf.length;
-      const currentOffset = zipBody.length;
-      const dataOffset = currentOffset + headerLen;
-      const pad = (4 - (dataOffset % 4)) % 4;
-      if (pad > 0) extra = Buffer.alloc(pad);
-    }
-
-    const localHdrOffset = zipBody.length;
-    const localHdr = Buffer.alloc(30);
-    localHdr.writeUInt32LE(0x04034b50, 0); // local file header signature
-    localHdr.writeUInt16LE(20, 4); // version needed
-    localHdr.writeUInt16LE(0, 6); // flags
-    localHdr.writeUInt16LE(method, 8);
-    localHdr.writeUInt16LE(0, 10); // time
-    localHdr.writeUInt16LE(0, 12); // date
-    localHdr.writeUInt32LE(fileCrc, 14);
-    localHdr.writeUInt32LE(compressedSize, 18);
-    localHdr.writeUInt32LE(uncompressedSize, 22);
-    localHdr.writeUInt16LE(nameBuf.length, 26);
-    localHdr.writeUInt16LE(extra.length, 28);
-
-    zipBody = Buffer.concat([zipBody, localHdr, nameBuf, extra, compData]);
-
-    // Central Directory Entry
-    const cdEntry = Buffer.alloc(46);
-    cdEntry.writeUInt32LE(0x02014b50, 0); // CD header signature
-    cdEntry.writeUInt16LE(20, 4); // version made by
-    cdEntry.writeUInt16LE(20, 6); // version needed
-    cdEntry.writeUInt16LE(0, 8); // flags
-    cdEntry.writeUInt16LE(method, 10);
-    cdEntry.writeUInt16LE(0, 12); // time
-    cdEntry.writeUInt16LE(0, 14); // date
-    cdEntry.writeUInt32LE(fileCrc, 16);
-    cdEntry.writeUInt32LE(compressedSize, 20);
-    cdEntry.writeUInt32LE(uncompressedSize, 24);
-    cdEntry.writeUInt16LE(nameBuf.length, 28);
-    cdEntry.writeUInt16LE(0, 30); // extra length
-    cdEntry.writeUInt16LE(0, 32); // comment length
-    cdEntry.writeUInt16LE(0, 34); // disk number
-    cdEntry.writeUInt16LE(0, 36); // internal attr
-    cdEntry.writeUInt32LE(0, 38); // external attr
-    cdEntry.writeUInt32LE(localHdrOffset, 42);
-
-    cdEntries.push(Buffer.concat([cdEntry, nameBuf]));
-  }
-
-  const cdStart = zipBody.length;
-  const cdData = Buffer.concat(cdEntries);
-  const cdSize = cdData.length;
-
-  const eocd = Buffer.alloc(22);
-  eocd.writeUInt32LE(0x06054b50, 0); // EOCD signature
-  eocd.writeUInt16LE(0, 4); // disk number
-  eocd.writeUInt16LE(0, 6); // disk with CD
-  eocd.writeUInt16LE(allFiles.length, 8); // total entries on disk
-  eocd.writeUInt16LE(allFiles.length, 10); // total entries
-  eocd.writeUInt32LE(cdSize, 12);
-  eocd.writeUInt32LE(cdStart, 16);
-  eocd.writeUInt16LE(0, 20); // comment length
-
-  return Buffer.concat([zipBody, cdData, eocd]);
 }
 
-// Загрузка иконок
-const icon192 = existsSync('public/icons/icon-192.png') ? readFileSync('public/icons/icon-192.png') : Buffer.alloc(0);
-const icon512 = existsSync('public/icons/icon-512.png') ? readFileSync('public/icons/icon-512.png') : icon192;
+/** Разбирает DER-последовательность на элементы верхнего уровня. */
+function parseDerChildren(buf) {
+  /* Если передали целиком SEQUENCE — разбираем его содержимое. */
+  const out = [];
+  let i = 0;
+  while (i < buf.length) {
+    const start = i;
+    const tag = buf[i++];
+    let len = buf[i++];
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      len = 0;
+      for (let k = 0; k < n; k++) len = (len << 8) | buf[i++];
+    }
+    const content = buf.subarray(i, i + len);
+    out.push({ tag, content, raw: buf.subarray(start, i + len) });
+    i += len;
+  }
+  return out;
+}
 
-const apkFiles = [
-  { path: 'AndroidManifest.xml', data: generateAxml(), uncompressed: false },
-  { path: 'classes.dex', data: generateDex(), uncompressed: false },
-  { path: 'resources.arsc', data: generateArsc(), uncompressed: true },
-  { path: 'res/mipmap-mdpi/ic_launcher.png', data: icon192, uncompressed: true },
-  { path: 'res/mipmap-hdpi/ic_launcher.png', data: icon192, uncompressed: true },
-  { path: 'res/mipmap-xhdpi/ic_launcher.png', data: icon192, uncompressed: true },
-  { path: 'res/mipmap-xxhdpi/ic_launcher.png', data: icon192, uncompressed: true },
-  { path: 'res/mipmap-xxxhdpi/ic_launcher.png', data: icon512, uncompressed: true },
-  { path: 'assets/mir.html', data: readFileSync('mir.html'), uncompressed: false },
+/* ============================================================
+   7. ZIP + выравнивание + подпись v2
+   ============================================================ */
+
+const DOS_TIME = (() => {
+  const d = new Date();
+  const time = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xffff;
+  const date = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xffff;
+  return { time, date };
+})();
+
+function buildZip(entries) {
+  const body = [];
+  const central = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBuf = Buffer.from(entry.path, 'utf8');
+    const stored = Boolean(entry.stored);
+    const data = stored ? entry.data : zlib.deflateRawSync(entry.data, { level: 9 });
+    const method = stored ? 0 : 8;
+
+    /* zipalign: данные несжатых файлов должны начинаться с границы 4 байт. */
+    let extra = Buffer.alloc(0);
+    if (stored) {
+      const dataStart = offset + 30 + nameBuf.length;
+      const padding = pad4(dataStart);
+      if (padding) extra = Buffer.alloc(padding);
+    }
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4); // version needed
+    local.writeUInt16LE(0, 6); // flags
+    local.writeUInt16LE(method, 8);
+    local.writeUInt16LE(DOS_TIME.time, 10);
+    local.writeUInt16LE(DOS_TIME.date, 12);
+    local.writeUInt32LE(crc32(entry.data), 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(entry.data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(extra.length, 28);
+
+    body.push(local, nameBuf, extra, data);
+
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4); // version made by
+    cd.writeUInt16LE(20, 6); // version needed
+    cd.writeUInt16LE(0, 8);
+    cd.writeUInt16LE(method, 10);
+    cd.writeUInt16LE(DOS_TIME.time, 12);
+    cd.writeUInt16LE(DOS_TIME.date, 14);
+    cd.writeUInt32LE(crc32(entry.data), 16);
+    cd.writeUInt32LE(data.length, 20);
+    cd.writeUInt32LE(entry.data.length, 24);
+    cd.writeUInt16LE(nameBuf.length, 28);
+    cd.writeUInt16LE(0, 30);
+    cd.writeUInt16LE(0, 32);
+    cd.writeUInt16LE(0, 34);
+    cd.writeUInt16LE(0, 36);
+    cd.writeUInt32LE(0, 38);
+    cd.writeUInt32LE(offset, 42);
+    central.push(Buffer.concat([cd, nameBuf]));
+
+    offset += local.length + nameBuf.length + extra.length + data.length;
+  }
+
+  const bodyBuf = Buffer.concat(body);
+  const centralBuf = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralBuf.length, 12);
+  eocd.writeUInt32LE(bodyBuf.length, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return { body: bodyBuf, central: centralBuf, eocd };
+}
+
+/** Двухуровневый дайджест APK по схеме v2 (чанки по 1 МиБ). */
+function apkDigest(sections) {
+  const CHUNK = 1024 * 1024;
+  const chunkDigests = [];
+  let count = 0;
+
+  for (const section of sections) {
+    for (let off = 0; off < section.length; off += CHUNK) {
+      const chunk = section.subarray(off, Math.min(off + CHUNK, section.length));
+      const h = crypto.createHash('sha256');
+      h.update(Buffer.from([0xa5]));
+      h.update(u32(chunk.length));
+      h.update(chunk);
+      chunkDigests.push(h.digest());
+      count++;
+    }
+  }
+
+  const top = crypto.createHash('sha256');
+  top.update(Buffer.from([0x5a]));
+  top.update(u32(count));
+  for (const d of chunkDigests) top.update(d);
+  return top.digest();
+}
+
+const lenPrefixed = (buf) => Buffer.concat([u32(buf.length), buf]);
+
+function signV2({ body, central, eocd }, key) {
+  /* EOCD для дайджеста: смещение центрального каталога = начало блока подписи. */
+  const eocdForDigest = Buffer.from(eocd);
+  eocdForDigest.writeUInt32LE(body.length, 16);
+
+  const digest = apkDigest([body, central, eocdForDigest]);
+
+  const SIG_ALGO_SHA256_RSA_PKCS1 = 0x0103;
+  const digests = lenPrefixed(
+    lenPrefixed(Buffer.concat([u32(SIG_ALGO_SHA256_RSA_PKCS1), lenPrefixed(digest)])),
+  );
+  const certificates = lenPrefixed(lenPrefixed(key.certificate));
+  const additionalAttributes = lenPrefixed(Buffer.alloc(0));
+  const signedData = Buffer.concat([digests, certificates, additionalAttributes]);
+
+  const signature = crypto.sign('sha256', signedData, key.privateKey);
+  const signatures = lenPrefixed(
+    lenPrefixed(Buffer.concat([u32(SIG_ALGO_SHA256_RSA_PKCS1), lenPrefixed(signature)])),
+  );
+  const publicKey = lenPrefixed(
+    crypto.createPublicKey(key.privateKey).export({ type: 'spki', format: 'der' }),
+  );
+
+  const signer = Buffer.concat([lenPrefixed(signedData), signatures, publicKey]);
+  const v2Block = lenPrefixed(lenPrefixed(signer));
+
+  /* APK Signing Block: [size][pairs...][size]["APK Sig Block 42"] */
+  const pair = Buffer.concat([u32(v2Block.length + 4), Buffer.alloc(4), v2Block]);
+  pair.writeUInt32LE(0x7109871a, 8); // ID блока v2
+  const pairs = Buffer.concat([u32(v2Block.length + 4), Buffer.alloc(4)]);
+  pairs.writeUInt32LE(0, 4);
+
+  const idValue = Buffer.concat([
+    Buffer.alloc(8), // uint64 длина пары
+    u32(0x7109871a),
+    v2Block,
+  ]);
+  idValue.writeBigUInt64LE(BigInt(4 + v2Block.length), 0);
+
+  /* Выравниваем начало центрального каталога на 4096 не требуется, но сам
+     блок должен быть кратен 8 байтам — добавляем «пустую» пару-заполнитель. */
+  let payload = idValue;
+  const unpaddedSize = 8 + payload.length + 8 + 16; // size + pairs + size + magic
+  const padding = (4096 - (unpaddedSize % 4096)) % 4096;
+  if (padding >= 12) {
+    const filler = Buffer.alloc(padding);
+    filler.writeBigUInt64LE(BigInt(padding - 8), 0);
+    filler.writeUInt32LE(0x42726577, 8); // «padding» ID из apksigner
+    payload = Buffer.concat([payload, filler]);
+  }
+
+  const blockSize = BigInt(payload.length + 8 + 16);
+  const sizeBuf = Buffer.alloc(8);
+  sizeBuf.writeBigUInt64LE(blockSize, 0);
+  const signingBlock = Buffer.concat([sizeBuf, payload, sizeBuf, Buffer.from('APK Sig Block 42', 'ascii')]);
+
+  const eocdFinal = Buffer.from(eocd);
+  eocdFinal.writeUInt32LE(body.length + signingBlock.length, 16);
+
+  return Buffer.concat([body, signingBlock, central, eocdFinal]);
+}
+
+/* ============================================================
+   8. Самопроверка готового APK
+   ============================================================ */
+
+/** Проверяет инварианты DEX, которые проверяет и верификатор ART. */
+function verifyDex(dex) {
+  const problems = [];
+  if (dex.subarray(0, 4).toString('binary') !== 'dex\n') problems.push('dex: неверная сигнатура');
+  if (dex.readUInt32LE(32) !== dex.length) problems.push('dex: file_size не совпадает с длиной');
+  if (dex.readUInt32LE(40) !== 0x12345678) problems.push('dex: неверный endian_tag');
+
+  const sha1 = crypto.createHash('sha1').update(dex.subarray(32)).digest();
+  if (!sha1.equals(dex.subarray(12, 32))) problems.push('dex: неверная SHA-1 подпись заголовка');
+  if (adler32(dex.subarray(12)) !== dex.readUInt32LE(8)) problems.push('dex: неверная контрольная сумма');
+
+  const strCount = dex.readUInt32LE(56);
+  const strOff = dex.readUInt32LE(60);
+  const readString = (i) => {
+    let p = dex.readUInt32LE(strOff + i * 4);
+    while (dex[p] & 0x80) p++; // uleb128 длины
+    p++;
+    const end = dex.indexOf(0, p);
+    return dex.subarray(p, end).toString('utf8');
+  };
+  const list = [];
+  for (let i = 0; i < strCount; i++) list.push(readString(i));
+  for (let i = 1; i < list.length; i++) {
+    if (list[i - 1] >= list[i]) problems.push(`dex: string_ids не отсортированы (${list[i - 1]} / ${list[i]})`);
+  }
+
+  const typeCount = dex.readUInt32LE(64);
+  const typeOff = dex.readUInt32LE(68);
+  for (let i = 1; i < typeCount; i++) {
+    if (dex.readUInt32LE(typeOff + (i - 1) * 4) >= dex.readUInt32LE(typeOff + i * 4))
+      problems.push('dex: type_ids не отсортированы');
+  }
+
+  const methodCount = dex.readUInt32LE(88);
+  const methodOff = dex.readUInt32LE(92);
+  let prev = [-1, -1, -1];
+  for (let i = 0; i < methodCount; i++) {
+    const cur = [
+      dex.readUInt16LE(methodOff + i * 8),
+      dex.readUInt32LE(methodOff + i * 8 + 4),
+      dex.readUInt16LE(methodOff + i * 8 + 2),
+    ];
+    if (cur[0] < prev[0] || (cur[0] === prev[0] && cur[1] < prev[1]))
+      problems.push('dex: method_ids не отсортированы');
+    prev = cur;
+  }
+
+  const mapOff = dex.readUInt32LE(52);
+  const mapSize = dex.readUInt32LE(mapOff);
+  let prevOff = -1;
+  for (let i = 0; i < mapSize; i++) {
+    const off = dex.readUInt32LE(mapOff + 4 + i * 12 + 8);
+    if (off < prevOff) problems.push('dex: map_list не отсортирован по смещению');
+    if (off > dex.length) problems.push('dex: смещение в map_list за пределами файла');
+    prevOff = off;
+  }
+  return problems;
+}
+
+function verifyApk(apk) {
+  const problems = [];
+
+  /* --- EOCD и центральный каталог --- */
+  const eocdOff = apk.length - 22;
+  if (apk.readUInt32LE(eocdOff) !== 0x06054b50) problems.push('не найден EOCD в конце файла');
+  const cdOffset = apk.readUInt32LE(eocdOff + 16);
+  const cdSize = apk.readUInt32LE(eocdOff + 12);
+  if (cdOffset + cdSize !== eocdOff) problems.push('центральный каталог не примыкает к EOCD');
+
+  /* --- блок подписи --- */
+  const magic = apk.subarray(cdOffset - 16, cdOffset).toString('ascii');
+  if (magic !== 'APK Sig Block 42') problems.push('нет APK Signing Block (подпись v2)');
+  const blockSizeTail = Number(apk.readBigUInt64LE(cdOffset - 24));
+  const blockStart = cdOffset - blockSizeTail - 8;
+  const blockSizeHead = Number(apk.readBigUInt64LE(blockStart));
+  if (blockSizeHead !== blockSizeTail) problems.push('размеры блока подписи не совпадают');
+
+  /* --- разбор пар ID-value и проверка подписи v2 --- */
+  let cursor = blockStart + 8;
+  let v2 = null;
+  while (cursor < cdOffset - 24) {
+    const pairLen = Number(apk.readBigUInt64LE(cursor));
+    const id = apk.readUInt32LE(cursor + 8);
+    const value = apk.subarray(cursor + 12, cursor + 8 + pairLen);
+    if (id === 0x7109871a) v2 = value;
+    cursor += 8 + pairLen;
+  }
+  if (!v2) problems.push('в блоке подписи нет секции 0x7109871a');
+
+  if (v2) {
+    const readLP = (buf, off) => {
+      const len = buf.readUInt32LE(off);
+      return { value: buf.subarray(off + 4, off + 4 + len), next: off + 4 + len };
+    };
+    const signers = readLP(v2, 0).value;
+    const signer = readLP(signers, 0).value;
+    const signedData = readLP(signer, 0);
+    const signatures = readLP(signer, signedData.next);
+    const publicKeyDer = readLP(signer, signatures.next).value;
+
+    const sigBlock = readLP(signatures.value, 0).value;
+    const sigAlgo = sigBlock.readUInt32LE(0);
+    const signature = readLP(sigBlock, 4).value;
+
+    const publicKey = crypto.createPublicKey({ key: publicKeyDer, format: 'der', type: 'spki' });
+    if (sigAlgo !== 0x0103) problems.push(`неожиданный алгоритм подписи 0x${sigAlgo.toString(16)}`);
+    if (!crypto.verify('sha256', signedData.value, publicKey, signature))
+      problems.push('подпись v2 не проходит проверку');
+
+    /* дайджест содержимого */
+    const digestsBlock = readLP(signedData.value, 0).value;
+    const digestEntry = readLP(digestsBlock, 0).value;
+    const storedDigest = readLP(digestEntry, 4).value;
+
+    const eocdForDigest = Buffer.from(apk.subarray(eocdOff));
+    eocdForDigest.writeUInt32LE(blockStart, 16);
+    const actual = apkDigest([
+      apk.subarray(0, blockStart),
+      apk.subarray(cdOffset, eocdOff),
+      eocdForDigest,
+    ]);
+    if (!actual.equals(storedDigest)) problems.push('дайджест содержимого не совпадает с подписанным');
+  }
+
+  /* --- подпись v1: сверяем MANIFEST.MF с содержимым --- */
+  const entries = readZipEntries(apk, cdOffset, cdSize);
+  const manifest = entries.get('META-INF/MANIFEST.MF');
+  if (!manifest) problems.push('нет META-INF/MANIFEST.MF (подпись v1)');
+  else {
+    const text = manifest.toString('utf8');
+    for (const [name, data] of entries) {
+      if (name.startsWith('META-INF/')) continue;
+      const digest = crypto.createHash('sha256').update(data).digest('base64');
+      if (!text.includes(`Name: ${name}\r\nSHA-256-Digest: ${digest}\r\n`))
+        problems.push(`в MANIFEST.MF нет верного дайджеста для ${name}`);
+    }
+  }
+
+  /* --- требования Android 11+ к resources.arsc --- */
+  const arscEntry = findLocalEntry(apk, 'resources.arsc');
+  if (!arscEntry) problems.push('нет resources.arsc');
+  else {
+    if (arscEntry.method !== 0) problems.push('resources.arsc сжат (Android 11+ такое не ставит)');
+    if (arscEntry.dataOffset % 4 !== 0) problems.push('resources.arsc не выровнен по 4 байта');
+  }
+
+  return problems;
+}
+
+function readZipEntries(apk, cdOffset, cdSize) {
+  const map = new Map();
+  let p = cdOffset;
+  const end = cdOffset + cdSize;
+  while (p < end) {
+    const nameLen = apk.readUInt16LE(p + 28);
+    const extraLen = apk.readUInt16LE(p + 30);
+    const commentLen = apk.readUInt16LE(p + 32);
+    const localOff = apk.readUInt32LE(p + 42);
+    const name = apk.subarray(p + 46, p + 46 + nameLen).toString('utf8');
+    const method = apk.readUInt16LE(p + 10);
+    const compSize = apk.readUInt32LE(p + 20);
+
+    const lNameLen = apk.readUInt16LE(localOff + 26);
+    const lExtraLen = apk.readUInt16LE(localOff + 28);
+    const dataStart = localOff + 30 + lNameLen + lExtraLen;
+    const raw = apk.subarray(dataStart, dataStart + compSize);
+    map.set(name, method === 0 ? raw : zlib.inflateRawSync(raw));
+
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return map;
+}
+
+function findLocalEntry(apk, wanted) {
+  let p = 0;
+  while (p + 30 < apk.length && apk.readUInt32LE(p) === 0x04034b50) {
+    const method = apk.readUInt16LE(p + 8);
+    const compSize = apk.readUInt32LE(p + 18);
+    const nameLen = apk.readUInt16LE(p + 26);
+    const extraLen = apk.readUInt16LE(p + 28);
+    const name = apk.subarray(p + 30, p + 30 + nameLen).toString('utf8');
+    const dataOffset = p + 30 + nameLen + extraLen;
+    if (name === wanted) return { method, dataOffset, compSize };
+    p = dataOffset + compSize;
+  }
+  return null;
+}
+
+/* ============================================================
+   9. Сборка
+   ============================================================ */
+
+console.log('--- Сборка MIR для Android (.apk) ---');
+
+const html = await buildSingleHtml();
+const icon = readFileSync(existsSync('public/icons/icon-512.png') ? 'public/icons/icon-512.png' : 'public/icons/icon-192.png');
+
+const dex = buildDex();
+const dexProblems = verifyDex(dex);
+if (dexProblems.length) {
+  console.error('\n✗ Самопроверка classes.dex не прошла:');
+  for (const p of dexProblems) console.error(`    • ${p}`);
+  process.exit(1);
+}
+
+const ICON_PATH = 'res/mipmap/ic_launcher.png';
+const payload = [
+  { path: 'AndroidManifest.xml', data: buildManifest() },
+  { path: 'classes.dex', data: dex },
+  { path: 'resources.arsc', data: buildArsc(ICON_PATH), stored: true },
+  { path: ICON_PATH, data: icon, stored: true },
+  { path: 'assets/mir.html', data: Buffer.from(html, 'utf8') },
 ];
 
-if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
+const key = loadOrCreateKey();
+const signatureFiles = buildV1Signature(payload, key);
+const zip = buildZip([...payload, ...signatureFiles]);
+const apk = signV2(zip, key);
 
-const apkBuffer = createSignedApk(apkFiles);
-writeFileSync('dist-app/MIR.apk', apkBuffer);
-writeFileSync('MIR.apk', apkBuffer);
+const problems = verifyApk(apk);
+if (problems.length) {
+  console.error('\n✗ Самопроверка APK не прошла:');
+  for (const p of problems) console.error(`    • ${p}`);
+  process.exit(1);
+}
+
+if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
+writeFileSync(join('dist-app', 'MIR.apk'), apk);
+writeFileSync('MIR.apk', apk);
 
 console.log('');
-console.log('✓ Android APK успешно собран и подписан:');
-console.log('    dist-app/MIR.apk  (и копия в корне: MIR.apk)');
-console.log(`    Размер: ${(apkBuffer.length / 1024).toFixed(1)} КБ`);
-console.log('    Установка: отправьте MIR.apk на телефон через Telegram/диск и нажмите Установить.');
+console.log('✓ Android-приложение собрано и подписано (v1 + v2):');
+console.log('    MIR.apk  (копия: dist-app/MIR.apk)');
+console.log(`    Размер: ${(apk.length / 1024).toFixed(1)} КБ, версия ${VERSION_NAME} (${VERSION_CODE})`);
+console.log(`    minSdk ${MIN_SDK} (Android 5.0), targetSdk ${TARGET_SDK} (Android 14)`);
+if (key.fresh) console.log(`    Создан ключ подписи: ${KEY_FILE} — не удаляйте его, иначе обновления не встанут.`);
+console.log('    Проверено: подпись v2, дайджесты v1, выравнивание resources.arsc.');
+console.log('');
+console.log('    Установка: перекиньте MIR.apk на телефон (Telegram, USB, диск),');
+console.log('    откройте и разрешите установку из этого источника.');
 console.log('');

@@ -153,6 +153,17 @@ const dialogShell = ({ label, title, size = '', body }) => `
   </div>`;
 
 /* --- Окно входа / регистрации --- */
+/* Подпись под формой входа. Если браузер запретил хранилище (file:// в
+   Firefox и Safari, запрет данных сайтов), честно говорим об этом: иначе
+   человек создаст аккаунт и потеряет его при перезагрузке. */
+const authNoteHtml = () => {
+  if (!store.storagePersists())
+    return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте игру через MIR-Setup.exe или по ссылке хаба.</p>`;
+  return `<p class="form-note">${
+    store.isHub() ? 'Аккаунт хранится на общем хабе сети.' : 'Всё хранится локально, в этом браузере.'
+  }</p>`;
+};
+
 const authModalHtml = () => {
   const isLogin = ui.authTab === 'login';
   return dialogShell({
@@ -187,7 +198,7 @@ const authModalHtml = () => {
         <button class="solid-button" type="submit" data-role="submit">
           <span>${isLogin ? 'Войти' : 'Создать аккаунт'}</span>
         </button>
-        <p class="form-note">Всё хранится локально, в этом браузере.</p>
+        ${authNoteHtml()}
       </form>`,
   });
 };
