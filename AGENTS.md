@@ -58,6 +58,12 @@
 | `hub.mjs`        | хаб общих аккаунтов локальной сети (/api/*)     |
 | `serve.mjs`      | статический сервер + хаб для показа друзьям     |
 | `build-single.mjs` | сборка однофайловой версии (vite build + инлайн dist-ресурсов) |
+| `build-exe.mjs`  | Windows: упаковка dist/ в ресурс и компиляция установщика через csc |
+| `tools/win/MirSetup.cs` | исходник установщика: локальный сервер 127.0.0.1, ярлыки, удаление |
+| `build-apk.mjs`  | Android: DEX, AXML, ARSC и подпись v1+v2 без Android SDK |
+| `build-all.mjs`  | все форматы подряд + итоговый отчёт «что собралось» |
+| `tools/net-check.mjs` | проверка DNS/SRV: почему не поднимается публичная ссылка |
+| `doctor.mjs`     | самодиагностика системы, портов, DNS и туннелей |
 | `mir.html`       | собранная однофайловая версия (артефакт, PWA без SW — только локальный режим) |
 | `preview.svg`    | статичный макет экрана (артефакт)               |
 
@@ -70,6 +76,10 @@ npm run build    # продакшн-сборка в dist/
 npm run single   # пересобрать mir.html
 npm run share    # собрать и раздать по сети
 npm run serve    # раздать уже собранный dist/
+npm run build:exe  # Windows-установщик (нужен csc из .NET Framework)
+npm run build:apk  # Android-приложение
+npm run build:all  # всё сразу
+npm run doctor     # диагностика сети и туннелей
 ```
 
 ## Договорённости

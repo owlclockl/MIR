@@ -1146,6 +1146,16 @@ input[type='search']::-webkit-search-cancel-button {
   text-indent: 0.12em;
 }
 
+/* Браузер запретил хранилище — предупреждение читается как текст, не как шифр. */
+.form-note--warn {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  letter-spacing: 0;
+  text-indent: 0;
+  text-transform: none;
+  line-height: 1.5;
+}
+
 .hint {
   margin: 0;
   color: var(--text-dim);

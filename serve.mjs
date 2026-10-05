@@ -30,6 +30,7 @@ import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createHub } from './hub.mjs';
+import { checkDns, explainDns } from './tools/net-check.mjs';
 
 const MIME = {
   '.webmanifest': 'application/manifest+json',
@@ -95,14 +96,27 @@ function copyToClipboard(text) {
   } catch { }
 }
 
+/* Открыть игру в браузере. Важно звать уже после listen(): порт может
+   оказаться не 4173, если он занят, — и тогда ссылка была бы битой. */
+function openInBrowser(url) {
+  try {
+    if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+    else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+    else spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+  } catch {
+    /* Браузер не открылся — ссылка всё равно напечатана выше. */
+  }
+}
+
 /* ---------- аргументы ---------- */
 
 function parseArgs(argv) {
-  const opts = { dir: null, port: null, public: false, hub: true, token: null, help: false };
+  const opts = { dir: null, port: null, public: false, hub: true, token: null, help: false, open: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') opts.help = true;
     else if (a === '--public' || a === '-p') opts.public = true;
+    else if (a === '--open') opts.open = true;
     else if (a === '--no-hub') opts.hub = false;
     else if (a === '--hub') opts.hub = true;
     else if (a === '--port') opts.port = Number(argv[++i]);
@@ -130,6 +144,7 @@ if (args.help) {
   --public       публичная https-ссылка для друзей из интернета:
                  авто-переподключение, HTTP/2, сторожевой таймер от сбоев
   --token TOKEN  токен постоянного Cloudflare Tunnel (вечная неизменная ссылка)
+  --open         открыть игру в браузере на том порту, который реально занят
   --no-hub       не поднимать хаб общих аккаунтов (/api/*)
   --help         эта справка
 `);
@@ -365,7 +380,15 @@ function onReady(port) {
   console.log('  Ctrl+C — остановить');
   console.log('');
 
-  if (args.public) openTunnel(port);
+  if (args.open) openInBrowser(`http://localhost:${port}/`);
+
+  if (args.public) {
+    openTunnel(port).catch((error) => {
+      logToFile('error', 'tunnel', `openTunnel failed: ${error.message}`);
+      console.log(`  Публичную ссылку поднять не удалось: ${error.message}`);
+      console.log('  Локальный сервер продолжает работать.');
+    });
+  }
 }
 
 /* ---------- публичная ссылка с авто-восстановлением ---------- */
@@ -628,7 +651,46 @@ function runLocaltunnel(port) {
   });
 }
 
-function openTunnel(port) {
+async function openTunnel(port) {
+  /* Сначала смотрим, работает ли DNS. Cloudflare Tunnel без SRV-записи
+     не стартует вообще, и ждать его минуту бессмысленно: лучше сразу
+     объяснить причину и уйти на localtunnel, которому хватает обычного
+     разрешения имён. */
+  console.log('  Проверяю сеть перед публикацией ссылки…');
+  const report = await checkDns();
+  logToFile(
+    'info',
+    'tunnel',
+    `DNS check: verdict=${report.verdict} lookup=${report.lookup.ok} resolve4=${report.resolve4.ok} ` +
+      `srv=${report.srv.ok} srvPublic=${report.srvPublic.ok} servers=${report.servers.join(',')}`,
+  );
+
+  if (report.verdict === 'ok') {
+    runCloudflared(port, () => runLocaltunnel(port));
+    return;
+  }
+
+  console.log('');
+  for (const line of explainDns(report)) console.log(`  ${line}`);
+  console.log('');
+
+  if (report.verdict === 'offline') {
+    console.log('  Публичную ссылку пропускаю: без интернета её негде разместить.');
+    console.log('  Адреса для друзей в этой же сети Wi-Fi напечатаны выше.');
+    console.log('');
+    return;
+  }
+
+  if (!report.cloudflareWillWork) {
+    console.log('  Cloudflare пропускаю — он без SRV-записи не запустится.');
+    console.log('  Пробую localtunnel: ему хватает обычного разрешения имён.');
+    console.log('');
+    runLocaltunnel(port);
+    return;
+  }
+
+  console.log('  Пробую Cloudflare — SRV-запись всё-таки отвечает.');
+  console.log('');
   runCloudflared(port, () => runLocaltunnel(port));
 }
 
