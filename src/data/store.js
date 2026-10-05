@@ -373,7 +373,10 @@ const localBackend = {
     const me = users.find((u) => u.id === userId);
     const owner = users.find((u) => u.inviteCode === code);
     if (!me) throw new Error('Вы не вошли в аккаунт.');
-    if (!owner) throw new Error('Такой код никому не выдан.');
+    if (!owner)
+      throw new Error(
+        'Этого кода здесь нет: локальные коды знает только этот браузер. Если игра открыта без ссылки сервера, добавить друга с другого устройства не выйдет — попросите ссылку у хозяина сети или используйте «Прямое подключение».',
+      );
     if (owner.id === me.id) throw new Error('Это ваш собственный код.');
     if (me.friends.includes(owner.id)) throw new Error(`${owner.name} уже у вас в друзьях.`);
     /* Код — это личное приглашение: дружба сразу взаимная, без заявки. */
@@ -469,9 +472,21 @@ const hubBackend = {
   async useInviteCode(userId, rawCode) {
     const code = normalizeInviteInput(rawCode);
     if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Код выглядит как XXXX-XXXX.');
-    const { state, result } = await remote.apiUseCode(code);
-    remote.applyState(state);
-    return { result };
+    try {
+      const { state, result } = await remote.apiUseCode(code);
+      remote.applyState(state);
+      return { result };
+    } catch (error) {
+      /* Частый тупик: друг прислал код из офлайн-приложения (APK или
+         mir.html с флешки) — тот живёт в его локальном хранилище, и
+         хаб про него никогда не слышал. Без объяснения человек вводит
+         тот же код двадцать раз подряд. */
+      if (error?.status === 404)
+        throw new Error(
+          'На общем хабе такого кода нет. Код действует только там, где открыта игра: если друг сидит в офлайн-приложении (APK), его код из другого режима — пусть откроет вашу ссылку, или соединитесь с ним в «Прямом подключении».',
+        );
+      throw error;
+    }
   },
 
   async regenCode() {
@@ -726,6 +741,13 @@ export const regenerateInviteCode = async () => {
 export const useInviteCode = async (rawCode) => {
   const me = getCurrentUser();
   if (!me) throw new Error('Вы не вошли в аккаунт.');
+  /* Длинный код MIR1.… — это приглашение прямого подключения, а не
+     код друга: после нормализации он неотличим от обычного («MIR1-EJW9»),
+     и хаб честно отвечает «не найден». Отлавливаем до отправки. */
+  if (/^\s*MIR[01]\./i.test(String(rawCode || '')))
+    throw new Error(
+      'Это код прямого подключения — он вставляется в окне «Прямое подключение», а сюда короткий код друга вида XXXX-XXXX.',
+    );
   const { result } = await backend.useInviteCode(me.id, rawCode);
   notify();
   return getUser(result.ownerId) ?? { name: result.ownerName };

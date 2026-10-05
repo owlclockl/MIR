@@ -48,7 +48,11 @@ const TIMING = {
   retryBase: 2000, // пауза перед повтором, растёт до retryMax
   retryMax: 20_000,
   handshake: 30_000, // предел на одну попытку соединения
-  manualGather: 5000, // сбор ICE для кода прямого подключения
+  /* Сбор ICE для кода прямого подключения. Мёртвые VPN-адаптеры
+     (TUN-режим) заставляют STUN-запросы умирать по таймауту, поэтому
+     сбор с заметным числом интерфейсов дольше обычного: ждём с запасом —
+     код без внешнего адреса через интернет всё равно не соединится. */
+  manualGather: 8000,
 };
 
 const HISTORY_LIMIT = 200;
@@ -142,6 +146,10 @@ const blankPeer = (peerId) => ({
   pingTimer: null,
   guardTimer: null,
   closing: false,
+  /* Диагностика ручного соединения: без них интерфейс мог показать
+     только голое «нет связи», и человек гадал, в чём дело. */
+  failReason: null, // 'nat' — канал не пробился между устройствами
+  gather: null, // { total, host, srflx } — какие адреса вошли в последний код
 });
 
 const peerRecord = (peerId) => {
@@ -167,8 +175,16 @@ const setState = (peer, state) => {
 /** Состояние связи с игроком: { state, rtt, since, name }. */
 export const status = (peerId) => {
   const peer = peers.get(peerId);
-  if (!peer) return { state: 'offline', rtt: null, since: 0, name: '' };
-  return { state: peer.state, rtt: peer.rtt, since: peer.since, name: peer.name };
+  if (!peer)
+    return { state: 'offline', rtt: null, since: 0, name: '', failReason: null, gather: null };
+  return {
+    state: peer.state,
+    rtt: peer.rtt,
+    since: peer.since,
+    name: peer.name,
+    failReason: peer.failReason,
+    gather: peer.gather,
+  };
 };
 
 /** Сколько друзей сейчас на прямой связи. */
@@ -271,6 +287,7 @@ const attachChannel = (peer, dc) => {
   dc.onopen = () => {
     peer.tries = 0;
     peer.rtt = null;
+    peer.failReason = null;
     setState(peer, 'direct');
     const me = store.getCurrentUser();
     sendRaw(peer, { t: 'hello', name: me?.name ?? '' });
@@ -353,7 +370,13 @@ const createConnection = (peer) => {
 
   pc.onconnectionstatechange = () => {
     if (!peer.pc || peer.pc !== pc) return;
-    if (pc.connectionState === 'failed') restart(peer);
+    if (pc.connectionState === 'failed') {
+      /* У ручного соединения запасного пути нет: прежде чем разобрать
+         канал, запоминаем причину — окно скажет, что делать дальше,
+         вместо молчаливого «нет связи». */
+      if (peer.manual) peer.failReason = 'nat';
+      restart(peer);
+    }
     if (pc.connectionState === 'disconnected' && peer.state === 'direct')
       setState(peer, store.isHub() && !peer.manual ? 'relay' : 'offline');
   };
@@ -657,16 +680,29 @@ const manualPeer = () => {
   return peer;
 };
 
+/* Разбор того, что вошло в код после сбора ICE. Через интернет без
+   srflx-кандидата (своего внешнего адреса от STUN) соединение почти
+   никогда не поднимается — по этому отчёту окно честно подсказывает,
+   что код годится разве что внутри одной Wi-Fi сети. */
+const candidatesOf = (sdp) => {
+  const text = String(sdp || '');
+  const total = text.match(/a=candidate:/g)?.length ?? 0;
+  const count = (type) => text.match(new RegExp(` typ ${type}(?=\\s|$)`, 'g'))?.length ?? 0;
+  return { total, host: count('host'), srflx: count('srflx') };
+};
+
 /** Шаг 1 у приглашающего: создать код и отдать его другу. */
 export const createInviteCode = async () => {
   if (!supported()) throw new Error('Браузер не поддерживает прямые соединения.');
   const peer = manualPeer();
   teardown(peer, { silent: true });
+  peer.failReason = null;
   setState(peer, 'connecting');
   const pc = createConnection(peer);
   attachChannel(peer, pc.createDataChannel(CHANNEL, { ordered: true }));
   await pc.setLocalDescription(await pc.createOffer());
   await gathered(pc);
+  peer.gather = candidatesOf(pc.localDescription?.sdp);
   return encodeCode({
     v: 1,
     t: 'offer',
@@ -683,12 +719,14 @@ export const acceptInviteCode = async (code) => {
     throw new Error('Это ответный код. Его вставляет тот, кто создавал приглашение.');
   const peer = manualPeer();
   teardown(peer, { silent: true });
+  peer.failReason = null;
   peer.name = String(parsed.name || '').slice(0, 32);
   setState(peer, 'connecting');
   const pc = createConnection(peer);
   await pc.setRemoteDescription({ type: 'offer', sdp: parsed.sdp });
   await pc.setLocalDescription(await pc.createAnswer());
   await gathered(pc);
+  peer.gather = candidatesOf(pc.localDescription?.sdp);
   return encodeCode({
     v: 1,
     t: 'answer',

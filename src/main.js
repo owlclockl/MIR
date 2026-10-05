@@ -457,6 +457,27 @@ const linkHint = (friend, link) => {
 /* --- Окно прямого подключения по коду --- */
 /* Сценарий без всякого сервера: один создаёт код, второй отвечает
    своим. Нужен, когда хаба нет вовсе — например, у обоих mir.html. */
+
+/* После падения соединения интерфейс обязан сказать, что произошло:
+   молчаливое «нет связи» выглядит как зависание. */
+const directFailHtml = (link) => {
+  if (link.state !== 'offline' || link.failReason !== 'nat') return '';
+  return `<p class="form-note form-note--warn">Попытка не соединилась: прямой канал не пробился между устройствами. Чаще всего мешают включённый VPN или прокси (StealthSurf, Radmin, режим TUN) либо строгий роутер/файрвол. Отключите VPN и создайте коды заново — а если друг далеко, надёжнее общая ссылка: по ней сообщения дойдут даже запасным путём через хаб.</p>`;
+};
+
+/* Что вошло в код после сбора ICE: без внешнего адреса от STUN через
+   интернет не соединиться — предупреждаем до того, как код уйдёт другу. */
+const gatherNoteHtml = (code) => {
+  if (!code) return '';
+  const { gather } = p2p.status(p2p.MANUAL_ID);
+  if (!gather) return '';
+  if (gather.total === 0)
+    return `<p class="form-note form-note--warn">В код не вошёл ни один сетевой адрес: устройство не видит сеть — обычно это VPN/файрвол. Проверьте подключение и создайте код заново.</p>`;
+  if (gather.srflx === 0)
+    return `<p class="form-note form-note--warn">В код вошли только локальные адреса (STUN не ответил — чаще всего из-за VPN/прокси). В одной сети Wi-Fi такой код сработает, а для друга из интернета отключите VPN и создайте код заново.</p>`;
+  return '';
+};
+
 const directModalHtml = () => {
   const link = p2p.status(p2p.MANUAL_ID);
   const connected = link.state !== 'offline';
@@ -490,6 +511,8 @@ const directModalHtml = () => {
               : ''
           }
         </div>
+
+        ${directFailHtml(link)}
 
         ${
           connected
@@ -526,6 +549,7 @@ const directInviteHtml = () => `
              <span>${ui.direct.busy ? 'Готовим код…' : 'Создать код приглашения'}</span>
            </button>`
     }
+    ${gatherNoteHtml(ui.direct.offer)}
     ${
       ui.direct.offer
         ? `<form class="form" data-form="direct-complete" novalidate>
@@ -557,6 +581,7 @@ const directJoinHtml = () => `
           })
         : ''
     }
+    ${gatherNoteHtml(ui.direct.answer)}
   </div>`;
 
 /* --- Окно подтверждения --- */
