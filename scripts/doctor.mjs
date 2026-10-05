@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MIR Diagnostic Doctor — инструмент самодиагностики сети, туннелей и логов.
- * Запуск: node doctor.mjs (или через ЛОГИ-И-ДИАГНОСТИКА.bat / npm run doctor)
+ * Запуск: npm run doctor (или scripts/doctor.mjs, ЛОГИ-И-ДИАГНОСТИКА.bat) (или через ЛОГИ-И-ДИАГНОСТИКА.bat / npm run doctor)
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, cpus, totalmem, freemem, platform, arch, release } from 'node:os';
@@ -10,7 +10,8 @@ import { get as httpsGet } from 'node:https';
 import { resolve, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { promises as dns } from 'node:dns';
-import { checkDns, explainDns, CLOUDFLARE_SRV } from './tools/net-check.mjs';
+import './lib/root.mjs';
+import { checkDns, explainDns, CLOUDFLARE_SRV } from './lib/net-check.mjs';
 
 console.log('============================================================');
 console.log('   MIR — Диагностика системы, сети и туннелей (Doctor)    ');

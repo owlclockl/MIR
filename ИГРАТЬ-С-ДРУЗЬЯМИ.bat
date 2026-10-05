@@ -49,7 +49,7 @@ echo  Пока окно открыто — игра и хаб работают.
 echo  Вы можете просто свернуть его.
 echo ------------------------------------------------------------
 echo.
-node serve.mjs --open
+node server\serve.mjs --open
 goto :stopped
 
 :public
@@ -70,7 +70,7 @@ echo  Перед этим сервер проверит DNS: если ссылк
 echo  VPN или прокси, он прямо об этом напишет и подскажет, что сделать.
 echo ------------------------------------------------------------
 echo.
-node serve.mjs --public --open
+node server\serve.mjs --public --open
 goto :stopped
 
 :doctor

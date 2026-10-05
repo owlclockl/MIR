@@ -1,60 +1,14 @@
 import './style.css';
-import * as store from './store.js';
-import { pickAvatarFile, processAvatarFile } from './avatar.js';
+import * as store from './data/store.js';
+import * as p2p from './data/p2p.js';
+import { pickAvatarFile, processAvatarFile } from './ui/avatar.js';
+import { icon } from './ui/icons.js';
+import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
 const VERSION = '0.3.0';
-
-/* Иконки Lucide (ISC). Только контуры, 24×24, stroke = currentColor. */
-const ICONS = {
-  sigil:
-    '<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>',
-  settings:
-    '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',
-  play: '<path d="M6 3 20 12 6 21Z"/>',
-  userPlus:
-    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-  chevron: '<path d="m9 18 6-6-6-6"/>',
-  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-  x: '<path d="M18 6 6 18M6 6l12 12"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  copy: '<rect x="9" y="9" width="13" height="13" rx="0"/><rect x="5" y="5" width="13" height="13" rx="0"/>',
-  camera:
-    '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.4"/>',
-  logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
-  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
-  refresh:
-    '<path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 21v-5h5"/>',
-};
-
-const icon = (name, className = '') =>
-  `<svg class="icon${className ? ` ${className}` : ''}" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
-
-const PRESENCE = {
-  playing: { label: 'В игре', modifier: 'live' },
-  idle: { label: 'В меню', modifier: 'live' },
-  offline: { label: 'Не в сети', modifier: 'off' },
-};
-
-/* ---------- утилиты ---------------------------------------- */
-
-const escapeHtml = (text) =>
-  String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-
-const nameHue = (key) => {
-  let h = 0;
-  for (const ch of key) h = (h * 31 + ch.codePointAt(0)) % 360;
-  return h;
-};
-
-const formatDate = (ts) =>
-  new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(ts));
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени. */
 const avatarEl = (user, cls = '') => {
@@ -66,46 +20,10 @@ const avatarEl = (user, cls = '') => {
   return `<span class="avatar${cls ? ` ${cls}` : ''}${off}" style="background:hsl(${hue} 26% 30%);color:hsl(${hue} 45% 87%)" aria-hidden="true">${escapeHtml(user.name.slice(0, 2).toUpperCase())}</span>`;
 };
 
-const copyText = async (text) => {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      /* Ниже — запасной путь для http по локальной сети. */
-    }
-  }
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
-  document.body.append(area);
-  area.select();
-  let ok = false;
-  try {
-    ok = document.execCommand('copy');
-  } catch {
-    ok = false;
-  }
-  area.remove();
-  return ok;
-};
-
-/* ---------- тосты ------------------------------------------- */
-
-const toast = (message, tone = 'ok') => {
-  const root = document.querySelector('#toast-root');
-  if (!root) return;
-  const node = document.createElement('p');
-  node.className = `toast toast--${tone}`;
-  node.setAttribute('role', tone === 'error' ? 'alert' : 'status');
-  node.textContent = message;
-  root.append(node);
-  requestAnimationFrame(() => node.classList.add('toast--shown'));
-  setTimeout(() => {
-    node.classList.remove('toast--shown');
-    node.addEventListener('transitionend', () => node.remove(), { once: true });
-    setTimeout(() => node.remove(), 400);
-  }, 3400);
+const PRESENCE = {
+  playing: { label: 'В игре', modifier: 'live' },
+  idle: { label: 'В меню', modifier: 'live' },
+  offline: { label: 'Не в сети', modifier: 'off' },
 };
 
 /* ---------- модальные окна ---------------------------------- */
@@ -118,6 +36,9 @@ const ui = {
   pendingAvatar: null,
   confirm: null,
   opener: null,
+  chatDraft: '',
+  /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
+  direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
 };
 
 const overlayRoot = () => document.querySelector('#overlay-root');
@@ -133,6 +54,7 @@ const closeModal = () => {
   ui.confirm = null;
   ui.pendingAvatar = null;
   ui.codeValue = '';
+  ui.chatDraft = '';
   const root = overlayRoot();
   if (root) root.innerHTML = '';
   if (ui.opener && document.contains(ui.opener)) ui.opener.focus();
@@ -379,9 +301,14 @@ const profileModalHtml = () => {
 
         <div class="divider" role="separator"></div>
 
-        <button class="mini-button mini-button--danger" type="button" data-action="logout">
-          ${icon('logOut', 'icon--xs')} Выйти из аккаунта
-        </button>
+        <div class="dialog__actions dialog__actions--spread">
+          <button class="mini-button" type="button" data-action="open-direct">
+            ${icon('link', 'icon--xs')} Прямое подключение по коду
+          </button>
+          <button class="mini-button mini-button--danger" type="button" data-action="logout">
+            ${icon('logOut', 'icon--xs')} Выйти из аккаунта
+          </button>
+        </div>
       </div>`,
   });
 };
@@ -407,14 +334,65 @@ const avatarPreviewHtml = () => `
     </section>
   </div>`;
 
+/* --- Прямая связь: общие кусочки разметки --- */
+
+/* Как называется состояние канала в интерфейсе. «Через хаб» — честное
+   признание, что NAT не пробился и сообщения идут запасным путём. */
+const LINK = {
+  direct: { label: 'Напрямую', modifier: 'live' },
+  relay: { label: 'Через хаб', modifier: 'warn' },
+  connecting: { label: 'Соединяемся…', modifier: 'warn' },
+  offline: { label: 'Нет связи', modifier: 'off' },
+};
+
+const linkStateHtml = (peerId) => {
+  const { state, rtt } = p2p.status(peerId);
+  const view = LINK[state] ?? LINK.offline;
+  const ms = state === 'direct' && typeof rtt === 'number' ? ` · ${rtt} мс` : '';
+  return `<span class="link-state link-state--${view.modifier}">
+      <span class="dot dot--${view.modifier}" aria-hidden="true"></span>${view.label}${ms}
+    </span>`;
+};
+
+const chatRowHtml = (message) => `
+  <div class="chat__row${message.mine ? ' chat__row--mine' : ''}">
+    <p class="chat__bubble">${escapeHtml(message.text)}</p>
+    <small class="chat__meta">${new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(message.at))}${message.via === 'relay' ? ' · через хаб' : ''}</small>
+  </div>`;
+
+const chatHtml = (peerId, { placeholder }) => {
+  const list = p2p.messages(peerId);
+  const connected = p2p.status(peerId).state !== 'offline';
+  return `
+    <div class="chat">
+      <div class="chat__list" data-role="chat-list" role="log" aria-label="Переписка">
+        ${
+          list.length
+            ? list.map(chatRowHtml).join('')
+            : `<p class="hint hint--center">${escapeHtml(placeholder)}</p>`
+        }
+      </div>
+      <form class="chat__form" data-form="chat" data-id="${peerId}" novalidate>
+        <input class="input" type="text" maxlength="2000" autocomplete="off"
+               placeholder="${connected ? 'Сообщение…' : 'Связи нет — сообщение не уйдёт'}"
+               data-role="chat-input" value="${escapeHtml(ui.chatDraft)}" ${connected ? '' : 'disabled'} />
+        <button class="icon-button icon-button--sm" type="submit" aria-label="Отправить" ${connected ? '' : 'disabled'}>
+          ${icon('send')}
+        </button>
+      </form>
+    </div>`;
+};
+
 /* --- Окно друга --- */
 const friendModalHtml = (friendId) => {
   const friend = store.getUser(friendId);
   if (!friend) return authModalHtml();
   const presence = PRESENCE[store.presenceOf(friend)];
+  const link = p2p.status(friendId).state;
   return dialogShell({
     label: `Игрок ${friend.name}`,
     title: 'Игрок',
+    size: 'wide',
     body: `
       <div class="dialog__body">
         <div class="account">
@@ -427,13 +405,159 @@ const friendModalHtml = (friendId) => {
             </p>
           </div>
         </div>
+
         <div class="divider" role="separator"></div>
+
+        <div class="link-box">
+          <div class="link-box__text">
+            <p class="eyebrow">Прямая связь</p>
+            ${linkStateHtml(friendId)}
+            <p class="link-box__hint">${escapeHtml(linkHint(friend, link))}</p>
+          </div>
+          <div class="link-box__actions">
+            ${
+              link === 'offline'
+                ? `<button class="mini-button mini-button--accent" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('link', 'icon--xs')} Подключиться</button>`
+                : `<button class="mini-button" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('refresh', 'icon--xs')} Переподключить</button>
+                   <button class="mini-button mini-button--danger" type="button" data-action="p2p-disconnect" data-id="${friend.id}">${icon('linkOff', 'icon--xs')} Отключить</button>`
+            }
+          </div>
+        </div>
+
+        ${chatHtml(friend.id, {
+          placeholder:
+            link === 'offline'
+              ? 'Сообщения появятся, когда оба будете в приложении.'
+              : 'Напишите первым — сообщения идут прямо на устройство друга.',
+        })}
+
+        <div class="divider" role="separator"></div>
+
         <button class="mini-button mini-button--danger" type="button" data-action="remove-friend" data-id="${friend.id}">
           Убрать из друзей
         </button>
       </div>`,
   });
 };
+
+/* Короткое объяснение под статусом: человеку важно понимать, почему
+   связи нет и что с этим делать. */
+const linkHint = (friend, link) => {
+  if (!p2p.supported()) return 'Этот браузер не умеет прямые соединения — обновите его.';
+  if (link === 'direct') return 'Данные идут напрямую между устройствами, сервер не участвует.';
+  if (link === 'relay')
+    return 'Прямой путь закрыт домашним роутером — сообщения идут через хаб, попытки пробиться продолжаются.';
+  if (link === 'connecting') return 'Договариваемся о прямом канале — обычно пара секунд.';
+  if (store.presenceOf(friend) === 'offline') return 'Игрок не в сети. Связь поднимется сама, как только он откроет приложение.';
+  if (!store.isHub())
+    return 'Этот режим без хаба: соединитесь по коду прямого подключения (кнопка в профиле).';
+  return 'Связи нет. Нажмите «Подключиться» — попытка начнётся заново.';
+};
+
+/* --- Окно прямого подключения по коду --- */
+/* Сценарий без всякого сервера: один создаёт код, второй отвечает
+   своим. Нужен, когда хаба нет вовсе — например, у обоих mir.html. */
+const directModalHtml = () => {
+  const link = p2p.status(p2p.MANUAL_ID);
+  const connected = link.state !== 'offline';
+  const step = ui.direct.step;
+  return dialogShell({
+    label: 'Прямое подключение по коду',
+    title: 'Прямое подключение',
+    size: 'wide',
+    body: `
+      <div class="dialog__body">
+        <p class="hint">
+          Связь между двумя устройствами без сервера: один создаёт код приглашения,
+          второй вставляет его у себя и отдаёт ответный код. Коды длинные — копируйте кнопкой.
+        </p>
+
+        <div class="link-box">
+          <div class="link-box__text">
+            <p class="eyebrow">Состояние</p>
+            ${linkStateHtml(p2p.MANUAL_ID)}
+            <p class="link-box__hint">${
+              connected
+                ? `Собеседник: ${escapeHtml(link.name || 'без имени')}.`
+                : 'Пока никого. Выберите, кто создаёт приглашение.'
+            }</p>
+          </div>
+          ${
+            connected
+              ? `<div class="link-box__actions">
+                   <button class="mini-button mini-button--danger" type="button" data-action="direct-drop">${icon('linkOff', 'icon--xs')} Разорвать</button>
+                 </div>`
+              : ''
+          }
+        </div>
+
+        ${
+          connected
+            ? chatHtml(p2p.MANUAL_ID, { placeholder: 'Связь есть — пишите.' })
+            : `
+        <div class="tabs" role="tablist" aria-label="Роль">
+          <button class="tab${step === 'invite' ? ' tab--active' : ''}" type="button" role="tab" aria-selected="${step === 'invite'}" data-action="direct-step" data-step="invite">Я приглашаю</button>
+          <button class="tab${step === 'join' ? ' tab--active' : ''}" type="button" role="tab" aria-selected="${step === 'join'}" data-action="direct-step" data-step="join">Мне прислали код</button>
+        </div>
+
+        ${step === 'invite' ? directInviteHtml() : directJoinHtml()}`
+        }
+      </div>`,
+  });
+};
+
+const codeAreaHtml = (label, value, { action = '' } = {}) => `
+  <div class="field">
+    <span class="field__label">${escapeHtml(label)}</span>
+    <textarea class="input input--code-area" rows="3" readonly spellcheck="false">${escapeHtml(value)}</textarea>
+    ${
+      action
+        ? `<button class="mini-button" type="button" data-action="${action}">${icon('copy', 'icon--xs')} Скопировать код</button>`
+        : ''
+    }
+  </div>`;
+
+const directInviteHtml = () => `
+  <div class="steps">
+    ${
+      ui.direct.offer
+        ? codeAreaHtml('1. Отправьте другу этот код', ui.direct.offer, { action: 'direct-copy-offer' })
+        : `<button class="solid-button" type="button" data-action="direct-create" ${ui.direct.busy ? 'disabled' : ''}>
+             <span>${ui.direct.busy ? 'Готовим код…' : 'Создать код приглашения'}</span>
+           </button>`
+    }
+    ${
+      ui.direct.offer
+        ? `<form class="form" data-form="direct-complete" novalidate>
+             <label class="field">
+               <span class="field__label">2. Вставьте ответный код друга</span>
+               <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-answer" placeholder="MIR1.…">${escapeHtml(ui.direct.answerDraft)}</textarea>
+             </label>
+             <p class="form-error" data-role="form-error" hidden></p>
+             <button class="mini-button mini-button--accent" type="submit">Соединиться</button>
+           </form>`
+        : ''
+    }
+  </div>`;
+
+const directJoinHtml = () => `
+  <div class="steps">
+    <form class="form" data-form="direct-accept" novalidate>
+      <label class="field">
+        <span class="field__label">1. Вставьте код приглашения</span>
+        <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-offer" placeholder="MIR1.…">${escapeHtml(ui.direct.offerDraft)}</textarea>
+      </label>
+      <p class="form-error" data-role="form-error" hidden></p>
+      <button class="mini-button mini-button--accent" type="submit">Получить ответный код</button>
+    </form>
+    ${
+      ui.direct.answer
+        ? codeAreaHtml('2. Отправьте этот ответный код обратно', ui.direct.answer, {
+            action: 'direct-copy-answer',
+          })
+        : ''
+    }
+  </div>`;
 
 /* --- Окно подтверждения --- */
 const confirmModalHtml = () => dialogShell({
@@ -449,7 +573,10 @@ const confirmModalHtml = () => dialogShell({
     </div>`,
 });
 
-const renderModal = () => {
+/* focus: ставить ли фокус внутрь окна. При открытии — да; при
+   фоновой перерисовке (пришло сообщение, сменился статус) — нет,
+   иначе фокус прыгал бы с кнопки на кнопку каждые несколько секунд. */
+const renderModal = ({ focus = true } = {}) => {
   const root = overlayRoot();
   if (!root) return;
   if (!ui.modal) {
@@ -473,11 +600,18 @@ const renderModal = () => {
     case 'friend':
       html = friendModalHtml(ui.modal.data);
       break;
+    case 'direct':
+      html = directModalHtml();
+      break;
     case 'confirm':
       html = confirmModalHtml();
       break;
   }
   root.innerHTML = html;
+  /* Переписка всегда показывает последнее сообщение. */
+  const log = root.querySelector('[data-role="chat-list"]');
+  if (log) log.scrollTop = log.scrollHeight;
+  if (!focus) return;
   const focusTarget = root.querySelector('[data-autofocus]') || root.querySelector('input, button');
   focusTarget?.focus();
   const aut = root.querySelector('[data-autofocus]');
@@ -534,13 +668,28 @@ const requestRowHtml = (request) => {
 
 const friendRowHtml = (friend) => {
   const presence = PRESENCE[store.presenceOf(friend)];
+  const link = p2p.status(friend.id).state;
+  const unread = p2p.unread(friend.id);
+  /* Подпись показывает самое важное: есть ли прямой канал. */
+  const state =
+    link === 'direct' || link === 'relay' ? LINK[link].label : presence.label;
   return `
     <button class="friend friend--${presence.modifier}" type="button" data-action="open-friend" data-id="${friend.id}">
       ${avatarEl(friend, 'avatar--sm')}
       <span class="friend__text">
         <strong class="friend__name" translate="no">${escapeHtml(friend.name)}</strong>
-        <small class="friend__state">${presence.label}</small>
+        <small class="friend__state">${state}</small>
       </span>
+      ${
+        unread
+          ? `<span class="badge badge--inline" aria-label="Непрочитанных сообщений: ${unread}">${unread}</span>`
+          : ''
+      }
+      ${
+        link === 'direct'
+          ? `<span class="friend__link" title="Прямое соединение" aria-label="Прямое соединение">${icon('link', 'icon--xs')}</span>`
+          : ''
+      }
       <span class="dot dot--${presence.modifier}" aria-hidden="true"></span>
     </button>`;
 };
@@ -608,6 +757,9 @@ const railHtml = () => {
     </div>
 
     <div class="rail__foot">
+      <button class="mini-button mini-button--wide" type="button" data-action="open-direct">
+        ${icon('link', 'icon--xs')} Прямое подключение по коду
+      </button>
       <p class="eyebrow">Мой код-приглашение</p>
       <button class="code-box code-box--button" type="button" data-action="copy-code" data-code="${me.inviteCode}" title="Нажмите, чтобы скопировать">
         <code class="code-box__value" translate="no">${me.inviteCode}</code>
@@ -687,10 +839,11 @@ const render = () => {
   if (ui.modal && ui.modal.type !== 'auth' && ui.modal.type !== 'avatar-preview') {
     const active = document.activeElement;
     const keepFocus =
-      active instanceof HTMLInputElement && active.dataset.role
+      (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+      active.dataset.role
         ? { role: active.dataset.role, pos: active.selectionStart }
         : null;
-    renderModal();
+    renderModal({ focus: false });
     if (keepFocus) {
       const input = overlayRoot()?.querySelector(`[data-role="${keepFocus.role}"]`);
       if (input) {
@@ -702,6 +855,27 @@ const render = () => {
 };
 
 store.subscribe(render);
+p2p.subscribe(render);
+
+/* ---------- прямая связь: включение и выключение -------------- */
+
+/* P2P живёт ровно столько, сколько длится сессия игрока: вошёл —
+   поднимаем соединения с друзьями, вышел — закрываем все каналы,
+   чтобы ничего не висело в фоне и не держало чужую переписку. */
+let p2pRunning = false;
+
+const syncP2P = () => {
+  const me = store.getCurrentUser();
+  if (me && !p2pRunning) {
+    p2p.start();
+    p2pRunning = true;
+  } else if (!me && p2pRunning) {
+    p2p.stop();
+    p2pRunning = false;
+  }
+};
+
+store.subscribe(syncP2P);
 
 /* ---------- формы -------------------------------------------- */
 
@@ -761,6 +935,42 @@ const formHandlers = {
       toast('Пароль обновлён.');
     }),
 
+  chat: (form) => {
+    const input = form.querySelector('[data-role="chat-input"]');
+    const text = input.value.trim();
+    if (!text) return;
+    const via = p2p.send(form.dataset.id, text);
+    if (!via) {
+      toast('Связи нет — сообщение не отправлено.', 'error');
+      return;
+    }
+    ui.chatDraft = '';
+    input.value = '';
+    render();
+    document.querySelector('[data-role="chat-input"]')?.focus();
+  },
+
+  'direct-accept': (form) =>
+    withBusy(form, async () => {
+      const area = form.querySelector('[data-role="direct-offer"]');
+      const answer = await p2p.acceptInviteCode(area.value);
+      ui.direct.answer = answer;
+      ui.direct.offerDraft = area.value.trim();
+      setFormError(form, '');
+      renderModal({ focus: false });
+      toast('Ответный код готов — отправьте его другу.');
+    }),
+
+  'direct-complete': (form) =>
+    withBusy(form, async () => {
+      const area = form.querySelector('[data-role="direct-answer"]');
+      await p2p.completeInvite(area.value);
+      ui.direct.answerDraft = '';
+      setFormError(form, '');
+      renderModal({ focus: false });
+      toast('Коды приняты — устанавливаем прямую связь.');
+    }),
+
   noop: () => {},
 };
 
@@ -781,6 +991,9 @@ document.addEventListener('input', (event) => {
     const box = document.querySelector('[data-role="friend-results"]');
     if (me && box) box.innerHTML = searchResultsHtml(me);
   }
+  if (role === 'chat-input') ui.chatDraft = event.target.value;
+  if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
+  if (role === 'direct-answer') ui.direct.answerDraft = event.target.value;
   if (role === 'code-input') {
     const raw = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const formatted = raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4, 8)}` : raw;
@@ -827,7 +1040,64 @@ const actions = {
     ui.codeValue = '';
     openModal('add-friend');
   },
-  'open-friend': (el) => openModal('friend', el.dataset.id),
+  'open-friend': (el) => {
+    ui.chatDraft = '';
+    openModal('friend', el.dataset.id);
+    p2p.markRead(el.dataset.id);
+  },
+
+  'open-direct': () => {
+    ui.direct = { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false };
+    ui.chatDraft = '';
+    openModal('direct');
+    p2p.markRead(p2p.MANUAL_ID);
+  },
+
+  'direct-step': (el) => {
+    ui.direct.step = el.dataset.step;
+    renderModal();
+  },
+
+  'direct-create': async () => {
+    ui.direct.busy = true;
+    renderModal({ focus: false });
+    try {
+      ui.direct.offer = await p2p.createInviteCode();
+      toast('Код готов. Передайте его другу любым способом.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось создать код.', 'error');
+    } finally {
+      ui.direct.busy = false;
+      renderModal({ focus: false });
+    }
+  },
+
+  'direct-copy-offer': async () => {
+    const ok = await copyText(ui.direct.offer);
+    toast(ok ? 'Код приглашения скопирован.' : 'Не получилось скопировать — выделите текст вручную.', ok ? 'ok' : 'error');
+  },
+
+  'direct-copy-answer': async () => {
+    const ok = await copyText(ui.direct.answer);
+    toast(ok ? 'Ответный код скопирован.' : 'Не получилось скопировать — выделите текст вручную.', ok ? 'ok' : 'error');
+  },
+
+  'direct-drop': () => {
+    p2p.dropManual();
+    ui.direct = { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false };
+    renderModal();
+    toast('Прямое подключение закрыто.');
+  },
+
+  'p2p-connect': (el) => {
+    p2p.reconnect(el.dataset.id);
+    toast('Пробуем соединиться напрямую…');
+  },
+
+  'p2p-disconnect': (el) => {
+    p2p.disconnect(el.dataset.id);
+    toast('Прямая связь разорвана.');
+  },
 
   'close-modal': () => closeModal(),
 
@@ -989,7 +1259,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('focus', () => store.heartbeat());
-window.addEventListener('beforeunload', () => store.markOffline());
+window.addEventListener('beforeunload', () => {
+  store.markOffline();
+  p2p.stop({ quiet: true });
+  p2pRunning = false;
+});
 
 /* PWA: по https/localhost регистрируем service worker — меню становится
    устанавливаемым приложением и работает офлайн. С file:// (mir.html)
@@ -1006,5 +1280,8 @@ render();
 if (typeof store.initBackend === 'function') {
   store.initBackend().then((mode) => {
     if (mode === 'hub') toast('Подключено к общему хабу этой сети.');
+    syncP2P();
   });
+} else {
+  syncP2P();
 }

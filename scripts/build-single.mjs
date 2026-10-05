@@ -1,5 +1,5 @@
 // Собирает весь проект в один самодостаточный HTML-файл (mir.html).
-// Запуск: node build-single.mjs
+// Запуск: npm run single
 //
 // Проект модульный (src/main.js импортирует store.js и avatar.js), поэтому
 // сначала прогоняем продакшн-сборку Vite, а потом встраиваем её JS и CSS
@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
+import './lib/root.mjs';
 
 /**
  * Прогоняет vite build и возвращает однофайловый HTML (он же пишется в mir.html).

@@ -1,0 +1,77 @@
+{
+ "users": [
+  {
+   "id": "u_5e41068d611dabfe",
+   "name": "alpha282",
+   "nameKey": "alpha282",
+   "salt": "d0e1861bb3313e5db7c3f06af4eb981b",
+   "passHash": "dd736006750e0e663b2a63f12dfbe62bffdd5c02e4d0879046ca0567c56a82d9",
+   "tokens": [
+    "59e396c75e98ea659d392886e2a0f90d"
+   ],
+   "avatar": null,
+   "friends": [
+    "u_efd59dce158bbb6e"
+   ],
+   "inviteCode": "3TS7-DNH2",
+   "createdAt": 1791218571603,
+   "seenAt": 1791218571924,
+   "online": true
+  },
+  {
+   "id": "u_efd59dce158bbb6e",
+   "name": "beta650",
+   "nameKey": "beta650",
+   "salt": "52601de335206d7a7a19d8b2dceb34b2",
+   "passHash": "1013182d799e975fc55d73135b08e7d3e20288265265fba2755e5f46fbf0fe33",
+   "tokens": [
+    "448369caf5e84684f65c0b2ee8277505"
+   ],
+   "avatar": null,
+   "friends": [
+    "u_5e41068d611dabfe"
+   ],
+   "inviteCode": "KZ9T-3QTC",
+   "createdAt": 1791218571611,
+   "seenAt": 1791218571927,
+   "online": true
+  },
+  {
+   "id": "u_9fcf535b39ea4482",
+   "name": "alpha350",
+   "nameKey": "alpha350",
+   "salt": "fa140b049a673ad1b815ab756c41b231",
+   "passHash": "c4a41deb5dd9e93604779bdda3cd6203edd76a525424e175561c9be30705aded",
+   "tokens": [
+    "9bee80c0f0f52506602fef36b7c8db57"
+   ],
+   "avatar": null,
+   "friends": [
+    "u_bbe13d8a9200207d"
+   ],
+   "inviteCode": "ZWXX-ZS36",
+   "createdAt": 1791218584705,
+   "seenAt": 1791218585026,
+   "online": true
+  },
+  {
+   "id": "u_bbe13d8a9200207d",
+   "name": "beta406",
+   "nameKey": "beta406",
+   "salt": "b896cbfc2ded414088b741b612c7cc38",
+   "passHash": "603cb72770bfa03193638d12b1aa5b6e83a72a0c7f26bff48998c2c36c89072d",
+   "tokens": [
+    "efae83d0ca09d2dacdecb8c2e45e5396"
+   ],
+   "avatar": null,
+   "friends": [
+    "u_9fcf535b39ea4482"
+   ],
+   "inviteCode": "JGRQ-WQRA",
+   "createdAt": 1791218584714,
+   "seenAt": 1791218585029,
+   "online": true
+  }
+ ],
+ "requests": []
+}

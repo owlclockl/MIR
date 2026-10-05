@@ -14,12 +14,27 @@ const MAX_BODY_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 const MAX_AVATAR_CHARS = 300 * 1024;
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
 
+/* ---------- сигналинг P2P ----------------------------------
+   Хаб сводит друзей напрямую: через него идут только offer/answer/ICE
+   (несколько килобайт на соединение), а дальше трафик течёт между
+   устройствами. Если NAT не пробился, по этому же каналу работает
+   запасная передача сообщений (kind: 'relay').
+   Очередь живёт в памяти: сигналы бессмысленны после перезапуска. */
+const SIGNAL_TTL_MS = 60_000;
+const SIGNAL_MAX_QUEUE = 300; // на пользователя
+const SIGNAL_MAX_CHARS = 64 * 1024; // sdp с кандидатами укладывается с запасом
+const INBOX_WAIT_MS = 20_000; // предел длинного опроса
+
 /* В интернете хаб без защиты — приманка для ботов. Простой лимит
    по IP на минутное окно: для друзей за глаза, для парсера — мало. */
 const DEFAULT_LIMITS = {
   '/api/register': 10,
   '/api/login': 20,
   '/api/salt': 30,
+  /* Сигналинг шумный по своей природе: ICE-кандидаты летят пачками,
+     а длинный опрос входящих висит по 20 секунд и сразу повторяется. */
+  '/api/p2p/signal': 1200,
+  '/api/p2p/inbox': 600,
   default: 400,
 };
 const RATE_WINDOW_MS = 60_000;
@@ -125,6 +140,53 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
     );
   };
 
+  /* ---------- почтовые ящики сигналинга ----------------------
+     Ящик на пользователя: короткая очередь + список ждущих запросов
+     (длинный опрос). Доставка — только между друзьями, чужой человек
+     не может даже постучаться. Ничего не пишем на диск. */
+
+  const inboxes = new Map(); // userId → { queue: [], waiters: Set<fn> }
+  let signalSeq = 0;
+
+  const inboxOf = (userId) => {
+    let box = inboxes.get(userId);
+    if (!box) {
+      box = { queue: [], waiters: new Set() };
+      inboxes.set(userId, box);
+    }
+    return box;
+  };
+
+  const freshQueue = (box) => {
+    const edge = Date.now() - SIGNAL_TTL_MS;
+    box.queue = box.queue.filter((m) => m.at > edge);
+    return box.queue;
+  };
+
+  const pushSignal = (toId, message) => {
+    const box = inboxOf(toId);
+    freshQueue(box).push(message);
+    /* Переполнение бывает, когда адресат закрыл вкладку: держим хвост. */
+    if (box.queue.length > SIGNAL_MAX_QUEUE) box.queue = box.queue.slice(-SIGNAL_MAX_QUEUE);
+    for (const wake of [...box.waiters]) wake();
+  };
+
+  const takeSignals = (userId) => {
+    const box = inboxOf(userId);
+    const out = freshQueue(box);
+    box.queue = [];
+    return out;
+  };
+
+  /* Раз в минуту выкидываем протухшее у тех, кто не заходит. */
+  const inboxSweeper = setInterval(() => {
+    for (const [userId, box] of inboxes) {
+      freshQueue(box);
+      if (box.queue.length === 0 && box.waiters.size === 0) inboxes.delete(userId);
+    }
+  }, SIGNAL_TTL_MS);
+  inboxSweeper.unref?.();
+
   /* ---------- разбор запроса ---------- */
 
   const readBody = (req) =>
@@ -158,6 +220,8 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
   }
 
   const send = (res, status, payload) => {
+    /* Длинный опрос мог оборваться на стороне клиента — тогда писать некуда. */
+    if (res.writableEnded || res.destroyed) return;
     const body = JSON.stringify(payload);
     res.writeHead(status, {
       'Content-Type': 'application/json; charset=utf-8',
@@ -361,6 +425,72 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
       return { state: stateFor(me), result: { ownerId: owner.id, ownerName: owner.name } };
     },
 
+    /* --- P2P: сведение друзей напрямую ---------------------- */
+
+    'POST /api/p2p/signal': async (req, body) => {
+      const me = auth(req, body);
+      const items = Array.isArray(body.batch) ? body.batch : [body];
+      if (items.length > 32) throw httpError(400, 'Слишком много сигналов за раз.');
+      let sent = 0;
+      for (const item of items) {
+        const target = byId(item?.to);
+        if (!target) throw httpError(404, 'Игрок не найден.');
+        if (target.id === me.id) throw httpError(400, 'Нельзя звонить самому себе.');
+        if (!me.friends.includes(target.id))
+          throw httpError(403, 'Прямое соединение доступно только друзьям.');
+        const kind = String(item.kind || '');
+        if (!['offer', 'answer', 'ice', 'bye', 'relay'].includes(kind))
+          throw httpError(400, 'Неизвестный тип сигнала.');
+        const data = item.data ?? null;
+        if (JSON.stringify(data ?? null).length > SIGNAL_MAX_CHARS)
+          throw httpError(413, 'Сигнал слишком большой.');
+        pushSignal(target.id, {
+          id: `s_${(signalSeq += 1).toString(36)}`,
+          from: me.id,
+          kind,
+          data,
+          at: Date.now(),
+        });
+        sent += 1;
+      }
+      /* Живой сигналинг — тоже признак присутствия. */
+      me.online = true;
+      me.seenAt = Date.now();
+      persistSoon();
+      return { ok: true, sent };
+    },
+
+    /* Длинный опрос: висим до первого сигнала или 20 секунд. Так
+       соединение поднимается за доли секунды, а запросов — три в минуту. */
+    'GET /api/p2p/inbox': (req) => {
+      const me = auth(req, {});
+      me.online = true;
+      me.seenAt = Date.now();
+      persistSoon();
+      const ready = takeSignals(me.id);
+      const wants = new URL(req.url, 'http://x').searchParams.get('wait') === '1';
+      if (ready.length > 0 || !wants) return { messages: ready, self: me.id };
+      const box = inboxOf(me.id);
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          box.waiters.delete(wake);
+          req.off?.('close', finish);
+          resolve({ messages: takeSignals(me.id), self: me.id });
+        };
+        /* Будим не мгновенно: пачка ICE-кандидатов приходит подряд,
+           и забрать её одним ответом дешевле, чем тремя. */
+        const wake = () => setTimeout(finish, 0);
+        const timer = setTimeout(finish, INBOX_WAIT_MS);
+        timer.unref?.();
+        box.waiters.add(wake);
+        req.on('close', finish);
+      });
+    },
+
     'POST /api/invite/regen': async (req, body) => {
       const me = auth(req, body);
       me.inviteCode = makeInviteCode();
@@ -393,7 +523,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
       }
       return true;
     },
-    stats: () => ({ users: db.users.length, requests: db.requests.length }),
+    stats: () => ({ users: db.users.length, requests: db.requests.length, p2p: inboxes.size }),
     dbFile,
   };
 }

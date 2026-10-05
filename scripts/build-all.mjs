@@ -1,11 +1,12 @@
 // Полная сборка всех форматов: Web, Windows (.exe) и Android (.apk).
-// Запуск: node build-all.mjs
+// Запуск: npm run build:all
 //
 // Каждый формат собирается отдельным процессом. Если один не получился
 // (например, на компьютере нет компилятора C# для .exe), остальные всё
 // равно собираются — в конце печатается честный итог.
 
 import { spawnSync } from 'node:child_process';
+import { fromRoot } from './lib/root.mjs';
 
 console.log('============================================================');
 console.log('  MIR — The civilization of the sages');
@@ -22,7 +23,7 @@ const done = [];
 
 steps.forEach((step, index) => {
   console.log(`\n[${index + 1}/${steps.length}] ${step.title}…`);
-  const run = spawnSync('node', [step.script], { stdio: 'inherit' });
+  const run = spawnSync('node', [fromRoot('scripts', step.script)], { stdio: 'inherit' });
   done.push({ ...step, ok: run.status === 0 });
 });
 

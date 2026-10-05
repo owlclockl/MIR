@@ -29,6 +29,9 @@
 
   /* Акцент */
   --accent: #c2d9c9;
+  /* Связь через хаб — не ошибка, но и не идеал: тёплый оттенок. */
+  --warn: #d9c08a;
+  --warn-glow: rgba(217, 192, 138, 0.4);
   --accent-glow: rgba(176, 208, 186, 0.45);
 
   /* Размеры каркаса */
@@ -353,6 +356,11 @@ a {
 .dot--off {
   background: #3b3b41;
   box-shadow: none;
+}
+
+.dot--warn {
+  background: var(--warn);
+  box-shadow: 0 0 9px var(--warn-glow);
 }
 
 /* Профиль */
@@ -779,6 +787,179 @@ a {
   .profile {
     padding: 5px;
   }
+}
+
+
+/* ---------- Прямая связь (P2P) ------------------------------
+   Блок состояния канала и переписка. Живут и в окне друга, и в
+   окне подключения по коду — разметка одна и та же. */
+
+.link-box {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+}
+
+.link-box__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.link-box__hint {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.link-box__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.link-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.link-state--live {
+  color: var(--accent);
+}
+
+.link-state--warn {
+  color: var(--warn);
+}
+
+.link-state--off {
+  color: var(--text-faint);
+}
+
+.friend__link {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.badge--inline {
+  position: static;
+  transform: none;
+}
+
+.mini-button--wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.dialog__actions--spread {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.hint--center {
+  margin: auto;
+  text-align: center;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.input--code-area {
+  min-height: 72px;
+  resize: vertical;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: var(--fs-small);
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+/* --- переписка --- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+}
+
+.chat__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 208px;
+  padding: 13px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat__row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  max-width: 82%;
+}
+
+.chat__row--mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat__bubble {
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat__row--mine .chat__bubble {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.chat__meta {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chat__form {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 13px;
+}
+
+.chat__form .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat__form .icon-button:disabled,
+.chat__form .input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 @media (max-width: 860px) {
@@ -1606,6 +1787,14 @@ input[type='search']::-webkit-search-cancel-button {
   }
 
   .code-form__row {
+    flex-direction: column;
+  }
+
+  .chat__list {
+    height: 168px;
+  }
+
+  .link-box {
     flex-direction: column;
   }
 
