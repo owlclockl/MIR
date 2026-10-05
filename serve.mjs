@@ -4,15 +4,25 @@
  *
  *   node serve.mjs                 # раздать ./dist на всех интерфейсах
  *   node serve.mjs . --port 8080   # другой каталог и порт
- *   node serve.mjs --public        # плюс публичная ссылка через localtunnel
+ *   node serve.mjs --public        # плюс публичная ссылка через Cloudflare / localtunnel
  *   node serve.mjs --no-hub        # без общих аккаунтов, только статика
+ *   node serve.mjs --token TOKEN   # постоянный туннель Cloudflare по токену
  *
  * По умолчанию вместе со статикой работает хаб (/api/*): друзья в той же
  * Wi-Fi видят общие аккаунты, списки друзей и коды-приглашения. Данные —
- * в data/mir-hub.json. Без зависимостей — только встроенные модули Node.
+ * в data/mir-hub.json.
  */
-import { createServer } from 'node:http';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createServer, get as httpGet } from 'node:http';
+import { get as httpsGet } from 'node:https';
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  appendFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { extname, join, resolve, sep } from 'node:path';
 import { networkInterfaces } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -50,10 +60,45 @@ const MIME = {
 
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.map']);
 
+/* ---------- логирование в файл logs/mir-server.log ---------- */
+
+const LOG_DIR = resolve('logs');
+const LOG_FILE = join(LOG_DIR, 'mir-server.log');
+
+function logToFile(level, category, message) {
+  try {
+    if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
+    if (existsSync(LOG_FILE)) {
+      const st = statSync(LOG_FILE);
+      if (st.size > 2 * 1024 * 1024) {
+        // Ротация: оставляем последнюю половину файла при превышении 2 МБ
+        const content = readFileSync(LOG_FILE, 'utf8');
+        const half = content.slice(content.length / 2);
+        writeFileSync(LOG_FILE, half, 'utf8');
+      }
+    }
+    const iso = new Date().toISOString();
+    const line = `[${iso}] [${level.toUpperCase()}] [${category}] ${message}\n`;
+    appendFileSync(LOG_FILE, line, 'utf8');
+  } catch { }
+}
+
+function copyToClipboard(text) {
+  try {
+    if (process.platform === 'win32') {
+      const p = spawn('clip', { stdio: ['pipe', 'ignore', 'ignore'] });
+      p.stdin.end(Buffer.from(text, 'utf8'));
+    } else if (process.platform === 'darwin') {
+      const p = spawn('pbcopy', { stdio: ['pipe', 'ignore', 'ignore'] });
+      p.stdin.end(Buffer.from(text, 'utf8'));
+    }
+  } catch { }
+}
+
 /* ---------- аргументы ---------- */
 
 function parseArgs(argv) {
-  const opts = { dir: null, port: null, public: false, hub: true, help: false };
+  const opts = { dir: null, port: null, public: false, hub: true, token: null, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') opts.help = true;
@@ -62,6 +107,8 @@ function parseArgs(argv) {
     else if (a === '--hub') opts.hub = true;
     else if (a === '--port') opts.port = Number(argv[++i]);
     else if (a.startsWith('--port=')) opts.port = Number(a.slice(7));
+    else if (a === '--token') opts.token = argv[++i];
+    else if (a.startsWith('--token=')) opts.token = a.slice(8);
     else if (a.startsWith('-')) {
       console.error(`Неизвестный флаг: ${a}\nПодсказка: node serve.mjs --help`);
       process.exit(1);
@@ -74,18 +121,17 @@ const args = parseArgs(process.argv.slice(2));
 
 if (args.help) {
   console.log(`
-Статический сервер проекта.
+Статический сервер проекта с поддержкой хаба и защищённых туннелей.
 
-  node serve.mjs [каталог] [--port N] [--public] [--no-hub]
+  node serve.mjs [каталог] [--port N] [--public] [--token TOKEN] [--no-hub]
 
-  каталог    что раздавать (по умолчанию dist)
-  --port N   порт (по умолчанию 4173 или PORT из окружения);
-             если занят — берётся следующий свободный
-  --public   публичная https-ссылка для друзей из интернета:
-             сначала Cloudflare Tunnel (без пароля),
-             запасной вариант — localtunnel (страница-пароль)
-  --no-hub   не поднимать хаб общих аккаунтов (/api/*)
-  --help     эта справка
+  каталог        что раздавать (по умолчанию dist)
+  --port N       порт (по умолчанию 4173 или PORT из окружения)
+  --public       публичная https-ссылка для друзей из интернета:
+                 авто-переподключение, HTTP/2, сторожевой таймер от сбоев
+  --token TOKEN  токен постоянного Cloudflare Tunnel (вечная неизменная ссылка)
+  --no-hub       не поднимать хаб общих аккаунтов (/api/*)
+  --help         эта справка
 `);
   process.exit(0);
 }
@@ -94,17 +140,19 @@ const ROOT = resolve(args.dir ?? 'dist');
 const BASE_PORT = Number.isFinite(args.port) && args.port > 0 ? args.port : Number(process.env.PORT) || 4173;
 const HOST = process.env.HOST || '0.0.0.0';
 
+logToFile('info', 'server', `Starting MIR server (dir: ${ROOT}, port: ${BASE_PORT}, public: ${args.public})`);
+
 if (!existsSync(ROOT) || !statSync(ROOT).isDirectory()) {
-  console.error(`\n  Каталог «${ROOT}» не найден.\n`);
-  console.error('  Сначала соберите проект:\n');
-  console.error('    npm run build\n');
-  console.error('  Либо запустите всё одной командой:\n');
-  console.error('    npm run share\n');
+  const msg = `Каталог «${ROOT}» не найден. Сначала соберите проект: npm run build`;
+  console.error(`\n  ${msg}\n`);
+  logToFile('error', 'server', msg);
   process.exit(1);
 }
 
 if (!existsSync(join(ROOT, 'index.html'))) {
-  console.error(`\n  В каталоге «${ROOT}» нет index.html — раздавать нечего.\n`);
+  const msg = `В каталоге «${ROOT}» нет index.html — раздавать нечего.`;
+  console.error(`\n  ${msg}\n`);
+  logToFile('error', 'server', msg);
   process.exit(1);
 }
 
@@ -117,7 +165,6 @@ const hub = args.hub
 /* ---------- сервер ---------- */
 
 function resolveFile(urlPath) {
-  // %-декодирование + защита от выхода за пределы каталога
   let decoded;
   try {
     decoded = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
@@ -137,7 +184,6 @@ function resolveFile(urlPath) {
     }
     return candidate;
   }
-  // путь без расширения — отдаём index.html (на случай будущих маршрутов)
   if (!extname(decoded)) {
     const index = join(ROOT, 'index.html');
     return existsSync(index) ? index : null;
@@ -148,7 +194,15 @@ function resolveFile(urlPath) {
 const server = createServer((req, res) => {
   const started = Date.now();
 
-  /* API хаба обслуживаем до статики и до фильтра методов (там POST). */
+  // Служебный эндпоинт проверки здоровья для сторожевого таймера
+  if (req.url === '/api/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ status: 'ok', uptime: process.uptime(), time: Date.now() }));
+    log(req, 200, started);
+    return;
+  }
+
+  /* API хаба */
   if (hub && (req.url || '').startsWith('/api/')) {
     hub
       .handle(req, res)
@@ -159,6 +213,7 @@ const server = createServer((req, res) => {
           res.end(JSON.stringify({ error: 'Внутренняя ошибка хаба.' }));
         }
         console.error('  × хаб:', err.message);
+        logToFile('error', 'hub', `${req.url} error: ${err.message}`);
         log(req, 500, started);
       });
     return;
@@ -190,7 +245,6 @@ const server = createServer((req, res) => {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Last-Modified': stat.mtime.toUTCString(),
     ETag: etag,
-    // ассеты Vite содержат хеш в имени — их можно кэшировать надолго
     'Cache-Control': /\/assets\//.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
   };
@@ -225,7 +279,11 @@ const server = createServer((req, res) => {
 function log(req, status, started) {
   const mark = status >= 400 ? '×' : '·';
   const path = (req.url || '/').slice(0, 60);
-  console.log(`  ${mark} ${status}  ${path}  ${Date.now() - started}ms`);
+  const duration = Date.now() - started;
+  console.log(`  ${mark} ${status}  ${path}  ${duration}ms`);
+  if (status >= 400) {
+    logToFile('warn', 'http', `${status} ${req.method} ${path} (${duration}ms)`);
+  }
 }
 
 /* ---------- запуск с подбором свободного порта ---------- */
@@ -235,15 +293,16 @@ function listen(port, attemptsLeft = 10) {
     server.off('listening', onListening);
     if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
       console.log(`  порт ${port} занят, пробую ${port + 1}…`);
+      logToFile('warn', 'port', `Port ${port} in use, trying ${port + 1}`);
       listen(port + 1, attemptsLeft - 1);
     } else {
       console.error('\n  Не удалось занять порт:', err.message, '\n');
+      logToFile('error', 'port', `Failed to bind port: ${err.message}`);
       process.exit(1);
     }
   };
   const onListening = () => {
     server.off('error', onError);
-    // именно address().port, а не port: при подборе номер мог измениться
     onReady(server.address().port);
   };
   server.once('error', onError);
@@ -258,7 +317,6 @@ function lanAddresses() {
       if (net.family === 'IPv4' && !net.internal) out.push(net.address);
     }
   }
-  // 169.254.x.x — link-local, по такому адресу друг не зайдёт: в конец списка
   return out.sort((a, b) => Number(a.startsWith('169.254.')) - Number(b.startsWith('169.254.')));
 }
 
@@ -272,13 +330,24 @@ function onReady(port) {
     }
   })();
 
+  logToFile('info', 'server', `Server ready on port ${port}. LAN addresses: ${lan.join(', ') || 'none'}`);
+
   console.log('');
-  console.log(`  ${name} — раздаю ${ROOT}`);
+  console.log(`  ============================================================`);
+  console.log(`  ${name} — сервер запущен (раздаю ${ROOT})`);
+  console.log(`  ============================================================`);
   console.log('');
   console.log(`  На этом компьютере   http://localhost:${port}/`);
   if (lan.length) {
     console.log(`  Для друзей в той же сети Wi-Fi:`);
-    for (const ip of lan) console.log(`                       http://${ip}:${port}/`);
+    for (const ip of lan) {
+      console.log(`                       http://${ip}:${port}/`);
+    }
+    // Автокопирование первого Wi-Fi адреса, если не public
+    if (!args.public && lan[0]) {
+      copyToClipboard(`http://${lan[0]}:${port}/`);
+      console.log(`  ✓ Ссылка Wi-Fi скопирована в буфер обмена (Ctrl+V)`);
+    }
   } else {
     console.log('  Сетевой адрес не найден — доступно только локально.');
   }
@@ -289,23 +358,17 @@ function onReady(port) {
   }
   console.log('');
   if (!args.public) {
-    console.log('  Нужны друзья из интернета (не только Wi-Fi)? --public поднимет');
-    console.log('  https-ссылку через Cloudflare Tunnel; общий хаб работает и по ней.');
+    console.log('  Нужны друзья из интернета? Запустите с флагом --public');
     console.log('');
   }
+  console.log('  Журнал логов: logs/mir-server.log');
   console.log('  Ctrl+C — остановить');
   console.log('');
 
   if (args.public) openTunnel(port);
 }
 
-/* ---------- публичная ссылка ---------- */
-/*
- * Общий хаб работает и через интернет: туннель прокидывает тот же порт,
- * значит сайт и /api/* живут на одном адресе — фронт сам подключится к хабу.
- * Сначала пробуем Cloudflare Quick Tunnel (https без пароля, без аккаунта);
- * если не вышло — localtunnel (у него страница-пароль перед входом).
- */
+/* ---------- публичная ссылка с авто-восстановлением ---------- */
 
 const HUB_NOTE = `  По этой же ссылке работает и общий хаб: аккаунты, друзья и
   приглашения у всех гостей — одни и те же. Отсюда же меню
@@ -321,113 +384,220 @@ function spawnTunnel(command, cmdArgs) {
   });
 }
 
+let activeChildProcess = null;
+let watchdogTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+function stopTunnelWatchdog() {
+  if (watchdogTimer) {
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
+}
+
+function startTunnelWatchdog(url, port, onFail) {
+  stopTunnelWatchdog();
+  let failureCount = 0;
+
+  watchdogTimer = setInterval(async () => {
+    try {
+      const isHttps = url.startsWith('https:');
+      const getter = isHttps ? httpsGet : httpGet;
+      const pingUrl = `${url}/api/health`;
+
+      const req = getter(pingUrl, { headers: { 'User-Agent': 'MIR-Watchdog/1.0' } }, (res) => {
+        res.resume();
+        if (res.statusCode >= 200 && res.statusCode < 500) {
+          if (failureCount > 0) {
+            logToFile('info', 'watchdog', `Health recovered (status ${res.statusCode})`);
+          }
+          failureCount = 0;
+        } else if (res.statusCode === 502 || res.statusCode === 503 || res.statusCode === 1033) {
+          failureCount++;
+          logToFile('warn', 'watchdog', `Health ping returned ${res.statusCode}, failure count: ${failureCount}`);
+        }
+      });
+
+      req.setTimeout(8000, () => {
+        req.destroy();
+        failureCount++;
+        logToFile('warn', 'watchdog', `Health ping timeout, failure count: ${failureCount}`);
+      });
+
+      req.on('error', (err) => {
+        failureCount++;
+        logToFile('warn', 'watchdog', `Health ping error: ${err.message}, failure count: ${failureCount}`);
+      });
+
+      if (failureCount >= 3) {
+        logToFile('error', 'watchdog', `Tunnel ${url} unresponsive 3 times in a row. Restarting connection...`);
+        console.log('');
+        console.log('  [Watchdog] Обнаружен сбой связи туннеля (Error 1033 / таймаут).');
+        console.log('  Автоматически перезапускаю соединение…');
+        console.log('');
+        failureCount = 0;
+        if (activeChildProcess && !activeChildProcess.killed) {
+          activeChildProcess.kill();
+        }
+      }
+    } catch (err) {
+      logToFile('error', 'watchdog', `Watchdog tick error: ${err.message}`);
+    }
+  }, 25_000);
+
+  if (watchdogTimer.unref) watchdogTimer.unref();
+}
+
 function runCloudflared(port, onFail) {
+  const token = args.token || process.env.CLOUDFLARE_TUNNEL_TOKEN || process.env.CLOUDFLARE_TOKEN || (() => {
+    try {
+      const tf = resolve('data/tunnel-token.txt');
+      return existsSync(tf) ? readFileSync(tf, 'utf8').trim() : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const cmdArgs = token
+    ? ['--yes', 'cloudflared', 'tunnel', 'run', '--token', token]
+    : ['--yes', 'cloudflared', 'tunnel', '--url', `http://127.0.0.1:${port}`, '--protocol', 'http2', '--no-autoupdate'];
+
   console.log('  Поднимаю публичную https-ссылку через Cloudflare Tunnel…');
-  console.log('');
+  logToFile('info', 'tunnel', `Starting cloudflared (hasToken: ${Boolean(token)}, protocol: http2, port: ${port})`);
 
-  const child = spawnTunnel('npx', [
-    '--yes',
-    'cloudflared',
-    'tunnel',
-    '--url',
-    `http://127.0.0.1:${port}`,
-    '--no-autoupdate',
-  ]);
+  const child = spawnTunnel('npx', cmdArgs);
+  activeChildProcess = child;
 
-  let done = false;
-  const finish = (fn) => {
-    if (done) return;
-    done = true;
-    clearTimeout(watchdog);
-    if (!child.killed) child.kill();
-    fn();
-  };
+  let announced = false;
 
-  /* cloudflared качает свой бинарь при первом запуске — даём времени с запасом. */
-  const watchdog = setTimeout(() => {
-    console.log('');
-    console.log('  Cloudflare Tunnel молчит больше минуты (сеть не пустила или');
-    console.log('  не скачался cloudflared). Пробую запасной вариант — localtunnel…');
-    console.log('');
-    finish(onFail);
+  const initialWatchdog = setTimeout(() => {
+    if (!announced) {
+      logToFile('warn', 'tunnel', 'Cloudflare startup timed out after 60s');
+      console.log('');
+      console.log('  Cloudflare Tunnel молчит больше минуты (сеть не пустила или');
+      console.log('  не скачался cloudflared). Пробую запасной вариант — localtunnel…');
+      console.log('');
+      if (!child.killed) child.kill();
+      onFail();
+    }
   }, 60_000);
 
   const onData = (buf) => {
     const text = buf.toString();
-    if (done) return;
-    const url = text.match(CLOUDFLARED_RE);
-    if (url) {
-      done = true;
-      clearTimeout(watchdog);
+    logToFile('debug', 'cloudflared', text.trim());
+    if (announced) return;
+
+    const urlMatch = text.match(CLOUDFLARED_RE);
+    if (urlMatch) {
+      announced = true;
+      clearTimeout(initialWatchdog);
+      const url = urlMatch[0];
+      reconnectAttempts = 0;
+
+      logToFile('info', 'tunnel', `Cloudflare Tunnel established: ${url}`);
+
       console.log('');
-      console.log(`  Публичная ссылка   ${url[0]}`);
-      console.log('');
+      console.log(`  ============================================================`);
+      console.log(`  ✓ ПУБЛИЧНАЯ ССЫЛКА ДЛЯ ДРУЗЕЙ:`);
+      console.log(`    ${url}`);
+      console.log(`  ============================================================`);
+      console.log('  ✓ Ссылка скопирована в буфер обмена (Ctrl+V в чат с друзьями)');
       console.log('  Пароль не нужен — скидывайте друзьям как есть.');
       console.log(HUB_NOTE);
       console.log('');
+      console.log('  [i] Защита от сбоев: авто-проверка здоровья и протокол HTTP/2 активны.');
+      console.log('  [!] НЕ ЗАКРЫВАЙТЕ ЭТО ОКНО — пока оно открыто, ссылка работает.');
+      console.log('');
+
+      copyToClipboard(url);
+      startTunnelWatchdog(url, port, onFail);
     }
   };
 
   child.stdout.on('data', onData);
   child.stderr.on('data', onData);
 
-  child.on('error', () => finish(onFail));
-  child.on('exit', (code) => {
-    if (done) {
-      console.log('');
-      console.log('  Туннель закрылся. Перезапустите serve.mjs --public,');
-      console.log('  чтобы получить новую ссылку. Локальный сервер работает.');
-      console.log('');
-      return;
-    }
-    console.log('');
-    console.log(`  Cloudflare Tunnel не поднялся${code ? ` (код ${code})` : ''}.`);
-    console.log('  Пробую запасной вариант — localtunnel…');
-    console.log('');
-    finish(onFail);
+  child.on('error', (err) => {
+    logToFile('error', 'cloudflared', `Process error: ${err.message}`);
+    clearTimeout(initialWatchdog);
+    if (!announced) onFail();
   });
 
-  const stop = () => {
-    if (!child.killed) child.kill();
-  };
-  process.on('exit', stop);
-  process.on('SIGINT', stop);
-  process.on('SIGTERM', stop);
+  child.on('exit', (code, signal) => {
+    clearTimeout(initialWatchdog);
+    stopTunnelWatchdog();
+    logToFile('warn', 'cloudflared', `Process exited (code: ${code}, signal: ${signal})`);
+
+    if (announced) {
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+        console.log('');
+        console.log(`  [!] Связь с туннелем прервалась. Выполняю авто-восстановление (попытка ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) через ${delay / 1000}с…`);
+        logToFile('info', 'tunnel', `Auto-reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+        setTimeout(() => runCloudflared(port, onFail), delay);
+      } else {
+        console.log('');
+        console.log('  [!] Не удалось восстановить Cloudflare Tunnel после нескольких попыток.');
+        console.log('  Переключаюсь на резервный вариант (localtunnel)…');
+        logToFile('warn', 'tunnel', 'Cloudflare retries exhausted. Failing over to localtunnel.');
+        onFail();
+      }
+    } else {
+      console.log('');
+      console.log(`  Cloudflare Tunnel не поднялся${code ? ` (код ${code})` : ''}.`);
+      console.log('  Пробую запасной вариант — localtunnel…');
+      logToFile('warn', 'tunnel', `Cloudflare failed on start (code ${code}). Failing over to localtunnel.`);
+      onFail();
+    }
+  });
 }
 
 function runLocaltunnel(port) {
   console.log('  Поднимаю публичную ссылку через npx localtunnel…');
-  console.log('');
+  logToFile('info', 'localtunnel', `Starting localtunnel on port ${port}`);
 
   const child = spawnTunnel('npx', ['--yes', 'localtunnel', '--port', String(port)]);
+  activeChildProcess = child;
 
   let announced = false;
 
-  // Если за полминуты ссылки нет — почти всегда это заблокированная сеть.
   const watchdog = setTimeout(() => {
     if (announced) return;
     console.log('');
     console.log('  localtunnel молчит больше 30 секунд. Обычно это значит, что');
-    console.log('  сеть или файрвол не пускают наружу. Локальный сервер работает,');
-    console.log('  а для постоянной ссылки смотрите раздел про GitHub Pages в README.');
+    console.log('  сеть или файрвол не пускают наружу. Локальный сервер работает.');
+    console.log('  Запустите диагностику: npm run doctor');
     console.log('');
+    logToFile('warn', 'localtunnel', 'Localtunnel timeout after 30s');
   }, 30_000);
   watchdog.unref();
 
   const onData = (buf) => {
     const text = buf.toString();
+    logToFile('debug', 'localtunnel', text.trim());
     const url = text.match(LOCALTUNNEL_RE);
     if (url && !announced) {
       announced = true;
       clearTimeout(watchdog);
+      const publicUrl = url[0];
+      logToFile('info', 'localtunnel', `Localtunnel established: ${publicUrl}`);
+
       console.log('');
-      console.log(`  Публичная ссылка   ${url[0]}`);
+      console.log(`  ============================================================`);
+      console.log(`  ✓ ПУБЛИЧНАЯ ССЫЛКА (localtunnel):`);
+      console.log(`    ${publicUrl}`);
+      console.log(`  ============================================================`);
+      console.log('  ✓ Ссылка скопирована в буфер обмена (Ctrl+V в чат с друзьями)');
       console.log('');
       console.log('  Важно: при первом заходе localtunnel просит ввести пароль —');
       console.log('  это ваш внешний IP, посмотреть можно на https://loca.lt/mytunnelpassword');
       console.log('  После ввода пароля страницу стоит обновить, чтобы включился общий хаб.');
       console.log(HUB_NOTE);
       console.log('');
+
+      copyToClipboard(publicUrl);
     } else if (!url) {
       process.stdout.write('  localtunnel: ' + text);
     }
@@ -438,6 +608,7 @@ function runLocaltunnel(port) {
 
   child.on('error', (err) => {
     clearTimeout(watchdog);
+    logToFile('error', 'localtunnel', `Process error: ${err.message}`);
     console.log('');
     console.log('  Не удалось запустить localtunnel:', err.message);
     console.log('  Локальный сервер продолжает работать.');
@@ -446,30 +617,35 @@ function runLocaltunnel(port) {
 
   child.on('exit', (code) => {
     clearTimeout(watchdog);
+    logToFile('warn', 'localtunnel', `Process exited with code ${code}`);
     if (code !== 0 && code !== null) {
       console.log('');
       console.log(`  localtunnel завершился с кодом ${code}. Публичной ссылки не будет,`);
-      console.log('  но локальный сервер работает. Альтернатива — выложить на GitHub Pages,');
-      console.log('  см. README.');
+      console.log('  но локальный сервер работает.');
+      console.log('  Запустите диагностику: npm run doctor (или ЛОГИ-И-ДИАГНОСТИКА.bat)');
       console.log('');
     }
   });
-
-  const stop = () => {
-    if (!child.killed) child.kill();
-  };
-  process.on('exit', stop);
-  process.on('SIGINT', stop);
-  process.on('SIGTERM', stop);
 }
 
 function openTunnel(port) {
   runCloudflared(port, () => runLocaltunnel(port));
 }
 
+const cleanup = () => {
+  stopTunnelWatchdog();
+  if (activeChildProcess && !activeChildProcess.killed) {
+    activeChildProcess.kill();
+  }
+};
+
+process.on('exit', cleanup);
+
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
-    console.log('\n  Остановлено.\n');
+    logToFile('info', 'server', `Server stopped by signal ${sig}`);
+    console.log('\n  Сервер остановлен.\n');
+    cleanup();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 500).unref();
   });
