@@ -14,6 +14,25 @@ const MAX_BODY_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 const MAX_AVATAR_CHARS = 300 * 1024;
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
 
+/* В интернете хаб без защиты — приманка для ботов. Простой лимит
+   по IP на минутное окно: для друзей за глаза, для парсера — мало. */
+const DEFAULT_LIMITS = {
+  '/api/register': 10,
+  '/api/login': 20,
+  '/api/salt': 30,
+  default: 400,
+};
+const RATE_WINDOW_MS = 60_000;
+
+const clientIp = (req) =>
+  String(req.headers['cf-connecting-ip'] || '')
+    .trim() ||
+  String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim() ||
+  req.socket.remoteAddress ||
+  'unknown';
+
 const NAME_RE = /^[A-Za-zА-Яа-яЁё0-9_-]{3,16}$/;
 const RESERVED_NAMES = new Set(['гость', 'guest', 'игрок', 'player']);
 const NAME_RULE =
@@ -34,7 +53,7 @@ const normalizeCode = (code) =>
     .replace(/[^A-Z0-9]/g, '')
     .replace(/^(.{4})(.{4}).*$/, '$1-$2');
 
-export function createHub({ dbFile }) {
+export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
   /* ---------- хранилище ---------- */
 
   const load = () => {
@@ -163,6 +182,27 @@ export function createHub({ dbFile }) {
     } catch {
       return null;
     }
+  };
+
+  /* ---------- лимиты по IP ---------------------------------- */
+
+  const buckets = new Map(); // "ip путь" → { count, resetAt }
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of buckets) if (bucket.resetAt <= now) buckets.delete(key);
+  }, RATE_WINDOW_MS);
+  sweeper.unref?.();
+
+  const rateLimited = (req, path) => {
+    const limit = limits[path] ?? limits.default;
+    if (!limit) return false;
+    const key = `${clientIp(req)} ${path}`;
+    const now = Date.now();
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) bucket = { count: 0, resetAt: now + RATE_WINDOW_MS };
+    bucket.count += 1;
+    buckets.set(key, bucket);
+    return bucket.count > limit;
   };
 
   const validName = (name) => {
@@ -339,6 +379,10 @@ export function createHub({ dbFile }) {
       const route = routes[`${req.method} ${path}`];
       if (!route) {
         send(res, 404, { error: 'Нет такого метода хаба.' });
+        return true;
+      }
+      if (rateLimited(req, path)) {
+        send(res, 429, { error: 'Слишком много запросов. Подождите минуту.' });
         return true;
       }
       try {

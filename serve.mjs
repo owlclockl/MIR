@@ -81,7 +81,9 @@ if (args.help) {
   каталог    что раздавать (по умолчанию dist)
   --port N   порт (по умолчанию 4173 или PORT из окружения);
              если занят — берётся следующий свободный
-  --public   поднять публичную https-ссылку через npx localtunnel
+  --public   публичная https-ссылка для друзей из интернета:
+             сначала Cloudflare Tunnel (без пароля),
+             запасной вариант — localtunnel (страница-пароль)
   --no-hub   не поднимать хаб общих аккаунтов (/api/*)
   --help     эта справка
 `);
@@ -287,8 +289,8 @@ function onReady(port) {
   }
   console.log('');
   if (!args.public) {
-    console.log('  Нужна ссылка для друзей из интернета? Запустите с флагом --public');
-    console.log('  или в соседнем терминале: npx localtunnel --port ' + port);
+    console.log('  Нужны друзья из интернета (не только Wi-Fi)? --public поднимет');
+    console.log('  https-ссылку через Cloudflare Tunnel; общий хаб работает и по ней.');
     console.log('');
   }
   console.log('  Ctrl+C — остановить');
@@ -298,15 +300,106 @@ function onReady(port) {
 }
 
 /* ---------- публичная ссылка ---------- */
+/*
+ * Общий хаб работает и через интернет: туннель прокидывает тот же порт,
+ * значит сайт и /api/* живут на одном адресе — фронт сам подключится к хабу.
+ * Сначала пробуем Cloudflare Quick Tunnel (https без пароля, без аккаунта);
+ * если не вышло — localtunnel (у него страница-пароль перед входом).
+ */
 
-function openTunnel(port) {
-  console.log('  Поднимаю публичную ссылку через npx localtunnel…');
-  console.log('');
+const HUB_NOTE = `  По этой же ссылке работает и общий хаб: аккаунты, друзья и
+  приглашения у всех гостей — одни и те же. Отсюда же меню
+  устанавливается на телефон как приложение (кнопка «Установить»).`;
 
-  const child = spawn('npx', ['--yes', 'localtunnel', '--port', String(port)], {
+const CLOUDFLARED_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
+const LOCALTUNNEL_RE = /https:\/\/[^\s]+\.loca\.lt/;
+
+function spawnTunnel(command, cmdArgs) {
+  return spawn(command, cmdArgs, {
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: process.platform === 'win32',
   });
+}
+
+function runCloudflared(port, onFail) {
+  console.log('  Поднимаю публичную https-ссылку через Cloudflare Tunnel…');
+  console.log('');
+
+  const child = spawnTunnel('npx', [
+    '--yes',
+    'cloudflared',
+    'tunnel',
+    '--url',
+    `http://127.0.0.1:${port}`,
+    '--no-autoupdate',
+  ]);
+
+  let done = false;
+  const finish = (fn) => {
+    if (done) return;
+    done = true;
+    clearTimeout(watchdog);
+    if (!child.killed) child.kill();
+    fn();
+  };
+
+  /* cloudflared качает свой бинарь при первом запуске — даём времени с запасом. */
+  const watchdog = setTimeout(() => {
+    console.log('');
+    console.log('  Cloudflare Tunnel молчит больше минуты (сеть не пустила или');
+    console.log('  не скачался cloudflared). Пробую запасной вариант — localtunnel…');
+    console.log('');
+    finish(onFail);
+  }, 60_000);
+
+  const onData = (buf) => {
+    const text = buf.toString();
+    if (done) return;
+    const url = text.match(CLOUDFLARED_RE);
+    if (url) {
+      done = true;
+      clearTimeout(watchdog);
+      console.log('');
+      console.log(`  Публичная ссылка   ${url[0]}`);
+      console.log('');
+      console.log('  Пароль не нужен — скидывайте друзьям как есть.');
+      console.log(HUB_NOTE);
+      console.log('');
+    }
+  };
+
+  child.stdout.on('data', onData);
+  child.stderr.on('data', onData);
+
+  child.on('error', () => finish(onFail));
+  child.on('exit', (code) => {
+    if (done) {
+      console.log('');
+      console.log('  Туннель закрылся. Перезапустите serve.mjs --public,');
+      console.log('  чтобы получить новую ссылку. Локальный сервер работает.');
+      console.log('');
+      return;
+    }
+    console.log('');
+    console.log(`  Cloudflare Tunnel не поднялся${code ? ` (код ${code})` : ''}.`);
+    console.log('  Пробую запасной вариант — localtunnel…');
+    console.log('');
+    finish(onFail);
+  });
+
+  const stop = () => {
+    if (!child.killed) child.kill();
+  };
+  process.on('exit', stop);
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+}
+
+function runLocaltunnel(port) {
+  console.log('  Поднимаю публичную ссылку через npx localtunnel…');
+  console.log('');
+
+  const child = spawnTunnel('npx', ['--yes', 'localtunnel', '--port', String(port)]);
 
   let announced = false;
 
@@ -323,7 +416,7 @@ function openTunnel(port) {
 
   const onData = (buf) => {
     const text = buf.toString();
-    const url = text.match(/https:\/\/[^\s]+\.loca\.lt/);
+    const url = text.match(LOCALTUNNEL_RE);
     if (url && !announced) {
       announced = true;
       clearTimeout(watchdog);
@@ -332,6 +425,8 @@ function openTunnel(port) {
       console.log('');
       console.log('  Важно: при первом заходе localtunnel просит ввести пароль —');
       console.log('  это ваш внешний IP, посмотреть можно на https://loca.lt/mytunnelpassword');
+      console.log('  После ввода пароля страницу стоит обновить, чтобы включился общий хаб.');
+      console.log(HUB_NOTE);
       console.log('');
     } else if (!url) {
       process.stdout.write('  localtunnel: ' + text);
@@ -366,6 +461,10 @@ function openTunnel(port) {
   process.on('exit', stop);
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+}
+
+function openTunnel(port) {
+  runCloudflared(port, () => runLocaltunnel(port));
 }
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
