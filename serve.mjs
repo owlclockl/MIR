@@ -331,6 +331,8 @@ function runCloudflared(port, onFail) {
     'tunnel',
     '--url',
     `http://127.0.0.1:${port}`,
+    '--protocol',
+    'http2',
     '--no-autoupdate',
   ]);
 
