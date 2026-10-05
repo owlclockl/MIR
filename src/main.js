@@ -5,7 +5,7 @@ import { pickAvatarFile, processAvatarFile } from './avatar.js';
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 /* Иконки Lucide (ISC). Только контуры, 24×24, stroke = currentColor. */
 const ICONS = {
@@ -220,7 +220,9 @@ const relationControl = (me, user) => {
 const searchResultsHtml = (me) => {
   const query = ui.addQuery.trim().toLowerCase();
   if (query.length === 0)
-    return `<p class="hint">Введите имя игрока — поиск идёт по аккаунтам, созданным на этом устройстве.</p>`;
+    return `<p class="hint">Введите имя игрока — поиск идёт по ${
+      store.isHub() ? 'общему хабу этой сети' : 'аккаунтам, созданным на этом устройстве'
+    }.</p>`;
   if (query.length < 2) return `<p class="hint">Наберите хотя бы 2 символа.</p>`;
   const found = store
     .listUsers()
@@ -314,7 +316,7 @@ const profileModalHtml = () => {
           <div class="account__avatar">${avatarEl(me, 'avatar--lg')}</div>
           <div class="account__main">
             <p class="account__name" translate="no">${escapeHtml(me.name)}</p>
-            <p class="account__meta">С нами с ${formatDate(me.createdAt)} · друзей: ${me.friends.length}</p>
+            <p class="account__meta">С нами с ${formatDate(me.createdAt)} · друзей: ${me.friends.length} · ${store.backendLabel()}</p>
             <div class="account__actions">
               <button class="mini-button" type="button" data-action="pick-avatar">
                 ${icon('camera', 'icon--xs')} ${me.avatar ? 'Сменить аватарку' : 'Добавить аватарку'}
@@ -734,7 +736,7 @@ const formHandlers = {
   'use-code': (form, fields) =>
     withBusy(form, async () => {
       const input = form.querySelector('[data-role="code-input"]');
-      const owner = store.useInviteCode(input.value);
+      const owner = await store.useInviteCode(input.value);
       ui.codeValue = '';
       toast(`Вы теперь друзья с ${owner.name}.`);
       closeModal();
@@ -822,27 +824,27 @@ const actions = {
     if (event.target === el) closeModal();
   },
 
-  'send-request': (el) => {
+  'send-request': async (el) => {
     try {
-      const { accepted, target } = store.sendRequest(el.dataset.id);
+      const { accepted, target } = await store.sendRequest(el.dataset.id);
       toast(accepted ? `Вы теперь друзья с ${target.name}.` : `Заявка игроку ${target.name} отправлена.`);
     } catch (error) {
       toast(error.message, 'error');
     }
   },
 
-  'accept-request': (el) => {
+  'accept-request': async (el) => {
     try {
-      const from = store.acceptRequest(el.dataset.id);
+      const from = await store.acceptRequest(el.dataset.id);
       if (from) toast(`Вы теперь друзья с ${from.name}.`);
     } catch (error) {
       toast(error.message, 'error');
     }
   },
 
-  'decline-request': (el) => {
+  'decline-request': async (el) => {
     try {
-      const from = store.declineRequest(el.dataset.id);
+      const from = await store.declineRequest(el.dataset.id);
       if (from) toast(`Заявка от ${from.name} отклонена.`);
     } catch (error) {
       toast(error.message, 'error');
@@ -863,9 +865,9 @@ const actions = {
     renderModal();
   },
 
-  'confirm-remove-friend': (el) => {
+  'confirm-remove-friend': async (el) => {
     try {
-      const friend = store.removeFriend(el.dataset.id);
+      const friend = await store.removeFriend(el.dataset.id);
       closeModal();
       if (friend) toast(`${friend.name} убран из друзей.`);
     } catch (error) {
@@ -875,9 +877,9 @@ const actions = {
 
   'pick-avatar': () => pickAndPreviewAvatar(),
 
-  'save-avatar': () => {
+  'save-avatar': async () => {
     try {
-      store.setAvatar(ui.pendingAvatar);
+      await store.setAvatar(ui.pendingAvatar);
       toast('Аватарка обновлена.');
       openModal('profile');
     } catch (error) {
@@ -885,9 +887,9 @@ const actions = {
     }
   },
 
-  'remove-avatar': () => {
+  'remove-avatar': async () => {
     try {
-      store.setAvatar(null);
+      await store.setAvatar(null);
       toast('Аватарка убрана — вместо неё инициалы.');
     } catch (error) {
       toast(error.message, 'error');
@@ -899,9 +901,9 @@ const actions = {
     toast(ok ? `Код ${el.dataset.code} скопирован. Отправьте его другу.` : 'Не получилось скопировать — выделите код вручную.', ok ? 'ok' : 'error');
   },
 
-  'regen-code': () => {
+  'regen-code': async () => {
     try {
-      const code = store.regenerateInviteCode();
+      const code = await store.regenerateInviteCode();
       toast(`Новый код-приглашение: ${code}. Старый больше не работает.`);
     } catch (error) {
       toast(error.message, 'error');
@@ -963,11 +965,35 @@ setInterval(() => {
   if (!ui.modal) render();
   else renderRegions();
 }, 30_000);
+/* В hub-режиме опрашиваем общий сервер: друзья и заявки с других
+   устройств появляются сами. Чаще, когда вкладка видима. */
+setInterval(() => {
+  if (document.visibilityState === 'visible') store.refreshRemote();
+}, 5000);
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') store.heartbeat();
+  if (document.visibilityState === 'visible') {
+    store.heartbeat();
+    store.refreshRemote();
+  }
 });
 window.addEventListener('focus', () => store.heartbeat());
 window.addEventListener('beforeunload', () => store.markOffline());
 
+/* PWA: по https/localhost регистрируем service worker — меню становится
+   устанавливаемым приложением и работает офлайн. С file:// (mir.html)
+   и на голом http по локальной сети браузеры SW не разрешают. */
+if (
+  'serviceWorker' in navigator &&
+  (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
 render();
+/* Если меню открыто по сети с serve.mjs — подключаемся к общему хабу. */
+if (typeof store.initBackend === 'function') {
+  store.initBackend().then((mode) => {
+    if (mode === 'hub') toast('Подключено к общему хабу этой сети.');
+  });
+}

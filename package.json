@@ -1,13 +1,14 @@
 {
   "name": "mir-game-menu",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "single": "node build-single.mjs",
+    "icons": "node icons.mjs",
     "serve": "node serve.mjs",
     "share": "vite build && node serve.mjs",
     "share:public": "vite build && node serve.mjs --public"

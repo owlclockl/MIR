@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#08080a" />
     <meta name="description" content="Главное меню игры The civilization of the sages." />
     <title>The civilization of the sages — Главное меню</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="The civilization" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,18 +20,18 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
     />
     <script type="module">
-(function(){const e=document.createElement("link").relList;if(e&&e.supports&&e.supports("modulepreload"))return;for(const o of document.querySelectorAll('link[rel="modulepreload"]'))n(o);new MutationObserver(o=>{for(const l of o)if(l.type==="childList")for(const r of l.addedNodes)r.tagName==="LINK"&&r.rel==="modulepreload"&&n(r)}).observe(document,{childList:!0,subtree:!0});function a(o){const l={};return o.integrity&&(l.integrity=o.integrity),o.referrerPolicy&&(l.referrerPolicy=o.referrerPolicy),o.crossOrigin==="use-credentials"?l.credentials="include":o.crossOrigin==="anonymous"?l.credentials="omit":l.credentials="same-origin",l}function n(o){if(o.ep)return;o.ep=!0;const l=a(o);fetch(o.href,l)}})();const w={users:"mir:users",requests:"mir:requests",session:"mir:session"},vt=new Set(["гость","guest","игрок","player"]),gt=/^[A-Za-zА-Яа-яЁё0-9_-]{3,16}$/,yt="Имя: 3–16 символов — буквы, цифры, дефис и подчёркивание, без пробелов.",B=(t,e)=>{try{const a=localStorage.getItem(t);return a?JSON.parse(a):e}catch{return e}},K=(t,e)=>{localStorage.setItem(t,JSON.stringify(e))},U=t=>{const e=new Uint8Array(t);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(e);else for(let a=0;a<t;a++)e[a]=Math.floor(Math.random()*256);return[...e].map(a=>a.toString(16).padStart(2,"0")).join("")};function C(t){const e=(i,u)=>i>>>u|i<<32-u,a=Math.pow,n=a(2,32),o=[],l=t.length*8;let r=C.h=C.h||[];const y=C.k=C.k||[];let $=y.length;const G={};for(let i=2;$<64;i++)if(!G[i]){for(let u=0;u<313;u+=i)G[u]=i;r[$]=a(i,.5)*n|0,y[$++]=a(i,1/3)*n|0}for(t+="";t.length%64-56;)t+="\0";for(let i=0;i<t.length;i++)o[i>>2]|=t.charCodeAt(i)<<(3-i)%4*8;o[o.length]=l/n|0,o[o.length]=l;for(let i=0;i<o.length;){const u=o.slice(i,i+=16),R=r;r=r.slice(0,8);for(let p=0;p<64;p++){const I=u[p-15],F=u[p-2],A=r[0],L=r[4],tt=r[7]+(e(L,6)^e(L,11)^e(L,25))+(L&r[5]^~L&r[6])+y[p]+(u[p]=p<16?u[p]:u[p-16]+(e(I,7)^e(I,18)^I>>>3)+u[p-7]+(e(F,17)^e(F,19)^F>>>10)|0)|0,ht=(e(A,2)^e(A,13)^e(A,22))+(A&r[1]^A&r[2]^r[1]&r[2])|0;r=[tt+ht|0].concat(r),r[4]=r[4]+tt|0}for(let p=0;p<8;p++)r[p]=r[p]+R[p]|0}let Y="";for(let i=0;i<8;i++)for(let u=3;u+1;u--){const R=r[i]>>u*8&255;Y+=(R<16?"0":"")+R.toString(16)}return Y}const _t=t=>{const e=new TextEncoder().encode(t);let a="";for(const n of e)a+=String.fromCharCode(n);return a},wt=async t=>{if(globalThis.crypto?.subtle){const e=Uint8Array.from(t,n=>n.charCodeAt(0)),a=await crypto.subtle.digest("SHA-256",e);return[...new Uint8Array(a)].map(n=>n.toString(16).padStart(2,"0")).join("")}return C(t)},N=(t,e)=>wt(_t(`${t}:${e}`)),S=()=>B(w.users,[]),st=t=>K(w.users,t),m=t=>S().find(e=>e.id===t)||null,rt=t=>{const e=t.trim().toLowerCase();return S().find(a=>a.nameKey===e)||null},v=(t,e)=>{const a=S(),n=a.findIndex(o=>o.id===t);return n===-1?null:(a[n]={...a[n],...e},st(a),a[n])},et="ABCDEFGHJKMNPQRSTUVWXYZ23456789",it=()=>{const t=new Uint8Array(8);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(t);else for(let a=0;a<8;a++)t[a]=Math.floor(Math.random()*256);const e=[...t].map(a=>et[a%et.length]).join("");return`${e.slice(0,4)}-${e.slice(4)}`},$t=t=>t.toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^(.{4})(.{4}).*$/,"$1-$2"),V=()=>{const t=B(w.session,null);return t&&m(t.userId)?t:null},b=()=>{const t=V();return t?m(t.userId):null},lt=t=>{const e=V();e&&e.userId!==t&&v(e.userId,{online:!1}),K(w.session,{userId:t,since:Date.now()})},Et=9e4,E=t=>t&&t.online&&Date.now()-t.seenAt<Et?"idle":"offline",X=()=>{const t=V();t&&v(t.userId,{online:!0,seenAt:Date.now()})},ct=()=>{const t=V();t&&v(t.userId,{online:!1})},xt=t=>{if(!gt.test(t.trim()))throw new Error(yt);if(vt.has(t.trim().toLowerCase()))throw new Error("Это имя занято.")},dt=t=>{if(typeof t!="string"||t.length<6)throw new Error("Пароль: минимум 6 символов.");if(t.length>72)throw new Error("Пароль: максимум 72 символа.")},St=async(t,e)=>{const a=t.trim();if(xt(a),dt(e),rt(a))throw new Error("Это имя занято.");const n=U(16),o={id:`u_${U(8)}`,name:a,nameKey:a.toLowerCase(),salt:n,passHash:await N(n,e),avatar:null,friends:[],inviteCode:it(),createdAt:Date.now(),seenAt:Date.now(),online:!0};return st([...S(),o]),lt(o.id),h(),o},Mt=async(t,e)=>{const a=rt(t);if(!a)throw new Error("Игрок с таким именем не найден.");if(await N(a.salt,e)!==a.passHash)throw new Error("Неверный пароль.");return lt(a.id),v(a.id,{online:!0,seenAt:Date.now()}),h(),m(a.id)},At=()=>{ct(),localStorage.removeItem(w.session),h()},Lt=async(t,e)=>{const a=b();if(!a)throw new Error("Вы не вошли в аккаунт.");if(dt(e),await N(a.salt,t)!==a.passHash)throw new Error("Текущий пароль не подходит.");const o=U(16);v(a.id,{salt:o,passHash:await N(o,e)}),h()},qt=300*1024,at=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");if(t&&t.length>qt)throw new Error("Картинка слишком тяжёлая даже после сжатия.");v(e.id,{avatar:t||null}),h()},g=()=>B(w.requests,[]),H=t=>K(w.requests,t),D=t=>g().filter(e=>e.to===t).sort((e,a)=>a.at-e.at),ut=t=>g().filter(e=>e.from===t),Ct=t=>{const e=m(t);return e?e.friends.map(m).filter(Boolean).sort((a,n)=>{const o=E(a)==="offline"?1:0,l=E(n)==="offline"?1:0;return o-l||a.name.localeCompare(n.name,"ru")}):[]},Z=(t,e)=>{const a=m(t),n=m(e);!a||!n||t===e||(a.friends.includes(e)||v(t,{friends:[...a.friends,e]}),n.friends.includes(t)||v(e,{friends:[...n.friends,t]}))},Ht=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=m(t);if(!a)throw new Error("Игрок не найден.");if(a.id===e.id)throw new Error("Нельзя добавить самого себя.");if(e.friends.includes(a.id))throw new Error(`${a.name} уже у вас в друзьях.`);if(ut(e.id).some(o=>o.to===a.id))throw new Error(`Заявка игроку ${a.name} уже отправлена.`);const n=D(e.id).find(o=>o.from===a.id);return n?(H(g().filter(o=>o.id!==n.id)),Z(e.id,a.id),h(),{accepted:!0,target:a}):(H([...g(),{id:`r_${U(6)}`,from:e.id,to:a.id,at:Date.now()}]),h(),{accepted:!1,target:a})},Tt=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=g().find(n=>n.id===t&&n.to===e.id);if(!a)throw new Error("Заявка не найдена.");return H(g().filter(n=>n.id!==t)),Z(a.from,e.id),h(),m(a.from)},kt=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=g().find(n=>n.id===t&&n.to===e.id);if(!a)throw new Error("Заявка не найдена.");return H(g().filter(n=>n.id!==t)),h(),m(a.from)},Rt=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=m(t);return a&&v(t,{friends:a.friends.filter(n=>n!==e.id)}),v(e.id,{friends:e.friends.filter(n=>n!==t)}),h(),a},Ot=()=>{const t=b();if(!t)throw new Error("Вы не вошли в аккаунт.");return v(t.id,{inviteCode:it()}),h(),m(t.id).inviteCode},Pt=t=>{const e=b();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=$t(t);if(!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(a))throw new Error("Код выглядит как XXXX-XXXX.");const n=S().find(o=>o.inviteCode===a);if(!n)throw new Error("Такой код никому не выдан.");if(n.id===e.id)throw new Error("Это ваш собственный код.");if(e.friends.includes(n.id))throw new Error(`${n.name} уже у вас в друзьях.`);return H(g().filter(o=>!(o.from===e.id&&o.to===n.id)&&!(o.from===n.id&&o.to===e.id))),Z(e.id,n.id),h(),n},j=new Set,Ut=t=>(j.add(t),()=>j.delete(t)),h=()=>{for(const t of j)t()};typeof window<"u"&&window.addEventListener("storage",t=>{Object.values(w).includes(t.key)&&h()});const O=96,Nt=8*1024*1024,Vt=()=>new Promise(t=>{const e=document.createElement("input");e.type="file",e.accept="image/png, image/jpeg, image/webp, image/gif";let a=!1;const n=o=>{a||(a=!0,t(o))};e.addEventListener("change",()=>n(e.files?.[0]||null)),window.addEventListener("focus",()=>setTimeout(()=>n(e.files?.[0]||null),350),{once:!0}),e.click()}),Xt=async t=>{if(typeof createImageBitmap=="function")try{return await createImageBitmap(t)}catch{}const e=URL.createObjectURL(t);try{const a=new Image;return a.decoding="async",a.src=e,await a.decode(),a}finally{setTimeout(()=>URL.revokeObjectURL(e),1e4)}},Dt=t=>({width:t.width,height:t.height}),It=async t=>{if(!t)return null;if(!t.type.startsWith("image/"))throw new Error("Это не картинка. Подойдут PNG, JPEG, WebP или GIF.");if(t.size>Nt)throw new Error("Файл тяжелее 8 МБ. Выберите картинку поменьше.");let e;try{e=await Xt(t)}catch{throw new Error("Не удалось прочитать картинку.")}const{width:a,height:n}=Dt(e),o=Math.min(a,n),l=Math.floor((a-o)/2),r=Math.floor((n-o)/2),y=document.createElement("canvas");y.width=O,y.height=O;const $=y.getContext("2d");return $.imageSmoothingEnabled=!0,$.imageSmoothingQuality="high",$.drawImage(e,l,r,o,o,0,0,O,O),typeof e.close=="function"&&e.close(),y.toDataURL("image/png")},x={lead:"The civilization",tail:"of the sages"},Ft=`${x.lead} ${x.tail}`,jt="0.2.0",Bt={sigil:'<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>',settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',play:'<path d="M6 3 20 12 6 21Z"/>',userPlus:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',chevron:'<path d="m9 18 6-6-6-6"/>',user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',check:'<path d="M20 6 9 17l-5-5"/>',copy:'<rect x="9" y="9" width="13" height="13" rx="0"/><rect x="5" y="5" width="13" height="13" rx="0"/>',camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.4"/>',logOut:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',refresh:'<path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 21v-5h5"/>'},d=(t,e="")=>`<svg class="icon${e?` ${e}`:""}" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${Bt[t]}</svg>`,Q={playing:{label:"В игре",modifier:"live"},idle:{label:"В меню",modifier:"live"},offline:{label:"Не в сети",modifier:"off"}},f=t=>String(t).replace(/[&<>"']/g,e=>`&#${e.charCodeAt(0)};`),Kt=t=>{let e=0;for(const a of t)e=(e*31+a.codePointAt(0))%360;return e},z=t=>new Intl.DateTimeFormat("ru-RU",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(t)),M=(t,e="")=>{const n=E(t)==="offline"?" avatar--dim":"";if(t.avatar)return`<span class="avatar avatar--img${e?` ${e}`:""}${n}"><img src="${t.avatar}" alt="" /></span>`;const o=Kt(t.nameKey);return`<span class="avatar${e?` ${e}`:""}${n}" style="background:hsl(${o} 26% 30%);color:hsl(${o} 45% 87%)" aria-hidden="true">${f(t.name.slice(0,2).toUpperCase())}</span>`},Zt=async t=>{if(navigator.clipboard?.writeText)try{return await navigator.clipboard.writeText(t),!0}catch{}const e=document.createElement("textarea");e.value=t,e.style.cssText="position:fixed;opacity:0;pointer-events:none",document.body.append(e),e.select();let a=!1;try{a=document.execCommand("copy")}catch{a=!1}return e.remove(),a},c=(t,e="ok")=>{const a=document.querySelector("#toast-root");if(!a)return;const n=document.createElement("p");n.className=`toast toast--${e}`,n.setAttribute("role",e==="error"?"alert":"status"),n.textContent=t,a.append(n),requestAnimationFrame(()=>n.classList.add("toast--shown")),setTimeout(()=>{n.classList.remove("toast--shown"),n.addEventListener("transitionend",()=>n.remove(),{once:!0}),setTimeout(()=>n.remove(),400)},3400)},s={modal:null,authTab:"login",addQuery:"",codeValue:"",pendingAvatar:null,confirm:null,opener:null},J=()=>document.querySelector("#overlay-root"),q=(t,e=null)=>{s.opener=document.activeElement instanceof HTMLElement?document.activeElement:null,s.modal={type:t,data:e},T()},_=()=>{s.modal=null,s.confirm=null,s.pendingAvatar=null,s.codeValue="";const t=J();t&&(t.innerHTML=""),s.opener&&document.contains(s.opener)&&s.opener.focus(),s.opener=null},k=({label:t,title:e,size:a="",body:n})=>`
+(function(){const e=document.createElement("link").relList;if(e&&e.supports&&e.supports("modulepreload"))return;for(const n of document.querySelectorAll('link[rel="modulepreload"]'))s(n);new MutationObserver(n=>{for(const r of n)if(r.type==="childList")for(const o of r.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&s(o)}).observe(document,{childList:!0,subtree:!0});function a(n){const r={};return n.integrity&&(r.integrity=n.integrity),n.referrerPolicy&&(r.referrerPolicy=n.referrerPolicy),n.crossOrigin==="use-credentials"?r.credentials="include":n.crossOrigin==="anonymous"?r.credentials="omit":r.credentials="same-origin",r}function s(n){if(n.ep)return;n.ep=!0;const r=a(n);fetch(n.href,r)}})();let dt="",Z=()=>null,G={users:[],requests:[]};const Et=t=>{Z=t},_=t=>{G={users:t.users??[],requests:t.requests??[]}},St=()=>G.users,xt=()=>G.requests,g=async(t,e,a,{timeout:s=8e3}={})=>{const n=Z(),r=await fetch(`${dt}${e}`,{method:t,cache:"no-store",signal:AbortSignal.timeout(s),headers:{"Content-Type":"application/json",...n?{Authorization:`Bearer ${n}`}:{}},...a?{body:JSON.stringify(a)}:{}}),o=await r.json().catch(()=>({}));if(!r.ok){const p=new Error(o.error||"Хаб недоступен.");throw p.status=r.status,p}return o},qt=async()=>{const t=await fetch(`${dt}/api/ping`,{cache:"no-store",signal:AbortSignal.timeout(1200)});if(!t.ok)throw new Error("Хаб недоступен.");return t.json()},kt=t=>g("GET",`/api/salt?name=${encodeURIComponent(t)}`),W=async()=>_(await g("GET","/api/state")),At=t=>g("POST","/api/register",t),Rt=t=>g("POST","/api/login",t),Tt=()=>g("POST","/api/heartbeat",{}),Lt=()=>g("POST","/api/offline",{token:Z()}),Ct=t=>g("POST","/api/password",t),Mt=t=>g("POST","/api/avatar",{avatar:t}),Ut=t=>g("POST","/api/request",{to:t}),Ht=(t,e)=>g("POST","/api/respond",{requestId:t,accept:e}),Pt=t=>g("POST","/api/friend/remove",{friendId:t}),Ot=t=>g("POST","/api/invite/use",{code:t}),Nt=()=>g("POST","/api/invite/regen",{}),w={users:"mir:users",requests:"mir:requests",session:"mir:session"},It=new Set(["гость","guest","игрок","player"]),Xt=/^[A-Za-zА-Яа-яЁё0-9_-]{3,16}$/,Ft="Имя: 3–16 символов — буквы, цифры, дефис и подчёркивание, без пробелов.",j=(t,e)=>{try{const a=localStorage.getItem(t);return a?JSON.parse(a):e}catch{return e}},D=(t,e)=>{localStorage.setItem(t,JSON.stringify(e))},N=t=>{const e=new Uint8Array(t);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(e);else for(let a=0;a<t;a++)e[a]=Math.floor(Math.random()*256);return[...e].map(a=>a.toString(16).padStart(2,"0")).join("")};function C(t){const e=(l,m)=>l>>>m|l<<32-m,a=Math.pow,s=a(2,32),n=[],r=t.length*8;let o=C.h=C.h||[];const p=C.k=C.k||[];let $=p.length;const et={};for(let l=2;$<64;l++)if(!et[l]){for(let m=0;m<313;m+=l)et[m]=l;o[$]=a(l,.5)*s|0,p[$++]=a(l,1/3)*s|0}for(t+="";t.length%64-56;)t+="\0";for(let l=0;l<t.length;l++)n[l>>2]|=t.charCodeAt(l)<<(3-l)%4*8;n[n.length]=r/s|0,n[n.length]=r;for(let l=0;l<n.length;){const m=n.slice(l,l+=16),H=o;o=o.slice(0,8);for(let f=0;f<64;f++){const F=m[f-15],B=m[f-2],R=o[0],T=o[4],st=o[7]+(e(T,6)^e(T,11)^e(T,25))+(T&o[5]^~T&o[6])+p[f]+(m[f]=f<16?m[f]:m[f-16]+(e(F,7)^e(F,18)^F>>>3)+m[f-7]+(e(B,17)^e(B,19)^B>>>10)|0)|0,$t=(e(R,2)^e(R,13)^e(R,22))+(R&o[1]^R&o[2]^o[1]&o[2])|0;o=[st+$t|0].concat(o),o[4]=o[4]+st|0}for(let f=0;f<8;f++)o[f]=o[f]+H[f]|0}let at="";for(let l=0;l<8;l++)for(let m=3;m+1;m--){const H=o[l]>>m*8&255;at+=(H<16?"0":"")+H.toString(16)}return at}const Bt=t=>{const e=new TextEncoder().encode(t);let a="";for(const s of e)a+=String.fromCharCode(s);return a},Vt=async t=>{if(globalThis.crypto?.subtle){const e=Uint8Array.from(t,s=>s.charCodeAt(0)),a=await crypto.subtle.digest("SHA-256",e);return[...new Uint8Array(a)].map(s=>s.toString(16).padStart(2,"0")).join("")}return C(t)},I=(t,e)=>Vt(Bt(`${t}:${e}`)),nt="ABCDEFGHJKMNPQRSTUVWXYZ23456789",ot=()=>{const t=new Uint8Array(8);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(t);else for(let a=0;a<8;a++)t[a]=Math.floor(Math.random()*256);const e=[...t].map(a=>nt[a%nt.length]).join("");return`${e.slice(0,4)}-${e.slice(4)}`},ut=t=>{if(!Xt.test(t.trim()))throw new Error(Ft);if(It.has(t.trim().toLowerCase()))throw new Error("Это имя занято.")},pt=t=>{if(typeof t!="string"||t.length<6)throw new Error("Пароль: минимум 6 символов.");if(t.length>72)throw new Error("Пароль: максимум 72 символа.")},mt=t=>String(t||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^(.{4})(.{4}).*$/,"$1-$2"),V=(t,e,a)=>{const s=t.find(r=>r.id===e),n=t.find(r=>r.id===a);!s||!n||e===a||(s.friends.includes(a)||(s.friends=[...s.friends,a]),n.friends.includes(e)||(n.friends=[...n.friends,e]))},q={mode:"local",listUsers:()=>j(w.users,[]),listRequests:()=>j(w.requests,[]),saveUsers:t=>D(w.users,t),saveRequests:t=>D(w.requests,t),updateUser(t,e){const a=this.listUsers(),s=a.findIndex(n=>n.id===t);return s===-1?null:(a[s]={...a[s],...e},this.saveUsers(a),a[s])},findByName(t){const e=t.trim().toLowerCase();return this.listUsers().find(a=>a.nameKey===e)||null},async saltFor(t){const e=this.findByName(t);if(!e)throw new Error("Игрок с таким именем не найден.");return e.salt},async registerAccount({name:t,salt:e,passHash:a}){if(jt(t),this.findByName(t))throw new Error("Это имя занято.");const s={id:`u_${N(8)}`,name:t.trim(),nameKey:t.trim().toLowerCase(),salt:e,passHash:a,avatar:null,friends:[],inviteCode:ot(),createdAt:Date.now(),seenAt:Date.now(),online:!0};return this.saveUsers([...this.listUsers(),s]),{user:s,token:null}},async checkLogin({name:t,passHash:e}){const a=this.findByName(t);if(!a)throw new Error("Игрок с таким именем не найден.");if(a.passHash!==e)throw new Error("Неверный пароль.");return{user:a,token:null}},async beat(t){this.updateUser(t,{online:!0,seenAt:Date.now()})},async offline(t){this.updateUser(t,{online:!1})},async setPassword(t,{oldHash:e,nextSalt:a,nextHash:s}){const n=this.listUsers().find(r=>r.id===t);if(!n)throw new Error("Вы не вошли в аккаунт.");if(n.passHash!==e)throw new Error("Текущий пароль не подходит.");return this.updateUser(t,{salt:a,passHash:s}),{}},async setAvatar(t,e){return this.updateUser(t,{avatar:e||null}),{}},async sendRequest(t,e){const a=this.listUsers(),s=a.find(o=>o.id===t),n=a.find(o=>o.id===e);if(!s)throw new Error("Вы не вошли в аккаунт.");if(!n)throw new Error("Игрок не найден.");if(n.id===s.id)throw new Error("Нельзя добавить самого себя.");if(s.friends.includes(n.id))throw new Error(`${n.name} уже у вас в друзьях.`);if(this.listRequests().some(o=>o.from===t&&o.to===e))throw new Error(`Заявка игроку ${n.name} уже отправлена.`);const r=this.listRequests().find(o=>o.from===e&&o.to===t);return r?(this.saveRequests(this.listRequests().filter(o=>o.id!==r.id)),V(a,t,e),this.saveUsers(a),{result:{accepted:!0,targetId:n.id,targetName:n.name}}):(this.saveRequests([...this.listRequests(),{id:`r_${N(6)}`,from:t,to:e,at:Date.now()}]),{result:{accepted:!1,targetId:n.id,targetName:n.name}})},async respond(t,e,a){const s=this.listRequests().find(o=>o.id===e&&o.to===t);if(!s)throw new Error("Заявка не найдена.");const n=this.listUsers(),r=n.find(o=>o.id===s.from)||null;return this.saveRequests(this.listRequests().filter(o=>o.id!==e)),a&&r&&(V(n,s.from,t),this.saveUsers(n)),{result:{accepted:a,fromId:s.from,fromName:r?.name??""}}},async removeFriend(t,e){const a=this.listUsers(),s=a.find(n=>n.id===e)||null;for(const n of a)(n.id===t||n.id===e)&&(n.friends=n.friends.filter(r=>r!==t&&r!==e));return this.saveUsers(a),{result:{friendName:s?.name??""}}},async useInviteCode(t,e){const a=mt(e);if(!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(a))throw new Error("Код выглядит как XXXX-XXXX.");const s=this.listUsers(),n=s.find(o=>o.id===t),r=s.find(o=>o.inviteCode===a);if(!n)throw new Error("Вы не вошли в аккаунт.");if(!r)throw new Error("Такой код никому не выдан.");if(r.id===n.id)throw new Error("Это ваш собственный код.");if(n.friends.includes(r.id))throw new Error(`${r.name} уже у вас в друзьях.`);return this.saveRequests(this.listRequests().filter(o=>!(o.from===t&&o.to===r.id)&&!(o.from===r.id&&o.to===t))),V(s,t,r.id),this.saveUsers(s),{result:{ownerId:r.id,ownerName:r.name}}},async regenCode(t){const e=ot();return this.updateUser(t,{inviteCode:e}),{result:{code:e}}},async refresh(){}},jt=ut,Dt={mode:"hub",listUsers:()=>St(),listRequests:()=>xt(),async saltFor(t){const{salt:e}=await kt(t);return e},async registerAccount(t){const{token:e,state:a}=await At(t);_(a);const s=k();return{user:a.users.find(n=>n.id===s?.userId)??null,token:e}},async checkLogin({name:t,passHash:e}){const{token:a,state:s}=await Rt({name:t,passHash:e});return _(s),{user:s.users.find(r=>r.nameKey===t.trim().toLowerCase())??null,token:a}},async beat(){await Tt()},async offline(){await Lt()},async setPassword(t,{oldHash:e,nextSalt:a,nextHash:s}){const{state:n}=await Ct({oldHash:e,newSalt:a,newHash:s});return _(n),{}},async setAvatar(t,e){const{state:a}=await Mt(e||null);return _(a),{}},async sendRequest(t,e){const{state:a,result:s}=await Ut(e);return _(a),{result:s}},async respond(t,e,a){const{state:s,result:n}=await Ht(e,a);return _(s),{result:n}},async removeFriend(t,e){const{state:a,result:s}=await Pt(e);return _(a),{result:s}},async useInviteCode(t,e){const a=mt(e);if(!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(a))throw new Error("Код выглядит как XXXX-XXXX.");const{state:s,result:n}=await Ot(a);return _(s),{result:n}},async regenCode(){const{state:t,result:e}=await Nt();return _(t),{result:e}},async refresh(){await W()}};let c=q;const Kt=()=>c.mode==="hub",Zt=()=>c.mode==="hub"?"Общий хаб сети":"Этот браузер",k=()=>j(w.session,null),ft=()=>{const t=k();return t&&v(t.userId)?t:null};Et(()=>k()?.token??null);const rt=async()=>{if(typeof fetch!="function"||typeof location<"u"&&location.protocol==="file:")return"local";try{if(await qt(),c=Dt,k()?.token)try{await W()}catch{localStorage.removeItem(w.session)}return h(),"hub"}catch{return c=q,"local"}},ht=async()=>{if(c.mode==="hub")try{await W(),h()}catch(t){t?.status===401&&(localStorage.removeItem(w.session),h())}},Gt=()=>c.listUsers(),v=t=>c.listUsers().find(e=>e.id===t)||null,y=()=>{const t=ft();return t?v(t.userId):null},Wt=9e4,S=t=>t&&t.online&&Date.now()-t.seenAt<Wt?"idle":"offline",X=()=>{const t=ft();t&&c.beat(t.userId).catch(()=>{})},bt=()=>{const t=k();t&&c.offline(t.userId).catch(()=>{})},vt=async(t,e)=>{const a=k();a&&a.userId!==t&&c.mode==="local"&&await q.offline(a.userId),D(w.session,{userId:t,token:e??null,since:Date.now()})},zt=async(t,e)=>{const a=t.trim();ut(a),pt(e);const s=N(16),n=await I(s,e),{user:r,token:o}=await c.registerAccount({name:a,salt:s,passHash:n}),p=c.listUsers().find($=>$.nameKey===a.toLowerCase())??r;return await vt(p.id,o),c.mode==="local"&&await q.beat(p.id),h(),v(p.id)??p},Jt=async(t,e)=>{const a=await c.saltFor(t),s=await I(a,e),{user:n,token:r}=await c.checkLogin({name:t,passHash:s});if(!n)throw new Error("Игрок с таким именем не найден.");if(c.mode==="local"&&q.listUsers().find(p=>p.id===n.id).passHash!==s)throw new Error("Неверный пароль.");return await vt(n.id,r),c.mode==="local"&&await q.beat(n.id),h(),v(n.id)??n},Qt=()=>{bt(),localStorage.removeItem(w.session),h()},Yt=async(t,e)=>{const a=y();if(!a)throw new Error("Вы не вошли в аккаунт.");pt(e);const s=await I(a.salt??await c.saltFor(a.name),t),n=N(16),r=await I(n,e);await c.setPassword(a.id,{oldHash:s,nextSalt:n,nextHash:r}),h()},te=300*1024,it=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");if(t&&t.length>te)throw new Error("Картинка слишком тяжёлая даже после сжатия.");await c.setAvatar(e.id,t||null),h()},z=t=>c.listRequests().filter(e=>e.to===t).sort((e,a)=>a.at-e.at),ee=t=>c.listRequests().filter(e=>e.from===t),ae=t=>{const e=v(t);return e?e.friends.map(v).filter(Boolean).sort((a,s)=>{const n=S(a)==="offline"?1:0,r=S(s)==="offline"?1:0;return n-r||a.name.localeCompare(s.name,"ru")}):[]},se=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");const{result:a}=await c.sendRequest(e.id,t);return h(),{accepted:a.accepted,target:v(a.targetId)??{id:a.targetId,name:a.targetName}}},ne=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");const{result:a}=await c.respond(e.id,t,!0);return h(),a.fromId?v(a.fromId):{name:a.fromName}},oe=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");const{result:a}=await c.respond(e.id,t,!1);return h(),a.fromId?v(a.fromId):{name:a.fromName}},re=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");const a=v(t),{result:s}=await c.removeFriend(e.id,t);return h(),a??{name:s.friendName}},ie=async()=>{const t=y();if(!t)throw new Error("Вы не вошли в аккаунт.");const{result:e}=await c.regenCode(t.id);return h(),e.code},ce=async t=>{const e=y();if(!e)throw new Error("Вы не вошли в аккаунт.");const{result:a}=await c.useInviteCode(e.id,t);return h(),v(a.ownerId)??{name:a.ownerName}},K=new Set,le=t=>(K.add(t),()=>K.delete(t)),h=()=>{for(const t of K)t()};typeof window<"u"&&window.addEventListener("storage",t=>{(t.key===w.session||c.mode==="local"&&Object.values(w).includes(t.key))&&h()});const P=96,de=8*1024*1024,ue=()=>new Promise(t=>{const e=document.createElement("input");e.type="file",e.accept="image/png, image/jpeg, image/webp, image/gif";let a=!1;const s=n=>{a||(a=!0,t(n))};e.addEventListener("change",()=>s(e.files?.[0]||null)),window.addEventListener("focus",()=>setTimeout(()=>s(e.files?.[0]||null),350),{once:!0}),e.click()}),pe=async t=>{if(typeof createImageBitmap=="function")try{return await createImageBitmap(t)}catch{}const e=URL.createObjectURL(t);try{const a=new Image;return a.decoding="async",a.src=e,await a.decode(),a}finally{setTimeout(()=>URL.revokeObjectURL(e),1e4)}},me=t=>({width:t.width,height:t.height}),fe=async t=>{if(!t)return null;if(!t.type.startsWith("image/"))throw new Error("Это не картинка. Подойдут PNG, JPEG, WebP или GIF.");if(t.size>de)throw new Error("Файл тяжелее 8 МБ. Выберите картинку поменьше.");let e;try{e=await pe(t)}catch{throw new Error("Не удалось прочитать картинку.")}const{width:a,height:s}=me(e),n=Math.min(a,s),r=Math.floor((a-n)/2),o=Math.floor((s-n)/2),p=document.createElement("canvas");p.width=P,p.height=P;const $=p.getContext("2d");return $.imageSmoothingEnabled=!0,$.imageSmoothingQuality="high",$.drawImage(e,r,o,n,n,0,0,P,P),typeof e.close=="function"&&e.close(),p.toDataURL("image/png")},x={lead:"The civilization",tail:"of the sages"},he=`${x.lead} ${x.tail}`,be="0.3.0",ve={sigil:'<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>',settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',play:'<path d="M6 3 20 12 6 21Z"/>',userPlus:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',chevron:'<path d="m9 18 6-6-6-6"/>',user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',check:'<path d="M20 6 9 17l-5-5"/>',copy:'<rect x="9" y="9" width="13" height="13" rx="0"/><rect x="5" y="5" width="13" height="13" rx="0"/>',camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.4"/>',logOut:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',refresh:'<path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 21v-5h5"/>'},u=(t,e="")=>`<svg class="icon${e?` ${e}`:""}" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ve[t]}</svg>`,J={playing:{label:"В игре",modifier:"live"},idle:{label:"В меню",modifier:"live"},offline:{label:"Не в сети",modifier:"off"}},b=t=>String(t).replace(/[&<>"']/g,e=>`&#${e.charCodeAt(0)};`),ye=t=>{let e=0;for(const a of t)e=(e*31+a.codePointAt(0))%360;return e},Q=t=>new Intl.DateTimeFormat("ru-RU",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(t)),A=(t,e="")=>{const s=S(t)==="offline"?" avatar--dim":"";if(t.avatar)return`<span class="avatar avatar--img${e?` ${e}`:""}${s}"><img src="${t.avatar}" alt="" /></span>`;const n=ye(t.nameKey);return`<span class="avatar${e?` ${e}`:""}${s}" style="background:hsl(${n} 26% 30%);color:hsl(${n} 45% 87%)" aria-hidden="true">${b(t.name.slice(0,2).toUpperCase())}</span>`},ge=async t=>{if(navigator.clipboard?.writeText)try{return await navigator.clipboard.writeText(t),!0}catch{}const e=document.createElement("textarea");e.value=t,e.style.cssText="position:fixed;opacity:0;pointer-events:none",document.body.append(e),e.select();let a=!1;try{a=document.execCommand("copy")}catch{a=!1}return e.remove(),a},d=(t,e="ok")=>{const a=document.querySelector("#toast-root");if(!a)return;const s=document.createElement("p");s.className=`toast toast--${e}`,s.setAttribute("role",e==="error"?"alert":"status"),s.textContent=t,a.append(s),requestAnimationFrame(()=>s.classList.add("toast--shown")),setTimeout(()=>{s.classList.remove("toast--shown"),s.addEventListener("transitionend",()=>s.remove(),{once:!0}),setTimeout(()=>s.remove(),400)},3400)},i={modal:null,authTab:"login",addQuery:"",codeValue:"",pendingAvatar:null,confirm:null,opener:null},Y=()=>document.querySelector("#overlay-root"),L=(t,e=null)=>{i.opener=document.activeElement instanceof HTMLElement?document.activeElement:null,i.modal={type:t,data:e},M()},E=()=>{i.modal=null,i.confirm=null,i.pendingAvatar=null,i.codeValue="";const t=Y();t&&(t.innerHTML=""),i.opener&&document.contains(i.opener)&&i.opener.focus(),i.opener=null},U=({label:t,title:e,size:a="",body:s})=>`
   <div class="overlay" data-action="overlay-down">
-    <section class="dialog${a?` dialog--${a}`:""}" role="dialog" aria-modal="true" aria-label="${f(t)}">
+    <section class="dialog${a?` dialog--${a}`:""}" role="dialog" aria-modal="true" aria-label="${b(t)}">
       <header class="dialog__head">
-        <h2 class="dialog__title">${f(e)}</h2>
+        <h2 class="dialog__title">${b(e)}</h2>
         <button class="icon-button icon-button--sm" type="button" data-action="close-modal" aria-label="Закрыть">
-          ${d("x")}
+          ${u("x")}
         </button>
       </header>
-      ${n}
+      ${s}
     </section>
-  </div>`,pt=()=>{const t=s.authTab==="login";return k({label:t?"Вход в аккаунт":"Создание аккаунта",title:t?"С возвращением":"Новый аккаунт",body:`
+  </div>`,yt=()=>{const t=i.authTab==="login";return U({label:t?"Вход в аккаунт":"Создание аккаунта",title:t?"С возвращением":"Новый аккаунт",body:`
       <div class="tabs" role="tablist" aria-label="Режим">
         <button class="tab${t?" tab--active":""}" type="button" role="tab" aria-selected="${t}" data-action="auth-tab" data-tab="login">Вход</button>
         <button class="tab${t?"":" tab--active"}" type="button" role="tab" aria-selected="${!t}" data-action="auth-tab" data-tab="register">Регистрация</button>
@@ -50,15 +57,15 @@
           <span>${t?"Войти":"Создать аккаунт"}</span>
         </button>
         <p class="form-note">Всё хранится локально, в этом браузере.</p>
-      </form>`})},Qt=(t,e)=>t.id===e.id?"self":t.friends.includes(e.id)?"friend":D(t.id).find(n=>n.from===e.id)?"incoming":ut(t.id).some(n=>n.to===e.id)?"outgoing":"none",zt=(t,e)=>{switch(Qt(t,e)){case"friend":return`<span class="relation-tag">${d("check","icon--xs")} Уже в друзьях</span>`;case"incoming":return`<button class="mini-button" type="button" data-action="accept-request" data-id="${D(t.id).find(n=>n.from===e.id).id}">Принять заявку</button>`;case"outgoing":return'<span class="relation-tag relation-tag--muted">Заявка отправлена</span>';default:return`<button class="mini-button mini-button--accent" type="button" data-action="send-request" data-id="${e.id}">Добавить</button>`}},mt=t=>{const e=s.addQuery.trim().toLowerCase();if(e.length===0)return'<p class="hint">Введите имя игрока — поиск идёт по аккаунтам, созданным на этом устройстве.</p>';if(e.length<2)return'<p class="hint">Наберите хотя бы 2 символа.</p>';const a=S().filter(n=>n.id!==t.id&&n.nameKey.includes(e)).sort((n,o)=>{const l=n.nameKey.startsWith(e)?0:1,r=o.nameKey.startsWith(e)?0:1;return l-r||n.name.localeCompare(o.name,"ru")}).slice(0,6);return a.length===0?'<p class="hint">Никого не нашлось. Скиньте другу свой код-приглашение — он указан выше.</p>':a.map(n=>`
+      </form>`})},we=(t,e)=>t.id===e.id?"self":t.friends.includes(e.id)?"friend":z(t.id).find(s=>s.from===e.id)?"incoming":ee(t.id).some(s=>s.to===e.id)?"outgoing":"none",_e=(t,e)=>{switch(we(t,e)){case"friend":return`<span class="relation-tag">${u("check","icon--xs")} Уже в друзьях</span>`;case"incoming":return`<button class="mini-button" type="button" data-action="accept-request" data-id="${z(t.id).find(s=>s.from===e.id).id}">Принять заявку</button>`;case"outgoing":return'<span class="relation-tag relation-tag--muted">Заявка отправлена</span>';default:return`<button class="mini-button mini-button--accent" type="button" data-action="send-request" data-id="${e.id}">Добавить</button>`}},gt=t=>{const e=i.addQuery.trim().toLowerCase();if(e.length===0)return`<p class="hint">Введите имя игрока — поиск идёт по ${Kt()?"общему хабу этой сети":"аккаунтам, созданным на этом устройстве"}.</p>`;if(e.length<2)return'<p class="hint">Наберите хотя бы 2 символа.</p>';const a=Gt().filter(s=>s.id!==t.id&&s.nameKey.includes(e)).sort((s,n)=>{const r=s.nameKey.startsWith(e)?0:1,o=n.nameKey.startsWith(e)?0:1;return r-o||s.name.localeCompare(n.name,"ru")}).slice(0,6);return a.length===0?'<p class="hint">Никого не нашлось. Скиньте другу свой код-приглашение — он указан выше.</p>':a.map(s=>`
       <div class="result">
-        ${M(n,"avatar--sm")}
+        ${A(s,"avatar--sm")}
         <span class="result__text">
-          <strong class="friend__name" translate="no">${f(n.name)}</strong>
-          <small class="friend__state">${Q[E(n)].label}</small>
+          <strong class="friend__name" translate="no">${b(s.name)}</strong>
+          <small class="friend__state">${J[S(s)].label}</small>
         </span>
-        ${zt(t,n)}
-      </div>`).join("")},Jt=()=>{const t=b();return t?k({label:"Добавить друга",title:"Добавить друга",size:"wide",body:`
+        ${_e(t,s)}
+      </div>`).join("")},$e=()=>{const t=y();return t?U({label:"Добавить друга",title:"Добавить друга",size:"wide",body:`
       <div class="dialog__body">
         <div class="invite-box">
           <div class="invite-box__text">
@@ -68,7 +75,7 @@
           <div class="code-box">
             <code class="code-box__value" translate="no">${t.inviteCode}</code>
             <button class="icon-button icon-button--sm" type="button" data-action="copy-code" data-code="${t.inviteCode}" aria-label="Скопировать код-приглашение">
-              ${d("copy")}
+              ${u("copy")}
             </button>
           </div>
         </div>
@@ -79,10 +86,10 @@
           <span class="field__label" id="by-name-label">По имени</span>
           <input class="input" id="friend-search" type="search" placeholder="Имя игрока…"
                  autocomplete="off" spellcheck="false" maxlength="16" aria-labelledby="by-name-label"
-                 value="${f(s.addQuery)}" data-role="friend-search" />
+                 value="${b(i.addQuery)}" data-role="friend-search" />
         </div>
         <div class="results" data-role="friend-results">
-          ${mt(t)}
+          ${gt(t)}
         </div>
 
         <div class="divider" role="separator"></div>
@@ -93,22 +100,22 @@
             <div class="code-form__row">
               <input class="input input--code" type="text" placeholder="XXXX-XXXX" maxlength="9"
                      autocomplete="off" spellcheck="false" aria-labelledby="by-code-label"
-                     value="${f(s.codeValue)}" data-role="code-input" />
+                     value="${b(i.codeValue)}" data-role="code-input" />
               <button class="mini-button mini-button--accent" type="submit">Применить</button>
             </div>
           </div>
           <p class="form-error" data-role="form-error" hidden></p>
         </form>
-      </div>`}):""},Wt=()=>{const t=b();return t?k({label:"Профиль игрока",title:"Профиль",size:"wide",body:`
+      </div>`}):""},Ee=()=>{const t=y();return t?U({label:"Профиль игрока",title:"Профиль",size:"wide",body:`
       <div class="dialog__body">
         <div class="account">
-          <div class="account__avatar">${M(t,"avatar--lg")}</div>
+          <div class="account__avatar">${A(t,"avatar--lg")}</div>
           <div class="account__main">
-            <p class="account__name" translate="no">${f(t.name)}</p>
-            <p class="account__meta">С нами с ${z(t.createdAt)} · друзей: ${t.friends.length}</p>
+            <p class="account__name" translate="no">${b(t.name)}</p>
+            <p class="account__meta">С нами с ${Q(t.createdAt)} · друзей: ${t.friends.length} · ${Zt()}</p>
             <div class="account__actions">
               <button class="mini-button" type="button" data-action="pick-avatar">
-                ${d("camera","icon--xs")} ${t.avatar?"Сменить аватарку":"Добавить аватарку"}
+                ${u("camera","icon--xs")} ${t.avatar?"Сменить аватарку":"Добавить аватарку"}
               </button>
               ${t.avatar?'<button class="mini-button mini-button--danger" type="button" data-action="remove-avatar">Убрать</button>':""}
             </div>
@@ -125,10 +132,10 @@
           <div class="code-box">
             <code class="code-box__value" translate="no">${t.inviteCode}</code>
             <button class="icon-button icon-button--sm" type="button" data-action="copy-code" data-code="${t.inviteCode}" aria-label="Скопировать код-приглашение">
-              ${d("copy")}
+              ${u("copy")}
             </button>
             <button class="icon-button icon-button--sm" type="button" data-action="regen-code" aria-label="Сменить код (старый перестанет работать)" title="Сменить код — старый перестанет работать">
-              ${d("refresh")}
+              ${u("refresh")}
             </button>
           </div>
         </div>
@@ -148,25 +155,25 @@
             </label>
           </div>
           <p class="form-error" data-role="form-error" hidden></p>
-          <button class="mini-button" type="submit">${d("key","icon--xs")} Обновить пароль</button>
+          <button class="mini-button" type="submit">${u("key","icon--xs")} Обновить пароль</button>
         </form>
 
         <div class="divider" role="separator"></div>
 
         <button class="mini-button mini-button--danger" type="button" data-action="logout">
-          ${d("logOut","icon--xs")} Выйти из аккаунта
+          ${u("logOut","icon--xs")} Выйти из аккаунта
         </button>
-      </div>`}):""},Gt=()=>`
+      </div>`}):""},Se=()=>`
   <div class="overlay" data-action="overlay-down">
     <section class="dialog" role="dialog" aria-modal="true" aria-label="Новая аватарка">
       <header class="dialog__head">
         <h2 class="dialog__title">Новая аватарка</h2>
         <button class="icon-button icon-button--sm" type="button" data-action="close-modal" aria-label="Закрыть">
-          ${d("x")}
+          ${u("x")}
         </button>
       </header>
       <div class="dialog__body avatar-preview">
-        <img class="avatar-preview__img" src="${s.pendingAvatar}" alt="Предпросмотр аватарки" />
+        <img class="avatar-preview__img" src="${i.pendingAvatar}" alt="Предпросмотр аватарки" />
         <p class="hint">Картинка обрезана по центру до квадрата 96×96.</p>
         <div class="dialog__actions">
           <button class="mini-button" type="button" data-action="pick-avatar">Выбрать другую</button>
@@ -174,15 +181,15 @@
         </div>
       </div>
     </section>
-  </div>`,Yt=t=>{const e=m(t);if(!e)return pt();const a=Q[E(e)];return k({label:`Игрок ${e.name}`,title:"Игрок",body:`
+  </div>`,xe=t=>{const e=v(t);if(!e)return yt();const a=J[S(e)];return U({label:`Игрок ${e.name}`,title:"Игрок",body:`
       <div class="dialog__body">
         <div class="account">
-          <div class="account__avatar">${M(e,"avatar--lg")}</div>
+          <div class="account__avatar">${A(e,"avatar--lg")}</div>
           <div class="account__main">
-            <p class="account__name" translate="no">${f(e.name)}</p>
+            <p class="account__name" translate="no">${b(e.name)}</p>
             <p class="account__meta">
               <span class="dot dot--${a.modifier}" aria-hidden="true"></span>
-              ${a.label} · с нами с ${z(e.createdAt)}
+              ${a.label} · с нами с ${Q(e.createdAt)}
             </p>
           </div>
         </div>
@@ -190,52 +197,52 @@
         <button class="mini-button mini-button--danger" type="button" data-action="remove-friend" data-id="${e.id}">
           Убрать из друзей
         </button>
-      </div>`})},te=()=>k({label:s.confirm.title,title:s.confirm.title,body:`
+      </div>`})},qe=()=>U({label:i.confirm.title,title:i.confirm.title,body:`
     <div class="dialog__body">
-      <p class="hint">${s.confirm.text}</p>
+      <p class="hint">${i.confirm.text}</p>
       <div class="dialog__actions">
         <button class="mini-button" type="button" data-action="close-modal" data-autofocus>Отмена</button>
-        <button class="mini-button mini-button--danger" type="button" data-action="${s.confirm.action}" data-id="${s.confirm.id||""}">${s.confirm.label}</button>
+        <button class="mini-button mini-button--danger" type="button" data-action="${i.confirm.action}" data-id="${i.confirm.id||""}">${i.confirm.label}</button>
       </div>
-    </div>`}),T=()=>{const t=J();if(!t)return;if(!s.modal){t.innerHTML="";return}let e="";switch(s.modal.type){case"auth":e=pt();break;case"add-friend":e=Jt();break;case"profile":e=Wt();break;case"avatar-preview":e=Gt();break;case"friend":e=Yt(s.modal.data);break;case"confirm":e=te();break}t.innerHTML=e,(t.querySelector("[data-autofocus]")||t.querySelector("input, button"))?.focus();const n=t.querySelector("[data-autofocus]");n instanceof HTMLInputElement&&n.select()},ee=()=>{const t=b();return t?`
+    </div>`}),M=()=>{const t=Y();if(!t)return;if(!i.modal){t.innerHTML="";return}let e="";switch(i.modal.type){case"auth":e=yt();break;case"add-friend":e=$e();break;case"profile":e=Ee();break;case"avatar-preview":e=Se();break;case"friend":e=xe(i.modal.data);break;case"confirm":e=qe();break}t.innerHTML=e,(t.querySelector("[data-autofocus]")||t.querySelector("input, button"))?.focus();const s=t.querySelector("[data-autofocus]");s instanceof HTMLInputElement&&s.select()},ke=()=>{const t=y();return t?`
     <p class="status">
       <span class="dot dot--live" aria-hidden="true"></span>
       <span>В сети</span>
     </p>
     <span class="topbar__divider" aria-hidden="true"></span>
-    <button class="profile" type="button" data-action="open-profile" aria-label="Профиль: ${f(t.name)}">
-      ${M(t)}
+    <button class="profile" type="button" data-action="open-profile" aria-label="Профиль: ${b(t.name)}">
+      ${A(t)}
       <span class="profile__text">
-        <strong class="profile__name" translate="no">${f(t.name)}</strong>
-        <small class="profile__meta">С нами с ${z(t.createdAt)}</small>
+        <strong class="profile__name" translate="no">${b(t.name)}</strong>
+        <small class="profile__meta">С нами с ${Q(t.createdAt)}</small>
       </span>
-      ${d("chevron","icon--chevron")}
+      ${u("chevron","icon--chevron")}
     </button>`:`
       <button class="ghost-button ghost-button--inline" type="button" data-action="open-auth">
-        ${d("user")}
+        ${u("user")}
         <span>Войти</span>
-      </button>`},ae=t=>{const e=m(t.from);return e?`
+      </button>`},Ae=t=>{const e=v(t.from);return e?`
     <div class="request">
-      ${M(e,"avatar--sm")}
+      ${A(e,"avatar--sm")}
       <span class="friend__text">
-        <strong class="friend__name" translate="no">${f(e.name)}</strong>
+        <strong class="friend__name" translate="no">${b(e.name)}</strong>
         <small class="friend__state">Хочет добавить вас</small>
       </span>
-      <button class="icon-button icon-button--sm" type="button" data-action="accept-request" data-id="${t.id}" aria-label="Принять заявку от ${f(e.name)}" title="Принять">
-        ${d("check")}
+      <button class="icon-button icon-button--sm" type="button" data-action="accept-request" data-id="${t.id}" aria-label="Принять заявку от ${b(e.name)}" title="Принять">
+        ${u("check")}
       </button>
-      <button class="icon-button icon-button--sm icon-button--danger" type="button" data-action="decline-request" data-id="${t.id}" aria-label="Отклонить заявку от ${f(e.name)}" title="Отклонить">
-        ${d("x")}
+      <button class="icon-button icon-button--sm icon-button--danger" type="button" data-action="decline-request" data-id="${t.id}" aria-label="Отклонить заявку от ${b(e.name)}" title="Отклонить">
+        ${u("x")}
       </button>
-    </div>`:""},ne=t=>{const e=Q[E(t)];return`
+    </div>`:""},Re=t=>{const e=J[S(t)];return`
     <button class="friend friend--${e.modifier}" type="button" data-action="open-friend" data-id="${t.id}">
-      ${M(t,"avatar--sm")}
+      ${A(t,"avatar--sm")}
       <span class="friend__text">
-        <strong class="friend__name" translate="no">${f(t.name)}</strong>
+        <strong class="friend__name" translate="no">${b(t.name)}</strong>
         <small class="friend__state">${e.label}</small>
       </span>
       <span class="dot dot--${e.modifier}" aria-hidden="true"></span>
-    </button>`},oe=()=>{const t=b();if(!t)return`
+    </button>`},Te=()=>{const t=y();if(!t)return`
       <div class="rail__head">
         <div class="rail__heading">
           <p class="eyebrow">Сообщество</p>
@@ -247,19 +254,19 @@
           <p class="empty__title">Здесь появятся друзья</p>
           <p class="empty__text">Войдите или создайте аккаунт — заявки, коды-приглашения и список друзей живут внутри.</p>
           <button class="mini-button mini-button--accent" type="button" data-action="open-auth">
-            ${d("user","icon--xs")} Войти / создать аккаунт
+            ${u("user","icon--xs")} Войти / создать аккаунт
           </button>
         </div>
-      </div>`;const e=Ct(t.id),a=D(t.id);return`
+      </div>`;const e=ae(t.id),a=z(t.id);return`
     <div class="rail__head">
       <div class="rail__heading">
         <p class="eyebrow">Сообщество</p>
         <h2 class="rail__title">
-          Друзья <span class="rail__count">${e.filter(o=>E(o)!=="offline").length} / ${e.length}</span>
+          Друзья <span class="rail__count">${e.filter(n=>S(n)!=="offline").length} / ${e.length}</span>
         </h2>
       </div>
       <button class="icon-button icon-button--sm icon-button--badged" type="button" data-action="open-add-friend" aria-label="Добавить друга">
-        ${d("userPlus")}
+        ${u("userPlus")}
         ${a.length?`<span class="badge" aria-label="Входящих заявок: ${a.length}">${a.length}</span>`:""}
       </button>
     </div>
@@ -267,13 +274,13 @@
     <div class="rail__list">
       ${a.length?`<div class="requests" role="group" aria-label="Входящие заявки">
               <p class="requests__title">Заявки · ${a.length}</p>
-              ${a.map(ae).join("")}
+              ${a.map(Ae).join("")}
             </div>`:""}
-      ${e.length?e.map(ne).join(""):`<div class="empty">
+      ${e.length?e.map(Re).join(""):`<div class="empty">
               <p class="empty__title">Пока пусто</p>
               <p class="empty__text">Найдите друзей по имени или поделитесь своим код-приглашением ниже.</p>
               <button class="mini-button mini-button--accent" type="button" data-action="open-add-friend">
-                ${d("userPlus","icon--xs")} Добавить друга
+                ${u("userPlus","icon--xs")} Добавить друга
               </button>
             </div>`}
     </div>
@@ -282,17 +289,17 @@
       <p class="eyebrow">Мой код-приглашение</p>
       <button class="code-box code-box--button" type="button" data-action="copy-code" data-code="${t.inviteCode}" title="Нажмите, чтобы скопировать">
         <code class="code-box__value" translate="no">${t.inviteCode}</code>
-        ${d("copy")}
+        ${u("copy")}
       </button>
     </div>`};document.querySelector("#app").innerHTML=`
   <div class="shell">
     <header class="topbar">
       <div class="topbar__side topbar__side--start">
         <button class="icon-button" type="button" aria-label="Настройки">
-          ${d("settings")}
+          ${u("settings")}
         </button>
         <p class="brand" translate="no">
-          <span class="brand__mark" aria-hidden="true">${d("sigil")}</span>
+          <span class="brand__mark" aria-hidden="true">${u("sigil")}</span>
           <span class="brand__name" lang="en">
             <span class="brand__line">${x.lead}</span>
             <span class="brand__line brand__line--muted">${x.tail}</span>
@@ -302,7 +309,7 @@
 
       <nav class="topbar__nav" aria-label="Основная навигация">
         <button class="play-button" type="button">
-          ${d("play","icon--play")}
+          ${u("play","icon--play")}
           <span>Играть</span>
         </button>
       </nav>
@@ -331,14 +338,14 @@
     <aside class="rail" data-region="rail" aria-label="Друзья"></aside>
 
     <footer class="footer">
-      <span>Версия ${jt}</span>
-      <span class="footer__name" lang="en" translate="no">© 2026 ${Ft}</span>
+      <span>Версия ${be}</span>
+      <span class="footer__name" lang="en" translate="no">© 2026 ${he}</span>
     </footer>
 
     <div id="overlay-root"></div>
     <div id="toast-root" class="toast-stack" aria-live="polite"></div>
   </div>
-`;const ft=()=>{document.querySelector('[data-region="account"]').innerHTML=ee(),document.querySelector('[data-region="rail"]').innerHTML=oe()},W=()=>{if(ft(),s.modal&&s.modal.type!=="auth"&&s.modal.type!=="avatar-preview"){const t=document.activeElement,e=t instanceof HTMLInputElement&&t.dataset.role?{role:t.dataset.role,pos:t.selectionStart}:null;if(T(),e){const a=J()?.querySelector(`[data-role="${e.role}"]`);a&&(a.focus(),a.setSelectionRange?.(e.pos,e.pos))}}};Ut(W);const bt=(t,e)=>{const a=t.querySelector('[data-role="form-error"]');if(!a){e&&c(e,"error");return}a.hidden=!e,a.textContent=e||""},P=async(t,e)=>{const a=t.querySelector('[data-role="submit"], button[type="submit"]');a?.setAttribute("disabled","");try{await e()}catch(n){bt(t,n instanceof Error?n.message:"Что-то пошло не так.")}finally{a?.removeAttribute("disabled")}},nt={login:(t,e)=>P(t,async()=>{const a=await Mt(e.name.value,e.password.value);_(),c(`С возвращением, ${a.name}.`)}),register:(t,e)=>P(t,async()=>{if(e.password.value!==e.password2.value)throw new Error("Пароли не совпадают.");const a=await St(e.name.value,e.password.value);_(),c(`Аккаунт ${a.name} создан. Добро пожаловать.`)}),"use-code":(t,e)=>P(t,async()=>{const a=t.querySelector('[data-role="code-input"]'),n=Pt(a.value);s.codeValue="",c(`Вы теперь друзья с ${n.name}.`),_()}),"change-password":(t,e)=>P(t,async()=>{await Lt(e.old.value,e.next.value),t.reset(),bt(t,""),c("Пароль обновлён.")}),noop:()=>{}};document.addEventListener("submit",t=>{const e=t.target.closest("form[data-form]");if(!e)return;t.preventDefault(),(nt[e.dataset.form]||nt.noop)(e,e.elements)});document.addEventListener("input",t=>{const e=t.target.dataset?.role;if(e==="friend-search"){s.addQuery=t.target.value;const a=b(),n=document.querySelector('[data-role="friend-results"]');a&&n&&(n.innerHTML=mt(a))}if(e==="code-input"){const a=t.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""),n=a.length>4?`${a.slice(0,4)}-${a.slice(4,8)}`:a;t.target.value=n,s.codeValue=n}});const se=async()=>{let t;try{t=await Vt()}catch{return}if(t)try{const e=await It(t);if(!e)return;s.pendingAvatar=e,s.modal={type:"avatar-preview"},T()}catch(e){c(e instanceof Error?e.message:"Не удалось обработать картинку.","error")}},ot={"open-auth":()=>{s.authTab="login",q("auth")},"auth-tab":t=>{s.authTab=t.dataset.tab,T()},"open-profile":()=>q("profile"),"open-add-friend":()=>{s.addQuery="",s.codeValue="",q("add-friend")},"open-friend":t=>q("friend",t.dataset.id),"close-modal":()=>_(),"overlay-down":(t,e)=>{e.target===t&&_()},"send-request":t=>{try{const{accepted:e,target:a}=Ht(t.dataset.id);c(e?`Вы теперь друзья с ${a.name}.`:`Заявка игроку ${a.name} отправлена.`)}catch(e){c(e.message,"error")}},"accept-request":t=>{try{const e=Tt(t.dataset.id);e&&c(`Вы теперь друзья с ${e.name}.`)}catch(e){c(e.message,"error")}},"decline-request":t=>{try{const e=kt(t.dataset.id);e&&c(`Заявка от ${e.name} отклонена.`)}catch(e){c(e.message,"error")}},"remove-friend":t=>{const e=m(t.dataset.id);e&&(s.confirm={title:"Убрать из друзей?",text:`${e.name} пропадёт из вашего списка, а вы — из его. Вернуть всё можно новой заявкой или код-приглашением.`,label:"Убрать",action:"confirm-remove-friend",id:e.id},s.modal={type:"confirm"},T())},"confirm-remove-friend":t=>{try{const e=Rt(t.dataset.id);_(),e&&c(`${e.name} убран из друзей.`)}catch(e){c(e.message,"error")}},"pick-avatar":()=>se(),"save-avatar":()=>{try{at(s.pendingAvatar),c("Аватарка обновлена."),q("profile")}catch(t){c(t.message,"error")}},"remove-avatar":()=>{try{at(null),c("Аватарка убрана — вместо неё инициалы.")}catch(t){c(t.message,"error")}},"copy-code":async t=>{const e=await Zt(t.dataset.code);c(e?`Код ${t.dataset.code} скопирован. Отправьте его другу.`:"Не получилось скопировать — выделите код вручную.",e?"ok":"error")},"regen-code":()=>{try{const t=Ot();c(`Новый код-приглашение: ${t}. Старый больше не работает.`)}catch(t){c(t.message,"error")}},logout:()=>{const t=b();At(),_(),c(t?`${t.name}, до встречи.`:"Вы вышли.")}};document.addEventListener("click",t=>{if(t.target.closest('[data-action="overlay-down"]')){const n=t.target.closest('[data-action="overlay-down"]');t.target===n&&ot["overlay-down"](n,t)}const e=t.target.closest("[data-action]");if(!e||e.dataset.action==="overlay-down")return;const a=ot[e.dataset.action];a&&a(e,t)});document.addEventListener("keydown",t=>{if(!s.modal)return;if(t.key==="Escape"){_();return}if(t.key!=="Tab")return;const e=document.querySelector(".dialog");if(!e)return;const a=[...e.querySelectorAll("button:not([disabled]), input:not([disabled])")].filter(l=>l.offsetParent!==null);if(a.length===0)return;const n=a[0],o=a[a.length-1];t.shiftKey&&document.activeElement===n?(t.preventDefault(),o.focus()):!t.shiftKey&&document.activeElement===o&&(t.preventDefault(),n.focus())});X();setInterval(()=>X(),3e4);setInterval(()=>{s.modal?ft():W()},3e4);document.addEventListener("visibilitychange",()=>{document.visibilityState==="visible"&&X()});window.addEventListener("focus",()=>X());window.addEventListener("beforeunload",()=>ct());W();
+`;const wt=()=>{document.querySelector('[data-region="account"]').innerHTML=ke(),document.querySelector('[data-region="rail"]').innerHTML=Te()},tt=()=>{if(wt(),i.modal&&i.modal.type!=="auth"&&i.modal.type!=="avatar-preview"){const t=document.activeElement,e=t instanceof HTMLInputElement&&t.dataset.role?{role:t.dataset.role,pos:t.selectionStart}:null;if(M(),e){const a=Y()?.querySelector(`[data-role="${e.role}"]`);a&&(a.focus(),a.setSelectionRange?.(e.pos,e.pos))}}};le(tt);const _t=(t,e)=>{const a=t.querySelector('[data-role="form-error"]');if(!a){e&&d(e,"error");return}a.hidden=!e,a.textContent=e||""},O=async(t,e)=>{const a=t.querySelector('[data-role="submit"], button[type="submit"]');a?.setAttribute("disabled","");try{await e()}catch(s){_t(t,s instanceof Error?s.message:"Что-то пошло не так.")}finally{a?.removeAttribute("disabled")}},ct={login:(t,e)=>O(t,async()=>{const a=await Jt(e.name.value,e.password.value);E(),d(`С возвращением, ${a.name}.`)}),register:(t,e)=>O(t,async()=>{if(e.password.value!==e.password2.value)throw new Error("Пароли не совпадают.");const a=await zt(e.name.value,e.password.value);E(),d(`Аккаунт ${a.name} создан. Добро пожаловать.`)}),"use-code":(t,e)=>O(t,async()=>{const a=t.querySelector('[data-role="code-input"]'),s=await ce(a.value);i.codeValue="",d(`Вы теперь друзья с ${s.name}.`),E()}),"change-password":(t,e)=>O(t,async()=>{await Yt(e.old.value,e.next.value),t.reset(),_t(t,""),d("Пароль обновлён.")}),noop:()=>{}};document.addEventListener("submit",t=>{const e=t.target.closest("form[data-form]");if(!e)return;t.preventDefault(),(ct[e.dataset.form]||ct.noop)(e,e.elements)});document.addEventListener("input",t=>{const e=t.target.dataset?.role;if(e==="friend-search"){i.addQuery=t.target.value;const a=y(),s=document.querySelector('[data-role="friend-results"]');a&&s&&(s.innerHTML=gt(a))}if(e==="code-input"){const a=t.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""),s=a.length>4?`${a.slice(0,4)}-${a.slice(4,8)}`:a;t.target.value=s,i.codeValue=s}});const Le=async()=>{let t;try{t=await ue()}catch{return}if(t)try{const e=await fe(t);if(!e)return;i.pendingAvatar=e,i.modal={type:"avatar-preview"},M()}catch(e){d(e instanceof Error?e.message:"Не удалось обработать картинку.","error")}},lt={"open-auth":()=>{i.authTab="login",L("auth")},"auth-tab":t=>{i.authTab=t.dataset.tab,M()},"open-profile":()=>L("profile"),"open-add-friend":()=>{i.addQuery="",i.codeValue="",L("add-friend")},"open-friend":t=>L("friend",t.dataset.id),"close-modal":()=>E(),"overlay-down":(t,e)=>{e.target===t&&E()},"send-request":async t=>{try{const{accepted:e,target:a}=await se(t.dataset.id);d(e?`Вы теперь друзья с ${a.name}.`:`Заявка игроку ${a.name} отправлена.`)}catch(e){d(e.message,"error")}},"accept-request":async t=>{try{const e=await ne(t.dataset.id);e&&d(`Вы теперь друзья с ${e.name}.`)}catch(e){d(e.message,"error")}},"decline-request":async t=>{try{const e=await oe(t.dataset.id);e&&d(`Заявка от ${e.name} отклонена.`)}catch(e){d(e.message,"error")}},"remove-friend":t=>{const e=v(t.dataset.id);e&&(i.confirm={title:"Убрать из друзей?",text:`${e.name} пропадёт из вашего списка, а вы — из его. Вернуть всё можно новой заявкой или код-приглашением.`,label:"Убрать",action:"confirm-remove-friend",id:e.id},i.modal={type:"confirm"},M())},"confirm-remove-friend":async t=>{try{const e=await re(t.dataset.id);E(),e&&d(`${e.name} убран из друзей.`)}catch(e){d(e.message,"error")}},"pick-avatar":()=>Le(),"save-avatar":async()=>{try{await it(i.pendingAvatar),d("Аватарка обновлена."),L("profile")}catch(t){d(t.message,"error")}},"remove-avatar":async()=>{try{await it(null),d("Аватарка убрана — вместо неё инициалы.")}catch(t){d(t.message,"error")}},"copy-code":async t=>{const e=await ge(t.dataset.code);d(e?`Код ${t.dataset.code} скопирован. Отправьте его другу.`:"Не получилось скопировать — выделите код вручную.",e?"ok":"error")},"regen-code":async()=>{try{const t=await ie();d(`Новый код-приглашение: ${t}. Старый больше не работает.`)}catch(t){d(t.message,"error")}},logout:()=>{const t=y();Qt(),E(),d(t?`${t.name}, до встречи.`:"Вы вышли.")}};document.addEventListener("click",t=>{if(t.target.closest('[data-action="overlay-down"]')){const s=t.target.closest('[data-action="overlay-down"]');t.target===s&&lt["overlay-down"](s,t)}const e=t.target.closest("[data-action]");if(!e||e.dataset.action==="overlay-down")return;const a=lt[e.dataset.action];a&&a(e,t)});document.addEventListener("keydown",t=>{if(!i.modal)return;if(t.key==="Escape"){E();return}if(t.key!=="Tab")return;const e=document.querySelector(".dialog");if(!e)return;const a=[...e.querySelectorAll("button:not([disabled]), input:not([disabled])")].filter(r=>r.offsetParent!==null);if(a.length===0)return;const s=a[0],n=a[a.length-1];t.shiftKey&&document.activeElement===s?(t.preventDefault(),n.focus()):!t.shiftKey&&document.activeElement===n&&(t.preventDefault(),s.focus())});X();setInterval(()=>X(),3e4);setInterval(()=>{i.modal?wt():tt()},3e4);setInterval(()=>{document.visibilityState==="visible"&&ht()},5e3);document.addEventListener("visibilitychange",()=>{document.visibilityState==="visible"&&(X(),ht())});window.addEventListener("focus",()=>X());window.addEventListener("beforeunload",()=>bt());"serviceWorker"in navigator&&(location.protocol==="https:"||location.hostname==="localhost"||location.hostname==="127.0.0.1")&&navigator.serviceWorker.register("/sw.js").catch(()=>{});tt();typeof rt=="function"&&rt().then(t=>{t==="hub"&&d("Подключено к общему хабу этой сети.")});
 
     </script>
     <style>

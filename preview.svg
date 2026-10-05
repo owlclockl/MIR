@@ -60,7 +60,7 @@
 <rect x="685" y="576" width="64" height="1" fill="url(#accentR)"/>
 
 <!-- подвал -->
-<text x="26" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.2.0</text>
+<text x="26" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.3.0</text>
 <text x="1110" y="876" font-size="10" letter-spacing="1.6" text-anchor="end" fill="#55555d">© 2026 THE CIVILIZATION OF THE SAGES</text>
 
 <!-- верхняя панель -->

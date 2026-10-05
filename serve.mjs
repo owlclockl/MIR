@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 /**
- * Статический сервер для показа сборки друзьям.
+ * Сервер показа сборки друзьям + хаб общих аккаунтов.
  *
  *   node serve.mjs                 # раздать ./dist на всех интерфейсах
  *   node serve.mjs . --port 8080   # другой каталог и порт
  *   node serve.mjs --public        # плюс публичная ссылка через localtunnel
+ *   node serve.mjs --no-hub        # без общих аккаунтов, только статика
  *
- * Без зависимостей — только встроенные модули Node.
+ * По умолчанию вместе со статикой работает хаб (/api/*): друзья в той же
+ * Wi-Fi видят общие аккаунты, списки друзей и коды-приглашения. Данные —
+ * в data/mir-hub.json. Без зависимостей — только встроенные модули Node.
  */
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
@@ -15,8 +18,11 @@ import { networkInterfaces } from 'node:os';
 import { spawn } from 'node:child_process';
 import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream';
+import { fileURLToPath } from 'node:url';
+import { createHub } from './hub.mjs';
 
 const MIME = {
+  '.webmanifest': 'application/manifest+json',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -47,11 +53,13 @@ const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '
 /* ---------- аргументы ---------- */
 
 function parseArgs(argv) {
-  const opts = { dir: null, port: null, public: false, help: false };
+  const opts = { dir: null, port: null, public: false, hub: true, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') opts.help = true;
     else if (a === '--public' || a === '-p') opts.public = true;
+    else if (a === '--no-hub') opts.hub = false;
+    else if (a === '--hub') opts.hub = true;
     else if (a === '--port') opts.port = Number(argv[++i]);
     else if (a.startsWith('--port=')) opts.port = Number(a.slice(7));
     else if (a.startsWith('-')) {
@@ -68,12 +76,13 @@ if (args.help) {
   console.log(`
 Статический сервер проекта.
 
-  node serve.mjs [каталог] [--port N] [--public]
+  node serve.mjs [каталог] [--port N] [--public] [--no-hub]
 
   каталог    что раздавать (по умолчанию dist)
   --port N   порт (по умолчанию 4173 или PORT из окружения);
              если занят — берётся следующий свободный
   --public   поднять публичную https-ссылку через npx localtunnel
+  --no-hub   не поднимать хаб общих аккаунтов (/api/*)
   --help     эта справка
 `);
   process.exit(0);
@@ -96,6 +105,12 @@ if (!existsSync(join(ROOT, 'index.html'))) {
   console.error(`\n  В каталоге «${ROOT}» нет index.html — раздавать нечего.\n`);
   process.exit(1);
 }
+
+/* ---------- хаб общих аккаунтов ---------- */
+
+const hub = args.hub
+  ? createHub({ dbFile: fileURLToPath(new URL('./data/mir-hub.json', import.meta.url)) })
+  : null;
 
 /* ---------- сервер ---------- */
 
@@ -130,6 +145,22 @@ function resolveFile(urlPath) {
 
 const server = createServer((req, res) => {
   const started = Date.now();
+
+  /* API хаба обслуживаем до статики и до фильтра методов (там POST). */
+  if (hub && (req.url || '').startsWith('/api/')) {
+    hub
+      .handle(req, res)
+      .then(() => log(req, res.statusCode || 200, started))
+      .catch((err) => {
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'Внутренняя ошибка хаба.' }));
+        }
+        console.error('  × хаб:', err.message);
+        log(req, 500, started);
+      });
+    return;
+  }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', Allow: 'GET, HEAD' });
@@ -248,6 +279,11 @@ function onReady(port) {
     for (const ip of lan) console.log(`                       http://${ip}:${port}/`);
   } else {
     console.log('  Сетевой адрес не найден — доступно только локально.');
+  }
+  if (hub) {
+    console.log('');
+    console.log(`  Общий хаб включён: аккаунты, друзья и приглашения общие`);
+    console.log(`  для всех в этой сети. Данные: ${hub.dbFile}`);
   }
   console.log('');
   if (!args.public) {
