@@ -141,6 +141,14 @@ const heavy = await call('POST', '/api/avatar', {
 });
 expect('слишком тяжёлая аватарка отклонена', heavy.status === 400 || heavy.status === 413, heavy.data.error);
 
+const renamed = `${A.name}x`;
+const rename = await call('POST', '/api/name', { token: A.token, body: { name: renamed } });
+expect('смена никнейма', rename.status === 200 && rename.data.state.users.find((u) => u.id === A.id)?.name === renamed);
+const occupiedRename = await call('POST', '/api/name', { token: A.token, body: { name: B.name } });
+expect('занятый никнейм отклонён', occupiedRename.status === 409, occupiedRename.data.error);
+const renameBack = await call('POST', '/api/name', { token: A.token, body: { name: A.name } });
+expect('никнейм возвращён обратно', renameBack.status === 200);
+
 const newSalt = hex(16);
 const newHash = await sha256(`${newSalt}:другойпароль`);
 const pass = await call('POST', '/api/password', {

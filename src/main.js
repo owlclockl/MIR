@@ -1,14 +1,20 @@
 import './style.css';
 import * as store from './data/store.js';
 import * as p2p from './data/p2p.js';
-import { pickAvatarFile, processAvatarFile } from './ui/avatar.js';
+import {
+  createAvatarPreview,
+  pickAvatarFile,
+  processAvatarFile,
+  releaseAvatarPreview,
+} from './ui/avatar.js';
 import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
+import { configureSounds, playSound } from './ui/sound.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени. */
 const avatarEl = (user, cls = '') => {
@@ -34,6 +40,8 @@ const ui = {
   addQuery: '',
   codeValue: '',
   pendingAvatar: null,
+  pendingAvatarFile: null,
+  avatarCrop: { x: 50, y: 50, zoom: 1 },
   confirm: null,
   opener: null,
   chatDraft: '',
@@ -53,7 +61,10 @@ const openModal = (type, data = null) => {
 const closeModal = () => {
   ui.modal = null;
   ui.confirm = null;
+  releaseAvatarPreview(ui.pendingAvatar);
   ui.pendingAvatar = null;
+  ui.pendingAvatarFile = null;
+  ui.avatarCrop = { x: 50, y: 50, zoom: 1 };
   ui.codeValue = '';
   ui.chatDraft = '';
   const root = overlayRoot();
@@ -286,6 +297,19 @@ const profileModalHtml = () => {
 
         <div class="divider" role="separator"></div>
 
+        <form class="form" data-form="change-name" novalidate>
+          <p class="eyebrow">Никнейм</p>
+          <div class="code-form__row">
+            <input class="input" name="name" type="text" minlength="3" maxlength="16"
+                   value="${escapeHtml(me.name)}" autocomplete="username" spellcheck="false" required />
+            <button class="mini-button mini-button--accent" type="submit">Сохранить</button>
+          </div>
+          <p class="form-error" data-role="form-error" hidden></p>
+          <p class="form-note">3–16 символов: буквы, цифры, дефис и подчёркивание.</p>
+        </form>
+
+        <div class="divider" role="separator"></div>
+
         <form class="form" data-form="change-password" novalidate>
           <p class="eyebrow">Смена пароля</p>
           <div class="form__grid">
@@ -378,6 +402,36 @@ const hubModalHtml = () => {
   });
 };
 
+/* --- Настройки интерфейса --- */
+const settingsModalHtml = () => {
+  const settings = store.getSettings();
+  return dialogShell({
+    label: 'Настройки',
+    title: 'Настройки',
+    size: 'wide',
+    body: `
+      <div class="dialog__body settings-list">
+        <label class="setting-row">
+          <span><strong>Звуки интерфейса</strong><small>Кнопки, успешные действия и ошибки</small></span>
+          <input class="switch" type="checkbox" data-setting="sound" ${settings.sound ? 'checked' : ''} />
+        </label>
+        <label class="setting-row setting-row--column">
+          <span><strong>Громкость</strong><small>${Math.round(settings.volume * 100)}%</small></span>
+          <input class="range" type="range" min="0" max="1" step="0.05" value="${settings.volume}" data-setting="volume" ${settings.sound ? '' : 'disabled'} />
+        </label>
+        <label class="setting-row">
+          <span><strong>Анимации</strong><small>Плавные переходы и движение фона</small></span>
+          <input class="switch" type="checkbox" data-setting="motion" ${settings.motion ? 'checked' : ''} />
+        </label>
+        <div class="setting-row">
+          <span><strong>Обновления</strong><small data-role="update-status">Версия ${VERSION}. Проверка выполняется автоматически.</small></span>
+          <button class="mini-button" type="button" data-action="check-update">Проверить</button>
+        </div>
+        <p class="form-note">Настройки сохраняются на этом устройстве. Обновление применяется один раз после загрузки и больше не создаёт цикл перезагрузок.</p>
+      </div>`,
+  });
+};
+
 /* --- Окно превью аватарки --- */
 const avatarPreviewHtml = () => `
   <div class="overlay" data-action="overlay-down">
@@ -388,9 +442,23 @@ const avatarPreviewHtml = () => `
           ${icon('x')}
         </button>
       </header>
-      <div class="dialog__body avatar-preview">
-        <img class="avatar-preview__img" src="${ui.pendingAvatar}" alt="Предпросмотр аватарки" />
-        <p class="hint">Картинка обрезана по центру до квадрата 96×96.</p>
+      <div class="dialog__body avatar-editor">
+        <div class="avatar-editor__frame">
+          <img class="avatar-editor__img" src="${ui.pendingAvatar}" alt="Предпросмотр аватарки"
+               style="object-position:${ui.avatarCrop.x}% ${ui.avatarCrop.y}%;transform:scale(${ui.avatarCrop.zoom})" />
+          <span class="avatar-editor__guide" aria-hidden="true"></span>
+        </div>
+        <div class="avatar-editor__controls">
+          <label class="field">
+            <span class="field__label">Масштаб</span>
+            <input class="range" type="range" min="1" max="2.5" step="0.05" value="${ui.avatarCrop.zoom}" data-role="avatar-zoom" />
+          </label>
+          <div class="form__grid">
+            <label class="field"><span class="field__label">По горизонтали</span><input class="range" type="range" min="0" max="100" value="${ui.avatarCrop.x}" data-role="avatar-x" /></label>
+            <label class="field"><span class="field__label">По вертикали</span><input class="range" type="range" min="0" max="100" value="${ui.avatarCrop.y}" data-role="avatar-y" /></label>
+          </div>
+        </div>
+        <p class="hint">Передвигайте кадр ползунками. Сохраняется чёткая версия 192×192.</p>
         <div class="dialog__actions">
           <button class="mini-button" type="button" data-action="pick-avatar">Выбрать другую</button>
           <button class="solid-button" type="button" data-action="save-avatar" data-autofocus><span>Сохранить</span></button>
@@ -684,6 +752,9 @@ const renderModal = ({ focus = true } = {}) => {
     case 'profile':
       html = profileModalHtml();
       break;
+    case 'settings':
+      html = settingsModalHtml();
+      break;
     case 'avatar-preview':
       html = avatarPreviewHtml();
       break;
@@ -873,7 +944,7 @@ document.querySelector('#app').innerHTML = `
   <div class="shell">
     <header class="topbar">
       <div class="topbar__side topbar__side--start">
-        <button class="icon-button" type="button" aria-label="Настройки">
+        <button class="icon-button" type="button" data-action="open-settings" aria-label="Настройки">
           ${icon('settings')}
         </button>
         <p class="brand" translate="no">
@@ -925,7 +996,15 @@ document.querySelector('#app').innerHTML = `
   </div>
 `;
 
-/* ---------- перерисовка динамических областей ---------------- */
+/* ---------- настройки и динамические области ----------------- */
+
+configureSounds(store.getSettings);
+const applySettings = () => {
+  const settings = store.getSettings();
+  document.documentElement.classList.toggle('reduce-motion', !settings.motion);
+};
+applySettings();
+store.subscribe(applySettings);
 
 const renderRegions = () => {
   document.querySelector('[data-region="account"]').innerHTML = accountSlotHtml();
@@ -955,6 +1034,15 @@ const render = () => {
 
 store.subscribe(render);
 p2p.subscribe(render);
+let knownUnread = 0;
+const notifyIncomingMessage = () => {
+  const me = store.getCurrentUser();
+  const total = (me ? store.listFriends(me.id).reduce((sum, friend) => sum + p2p.unread(friend.id), 0) : 0)
+    + p2p.unread(p2p.MANUAL_ID);
+  if (total > knownUnread) playSound('message');
+  knownUnread = total;
+};
+p2p.subscribe(notifyIncomingMessage);
 
 /* ---------- прямая связь: включение и выключение -------------- */
 
@@ -994,6 +1082,7 @@ const withBusy = async (form, fn) => {
   try {
     await fn();
   } catch (error) {
+    playSound('error');
     setFormError(form, error instanceof Error ? error.message : 'Что-то пошло не так.');
   } finally {
     submit?.removeAttribute('disabled');
@@ -1001,6 +1090,15 @@ const withBusy = async (form, fn) => {
 };
 
 const formHandlers = {
+  'change-name': (form, fields) =>
+    withBusy(form, async () => {
+      const user = await store.changeName(fields.name.value);
+      setFormError(form, '');
+      playSound('success');
+      toast(`Никнейм изменён на ${user.name}.`);
+      renderModal({ focus: false });
+    }),
+
   login: (form, fields) =>
     withBusy(form, async () => {
       const user = await store.login(fields.name.value, fields.password.value);
@@ -1098,6 +1196,16 @@ document.addEventListener('submit', (event) => {
 /* Мгновенный поиск и ввод кода. */
 document.addEventListener('input', (event) => {
   const role = event.target.dataset?.role;
+  if (role === 'avatar-zoom' || role === 'avatar-x' || role === 'avatar-y') {
+    if (role === 'avatar-zoom') ui.avatarCrop.zoom = Number(event.target.value);
+    if (role === 'avatar-x') ui.avatarCrop.x = Number(event.target.value);
+    if (role === 'avatar-y') ui.avatarCrop.y = Number(event.target.value);
+    const image = document.querySelector('.avatar-editor__img');
+    if (image) {
+      image.style.objectPosition = `${ui.avatarCrop.x}% ${ui.avatarCrop.y}%`;
+      image.style.transform = `scale(${ui.avatarCrop.zoom})`;
+    }
+  }
   if (role === 'friend-search') {
     ui.addQuery = event.target.value;
     const me = store.getCurrentUser();
@@ -1116,6 +1224,16 @@ document.addEventListener('input', (event) => {
   }
 });
 
+document.addEventListener('change', (event) => {
+  const key = event.target.dataset?.setting;
+  if (!key) return;
+  const value = event.target.type === 'checkbox' ? event.target.checked : Number(event.target.value);
+  store.updateSettings({ [key]: value });
+  applySettings();
+  if (key === 'sound' && value) playSound('success');
+  renderModal({ focus: false });
+});
+
 /* ---------- клики -------------------------------------------- */
 
 const pickAndPreviewAvatar = async () => {
@@ -1127,9 +1245,10 @@ const pickAndPreviewAvatar = async () => {
   }
   if (!file) return;
   try {
-    const dataUrl = await processAvatarFile(file);
-    if (!dataUrl) return;
-    ui.pendingAvatar = dataUrl;
+    releaseAvatarPreview(ui.pendingAvatar);
+    ui.pendingAvatar = createAvatarPreview(file);
+    ui.pendingAvatarFile = file;
+    ui.avatarCrop = { x: 50, y: 50, zoom: 1 };
     ui.modal = { type: 'avatar-preview' };
     renderModal();
   } catch (error) {
@@ -1149,6 +1268,21 @@ const actions = {
   },
 
   'open-profile': () => openModal('profile'),
+  'open-settings': () => openModal('settings'),
+  'check-update': async () => {
+    const status = document.querySelector('[data-role="update-status"]');
+    if (status) status.textContent = 'Проверяем…';
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration();
+      await registration?.update();
+      if (status) status.textContent = registration?.waiting ? 'Обновление готово — применяем…' : `Установлена свежая версия ${VERSION}.`;
+      if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      else playSound('success');
+    } catch {
+      if (status) status.textContent = 'Не удалось проверить. Проверьте интернет.';
+      playSound('error');
+    }
+  },
   'open-add-friend': () => {
     ui.addQuery = '';
     ui.codeValue = '';
@@ -1288,7 +1422,12 @@ const actions = {
 
   'save-avatar': async () => {
     try {
-      await store.setAvatar(ui.pendingAvatar);
+      const avatar = await processAvatarFile(ui.pendingAvatarFile, ui.avatarCrop);
+      await store.setAvatar(avatar);
+      releaseAvatarPreview(ui.pendingAvatar);
+      ui.pendingAvatar = null;
+      ui.pendingAvatarFile = null;
+      playSound('success');
       toast('Аватарка обновлена.');
       openModal('profile');
     } catch (error) {
@@ -1328,6 +1467,7 @@ const actions = {
 };
 
 document.addEventListener('click', (event) => {
+  if (event.target.closest('button:not([disabled])')) playSound('click');
   if (event.target.closest('[data-action="overlay-down"]')) {
     const overlay = event.target.closest('[data-action="overlay-down"]');
     if (event.target === overlay) actions['overlay-down'](overlay, event);
@@ -1400,7 +1540,22 @@ if (
   'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
 ) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  /* Обновляемся без вечного reload-цикла: перезагрузка разрешена ровно
+     один раз для конкретной версии и только если страницу уже контролировал SW. */
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const key = `mir:updated:${VERSION}`;
+    if (!hadController || reloading || sessionStorage.getItem(key)) return;
+    reloading = true;
+    sessionStorage.setItem(key, '1');
+    location.reload();
+  });
+  navigator.serviceWorker.register('/sw.js').then((registration) => {
+    registration.update().catch(() => {});
+    setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
+    if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }).catch(() => {});
 }
 
 render();

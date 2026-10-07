@@ -1,67 +1,55 @@
-/* Service worker: приложение работает офлайн.
-   Стратегия «сеть сначала, потом кэш» для страниц и «кэш сначала»
-   для статики. Запросы к API хаба (/api/) не кэшируются никогда —
-   там живые данные. */
+/* Офлайн-кэш без циклических перезагрузок. Документ всегда пробуем взять
+   из сети, статику показываем из кэша мгновенно и обновляем в фоне.
+   /api/* никогда не кэшируется. */
 
-const CACHE = 'mir-app-v2';
+const CACHE = 'mir-app-v3';
 const PRECACHE = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((names) =>
-        Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))),
-      )
+    caches.keys()
+      .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
       .then(() => self.clients.claim()),
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-  /* Переходы между страницами и сам документ: свежая версия приоритетнее,
-     но без сети отдаём сохранённую заглавную страницу. */
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put('/', copy));
-          }
+          if (response.ok) caches.open(CACHE).then((cache) => cache.put('/', response.clone())).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(async () => (await caches.match('/')) || Response.error()),
     );
     return;
   }
 
-  /* Статика: кэш сначала; промах — сеть с сохранением на будущее. */
+  /* Stale-while-revalidate: экран не мигает в ожидании сети, но следующий
+     запуск уже получает новые шрифты, звуки и манифест. */
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
+    caches.match(request).then((cached) => {
+      const fresh = fetch(request)
+        .then((response) => {
+          if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone())).catch(() => {});
           return response;
-        }),
-    ),
+        })
+        .catch(() => cached);
+      return cached || fresh;
+    }),
   );
 });

@@ -1,0 +1,5 @@
+MIR interface sounds
+
+These four short interface sounds were created specifically for this project
+with additive synthesis. They contain no third-party recordings or samples.
+Released under CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/

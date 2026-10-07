@@ -316,6 +316,18 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS 
       return { ok: true };
     },
 
+    'POST /api/name': async (req, body, save) => {
+      const user = auth(req);
+      const name = String(body.name || '').trim();
+      validName(name);
+      const owner = byName(name);
+      if (owner && owner.id !== user.id) throw httpError(409, 'Это имя занято.');
+      user.name = name;
+      user.nameKey = name.toLowerCase();
+      save.now();
+      return { state: stateFor(user) };
+    },
+
     'POST /api/password': async (req, body, save) => {
       const user = auth(req);
       if (body.oldHash !== user.passHash) throw httpError(401, 'Текущий пароль не подходит.');
