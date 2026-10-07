@@ -1,24 +1,19 @@
-/* Офлайн-кэш без циклических перезагрузок. Документ всегда пробуем взять
-   из сети, статику показываем из кэша мгновенно и обновляем в фоне.
-   /api/* никогда не кэшируется. */
+/* Офлайн-кэш без автоматических перезагрузок. Новый worker не отбирает
+   управление у открытой игры: версия ждёт закрытия вкладок и включается
+   при следующем запуске. Документы берём из сети, /api/* не кэшируем. */
 
-const CACHE = 'mir-app-v3';
+const CACHE = 'mir-app-v4';
 const PRECACHE = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
-      .then(() => self.clients.claim()),
+      .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name)))),
   );
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {

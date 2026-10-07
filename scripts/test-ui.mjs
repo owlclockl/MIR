@@ -33,6 +33,8 @@ const dom = new JSDOM(html, {
   pretendToBeVisual: true,
 });
 const { window } = dom;
+window.HTMLMediaElement.prototype.play = () => Promise.resolve(); // jsdom не декодирует звуки
+window.HTMLMediaElement.prototype.pause = () => {};
 window.fetch = globalThis.fetch;            // jsdom без fetch — отдаём ему node-овский
 window.AbortSignal = globalThis.AbortSignal;
 window.crypto.subtle = globalThis.crypto.subtle;
@@ -54,11 +56,22 @@ const errors = [];
 window.addEventListener('error', (e) => errors.push(e.message));
 window.onerror = (m) => errors.push(String(m));
 
-await wait(1500);
+await wait(2200); // даём завершиться стартовой проверке текущего адреса-хаба
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
+
+/* Проверяем обе группы меню: модальные действия не пересоздают страницу. */
+const shellBeforeMenus = $('.shell');
+click('[data-action="open-settings"]');
+await wait(50);
+ok('обычное меню открывает настройки без перезагрузки', $('.dialog__title')?.textContent === 'Настройки' && $('.shell') === shellBeforeMenus);
+click('[data-action="close-modal"]');
+click('[data-action="open-hub"]');
+await wait(50);
+ok('дополнительное меню открывает хаб без перезагрузки', $('.dialog__title')?.textContent === 'Общий хаб' && $('.shell') === shellBeforeMenus);
+click('[data-action="close-modal"]');
 
 click('[data-action="open-hub"]');
 await wait(100);
@@ -98,6 +111,12 @@ click('[data-action="open-profile"]');
 await wait(200);
 ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new URL(HUB).host}`.replace(/\./g, '\\.')).test($('.account__meta')?.textContent || ''), $('.account__meta')?.textContent?.trim());
 ok('в профиле есть кнопка хаба', !!$('[data-action="open-hub"]'));
+click('[data-action="open-direct"]');
+await wait(50);
+ok('прямое подключение из профиля не перезагружает страницу', $('.dialog__title')?.textContent === 'Прямое подключение' && $('.shell') === shellBeforeMenus);
+click('[data-action="close-modal"]');
+click('[data-action="open-profile"]');
+await wait(100);
 click('[data-action="close-modal"]');
 await wait(100);
 ok('подвал панели: хаб и прямое подключение', !!$('.rail__foot [data-action="open-hub"]') && !!$('.rail__foot [data-action="open-direct"]'));

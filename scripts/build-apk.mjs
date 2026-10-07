@@ -133,7 +133,7 @@ function crc32(buf) {
      public class MainActivity extends android.app.Activity {
        public MainActivity() { super(); }
        protected void onCreate(Bundle b) {
-         Log.i("MIR", "onCreate: старт, сборка 0.5.0");
+         Log.i("MIR", "onCreate: старт, версия и код сборки");
          try {
            super.onCreate(b);
            WebView w = new WebView(this);
