@@ -50,6 +50,13 @@ export const DEFAULT_LIMITS = {
   '/api/register': 10,
   '/api/login': 20,
   '/api/salt': 30,
+  /* Подбор ключа администратора не должен быть быстрым: обычному
+     владельцу хватает, а перебору — нет. Лимит стоит на всех
+     служебных маршрутах, а не только на «проверке ключа». */
+  '/api/admin/ping': 20,
+  '/api/admin/state': 60,
+  '/api/admin/user': 60,
+  '/api/admin/request': 60,
   /* Сигналинг шумный по своей природе: ICE-кандидаты летят пачками,
      а длинный опрос входящих висит по 20 секунд и сразу повторяется. */
   '/api/p2p/signal': 1200,
@@ -105,7 +112,19 @@ export const corsHeaders = () => ({
   'Access-Control-Max-Age': '86400',
 });
 
-export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS }) {
+/* Ключ администратора панели. Пусто — панель выключена: так ведёт себя
+   хаб на хостинге, если владелец не задал секрет. На ПК-хабе ключ
+   приходит из переменной окружения или из адаптера. */
+const secretEquals = (a, b) => {
+  const left = String(a ?? '');
+  const right = String(b ?? '');
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
+};
+
+export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS, adminKey = '' }) {
   db.users ??= [];
   db.requests ??= [];
 
@@ -245,6 +264,59 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS 
     const user = byToken(token);
     if (!user) throw httpError(401, 'Сессия не найдена — войдите заново.');
     return user;
+  };
+
+  /* ---------- панель админа ----------------------------------
+     Служебные маршруты для владельца игры: список аккаунтов и правки.
+     Вход — по ключу MIR_ADMIN_KEY в заголовке X-Mir-Admin. Без ключа
+     маршруты отвечают «панель выключена»: открытой админки на хабе
+     не бывает по умолчанию. Пароли и здесь не ходят открытым текстом —
+     панель присылает готовый salt и хеш. */
+
+  const adminAuth = (req) => {
+    if (!adminKey)
+      throw httpError(
+        503,
+        'Владелец хаба не задал ключ администратора — панель на этом хабе выключена.',
+      );
+    const given = req.headers?.['x-mir-admin'] || req.headers?.['X-Mir-Admin'] || '';
+    if (!secretEquals(given, adminKey)) throw httpError(403, 'Неверный ключ администратора.');
+  };
+
+  const adminUserShape = (u) => ({
+    id: u.id,
+    name: u.name,
+    avatar: u.avatar ?? null,
+    friends: u.friends ?? [],
+    createdAt: u.createdAt,
+    seenAt: u.seenAt,
+    online: !!u.online,
+    inviteCode: u.inviteCode ?? null,
+    tokens: Array.isArray(u.tokens) ? u.tokens.length : 0,
+  });
+
+  const adminStats = () => ({
+    users: db.users.length,
+    online: db.users.filter((u) => u.online && Date.now() - (u.seenAt ?? 0) < 90_000).length,
+    avatars: db.users.filter((u) => u.avatar).length,
+    requests: db.requests.length,
+    links: Math.round(db.users.reduce((sum, u) => sum + (u.friends?.length ?? 0), 0) / 2),
+    bytes: JSON.stringify({ users: db.users, requests: db.requests }).length,
+  });
+
+  const adminState = () => ({
+    users: db.users.map(adminUserShape),
+    requests: db.requests,
+    stats: adminStats(),
+  });
+
+  const adminDropUser = (user) => {
+    db.users = db.users.filter((u) => u.id !== user.id);
+    for (const other of db.users) {
+      if (other.friends?.includes(user.id))
+        other.friends = other.friends.filter((id) => id !== user.id);
+    }
+    db.requests = db.requests.filter((r) => r.from !== user.id && r.to !== user.id);
   };
 
   /* ---------- обработчики маршрутов ----------------------------
@@ -419,6 +491,94 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS 
       me.inviteCode = makeInviteCode();
       save.now();
       return { state: stateFor(me), result: { code: me.inviteCode } };
+    },
+
+    /* --- панель админа ------------------------------------- */
+
+    'POST /api/admin/ping': (req) => {
+      adminAuth(req);
+      return { ok: true, hub: 'mir', stats: adminStats() };
+    },
+
+    'POST /api/admin/state': (req) => {
+      adminAuth(req);
+      return adminState();
+    },
+
+    'POST /api/admin/user': async (req, body, save) => {
+      adminAuth(req);
+      const user = byId(body.userId);
+      if (!user) throw httpError(404, 'Аккаунт не найден.');
+      switch (body.action) {
+        case 'rename': {
+          const name = String(body.name || '').trim();
+          validName(name);
+          const owner = byName(name);
+          if (owner && owner.id !== user.id) throw httpError(409, 'Это имя занято.');
+          user.name = name;
+          user.nameKey = name.toLowerCase();
+          break;
+        }
+        case 'password': {
+          if (!/^[0-9a-f]{32}$/.test(body.salt || '') || !/^[0-9a-f]{64}$/.test(body.hash || ''))
+            throw httpError(400, 'Некорректные данные пароля.');
+          user.salt = body.salt;
+          user.passHash = body.hash;
+          /* Сброс пароля администратором выкидывает все устройства. */
+          user.tokens = [];
+          user.online = false;
+          break;
+        }
+        case 'kick': {
+          user.online = false;
+          user.tokens = [];
+          break;
+        }
+        case 'avatar': {
+          const avatar = body.avatar ?? null;
+          if (
+            avatar !== null &&
+            (!String(avatar).startsWith('data:image/') || String(avatar).length > MAX_AVATAR_CHARS)
+          )
+            throw httpError(400, 'Картинка слишком тяжёлая даже после сжатия.');
+          user.avatar = avatar === null ? null : String(avatar);
+          break;
+        }
+        case 'regen-code': {
+          user.inviteCode = makeInviteCode();
+          break;
+        }
+        case 'unlink': {
+          const friend = byId(body.friendId);
+          if (friend) unlinkFriends(user, friend);
+          break;
+        }
+        case 'unlink-all': {
+          for (const id of [...(user.friends ?? [])]) {
+            const friend = byId(id);
+            if (friend) unlinkFriends(user, friend);
+          }
+          user.friends = [];
+          break;
+        }
+        case 'delete': {
+          adminDropUser(user);
+          break;
+        }
+        default:
+          throw httpError(400, 'Неизвестное действие панели.');
+      }
+      save.now();
+      return adminState();
+    },
+
+    'POST /api/admin/request': async (req, body, save) => {
+      adminAuth(req);
+      const before = db.requests.length;
+      db.requests = db.requests.filter((r) => r.id !== body.requestId);
+      if (db.requests.length === before) throw httpError(404, 'Заявка не найдена.');
+      save.now();
+      return adminState();
     },
 
     /* --- P2P: сведение друзей напрямую ---------------------- */

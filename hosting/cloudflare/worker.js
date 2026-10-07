@@ -65,6 +65,12 @@ export class MirHub {
       this.core = createHubCore({
         db: this.db,
         persist: (_db, { immediate }) => this.persist(immediate),
+        /* Панель админа на хостинге включается только своим секретом:
+           адрес тут публичный, и ключа по умолчанию быть не должно.
+           Секрет задаётся командой
+             npx wrangler secret put MIR_ADMIN_KEY
+           или переменной [vars] в wrangler.toml. */
+        adminKey: String(this.env?.MIR_ADMIN_KEY || '').trim(),
       });
     });
   }
@@ -126,7 +132,11 @@ export class MirHub {
       method: request.method,
       path: url.pathname,
       query: url.searchParams,
-      headers: { authorization: request.headers.get('Authorization') || '' },
+      headers: {
+        authorization: request.headers.get('Authorization') || '',
+        /* Ключ панели админа передаём ядру: сам воркер его не проверяет. */
+        'x-mir-admin': request.headers.get('X-Mir-Admin') || '',
+      },
       body,
       ip: request.headers.get('CF-Connecting-IP') || 'unknown',
       signal: request.signal,

@@ -30,6 +30,7 @@ const KEYS = {
   session: 'mir:session',
   hub: 'mir:hub',
   settings: 'mir:settings',
+  admin: 'mir:admin',
 };
 
 /* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
@@ -106,17 +107,47 @@ const storage = {
 /** Переживут ли аккаунты перезагрузку страницы. */
 export const storagePersists = () => persistent !== null;
 
+/* Хранилище читается десятки раз за одну отрисовку: профиль, список
+   друзей, поиск, заявки — каждый спрашивает аккаунты заново. Раньше это
+   означало столько же JSON.parse по всей базе, а база с аватарками весит
+   сотни килобайт: открытие окна или переключение настройки заметно
+   подтормаживало на телефонах. Держим последний разобранный результат
+   рядом с той строкой, из которой он получился: строка та же — разбор не
+   нужен, строка изменилась (или её переписали мы сами) — разбираем снова.
+
+   Значение кеша — тот же объект, что уехал в хранилище. Поэтому менять
+   его на месте можно только вместе с записью (`writeJSON`), иначе кеш
+   и хранилище разойдутся. Все мутации в этом файле так и устроены. */
+const jsonCache = new Map(); // key → { raw, value }
+
 const readJSON = (key, fallback) => {
+  let raw;
   try {
-    const raw = storage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    raw = storage.getItem(key);
   } catch {
     return fallback;
   }
+  if (raw === null || raw === undefined) {
+    jsonCache.delete(key);
+    return fallback;
+  }
+  const cached = jsonCache.get(key);
+  if (cached && cached.raw === raw) return cached.value;
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    jsonCache.delete(key);
+    return fallback;
+  }
+  jsonCache.set(key, { raw, value });
+  return value;
 };
 
 const writeJSON = (key, value) => {
-  storage.setItem(key, JSON.stringify(value));
+  const raw = JSON.stringify(value);
+  jsonCache.set(key, { raw, value });
+  storage.setItem(key, raw);
 };
 
 const randomHex = (bytes) => {
@@ -263,8 +294,15 @@ const linkFriendsIn = (users, aId, bId) => {
    Локальный бэкенд — localStorage этого браузера.
    =========================================================== */
 
+/* Пульс приходит раз в 30 секунд, а запись — это вся база целиком
+   (с аватарками). В памяти отметку обновляем всегда, на диск — не чаще,
+   чем раз в 15 секунд: свежесть присутствия от этого не страдает,
+   а лишней работы в разы меньше. */
+const PRESENCE_WRITE_MS = 15_000;
+
 const localBackend = {
   mode: 'local',
+  presenceWrittenAt: 0,
 
   listUsers: () => readJSON(KEYS.users, []),
   listRequests: () => readJSON(KEYS.requests, []),
@@ -319,10 +357,19 @@ const localBackend = {
     return { user, token: null };
   },
 
+  /* Пульс: отметку обновляем в памяти всегда, а на диск — не чаще
+     PRESENCE_WRITE_MS. Иначе каждые 30 секунд переписывалась вся база
+     целиком (вместе с аватарками) — на телефоне это заметный рывок. */
   async beat(userId) {
-    this.updateUser(userId, { online: true, seenAt: Date.now() });
+    const users = this.listUsers();
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    user.online = true;
+    user.seenAt = Date.now();
+    if (Date.now() - this.presenceWrittenAt < PRESENCE_WRITE_MS) return;
+    this.presenceWrittenAt = Date.now();
+    this.saveUsers(users);
   },
-
   async offline(userId) {
     this.updateUser(userId, { online: false });
   },
@@ -892,12 +939,23 @@ export const changePassword = async (oldPassword, newPassword) => {
 
 const DEFAULT_SETTINGS = Object.freeze({ sound: true, volume: 0.55, motion: true });
 
+/* Системная просьба «меньше движения» — заодно и подсказка про слабое
+   устройство: анимации там стоят дороже всего. Пока игрок не выбрал
+   сам, уважаем эту настройку. */
+const systemPrefersCalm = () => {
+  try {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  } catch {
+    return false;
+  }
+};
+
 export const getSettings = () => {
   const saved = readJSON(KEYS.settings, {});
   return {
     sound: saved.sound !== false,
     volume: Math.max(0, Math.min(1, Number(saved.volume ?? DEFAULT_SETTINGS.volume))),
-    motion: saved.motion !== false,
+    motion: saved.motion === undefined ? !systemPrefersCalm() : saved.motion !== false,
   };
 };
 
@@ -1031,3 +1089,258 @@ if (typeof window !== 'undefined') {
       notify();
   });
 }
+
+/* ===========================================================
+   Админ-панель — служебный раздел для владельца игры.
+
+   Что здесь есть: список аккаунтов, переименование, сброс пароля,
+   отключение устройства, удаление аккаунта, разрыв дружбы, новый
+   код-приглашение и смена ключа администратора. Открывается по
+   ключу — см. вход в `main.js` (знак игры, Ctrl+Shift+Alt+A или
+   адрес с `#admin`).
+
+   Локальный режим: правятся аккаунты этого браузера, ключ лежит
+   здесь же хешем. По умолчанию он равен DEFAULT_ADMIN_KEY, и его
+   стоит сменить — панель сама об этом напомнит.
+
+   Режим хаба: общие аккаунты правит хаб, а не браузер. Он сверяет
+   ключ с MIR_ADMIN_KEY (переменная окружения на ПК, секрет воркера
+   на хостинге). Если владелец хаба ключ не задал, хаб отвечает
+   «панель выключена» — открытой админки в интернете не бывает по
+   умолчанию.
+
+   Пароли и здесь не ходят открытым текстом: панель считает
+   SHA-256(salt:пароль) на месте и отправляет только хеш.
+   =========================================================== */
+
+export const DEFAULT_ADMIN_KEY = 'mir-admin';
+const ADMIN_SALT_FALLBACK = 'mir-admin-salt-v1';
+const ADMIN_MIN_KEY = 6;
+
+/* Ключ живёт только в памяти вкладки: перезагрузка снова спросит его.
+   Держать его в localStorage — значит оставить вход открытым тому,
+   кто однажды заглянет в браузер. */
+let adminSessionKey = '';
+
+const adminRecord = () => readJSON(KEYS.admin, null);
+
+/** Ключ ещё заводской (по умолчанию) — панель просит его сменить. */
+export const adminKeyIsDefault = () => !adminRecord();
+
+export const adminKey = () => adminSessionKey;
+export const adminLogout = () => {
+  adminSessionKey = '';
+};
+
+const hashKey = (salt, key) => hashPassword(salt, key);
+
+/** Проверка ключа: у хаба спрашиваем хаб, локально сверяем хеш. */
+const verifyAdminKey = async (raw) => {
+  const key = String(raw ?? '').trim();
+  if (!key) throw new Error('Введите ключ администратора.');
+  if (backend.mode === 'hub') return remote.apiAdminPing(key);
+  const record = adminRecord();
+  const salt = record?.salt || ADMIN_SALT_FALLBACK;
+  const expected = record?.hash || (await hashKey(ADMIN_SALT_FALLBACK, DEFAULT_ADMIN_KEY));
+  if ((await hashKey(salt, key)) !== expected) throw new Error('Неверный ключ администратора.');
+  return { ok: true, hub: 'local' };
+};
+
+/** Вход в панель. Возвращает сведения о хабе — их показывает окно. */
+export const adminLogin = async (raw) => {
+  const key = String(raw ?? '').trim();
+  const info = await verifyAdminKey(key);
+  adminSessionKey = key;
+  return info;
+};
+
+const adminUserShape = (user) => ({
+  id: user.id,
+  name: user.name,
+  avatar: user.avatar ?? null,
+  friends: Array.isArray(user.friends) ? user.friends : [],
+  createdAt: user.createdAt ?? null,
+  seenAt: user.seenAt ?? null,
+  presence: presenceOf(user),
+  inviteCode: user.inviteCode ?? null,
+  devices: Array.isArray(user.tokens) ? user.tokens.length : 0,
+});
+
+const adminStats = (users, requests, bytes) => ({
+  users: users.length,
+  online: users.filter((user) => presenceOf(user) !== 'offline').length,
+  avatars: users.filter((user) => user.avatar).length,
+  requests: requests.length,
+  links: Math.round(users.reduce((sum, user) => sum + (user.friends?.length ?? 0), 0) / 2),
+  bytes,
+});
+
+const rawLength = (key) => {
+  try {
+    return (storage.getItem(key) || '').length;
+  } catch {
+    return 0;
+  }
+};
+
+/** Полный снимок для панели: игроки, заявки, размеры. */
+export const adminSnapshot = async () => {
+  if (backend.mode === 'hub') {
+    const data = await remote.apiAdminState(adminSessionKey);
+    const users = (data.users ?? []).map(adminUserShape);
+    const requests = data.requests ?? [];
+    return {
+      mode: 'hub',
+      host: hubHost(),
+      users,
+      requests,
+      stats: data.stats ?? adminStats(users, requests, 0),
+    };
+  }
+  const users = localBackend.listUsers();
+  const requests = localBackend.listRequests();
+  return {
+    mode: 'local',
+    host: '',
+    users: users.map(adminUserShape),
+    requests,
+    stats: adminStats(users, requests, rawLength(KEYS.users) + rawLength(KEYS.requests)),
+  };
+};
+
+/* Действия локального администратора. Имена те же, что у хаба, —
+   окно панели не знает, в каком мире оно работает. */
+const localAdminAction = (userId, action, payload = {}) => {
+  const users = localBackend.listUsers();
+  const user = users.find((item) => item.id === userId);
+  if (!user) throw new Error('Аккаунт не найден.');
+  const dropLink = (id, friendId) => {
+    const record = id === user.id ? user : users.find((item) => item.id === id);
+    if (record?.friends?.includes(friendId)) record.friends = record.friends.filter((x) => x !== friendId);
+  };
+
+  switch (action) {
+    case 'rename': {
+      const name = String(payload.name || '').trim();
+      validateName(name);
+      const owner = users.find((item) => item.nameKey === name.toLowerCase() && item.id !== userId);
+      if (owner) throw new Error('Это имя занято.');
+      user.name = name;
+      user.nameKey = name.toLowerCase();
+      break;
+    }
+    case 'password': {
+      if (!/^[0-9a-f]{32}$/.test(payload.salt || '') || !/^[0-9a-f]{64}$/.test(payload.hash || ''))
+        throw new Error('Не получилось подготовить новый пароль.');
+      user.salt = payload.salt;
+      user.passHash = payload.hash;
+      user.token = null; // старые входы отзываются
+      break;
+    }
+    case 'kick': {
+      user.online = false;
+      user.token = null;
+      break;
+    }
+    case 'avatar': {
+      const avatar = payload.avatar ?? null;
+      if (avatar !== null && !String(avatar).startsWith('data:image/'))
+        throw new Error('Аватарка должна быть картинкой.');
+      user.avatar = avatar === null ? null : String(avatar);
+      break;
+    }
+    case 'regen-code': {
+      user.inviteCode = makeInviteCode();
+      break;
+    }
+    case 'unlink': {
+      const friendId = String(payload.friendId || '');
+      dropLink(user.id, friendId);
+      dropLink(friendId, user.id);
+      break;
+    }
+    case 'unlink-all': {
+      for (const friendId of [...user.friends]) dropLink(friendId, user.id);
+      user.friends = [];
+      break;
+    }
+    case 'delete': {
+      const rest = users.filter((item) => item.id !== userId);
+      for (const other of rest) dropLink(other.id, userId);
+      localBackend.saveUsers(rest);
+      localBackend.saveRequests(
+        localBackend.listRequests().filter((r) => r.from !== userId && r.to !== userId),
+      );
+      if (readSession()?.userId === userId) storage.removeItem(KEYS.session);
+      notify();
+      return;
+    }
+    default:
+      throw new Error('Неизвестное действие панели.');
+  }
+  localBackend.saveUsers(users);
+  notify();
+};
+
+/** Действие над аккаунтом: локально или через хаб. */
+export const adminUserAction = async (userId, action, payload = {}) => {
+  if (backend.mode === 'hub') {
+    await remote.apiAdminUser(adminSessionKey, userId, action, payload);
+    return;
+  }
+  localAdminAction(userId, action, payload);
+};
+
+/** Новый пароль игроку — считается здесь, по сети идёт только хеш. */
+export const adminSetPassword = async (userId, password) => {
+  validatePassword(password);
+  const salt = randomHex(16);
+  const hash = await hashPassword(salt, password);
+  await adminUserAction(userId, 'password', { salt, hash });
+};
+
+export const adminRemoveRequest = async (requestId) => {
+  if (backend.mode === 'hub') {
+    await remote.apiAdminRequest(adminSessionKey, requestId);
+    return;
+  }
+  localBackend.saveRequests(localBackend.listRequests().filter((r) => r.id !== requestId));
+  notify();
+};
+
+/** Смена ключа администратора. На хабе ключ задаёт его владелец. */
+export const adminSetKey = async (next) => {
+  if (backend.mode === 'hub')
+    throw new Error(
+      'На хабе ключ задаёт его владелец: переменная MIR_ADMIN_KEY при запуске или секрет воркера на хостинге.',
+    );
+  const key = String(next || '').trim();
+  if (key.length < ADMIN_MIN_KEY)
+    throw new Error(`Ключ короче ${ADMIN_MIN_KEY} символов — подберите длиннее.`);
+  if (key === DEFAULT_ADMIN_KEY) throw new Error('Это заводской ключ — придумайте свой.');
+  const salt = randomHex(16);
+  writeJSON(KEYS.admin, { salt, hash: await hashPassword(salt, key), at: Date.now() });
+  adminSessionKey = key;
+};
+
+/** Сбросить заводской ключ (забыли свой — вернуть вход по умолчанию). */
+export const adminResetKey = () => {
+  storage.removeItem(KEYS.admin);
+  adminSessionKey = DEFAULT_ADMIN_KEY;
+};
+
+/** Что лежит в этом браузере: панель показывает это в диагностике. */
+export const localDataInfo = () => ({
+  accounts: localBackend.listUsers().length,
+  requests: localBackend.listRequests().length,
+  bytes: rawLength(KEYS.users) + rawLength(KEYS.requests),
+  persists: storagePersists(),
+});
+
+/** Полная очистка локальных аккаунтов и заявок этого браузера. */
+export const adminWipeLocal = async () => {
+  localBackend.saveUsers([]);
+  localBackend.saveRequests([]);
+  storage.removeItem(KEYS.session);
+  notify();
+};

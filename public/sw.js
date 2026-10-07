@@ -2,7 +2,7 @@
    управление у открытой игры: версия ждёт закрытия вкладок и включается
    при следующем запуске. Документы берём из сети, /api/* не кэшируем. */
 
-const CACHE = 'mir-app-v4';
+const CACHE = 'mir-app-v5';
 const PRECACHE = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

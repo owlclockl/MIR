@@ -27,19 +27,38 @@ const clientIp = (req) =>
   req.socket.remoteAddress ||
   'unknown';
 
-export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
+/* Ключ администратора панели. Порядок такой: переменная окружения
+   (MIR_ADMIN_KEY), затем ключ из файла данных, затем заводской. Хаб на
+   ПК живёт в своей сети, поэтому заводской ключ здесь работает «из
+   коробки», а публичную ссылку (--public) serve.mjs помечает
+   предупреждением: там ключ стоит сменить. На хостинге ключа по
+   умолчанию нет вовсе — без секрета панель выключена. */
+export const DEFAULT_ADMIN_KEY = 'mir-admin';
+
+export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   /* ---------- хранилище ---------- */
 
   const load = () => {
     try {
       const parsed = JSON.parse(readFileSync(dbFile, 'utf8'));
-      return { users: parsed.users ?? [], requests: parsed.requests ?? [] };
+      return {
+        users: parsed.users ?? [],
+        requests: parsed.requests ?? [],
+        adminKey: typeof parsed.adminKey === 'string' ? parsed.adminKey : '',
+      };
     } catch {
-      return { users: [], requests: [] };
+      return { users: [], requests: [], adminKey: '' };
     }
   };
 
   const db = load();
+
+  /* Ключ из переменной окружения старше файла: владелец мог сменить его,
+     не трогая данные. Заводской ключ в файл не пишем — иначе он уедет
+     в репозиторий вместе с данными хаба. */
+  const envKey = String(adminKey || process.env.MIR_ADMIN_KEY || '').trim();
+  const key = envKey || db.adminKey || DEFAULT_ADMIN_KEY;
+  if (envKey) db.adminKey = envKey;
 
   let saveTimer = null;
   const writeFile = () => {
@@ -62,7 +81,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
     saveTimer.unref?.();
   };
 
-  const core = createHubCore({ db, persist, limits });
+  const core = createHubCore({ db, persist, limits, adminKey: key });
 
   /* ---------- разбор запроса ---------- */
 
@@ -136,5 +155,9 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS }) {
     },
     stats: core.stats,
     dbFile,
+    /* Ключ нужен serve.mjs, чтобы предупредить о заводском на публичной
+       ссылке и подсказать его владельцу в консоли. */
+    adminKey: key,
+    adminKeyIsDefault: key === DEFAULT_ADMIN_KEY,
   };
 }
