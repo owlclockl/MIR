@@ -681,6 +681,23 @@ const sessionHub = (session) => {
   return session.token ? '' : null;
 };
 
+/* Один и тот же хаб может быть записан двумя способами: '' — хаб на
+   адресе самой страницы (подключение в окне хаба или регистрация сразу),
+   полный URL — в сохранённом адресе (KEYS.hub) или в ссылке ?hub=.
+   При перезагрузке страница находила хаб по полному адресу, строковое
+   сравнение с '' не сходилось — и сессию выбрасывали: игрока выкидывало
+   из аккаунта. Сравниваем адреса по смыслу: '' считаем адресом страницы. */
+const sameHub = (a, b) => {
+  const resolve = (url) => {
+    const text = trimSlash(url ?? '');
+    if (text) return text;
+    if (typeof location !== 'undefined' && /^https?:$/.test(location.protocol || ''))
+      return trimSlash(location.origin);
+    return '';
+  };
+  return resolve(a) === resolve(b);
+};
+
 remote.setTokenGetter(() => readSession()?.token ?? null);
 
 /** Сначала подключаемся к подходящему хабу, локальное хранилище — офлайн-резерв. */
@@ -735,7 +752,10 @@ export const initBackend = async () => {
   /* Не зависаем без сети: хаб всегда пробуем первым, а local — запасной путь. */
   remote.setBase('');
   backend = localBackend;
-  if (sessionHub(readSession()) !== null) storage.removeItem(KEYS.session);
+  /* Сессию не трогаем: хаб мог быть временно недоступен, а аккаунт — на
+     хабе. В локальном режиме она не действует (игрок виден гостем), но
+     переживёт перезагрузку, когда хаб снова ответит — иначе сбой сети
+     при перезагрузке выкидывал бы из аккаунта. */
   backendInitialized = true;
   notify();
   return 'local';
@@ -745,7 +765,7 @@ export const initBackend = async () => {
 const resumeSession = async (hub) => {
   const session = readSession();
   if (!session) return;
-  if (sessionHub(session) !== hub) {
+  if (!sameHub(sessionHub(session), hub)) {
     storage.removeItem(KEYS.session);
     return;
   }
@@ -780,7 +800,11 @@ export const connectHub = async (raw) => {
      гоняем запросы через полный URL, когда можно остаться «у себя». */
   const same = typeof location !== 'undefined' && url === trimSlash(location.origin);
   storage.setItem(KEYS.hub, url);
-  storage.removeItem(KEYS.session); // аккаунты другого хаба — другой мир
+  /* Аккаунты другого хаба — другой мир: сессию чужого хаба сбрасываем.
+     На тот же хаб сессия остаётся — например, переподключение после
+     временного обрыва связи не должно выкидывать из аккаунта. */
+  const session = readSession();
+  if (session && !sameHub(sessionHub(session), url)) storage.removeItem(KEYS.session);
   remote.setBase(same ? '' : url);
   remote.applyState({ users: [], requests: [] });
   backend = hubBackend;
