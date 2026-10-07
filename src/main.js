@@ -14,7 +14,11 @@ import { configureSounds, playSound } from './ui/sound.js';
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.7.0';
+/* Версию подставляет сборщик из package.json (define в vite.config.js) —
+   один источник правды вместо четырёх файлов, которые надо не забыть
+   обновить вместе. Запасное значение нужно лишь для чтения модуля без
+   сборки (например, из тестов). */
+const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени.
 

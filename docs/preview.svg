@@ -98,46 +98,46 @@
 <rect x="1136" width="304" height="900" fill="#0c0c0e"/>
 <path d="M1136.5 0v900M1137 77.5h303" stroke="#fff" stroke-opacity=".08"/>
 
-<text x="1155" y="29" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">СООБЩЕСТВО</text>
-<text x="1155" y="54" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="700" fill="#ededf0">Друзья</text>
-<text x="1219" y="54" font-size="11" font-weight="500" letter-spacing=".88" fill="#65656e">1 / 2</text>
-<rect x="1388" y="21.5" width="34" height="34" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-<g transform="translate(1397 30.5)" color="#8b8b94"><use href="#icoUserPlus" transform="scale(.667)"/></g>
-<rect x="1414" y="15" width="16" height="16" fill="#c2d9c9"/>
-<text x="1422" y="26.5" font-size="9" font-weight="700" text-anchor="middle" fill="#0b0b0d">1</text>
+<text x="1150" y="29" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">СООБЩЕСТВО</text>
+<text x="1150" y="54" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="700" fill="#ededf0">Друзья</text>
+<text x="1214" y="54" font-size="11" font-weight="500" letter-spacing=".88" fill="#65656e">1 / 2</text>
+<rect x="1392" y="21.5" width="34" height="34" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<g transform="translate(1401 30.5)" color="#8b8b94"><use href="#icoUserPlus" transform="scale(.667)"/></g>
+<rect x="1416" y="15" width="16" height="16" fill="#c2d9c9"/>
+<text x="1424" y="26.5" font-size="9" font-weight="700" text-anchor="middle" fill="#0b0b0d">1</text>
 
 <!-- входящая заявка -->
-<rect x="1147" y="88" width="283" height="86" fill="#c2d9c9" fill-opacity=".09" stroke="#c2d9c9" stroke-opacity=".32"/>
-<text x="1159" y="106" font-size="10" font-weight="700" letter-spacing="1.8" fill="#c2d9c9">ЗАЯВКИ · 1</text>
-<rect x="1154" y="115" width="269" height="50" fill="#101013" stroke="#fff" stroke-opacity=".08"/>
-<rect x="1162" y="124" width="32" height="32" fill="#313136"/>
-<text x="1178" y="144" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">NV</text>
-<text x="1202" y="137" font-size="12.5" font-weight="600" fill="#ededf0">NOVA</text>
-<text x="1202" y="152" font-size="10" fill="#65656e">Хочет добавить вас</text>
-<rect x="1351" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
-<path d="m1359 148 5 5 9-11" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1387" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
-<path d="m1395 141 14 14m0-14-14 14" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round"/>
+<rect x="1150" y="88" width="276" height="86" fill="#c2d9c9" fill-opacity=".09" stroke="#c2d9c9" stroke-opacity=".32"/>
+<text x="1160" y="106" font-size="10" font-weight="700" letter-spacing="1.8" fill="#c2d9c9">ЗАЯВКИ · 1</text>
+<rect x="1160" y="115" width="256" height="50" fill="#101013" stroke="#fff" stroke-opacity=".08"/>
+<rect x="1168" y="124" width="32" height="32" fill="#313136"/>
+<text x="1184" y="144" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">NV</text>
+<text x="1210" y="137" font-size="12.5" font-weight="600" fill="#ededf0">NOVA</text>
+<text x="1210" y="152" font-size="10" fill="#65656e">Хочет добавить вас</text>
+<rect x="1338" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
+<path d="m1346 148 5 5 9-11" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1378" y="133" width="30" height="30" fill="none" stroke="#fff" stroke-opacity=".08"/>
+<path d="m1386 141 14 14m0-14-14 14" fill="none" stroke="#8b8b94" stroke-width="1.7" stroke-linecap="round"/>
 
 <!-- друзья -->
 <g font-size="12.5" font-weight="600">
-  <rect x="1158" y="195" width="32" height="32" fill="#313136"/>
-  <text x="1174" y="215" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">FO</text>
-  <text x="1202" y="208" fill="#ededf0">FOX</text>
-  <text x="1202" y="223" font-size="10" font-weight="400" fill="#65656e">В меню</text>
-  <circle cx="1415.5" cy="211" r="3.5" fill="#c2d9c9"/>
+  <rect x="1160" y="195" width="32" height="32" fill="#313136"/>
+  <text x="1176" y="215" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#8b8b94">FO</text>
+  <text x="1204" y="208" fill="#ededf0">FOX</text>
+  <text x="1204" y="223" font-size="10" font-weight="400" fill="#65656e">В меню</text>
+  <circle cx="1412.5" cy="211" r="3.5" fill="#c2d9c9"/>
 
-  <rect x="1158" y="251" width="32" height="32" fill="#313136"/>
-  <text x="1174" y="271" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#65656e">GR</text>
-  <text x="1202" y="264" fill="#65656e">GREY</text>
-  <text x="1202" y="279" font-size="10" font-weight="400" fill="#65656e">Не в сети</text>
-  <circle cx="1415.5" cy="267" r="3.5" fill="#3b3b41"/>
+  <rect x="1160" y="251" width="32" height="32" fill="#313136"/>
+  <text x="1176" y="271" font-size="10" font-weight="700" letter-spacing=".8" text-anchor="middle" fill="#65656e">GR</text>
+  <text x="1204" y="264" fill="#65656e">GREY</text>
+  <text x="1204" y="279" font-size="10" font-weight="400" fill="#65656e">Не в сети</text>
+  <circle cx="1412.5" cy="267" r="3.5" fill="#3b3b41"/>
 </g>
 
 <!-- подвал панели: мой код -->
 <path d="M1137 833.5h303" stroke="#fff" stroke-opacity=".08"/>
-<text x="1147" y="852" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">МОЙ КОД-ПРИГЛАШЕНИЕ</text>
-<rect x="1147" y="860" width="283" height="30" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-<text x="1159" y="880" font-size="15" letter-spacing="2.7" fill="#c2d9c9" font-family="Menlo, Consolas, monospace">K7QX-2NAD</text>
-<g transform="translate(1401 867)" color="#8b8b94"><use href="#icoCopy" transform="scale(.667)"/></g>
+<text x="1150" y="852" font-size="10" font-weight="600" letter-spacing="3" fill="#65656e">МОЙ КОД-ПРИГЛАШЕНИЕ</text>
+<rect x="1150" y="860" width="276" height="30" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+<text x="1162" y="880" font-size="15" letter-spacing="2.7" fill="#c2d9c9" font-family="Menlo, Consolas, monospace">K7QX-2NAD</text>
+<g transform="translate(1397 867)" color="#8b8b94"><use href="#icoCopy" transform="scale(.667)"/></g>
 </svg>

@@ -1,11 +1,15 @@
-/* Короткие CC0-звуки интерфейса. Audio создаётся лениво после первого
-   действия пользователя — так мобильные браузеры не блокируют воспроизведение. */
-const FILES = {
-  click: '/sounds/click.wav',
-  success: '/sounds/success.wav',
-  message: '/sounds/message.wav',
-  error: '/sounds/error.wav',
-};
+/* Короткие CC0-звуки интерфейса. Файлы лежат рядом с кодом и проходят через
+   сборщик, а не через public/: так у веб-версии получается хешированное имя
+   с вечным кешем, а в однофайловом mir.html звук становится data URL сам
+   собой (сборщик встраивает мелкие ресурсы) — без ручной склейки строк.
+   Audio создаётся лениво после первого действия пользователя: мобильные
+   браузеры блокируют воспроизведение до касания. */
+import click from '../assets/sounds/click.wav';
+import success from '../assets/sounds/success.wav';
+import message from '../assets/sounds/message.wav';
+import error from '../assets/sounds/error.wav';
+
+const FILES = { click, success, message, error };
 const pool = new Map();
 let settingsGetter = () => ({ sound: true, volume: 0.55 });
 

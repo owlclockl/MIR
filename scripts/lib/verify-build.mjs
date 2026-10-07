@@ -1,0 +1,233 @@
+/* Проверка артефактов сборки.
+
+   Зачем. Сборка — единственный шаг, который нельзя перепроверить на глаз:
+   сломанный `mir.html` открывается чёрным экраном, а лишний файл в `dist/`
+   на хостинге замечают через неделю. Здесь мы разбираем готовые файлы и
+   отвечаем на вопросы, которые иначе всплывают у игрока:
+
+     • самодостаточен ли `mir.html` (нет ли ссылок на файлы вне себя);
+     • запустится ли его скрипт по file:// (обычный скрипт, а не модуль);
+     • та ли версия в разметке, что в package.json;
+     • все ли файлы, на которые ссылается `dist/index.html` и список
+       оболочки service worker, реально существуют;
+     • не вырос ли вес за бюджеты (щёлкнули не тот ассет — видно сразу).
+
+   Модуль ничего не печатает: он отдаёт список проверок, а показывают его
+   `npm run test:build` и `npm run build:all`. */
+
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import vm from 'node:vm';
+
+const ROOT_FILES = ['dist', 'mir.html'];
+
+/* Бюджеты веса: не «чтобы было», а сигнал. Резкий скачок здесь означает,
+   что в сборку попал лишний ресурс (обычно забытый data URL картинки). */
+export const BUDGETS = {
+  js: 160 * 1024,
+  css: 48 * 1024,
+  single: 256 * 1024,
+};
+
+const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
+
+const kb = (bytes) => `${(bytes / 1024).toFixed(1)} КБ`;
+
+/** Локальные ссылки разметки (/assets/…, /icons/…) и их наличие в dist. */
+const localRefs = (html) =>
+  [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((ref) => !ref.startsWith('/api/'));
+
+const walk = (dir, base = dir) => {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...walk(full, base));
+    else out.push(relative(base, full).split(sep).join('/'));
+  }
+  return out;
+};
+
+/** Проверки веб-сборки (dist/). */
+export function checkWeb() {
+  const checks = [];
+  const add = (ok, what, detail = '') => checks.push({ ok, what, detail });
+
+  if (!existsSync('dist/index.html')) {
+    add(false, 'dist/index.html на месте');
+    return checks;
+  }
+  add(true, 'dist/index.html на месте');
+
+  const files = walk('dist');
+  const html = readFileSync('dist/index.html', 'utf8');
+
+  const missing = localRefs(html).filter((ref) => !existsSync(join('dist', ref)));
+  add(
+    missing.length === 0,
+    'все ссылки index.html ведут на существующие файлы',
+    missing.length ? `нет: ${missing.join(', ')}` : `${localRefs(html).length} ссылок`,
+  );
+
+  const expected = version();
+  const meta = html.match(/<meta name="mir-version" content="([^"]+)"/);
+  add(
+    meta?.[1] === expected,
+    'версия в разметке совпадает с package.json',
+    `разметка: ${meta?.[1] ?? '—'}, package.json: ${expected}`,
+  );
+
+  const jsFiles = files.filter((name) => /^assets\/.*\.js$/.test(name));
+  add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
+
+  const jsBytes = jsFiles.reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
+  add(
+    jsBytes > 0 && jsBytes <= BUDGETS.js,
+    `скрипт приложения в бюджете (${kb(BUDGETS.js)})`,
+    kb(jsBytes),
+  );
+
+  const cssBytes = files
+    .filter((name) => name.endsWith('.css'))
+    .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
+  add(cssBytes > 0 && cssBytes <= BUDGETS.css, `стили в бюджете (${kb(BUDGETS.css)})`, kb(cssBytes));
+
+  /* Service worker: имя кэша и список оболочки. */
+  if (!existsSync('dist/sw.js')) {
+    add(false, 'dist/sw.js собран');
+  } else {
+    const sw = readFileSync('dist/sw.js', 'utf8');
+    const cache = sw.match(/const CACHE = '([^']+)'/);
+    add(
+      Boolean(cache) && cache[1].startsWith(`mir-app-${expected}-`) && /-[0-9a-f]{8}$/.test(cache[1]),
+      'имя кэша service worker привязано к версии и сборке',
+      cache?.[1] ?? 'не найдено',
+    );
+
+    const listMatch = sw.match(/const PRECACHE = (\[[\s\S]*?\]);/);
+    let precache = [];
+    try {
+      precache = JSON.parse(listMatch?.[1] ?? '[]');
+    } catch {
+      precache = [];
+    }
+    const broken = precache.filter((url) => url !== '/' && !existsSync(join('dist', url)));
+    add(
+      precache.length > 2 && broken.length === 0,
+      'список оболочки service worker существует целиком',
+      broken.length ? `нет: ${broken.join(', ')}` : `${precache.length} файлов`,
+    );
+    add(
+      new Set(precache).size === precache.length,
+      'в списке оболочки нет повторов',
+      `${precache.length - new Set(precache).size} лишних`,
+    );
+  }
+
+  /* Манифест и иконки установки приложения. */
+  if (existsSync('dist/manifest.webmanifest')) {
+    let manifest = null;
+    try {
+      manifest = JSON.parse(readFileSync('dist/manifest.webmanifest', 'utf8'));
+    } catch {
+      manifest = null;
+    }
+    const icons = (manifest?.icons ?? []).map((icon) => icon.src);
+    const missingIcons = icons.filter((src) => !existsSync(join('dist', src)));
+    add(
+      Array.isArray(manifest?.icons) && manifest.icons.length > 0 && missingIcons.length === 0,
+      'иконки манифеста на месте',
+      missingIcons.length ? `нет: ${missingIcons.join(', ')}` : `${icons.length} иконок`,
+    );
+  } else {
+    add(false, 'манифест установки существует');
+  }
+
+  /* Переезд звуков из public/ в бандл не должен оставить старых путей. */
+  const staleSounds = files.filter(
+    (name) => name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.css'),
+  ).filter((name) => readFileSync(join('dist', name), 'utf8').includes('/sounds/'));
+  add(staleSounds.length === 0, 'в dist нет ссылок на старые /sounds/', staleSounds.join(', '));
+
+  return checks;
+}
+
+/** Проверки однофайловой сборки (mir.html). */
+export function checkSingle() {
+  const checks = [];
+  const add = (ok, what, detail = '') => checks.push({ ok, what, detail });
+
+  if (!existsSync('mir.html')) {
+    add(false, 'mir.html собран');
+    return checks;
+  }
+  const html = readFileSync('mir.html', 'utf8');
+  const bytes = Buffer.byteLength(html);
+  add(true, 'mir.html собран', kb(bytes));
+
+  const forbidden = [
+    ['<script[^>]*type="module"', 'модульный скрипт'],
+    ['modulepreload', 'предзагрузка модулей'],
+    ['/assets/', 'ссылки на каталог сборки'],
+    ['/sounds/', 'ссылки на звуки файлами'],
+    [/__MIR_[A-Z_]+__/.source, 'неподставленные метки сборщика'],
+  ];
+  for (const [pattern, what] of forbidden)
+    add(!new RegExp(pattern).test(html), `в mir.html нет: ${what}`);
+
+  const external = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
+  const allowed = external.every(
+    (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com'),
+  );
+  add(
+    allowed,
+    'из внешнего в mir.html только шрифты',
+    external.filter((url) => !allowed || !/fonts\.g/.test(url)).join(', ') || `${external.length} ссылок`,
+  );
+
+  const expected = version();
+  add(
+    html.includes(`<meta name="mir-version" content="${expected}"`),
+    'версия mir.html совпадает с package.json',
+    expected,
+  );
+
+  add(
+    (html.match(/data:audio\/wav;base64/g) ?? []).length >= 4,
+    'все звуки интерфейса встроены',
+    `${(html.match(/data:audio\/wav;base64/g) ?? []).length} из 4`,
+  );
+  add(/rel="icon"[^>]*href="data:image\/png;base64,/.test(html), 'значок вкладки встроен');
+
+  add(bytes <= BUDGETS.single, `mir.html в бюджете (${kb(BUDGETS.single)})`, kb(bytes));
+
+  /* Главная проверка: скрипт из файла — обычный скрипт. Разбираем его как
+     классический код: модульный синтаксис (import/export) здесь не пройдёт,
+     а значит по file:// игра запустится. */
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  add(scripts.length === 1, 'в mir.html ровно один скрипт', `${scripts.length}`);
+  let parsed = false;
+  let parseError = '';
+  try {
+    new vm.Script(scripts[0] ?? '');
+    parsed = true;
+  } catch (error) {
+    parseError = error.message;
+  }
+  add(parsed, 'скрипт mir.html разбирается как обычный (не модульный)', parseError);
+
+  add(
+    html.indexOf('<script>') > html.indexOf('<div id="app">'),
+    'скрипт подключён после разметки (DOM уже готов)',
+  );
+
+  return checks;
+}
+
+/** Проверки всего, что собирает `npm run build:all`. */
+export function checkAll() {
+  return [...checkWeb(), ...checkSingle()];
+}
+
+export const buildInputsExist = () => ROOT_FILES.every((path) => existsSync(path));

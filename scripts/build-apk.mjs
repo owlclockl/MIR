@@ -34,7 +34,7 @@ import { join } from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import './lib/root.mjs';
-import { buildSingleHtml } from './build-single.mjs';
+import { buildSingleHtml } from './lib/build.mjs';
 import { createLogger, human, sha256 } from './lib/log.mjs';
 import { ANDROID_THEMES } from './lib/apk-read.mjs';
 import { auditApk } from './lib/apk-audit.mjs';

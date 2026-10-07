@@ -181,7 +181,7 @@ npm run share
   масштабом, поворотом и точной настройкой кадра; сохраняется версия 192×192.
 - **Настройки** — шестерёнка слева вверху: звуки, громкость, анимации и
   ручная проверка обновлений. Короткие звуки созданы для проекта и выпущены
-  под CC0; лицензия лежит в `public/sounds/LICENSE.txt`.
+  под CC0; лицензия лежит в `src/assets/sounds/LICENSE.txt`.
 - **Добавить друга** — кнопка «+» в панели друзей: поиск по имени среди
   аккаунтов этого устройства. Заявки приходят блоком «Заявки» в ту же панель.
 - **Код-приглашение** — в подвале панели и в профиле: передайте его другу,
@@ -328,21 +328,32 @@ npm run host:logs   # живой журнал хостинга: каждый з�
 ## Команды сборщика
 
 ```bash
-npm run host         # выложить игру и хаб в интернет (бесплатный хостинг)
+npm run build        # веб-версия в dist/ (её раздаёт сервер, хаб и .exe)
+npm run single       # один файл mir.html для двойного клика и .apk
+npm run build:all    # собрать всё сразу (Web + mir.html + .exe + .apk)
 npm run build:exe    # собрать Windows-установщик (MIR-Setup.exe)
 npm run build:apk    # собрать Android-установщик (MIR.apk)
 npm run apk:doctor   # разобрать готовый MIR.apk и объяснить, что с ним не так
-npm run build:all    # собрать всё сразу (Web + .exe + .apk)
-npm run single       # собрать mir.html
+npm run host         # выложить игру и хаб в интернет (бесплатный хостинг)
 ```
+
+Дополнительные ключи: `node scripts/build-all.mjs --only=web,apk` — собрать
+только нужные форматы; в конце сборка сама печатает размер и `sha256` каждого
+файла, чтобы было видно, что именно вы отправляете друзьям.
+
+Версия берётся из `package.json` при сборке — отдельно её править нигде не
+надо. Имя офлайн-кэша service worker сборка тоже считает сама: оно состоит из
+версии и хеша содержимого, поэтому старый кэш не может «залипнуть» у игроков.
 
 Проверки (подробности — в `AGENTS.md`, раздел «Как проверять»):
 
 ```bash
-npm run test:hub -- http://127.0.0.1:4173   # хаб: аккаунты, друзья, панель админа
-npm run test:ui  -- http://127.0.0.1:4173   # окна меню в собранном mir.html
-npm run test:p2p                            # прямая связь между игроками
-npm run single && npm run test:perf         # отзывчивость меню (нужен jsdom)
+npm run test:hub      -- http://127.0.0.1:4173   # хаб: аккаунты, друзья, панель админа
+npm run test:ui       -- http://127.0.0.1:4173   # окна меню в собранном mir.html
+npm run test:p2p                                 # прямая связь между игроками
+npm run test:perf                                # отзывчивость меню (нужен jsdom)
+npm run test:build                               # артефакты сборки: ссылки, версия, вес
+npm run test:spacing                             # отступы: шкала и совпадение полей
 ```
 
 ## Показать друзьям
@@ -426,8 +437,13 @@ SRV-запись `_v2-origintunneld._tcp.argotunnel.com` — иначе он н�
 Пересобрать после правок в `index.html` / `src/`:
 
 ```bash
-npm run single   # или: node scripts/build-single.mjs
+npm run build    # обновит dist/ (папку сайта) и проверит сборку
+npm run single   # обновит mir.html
 ```
+
+Внутри `mir.html` лежит всё, кроме шрифтов: код, стили, звуки и значок
+вкладки. Шрифты Google остаются внешними — без сети интерфейс возьмёт
+системный, но меню продолжит работать.
 
 ## Структура
 
@@ -437,18 +453,26 @@ MIR/
 ├─ mir.html              собранная однофайловая версия
 ├─ src/                  исходники приложения
 │  ├─ main.js            меню, окна, обработчики, скрытая панель админа
-│  ├─ style.css          вся вёрстка и оформление
+│  ├─ style.css          вся вёрстка; начинается со шкалы отступов --sp-*
+│  ├─ sw.js              заготовка service worker: имя кэша и список файлов
+│  │                     подставляет сборка (src/sw.js → dist/sw.js)
+│  ├─ assets/sounds/     короткие звуки интерфейса (CC0) рядом с кодом:
+│  │                     сборщик сам решает, встроить их или отдать файлом
 │  ├─ data/              store.js (аккаунты, друзья, админ-слой), remote.js (хаб), p2p.js (прямая связь)
-│  └─ ui/                icons.js, dom.js (тосты, буфер, даты), avatar.js
+│  └─ ui/                icons.js, dom.js (тосты, буфер, даты), avatar.js, sound.js
+├─ vite.config.js        две сборки: web (dist/) и single (mir.html)
 ├─ server/               hub-core.mjs (вся логика хаба), hub.mjs (хаб на ПК),
 │                        serve.mjs (раздача + туннель)
 ├─ hosting/cloudflare/   тот же хаб на бесплатном хостинге (worker.js)
 ├─ wrangler.toml         настройки хостинга: имя, адрес, хранилище
-├─ scripts/              сборка: build-single / build-exe / build-apk / build-all,
-│                        icons.mjs, doctor.mjs, apk-doctor.mjs,
-│                        test-p2p.mjs, test-hub.mjs, test-ui.mjs, test-perf.mjs,
-│                        lib/ (log.mjs, apk-read.mjs, apk-audit.mjs, …), win/MirSetup.cs
-├─ public/               манифест, service worker, иконки
+├─ scripts/              сборка: build-web / build-single / build-exe / build-apk /
+│                        build-all, icons.mjs, doctor.mjs, apk-doctor.mjs,
+│                        test-build.mjs, test-spacing.mjs, test-p2p.mjs, test-hub.mjs,
+│                        test-ui.mjs, test-perf.mjs,
+│                        lib/ (build.mjs, vite-mir.mjs — плагины сборки,
+│                        verify-build.mjs — проверки артефактов,
+│                        log.mjs, apk-read.mjs, apk-audit.mjs, …), win/MirSetup.cs
+├─ public/               манифест и иконки (копируются в dist/ как есть)
 ├─ docs/preview.svg      статичный макет экрана
 ├─ CHANGELOG.md          журнал изменений
 ├─ AGENTS.md             правила проекта для ИИ-агентов и людей

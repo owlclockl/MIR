@@ -34,10 +34,43 @@
   --warn-glow: rgba(217, 192, 138, 0.4);
   --accent-glow: rgba(176, 208, 186, 0.45);
 
+  /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
+     эти токены — «своих» чисел там нет. Без шкалы рядом оказывались 7, 9,
+     13 и 17 пикселей, и блоки перестали совпадать друг с другом: шапка
+     окна шла с одним полем, тело с другим, вкладки с третьим. */
+  --sp-2: 2px;    /* волосок: строки плотных списков */
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-14: 14px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+
   /* Размеры каркаса */
   --bar-h: 78px;
   --rail-w: 304px;
-  --pad-x: clamp(16px, 2vw, 26px);
+  --pad-x: clamp(16px, 2vw, 24px);
+
+  /* Единые поля компонентов: по ним выравниваются шапка, тело и вкладки
+     одного окна, а также шапка, список и подвал панели друзей. Менять
+     поле окна нужно в одном месте — рассинхрона «шапка 18, тело 16» не
+     бывает по построению. */
+  --panel-pad-x: var(--sp-14);
+  --panel-pad-y: var(--sp-12);
+  --dialog-pad: var(--sp-16);
+
+  /* Плотности строк. Их всего три, и они одинаковы у однотипных блоков:
+       строка списка  — друзья, результаты поиска, строки панели админа;
+       строка панели  — настройки, блоки связи, переписка (с рамкой);
+       плотная строка — заявки и прочие вложенные карточки. */
+  --row-pad: var(--sp-10);
+  --row-gap: var(--sp-12);
+  --box-pad: var(--sp-12) var(--sp-14);
+  --box-gap: var(--sp-14);
 
   /* Типографическая шкала */
   --fs-micro: 10px;
@@ -107,9 +140,9 @@ a {
 .skip-link {
   position: fixed;
   z-index: 100;
-  top: 12px;
-  left: 12px;
-  padding: 10px 14px;
+  top: var(--sp-12);
+  left: var(--sp-12);
+  padding: var(--sp-10) var(--sp-14);
   color: #0b0b0d;
   background: #fff;
   font-size: var(--fs-small);
@@ -160,14 +193,14 @@ a {
 .topbar__side {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-14);
   min-width: 0;
   padding-inline: var(--pad-x);
 }
 
 .topbar__side--end {
   justify-content: flex-end;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .topbar__divider {
@@ -223,7 +256,7 @@ a {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-12);
   min-width: 0;
 }
 
@@ -249,7 +282,7 @@ a {
 .brand__name {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-4);
   min-width: 0;
   font-family: var(--font-display);
   font-size: var(--fs-micro);
@@ -275,9 +308,9 @@ a {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-12);
   height: 100%;
-  padding-inline: clamp(26px, 3.2vw, 44px);
+  padding-inline: clamp(var(--sp-24), 3.2vw, 44px);
   color: var(--text);
   border: 0;
   border-inline: 1px solid var(--line);
@@ -331,8 +364,8 @@ a {
 .status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-12);
   color: var(--text-dim);
   border: 1px solid var(--line);
   font-size: var(--fs-micro);
@@ -371,10 +404,10 @@ a {
 .profile {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: var(--sp-12);
   min-width: 0;
   max-width: 220px;
-  padding: 5px 8px 5px 5px;
+  padding: var(--sp-4);
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
@@ -418,7 +451,7 @@ a {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-4);
   min-width: 0;
 }
 
@@ -457,7 +490,7 @@ a {
   display: grid;
   place-items: center;
   min-height: 0;
-  padding: clamp(28px, 6vh, 72px) var(--pad-x);
+  padding: clamp(var(--sp-24), 6vh, 72px) var(--pad-x);
   overflow: hidden;
   background: radial-gradient(circle at 50% 50%, #242428 0, #151517 30%, #0a0a0b 68%);
 }
@@ -553,7 +586,7 @@ a {
 }
 
 .hero__title {
-  margin-top: clamp(22px, 3.4vh, 38px);
+  margin-top: clamp(var(--sp-20), 3.4vh, 38px);
   font-family: var(--font-display);
   font-size: clamp(2.6rem, 5.6vw + 1rem, 4.6rem);
   font-weight: 500;
@@ -573,8 +606,8 @@ a {
 .hero__caption {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: clamp(24px, 3.6vh, 40px);
+  gap: var(--sp-16);
+  margin-top: clamp(var(--sp-24), 3.6vh, 40px);
   color: var(--text-dim);
   font-size: var(--fs-small);
   line-height: 1;
@@ -618,23 +651,23 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--sp-14);
   height: var(--bar-h);
-  padding-inline: 18px;
+  padding-inline: var(--panel-pad-x);
   border-bottom: 1px solid var(--line);
 }
 
 .rail__heading {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: var(--sp-12);
   min-width: 0;
 }
 
 .rail__title {
   display: flex;
   align-items: baseline;
-  gap: 9px;
+  gap: var(--sp-8);
   font-family: var(--font-display);
   font-size: var(--fs-lead);
   font-weight: 700;
@@ -654,9 +687,9 @@ a {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-2);
   min-height: 0;
-  padding: 10px;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -674,9 +707,9 @@ a {
 .friend {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--row-gap);
   width: 100%;
-  padding: 10px;
+  padding: var(--row-pad);
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
@@ -705,17 +738,12 @@ a {
   color: var(--text-faint);
 }
 
-.rail__foot {
-  padding: 10px;
-  border-top: 1px solid var(--line);
-}
-
 .ghost-button {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: var(--sp-12);
   width: 100%;
-  padding: 13px 12px;
+  padding: var(--sp-12);
   color: var(--text-dim);
   border: 1px solid var(--line);
   background: var(--fill);
@@ -756,8 +784,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px var(--pad-x) max(16px, env(safe-area-inset-bottom));
+  gap: var(--sp-16);
+  padding: var(--sp-14) var(--pad-x) max(var(--sp-16), env(safe-area-inset-bottom));
   color: #55555d;
   font-size: var(--fs-micro);
   letter-spacing: 0.16em;
@@ -788,10 +816,6 @@ a {
   .profile .icon--chevron {
     display: none;
   }
-
-  .profile {
-    padding: 5px;
-  }
 }
 
 
@@ -803,9 +827,9 @@ a {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--box-gap);
   flex-wrap: wrap;
-  padding: 13px 14px;
+  padding: var(--box-pad);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -813,7 +837,7 @@ a {
 .link-box__text {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
 }
 
@@ -828,14 +852,14 @@ a {
 .link-box__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   flex-wrap: wrap;
 }
 
 .link-state {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   color: var(--text);
   font-size: var(--fs-small);
 }
@@ -880,7 +904,7 @@ a {
 .steps {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-14);
 }
 
 .input--code-area {
@@ -898,7 +922,7 @@ a {
 .chat {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-10);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -906,9 +930,9 @@ a {
 .chat__list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-10);
   height: 208px;
-  padding: 13px 14px;
+  padding: var(--box-pad);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -916,7 +940,7 @@ a {
 .chat__row {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--sp-2);
   align-items: flex-start;
   max-width: 82%;
 }
@@ -928,7 +952,7 @@ a {
 
 .chat__bubble {
   margin: 0;
-  padding: 8px 11px;
+  padding: var(--sp-8) var(--sp-12);
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -952,8 +976,8 @@ a {
 
 .chat__form {
   display: flex;
-  gap: 8px;
-  padding: 0 14px 13px;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-14) var(--sp-12);
 }
 
 .chat__form .input {
@@ -994,14 +1018,14 @@ a {
   .rail__head {
     height: auto;
     align-items: center;
-    padding: 14px 16px;
+    padding: var(--panel-pad-y) var(--panel-pad-x);
   }
 
   .rail__heading {
     flex-direction: row-reverse;
     align-items: baseline;
     justify-content: flex-end;
-    gap: 12px;
+    gap: var(--sp-12);
   }
 
   .rail__heading .eyebrow {
@@ -1010,8 +1034,7 @@ a {
 
   .rail__list {
     flex-direction: row;
-    gap: 6px;
-    padding: 10px;
+    gap: var(--sp-6);
     overflow-x: auto;
     overflow-y: hidden;
   }
@@ -1030,7 +1053,9 @@ a {
 
   .footer {
     justify-content: center;
-    padding-block: 12px;
+    /* Безопасную зону телефона не теряем: под подвалом может быть
+       системная полоса, и текст не должен в неё уезжать. */
+    padding-block: var(--sp-12) max(var(--sp-12), env(safe-area-inset-bottom));
     font-size: 9px;
     letter-spacing: 0.12em;
   }
@@ -1131,9 +1156,9 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: var(--sp-10);
   width: 100%;
-  padding: 12px 16px;
+  padding: var(--sp-12) var(--sp-16);
   color: #0b0b0d;
   border: 1px solid transparent;
   background: #e9e9ec;
@@ -1163,8 +1188,8 @@ a {
 .mini-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
   color: var(--text-soft);
   border: 1px solid var(--line);
   background: var(--fill);
@@ -1229,13 +1254,13 @@ a {
 
 .badge {
   position: absolute;
-  top: -7px;
-  right: -7px;
+  top: calc(-1 * var(--sp-6));
+  right: calc(-1 * var(--sp-6));
   display: grid;
   place-items: center;
   min-width: 16px;
   height: 16px;
-  padding-inline: 4px;
+  padding-inline: var(--sp-4);
   color: #0b0b0d;
   background: var(--accent);
   font-size: 9px;
@@ -1246,7 +1271,7 @@ a {
 /* Кнопка «Войти» в шапке для гостя. */
 .ghost-button--inline {
   width: auto;
-  padding: 11px 14px;
+  padding: var(--sp-12) var(--sp-14);
 }
 
 /* ---------- Формы ------------------------------------------ */
@@ -1254,19 +1279,19 @@ a {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-14);
 }
 
 .form__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--sp-8);
   min-width: 0;
 }
 
@@ -1280,7 +1305,7 @@ a {
 
 .input {
   width: 100%;
-  padding: 11px 12px;
+  padding: var(--sp-12);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 0;
@@ -1370,7 +1395,7 @@ input[type='search']::-webkit-search-cancel-button {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 18px;
+  padding: var(--sp-16);
   background: rgba(4, 4, 6, 0.74);
   animation: overlay-in 140ms var(--ease);
 }
@@ -1425,8 +1450,8 @@ input[type='search']::-webkit-search-cancel-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 15px 18px;
+  gap: var(--sp-14);
+  padding: var(--sp-14) var(--dialog-pad);
   border-bottom: 1px solid var(--line);
   background: var(--panel-solid);
 }
@@ -1441,15 +1466,15 @@ input[type='search']::-webkit-search-cancel-button {
 .dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px;
+  gap: var(--sp-16);
+  padding: var(--dialog-pad);
 }
 
 .dialog__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 
 .dialog__actions .solid-button {
@@ -1459,12 +1484,12 @@ input[type='search']::-webkit-search-cancel-button {
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  margin: 16px 18px 0;
+  margin: var(--sp-16) var(--dialog-pad) 0;
   border: 1px solid var(--line);
 }
 
 .tab {
-  padding: 10px;
+  padding: var(--sp-10);
   color: var(--text-dim);
   border: 0;
   background: transparent;
@@ -1498,13 +1523,13 @@ input[type='search']::-webkit-search-cancel-button {
 .account {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--sp-16);
 }
 
 .account__main {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
 }
 
@@ -1520,7 +1545,7 @@ input[type='search']::-webkit-search-cancel-button {
 .account__meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   color: var(--text-faint);
   font-size: var(--fs-small);
 }
@@ -1528,20 +1553,22 @@ input[type='search']::-webkit-search-cancel-button {
 .account__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--sp-8);
+  /* Отступ до ряда кнопок вдвое больше строк текста — так глаз читает
+     действия как отдельный блок, а не третью строку подписи. */
+  margin-top: var(--sp-6);
 }
 
 .invite-box {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .invite-box__text {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 
 .invite-box__hint {
@@ -1554,9 +1581,9 @@ input[type='search']::-webkit-search-cancel-button {
 .code-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   min-width: 0;
-  padding: 9px 12px;
+  padding: var(--sp-8) var(--sp-12);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -1597,7 +1624,7 @@ input[type='search']::-webkit-search-cancel-button {
 
 .code-form__row {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 
 .code-form__row .input {
@@ -1614,7 +1641,7 @@ input[type='search']::-webkit-search-cancel-button {
 .results {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-6);
   max-height: 236px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1623,8 +1650,8 @@ input[type='search']::-webkit-search-cancel-button {
 .result {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
+  gap: var(--row-gap);
+  padding: var(--row-pad);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -1633,14 +1660,14 @@ input[type='search']::-webkit-search-cancel-button {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-4);
   min-width: 0;
 }
 
 .relation-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   color: var(--accent);
   font-size: var(--fs-micro);
   font-weight: 600;
@@ -1658,9 +1685,9 @@ input[type='search']::-webkit-search-cancel-button {
 .requests {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 10px;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-8);
+  padding: var(--sp-10);
   border: 1px solid var(--accent-line);
   background: var(--accent-fill);
 }
@@ -1677,9 +1704,8 @@ input[type='search']::-webkit-search-cancel-button {
 .request {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px;
-  padding-left: 8px;
+  gap: var(--sp-10);
+  padding: var(--sp-6) var(--sp-8);
   border: 1px solid var(--line);
   background: var(--panel-solid);
 }
@@ -1695,9 +1721,9 @@ input[type='search']::-webkit-search-cancel-button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   margin: auto;
-  padding: 26px 18px;
+  padding: var(--sp-24) var(--sp-16);
   text-align: center;
 }
 
@@ -1715,15 +1741,15 @@ input[type='search']::-webkit-search-cancel-button {
   line-height: 1.55;
 }
 
-.empty .mini-button {
-  margin-top: 4px;
-}
-
-/* Подвал панели друзей: мой код-приглашение. */
+/* Подвал панели друзей: мой код-приглашение. Одно правило на все его
+   свойства — раньше поля и линия жили в одном месте, а раскладка в
+   другом, и правка одного поля легко терялась. */
 .rail__foot {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--sp-8);
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+  border-top: 1px solid var(--line);
 }
 
 /* ---------- Тосты -------------------------------------------- */
@@ -1732,17 +1758,17 @@ input[type='search']::-webkit-search-cancel-button {
   position: fixed;
   z-index: 60;
   left: var(--pad-x);
-  bottom: max(16px, env(safe-area-inset-bottom));
+  bottom: max(var(--sp-16), env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-8);
   pointer-events: none;
 }
 
 .toast {
   margin: 0;
   max-width: 320px;
-  padding: 11px 14px;
+  padding: var(--sp-12) var(--sp-14);
   color: var(--text-soft);
   border: 1px solid var(--line);
   border-left: 2px solid var(--accent);
@@ -1779,21 +1805,13 @@ input[type='search']::-webkit-search-cancel-button {
   .empty {
     flex: 1 0 100%;
     margin: 0;
-    padding-block: 34px;
-  }
-
-  .rail__foot {
-    display: none;
+    padding-block: var(--sp-32);
   }
 }
 
 @media (max-width: 680px) {
   .form__grid {
     grid-template-columns: 1fr;
-  }
-
-  .dialog__body {
-    padding: 16px;
   }
 
   .code-form__row {
@@ -1820,21 +1838,21 @@ input[type='search']::-webkit-search-cancel-button {
 /* ---------- Редактор аватарки и настройки ------------------- */
 .avatar-editor {
   align-items: stretch;
-  gap: 18px;
+  gap: var(--sp-16);
 }
 
 .avatar-editor__workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 270px);
   align-items: start;
-  gap: 24px;
+  gap: var(--sp-24);
 }
 
 .avatar-editor__canvas-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 11px;
+  gap: var(--sp-12);
   min-width: 0;
 }
 
@@ -1882,7 +1900,7 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__grid {
   position: absolute;
   z-index: 1;
-  inset: 12px;
+  inset: var(--sp-12);
   border: 1px solid var(--avatar-outline);
   background-image:
     linear-gradient(to right, transparent 33.05%, var(--avatar-grid) 33.33%, transparent 33.62%, transparent 66.38%, var(--avatar-grid) 66.67%, transparent 66.95%),
@@ -1913,15 +1931,15 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__panel {
   display: flex;
   flex-direction: column;
-  gap: 17px;
+  gap: var(--sp-16);
   min-width: 0;
 }
 
 .avatar-editor__sample {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px;
+  gap: var(--sp-12);
+  padding: var(--sp-10);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -1939,7 +1957,7 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__sample-meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
 }
 
@@ -1953,7 +1971,7 @@ input[type='search']::-webkit-search-cancel-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .avatar-editor__zoom-value {
@@ -1965,7 +1983,7 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__zoom-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: var(--sp-6);
 }
 
 .avatar-editor__zoom-actions .mini-button {
@@ -1976,7 +1994,7 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__details {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding-block: 12px;
+  padding-block: var(--sp-12);
 }
 
 .avatar-editor__details summary {
@@ -1988,8 +2006,8 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__fine-controls {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-top: 14px;
+  gap: var(--sp-14);
+  padding-top: var(--sp-14);
 }
 
 .avatar-editor__reset {
@@ -1999,8 +2017,8 @@ input[type='search']::-webkit-search-cancel-button {
 .avatar-editor__footer {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-top: 16px;
+  gap: var(--sp-14);
+  padding-top: var(--sp-16);
   border-top: 1px solid var(--line);
 }
 
@@ -2011,19 +2029,19 @@ input[type='search']::-webkit-search-cancel-button {
 .settings-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-14);
 }
 
 @media (max-width: 680px) {
   .avatar-editor__workspace {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: var(--sp-16);
   }
 
   .avatar-editor__panel {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--sp-12);
   }
 
   .avatar-editor__sample,
@@ -2051,8 +2069,8 @@ input[type='search']::-webkit-search-cancel-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 13px 14px;
+  gap: var(--sp-16);
+  padding: var(--box-pad);
   border: 1px solid var(--line);
   background: var(--fill);
 }
@@ -2060,14 +2078,14 @@ input[type='search']::-webkit-search-cancel-button {
 .setting-row--column {
   align-items: stretch;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .setting-row > span {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--sp-4);
   min-width: 0;
 }
 
@@ -2098,8 +2116,8 @@ input[type='search']::-webkit-search-cancel-button {
 .switch::after {
   content: '';
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: var(--sp-4);
+  left: var(--sp-4);
   width: 12px;
   height: 12px;
   background: var(--text-faint);
@@ -2130,7 +2148,7 @@ input[type='search']::-webkit-search-cancel-button {
 .admin-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-2);
   max-height: min(46vh, 46dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -2141,9 +2159,9 @@ input[type='search']::-webkit-search-cancel-button {
 .admin-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   width: 100%;
-  padding: 9px 10px;
+  padding: var(--row-pad);
   border: 1px solid transparent;
   background: none;
   color: inherit;
@@ -2167,7 +2185,7 @@ button.admin-row:hover {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--sp-2);
   min-width: 0;
 }
 
@@ -2201,8 +2219,8 @@ button.admin-row:hover {
 .admin-stat {
   display: flex;
   justify-content: space-between;
-  gap: 14px;
-  padding: 9px 12px;
+  gap: var(--sp-14);
+  padding: var(--sp-8) var(--sp-12);
   background: var(--fill);
   font-size: var(--fs-small);
 }
@@ -2224,8 +2242,8 @@ button.admin-row:hover {
 .danger-zone {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--sp-10);
+  padding: var(--sp-14);
   border: 1px solid var(--danger-line);
   background: var(--danger-fill);
 }
