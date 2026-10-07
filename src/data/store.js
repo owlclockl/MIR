@@ -26,6 +26,7 @@ const KEYS = {
   requests: 'mir:requests',
   session: 'mir:session',
   hub: 'mir:hub',
+  settings: 'mir:settings',
 };
 
 /* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
@@ -323,6 +324,14 @@ const localBackend = {
     this.updateUser(userId, { online: false });
   },
 
+  async setName(userId, name) {
+    validNameOrThrow(name);
+    const owner = this.findByName(name);
+    if (owner && owner.id !== userId) throw new Error('Это имя занято.');
+    this.updateUser(userId, { name: name.trim(), nameKey: name.trim().toLowerCase() });
+    return {};
+  },
+
   async setPassword(userId, { oldHash, nextSalt, nextHash }) {
     const user = this.listUsers().find((u) => u.id === userId);
     if (!user) throw new Error('Вы не вошли в аккаунт.');
@@ -456,6 +465,12 @@ const hubBackend = {
 
   async offline() {
     await remote.apiOffline();
+  },
+
+  async setName(userId, name) {
+    const { state } = await remote.apiName(name);
+    remote.applyState(state);
+    return {};
   },
 
   async setPassword(userId, { oldHash, nextSalt, nextHash }) {
@@ -825,6 +840,17 @@ export const logout = () => {
   notify();
 };
 
+export const changeName = async (name) => {
+  const me = getCurrentUser();
+  if (!me) throw new Error('Вы не вошли в аккаунт.');
+  const displayName = String(name || '').trim();
+  validateName(displayName);
+  if (displayName === me.name) return me;
+  await backend.setName(me.id, displayName);
+  notify();
+  return getCurrentUser();
+};
+
 export const changePassword = async (oldPassword, newPassword) => {
   const me = getCurrentUser();
   if (!me) throw new Error('Вы не вошли в аккаунт.');
@@ -834,6 +860,29 @@ export const changePassword = async (oldPassword, newPassword) => {
   const nextHash = await hashPassword(nextSalt, newPassword);
   await backend.setPassword(me.id, { oldHash, nextSalt, nextHash });
   notify();
+};
+
+/* ---------- настройки интерфейса --------------------------- */
+
+const DEFAULT_SETTINGS = Object.freeze({ sound: true, volume: 0.55, motion: true });
+
+export const getSettings = () => {
+  const saved = readJSON(KEYS.settings, {});
+  return {
+    sound: saved.sound !== false,
+    volume: Math.max(0, Math.min(1, Number(saved.volume ?? DEFAULT_SETTINGS.volume))),
+    motion: saved.motion !== false,
+  };
+};
+
+export const updateSettings = (patch) => {
+  const next = { ...getSettings(), ...patch };
+  next.sound = !!next.sound;
+  next.motion = !!next.motion;
+  next.volume = Math.max(0, Math.min(1, Number(next.volume) || 0));
+  writeJSON(KEYS.settings, next);
+  notify();
+  return next;
 };
 
 /* ---------- аватар ------------------------------------------ */

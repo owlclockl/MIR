@@ -149,7 +149,7 @@ writeFileSync(
   manifestPath,
   `<?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="0.4.0.0" name="MIR.Setup" type="win32" />
+  <assemblyIdentity version="0.5.0.0" name="MIR.Setup" type="win32" />
   <description>MIR — The civilization of the sages</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>

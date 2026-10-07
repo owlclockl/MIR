@@ -33,6 +33,12 @@ export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) 
       inlineScript = readFileSync(join('dist', path), 'utf8')
         /* Встроенный скрипт не должен содержать "</script" даже в строках. */
         .replaceAll('</script', '<\\/script');
+      /* У однофайловой версии нет каталога public: короткие CC0-звуки
+         превращаем в data URL, чтобы они работали по file:// и внутри APK. */
+      for (const sound of ['click', 'success', 'message', 'error']) {
+        const data = readFileSync(join('public', 'sounds', `${sound}.wav`)).toString('base64');
+        inlineScript = inlineScript.replaceAll(`/sounds/${sound}.wav`, `data:audio/wav;base64,${data}`);
+      }
       return '';
     },
   );

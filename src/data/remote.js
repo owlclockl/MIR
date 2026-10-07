@@ -66,6 +66,7 @@ export const apiRegister = (payload) => call('POST', '/api/register', payload);
 export const apiLogin = (payload) => call('POST', '/api/login', payload);
 export const apiHeartbeat = () => call('POST', '/api/heartbeat', {});
 export const apiOffline = () => call('POST', '/api/offline', { token: tokenGetter() });
+export const apiName = (name) => call('POST', '/api/name', { name });
 export const apiPassword = (payload) => call('POST', '/api/password', payload);
 export const apiAvatar = (avatar) => call('POST', '/api/avatar', { avatar });
 export const apiRequest = (to) => call('POST', '/api/request', { to });
