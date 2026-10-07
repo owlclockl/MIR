@@ -388,15 +388,33 @@ const DEX_OPCODES = {
   0x0c: 'move-result-object',
   0x0d: 'move-exception',
   0x0e: 'return-void',
+  0x0f: 'return',
   0x12: 'const/4',
+  0x13: 'const/16',
   0x1a: 'const-string',
   0x22: 'new-instance',
   0x28: 'goto',
+  0x38: 'if-eqz',
+  0x39: 'if-nez',
+  0x54: 'iget-object',
+  0x5b: 'iput-object',
+  0x62: 'sget-object',
+  0x69: 'sput-object',
   0x6e: 'invoke-virtual',
   0x6f: 'invoke-super',
   0x70: 'invoke-direct',
   0x71: 'invoke-static',
   0x72: 'invoke-interface',
+};
+
+/* Сколько 16-битных слов занимает инструкция. Без этого дизассемблер
+   сбивается на первой незнакомой инструкции и дальше расшифровывает
+   мусор: «непонятный» лог хуже честной ошибки. */
+const DEX_INSN_LENGTH = {
+  0x00: 1, 0x0c: 1, 0x0d: 1, 0x0e: 1, 0x0f: 1, 0x12: 1,
+  0x13: 2, 0x1a: 2, 0x22: 2, 0x28: 1, 0x38: 2, 0x39: 2,
+  0x54: 2, 0x5b: 2, 0x62: 2, 0x69: 2,
+  0x6e: 3, 0x6f: 3, 0x70: 3, 0x71: 3, 0x72: 3,
 };
 
 /** Разбирает classes.dex: заголовок, пулы, классы, методы и байт-код. */
@@ -481,6 +499,24 @@ export function parseDex(buf) {
     methods.push({ cls, name, proto, text: `${cls}->${name}(${proto.params.join('')})${proto.ret}` });
   }
 
+  /* Поля: class_idx, type_idx, name_idx — по ним читаются sget/iput. */
+  const fields = [];
+  for (let i = 0; i < header.fieldIdsSize; i++) {
+    const o = header.fieldIdsOff + i * 8;
+    const classIdx = buf.readUInt16LE(o);
+    const nameIdx = buf.readUInt32LE(o + 4);
+    const cls = types[classIdx];
+    const type = types[buf.readUInt16LE(o + 2)];
+    const name = strings[nameIdx];
+    fields.push({ classIdx, nameIdx, cls, type, name, text: `${cls}->${name}:${type}` });
+  }
+  for (let i = 1; i < fields.length; i++) {
+    const prev = fields[i - 1];
+    const cur = fields[i];
+    if (prev.classIdx > cur.classIdx || (prev.classIdx === cur.classIdx && prev.nameIdx > cur.nameIdx))
+      problems.push('field_ids не отсортированы по классу и имени');
+  }
+
   const disasm = (code, insnsOff, insnsSize) => {
     const lines = [];
     let i = 0;
@@ -490,7 +526,8 @@ export function parseDex(buf) {
       const hi = unit >> 8;
       const name = DEX_OPCODES[op] ?? `op0x${op.toString(16)}`;
       let text = name;
-      let len = 1;
+      const len = DEX_INSN_LENGTH[op] ?? 0;
+      if (!len) problems.push(`неизвестная инструкция 0x${op.toString(16)} в ${code}`);
       if (op >= 0x6e && op <= 0x72) {
         const a = hi >> 4;
         const g = hi & 0xf;
@@ -498,25 +535,35 @@ export function parseDex(buf) {
         const regsWord = buf.readUInt16LE(insnsOff + (i + 2) * 2);
         const regs = [regsWord & 0xf, (regsWord >> 4) & 0xf, (regsWord >> 8) & 0xf, (regsWord >> 12) & 0xf, g].slice(0, a);
         text = `${name} {${regs.map((r) => `v${r}`).join(', ')}}, ${methods[midx]?.text ?? `метод №${midx}`}`;
-        len = 3;
       } else if (op === 0x1a) {
         const idx = buf.readUInt16LE(insnsOff + (i + 1) * 2);
         text = `${name} v${hi}, ${JSON.stringify(strings[idx] ?? '')}`;
-        len = 2;
       } else if (op === 0x22) {
         const idx = buf.readUInt16LE(insnsOff + (i + 1) * 2);
         text = `${name} v${hi}, ${types[idx] ?? idx}`;
-        len = 2;
+      } else if (op === 0x62 || op === 0x69) {
+        const idx = buf.readUInt16LE(insnsOff + (i + 1) * 2);
+        text = `${name} v${hi}, ${fields[idx]?.text ?? `поле №${idx}`}`;
+      } else if (op === 0x54 || op === 0x5b) {
+        const idx = buf.readUInt16LE(insnsOff + (i + 1) * 2);
+        text = `${name} v${hi & 0xf}, v${hi >> 4}, ${fields[idx]?.text ?? `поле №${idx}`}`;
+      } else if (op === 0x38 || op === 0x39) {
+        const raw = buf.readUInt16LE(insnsOff + (i + 1) * 2);
+        const delta = raw > 0x7fff ? raw - 0x10000 : raw;
+        text = `${name} v${hi}, ${delta >= 0 ? '+' : ''}${delta} (на 0x${(i + delta).toString(16)})`;
+      } else if (op === 0x13) {
+        const raw = buf.readUInt16LE(insnsOff + (i + 1) * 2);
+        text = `${name} v${hi}, ${raw > 0x7fff ? raw - 0x10000 : raw}`;
       } else if (op === 0x12) {
         text = `${name} v${hi & 0xf}, ${hi >> 4}`;
-      } else if (op === 0x0c || op === 0x0d) {
+      } else if (op === 0x0c || op === 0x0d || op === 0x0f) {
         text = `${name} v${hi}`;
       } else if (op === 0x28) {
         const delta = hi > 127 ? hi - 256 : hi;
         text = `${name} ${delta >= 0 ? '+' : ''}${delta} (на 0x${(i + delta).toString(16)})`;
       }
       lines.push(`    ${String(i).padStart(4, '0')}: ${text}`);
-      i += len;
+      i += len || 1;
     }
     return lines;
   };
@@ -529,6 +576,7 @@ export function parseDex(buf) {
       accessFlags: buf.readUInt32LE(o + 4),
       superclass: types[buf.readUInt32LE(o + 8)],
       sourceFile: strings[buf.readUInt32LE(o + 16)] ?? null,
+      fields: [],
       methods: [],
     };
     const classDataOff = buf.readUInt32LE(o + 24);
@@ -543,9 +591,15 @@ export function parseDex(buf) {
       const instanceFields = take();
       const directMethods = take();
       const virtualMethods = take();
-      for (let f = 0; f < staticFields + instanceFields; f++) {
-        take();
-        take();
+      let fieldIndex = 0;
+      for (const [count, kind] of [[staticFields, 'static'], [instanceFields, 'instance']]) {
+        for (let f = 0; f < count; f++) {
+          fieldIndex += take();
+          const access = take();
+          const field = fields[fieldIndex];
+          if (!field) problems.push(`class_data ссылается на несуществующее поле №${fieldIndex}`);
+          else cls.fields.push({ kind, access, ...field });
+        }
       }
       for (const [count, kind] of [
         [directMethods, 'direct'],
@@ -576,10 +630,11 @@ export function parseDex(buf) {
               const triesOff = codeOff + 16 + insnsSize * 2 + (insnsSize % 2 ? 2 : 0);
               for (let t = 0; t < tries; t++) {
                 const to = triesOff + t * 8;
+                /* try_item: start_addr (4), insn_count (2), handler_off (2). */
                 method.code.handlers.push({
                   start: buf.readUInt32LE(to),
-                  count: buf.readUInt16LE(to + 2),
-                  handlerOff: buf.readUInt16LE(to + 4),
+                  count: buf.readUInt16LE(to + 4),
+                  handlerOff: buf.readUInt16LE(to + 6),
                 });
               }
             }
@@ -600,7 +655,7 @@ export function parseDex(buf) {
     }
   }
 
-  return { header, strings, types, protos, methods, classes, mapItems, problems };
+  return { header, strings, types, protos, fields, methods, classes, mapItems, problems };
 }
 
 export function adler32(buf) {

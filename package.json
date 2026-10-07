@@ -1,7 +1,7 @@
 {
   "name": "mir-game-menu",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -30,6 +30,7 @@
     "test:hub": "node scripts/test-hub.mjs",
     "test:worker": "node scripts/test-worker.mjs",
     "test:ui": "node scripts/test-ui.mjs",
+    "test:avatar": "node scripts/test-avatar.mjs",
     "test:perf": "node scripts/test-perf.mjs",
     "test:build": "node scripts/test-build.mjs",
     "test:spacing": "node scripts/test-spacing.mjs"
