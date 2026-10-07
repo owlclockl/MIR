@@ -55,6 +55,19 @@
   --rail-w: 304px;
   --pad-x: clamp(16px, 2vw, 24px);
 
+  /* Высоты элементов управления. Раньше высота получалась из полей, и в
+     одном ряду оказывались кнопки разного роста: мини-кнопка 30, основная
+     39, поле ввода 45, «Войти» в шапке 42 при 40 у соседней иконки.
+     Теперь высота задаётся токеном, а ряды со смешанными кнопками
+     растягиваются (align-items: stretch) — ряд получается ровным сам.
+     Ступени: 44 — основные контролы (основная кнопка, поле ввода,
+     крупная иконка — это и цель для пальца на телефоне), 36 — рядом с
+     аватарками 34/32 в строках списков и заявках. На телефоне мини-ступень
+     подтягивается до 44 в медиа-запросе ниже. */
+  --control-h: 44px;
+  --control-h-sm: 36px;
+  --control-h-mini: 36px;
+
   /* Единые поля компонентов: по ним выравниваются шапка, тело и вкладки
      одного окна, а также шапка, список и подвал панели друзей. Менять
      поле окна нужно в одном месте — рассинхрона «шапка 18, тело 16» не
@@ -218,8 +231,8 @@ a {
 .icon-button {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--control-h);
+  height: var(--control-h);
   flex: none;
   padding: 0;
   color: var(--text-dim);
@@ -243,8 +256,8 @@ a {
 }
 
 .icon-button--sm {
-  width: 34px;
-  height: 34px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
 }
 
 .icon-button--sm .icon {
@@ -851,7 +864,7 @@ a {
 
 .link-box__actions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--sp-8);
   flex-wrap: wrap;
 }
@@ -994,6 +1007,8 @@ a {
 @media (max-width: 860px) {
   :root {
     --bar-h: 68px;
+    /* На телефоне и мини-кнопки — цели для пальца: не меньше 44 пикселей. */
+    --control-h-mini: 44px;
   }
 
   .shell {
@@ -1158,6 +1173,7 @@ a {
   justify-content: center;
   gap: var(--sp-10);
   width: 100%;
+  min-height: var(--control-h);
   padding: var(--sp-12) var(--sp-16);
   color: #0b0b0d;
   border: 1px solid transparent;
@@ -1189,6 +1205,8 @@ a {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-8);
+  min-height: var(--control-h-mini);
+  max-width: 100%;
   padding: var(--sp-8) var(--sp-12);
   color: var(--text-soft);
   border: 1px solid var(--line);
@@ -1271,7 +1289,8 @@ a {
 /* Кнопка «Войти» в шапке для гостя. */
 .ghost-button--inline {
   width: auto;
-  padding: var(--sp-12) var(--sp-14);
+  min-height: var(--control-h);
+  padding: 0 var(--sp-14);
 }
 
 /* ---------- Формы ------------------------------------------ */
@@ -1305,7 +1324,8 @@ a {
 
 .input {
   width: 100%;
-  padding: var(--sp-12);
+  min-height: var(--control-h);
+  padding: var(--sp-8) var(--sp-12);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 0;
@@ -1710,9 +1730,11 @@ input[type='search']::-webkit-search-cancel-button {
   background: var(--panel-solid);
 }
 
+/* Заявка — самая плотная строка: кнопки по росту аватарки 32, а не 30,
+   как было раньше (30 — уже не цель для пальца). */
 .request .icon-button {
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-mini);
+  height: var(--control-h-mini);
 }
 
 /* ---------- Пустые состояния ---------------------------------- */

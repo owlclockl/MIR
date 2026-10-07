@@ -2075,6 +2075,16 @@ const pickAndPreviewAvatar = async () => {
     ui.pendingAvatarFile = file;
     ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
     ui.avatarDrag = null;
+  } catch {
+    return;
+  }
+  if (!file) return;
+  try {
+    releaseAvatarPreview(ui.pendingAvatar);
+    ui.pendingAvatar = createAvatarPreview(file);
+    ui.pendingAvatarFile = file;
+    ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
+    ui.avatarDrag = null;
     ui.modal = { type: 'avatar-preview' };
     renderModal();
   } catch (error) {
@@ -2319,7 +2329,10 @@ const actions = {
     toast('Локальные аккаунты очищены.');
   },
 
-  'close-modal': () => closeModal(),
+  'close-modal': () => {
+    closeModal();
+    playSound('close');
+  },
 
   'overlay-down': (el, event) => {
     if (event.target === el) closeModal();

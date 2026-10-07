@@ -31,6 +31,14 @@ export const BUDGETS = {
 
 const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
 
+/* Звуки интерфейса: файлы из src/assets/sounds/ (mp3 из библиотеки UI SFX,
+   см. scripts/sounds.mjs). Список читается с диска, а не прошивается числом:
+   набор звуков меняется командой `npm run sounds`, и проверка обязана
+   подхватить новый состав сама. */
+const SOUND_FILES = existsSync('src/assets/sounds')
+  ? readdirSync('src/assets/sounds').filter((name) => name.endsWith('.mp3'))
+  : [];
+
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} КБ`;
 
 /** Локальные ссылки разметки (/assets/…, /icons/…) и их наличие в dist. */
@@ -193,10 +201,11 @@ export function checkSingle() {
     expected,
   );
 
+  const embeddedSounds = (html.match(/data:audio\/mpeg;base64/g) ?? []).length;
   add(
-    (html.match(/data:audio\/wav;base64/g) ?? []).length >= 4,
+    embeddedSounds >= SOUND_FILES.length,
     'все звуки интерфейса встроены',
-    `${(html.match(/data:audio\/wav;base64/g) ?? []).length} из 4`,
+    `${embeddedSounds} из ${SOUND_FILES.length}`,
   );
   add(/rel="icon"[^>]*href="data:image\/png;base64,/.test(html), 'значок вкладки встроен');
 
