@@ -140,7 +140,7 @@ $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bu
 await wait(400);
 ok('неверный ключ не пускает в панель', !$('[data-action="admin-tab"]'));
 
-$('[data-role="admin-key"]').value = 'mir-admin';
+$('[data-role="admin-key"]').value = 'owlananaslwo';
 $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
 await wait(600);
 ok('заводской ключ пускает в панель', !!$('[data-action="admin-tab"]'), $('[data-role="form-error"]')?.textContent?.trim());
@@ -151,6 +151,83 @@ ok('диагностика показывает локальный режим', 
 click('[data-action="close-modal"]');
 await wait(100);
 ok('панель закрывается, меню на месте', !$('.dialog') && !!$('.shell'));
+
+/* Перезагрузка страницы не должна выкидывать из аккаунта. Регрессия:
+   страница открыта на адресе хаба, хаб подключён через окно «Общий хаб»
+   (сессия записывает хаб как «тот же адрес», а в хранилище — полный URL);
+   раньше при перезагрузке адреса не сходились и сессию удаляли. */
+{
+  const pageUrl = `${HUB}/`;
+  const bootPage = (saved) => {
+    const origin = new URL(pageUrl).origin;
+    const d = new JSDOM(html, {
+      runScripts: 'dangerously',
+      url: pageUrl,
+      pretendToBeVisual: true,
+      beforeParse(w) {
+        w.HTMLMediaElement.prototype.play = () => Promise.resolve();
+        w.HTMLMediaElement.prototype.pause = () => {};
+        /* В браузере относительные запросы (хаб «у себя») ходят на адрес
+           страницы; fetch из Node так не умеет — подставляем origin. */
+        w.fetch = (input, init) => globalThis.fetch(new URL(String(input), origin).href, init);
+        w.AbortSignal = globalThis.AbortSignal;
+        w.crypto.subtle = globalThis.crypto.subtle;
+        for (const [key, value] of Object.entries(saved ?? {})) w.localStorage.setItem(key, value);
+      },
+    });
+    return d;
+  };
+  const dumpStorage = (w) => {
+    const out = {};
+    for (let i = 0; i < w.localStorage.length; i += 1) {
+      const key = w.localStorage.key(i);
+      out[key] = w.localStorage.getItem(key);
+    }
+    return out;
+  };
+
+  const first = bootPage(null);
+  const w1 = first.window;
+  const errs1 = [];
+  w1.addEventListener('error', (e) => errs1.push(e.message));
+  await wait(2500); // стартовая проверка хаба на адресе страницы
+  const q1 = (sel) => w1.document.querySelector(sel);
+  const click1 = (sel) => {
+    const el = q1(sel);
+    if (!el) throw new Error(`нет элемента ${sel}`);
+    el.dispatchEvent(new w1.MouseEvent('click', { bubbles: true }));
+  };
+  click1('[data-action="open-hub"]');
+  await wait(150);
+  q1('[data-role="hub-input"]').value = HUB; // предложенный адрес — сам хаб
+  q1('form[data-form="connect-hub"]').dispatchEvent(new w1.Event('submit', { bubbles: true, cancelable: true }));
+  await wait(1500);
+  click1('[data-action="close-modal"]');
+  await wait(100);
+  click1('[data-action="open-auth"]');
+  await wait(100);
+  click1('[data-action="auth-tab"][data-tab="register"]');
+  await wait(100);
+  const reloadName = `rl${Math.floor(Math.random() * 9000) + 1000}`;
+  const rform = q1('form[data-form="register"]');
+  rform.elements.name.value = reloadName;
+  rform.elements.password.value = 'secret123';
+  rform.elements.password2.value = 'secret123';
+  rform.dispatchEvent(new w1.Event('submit', { bubbles: true, cancelable: true }));
+  await wait(2500);
+  ok('перезагрузка: аккаунт создан, страница на адресе хаба', (q1('.profile')?.textContent || '').includes(reloadName), q1('.profile')?.textContent?.trim());
+  const saved = dumpStorage(w1);
+  first.window.close();
+
+  const second = bootPage(saved); // «перезагрузка» той же страницы
+  const w2 = second.window;
+  const errs2 = [];
+  w2.addEventListener('error', (e) => errs2.push(e.message));
+  await wait(3500);
+  ok('перезагрузка: вход в аккаунт сохранился', (w2.document.querySelector('.profile')?.textContent || '').includes(reloadName), w2.document.querySelector('.profile')?.textContent?.trim() || 'гость');
+  ok('перезагрузка: ошибок в консоли нет', errs1.length === 0 && errs2.length === 0, [...errs1, ...errs2].join(' | '));
+  second.window.close();
+}
 
 ok('ошибок в консоли по-прежнему нет', errors.length === 0, errors.join(' | '));
 

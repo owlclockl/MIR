@@ -61,13 +61,17 @@ export class MirHub {
       }
       const requests = (await state.storage.get('reqs')) ?? [];
       this.snapshot.set('reqs', JSON.stringify(requests));
-      this.db = { users, requests };
+      const adminKey = (await state.storage.get('adminKey')) ?? '';
+      this.snapshot.set('adminKey', JSON.stringify(adminKey));
+      this.db = { users, requests, adminKey: typeof adminKey === 'string' ? adminKey : '' };
       this.core = createHubCore({
         db: this.db,
         persist: (_db, { immediate }) => this.persist(immediate),
-        /* Панель админа на хостинге включается только своим секретом:
-           адрес тут публичный, и ключа по умолчанию быть не должно.
-           Секрет задаётся командой
+        /* Ключ панели: сменённый через панель лежит в хранилище объекта
+           (adminKey выше), секрет воркера MIR_ADMIN_KEY задаёт свой
+           начальный ключ, а по умолчанию действует заводской
+           HUB_DEFAULT_ADMIN_KEY — адрес публичный, поэтому панель сама
+           напоминает сменить заводской ключ. Секрет задаётся командой
              npx wrangler secret put MIR_ADMIN_KEY
            или переменной [vars] в wrangler.toml. */
         adminKey: String(this.env?.MIR_ADMIN_KEY || '').trim(),
@@ -92,6 +96,12 @@ export class MirHub {
     if (this.snapshot.get('reqs') !== requests) {
       puts.reqs = this.db.requests;
       this.snapshot.set('reqs', requests);
+    }
+    /* Ключ панели админа, сменённый через панель, живёт в данных хаба. */
+    const adminKey = JSON.stringify(this.db.adminKey ?? '');
+    if (this.snapshot.get('adminKey') !== adminKey) {
+      puts.adminKey = this.db.adminKey ?? '';
+      this.snapshot.set('adminKey', adminKey);
     }
     const gone = [...this.snapshot.keys()].filter((key) => key.startsWith('u:') && !alive.has(key));
     /* Больше 128 ключей за раз хранилище не принимает. */

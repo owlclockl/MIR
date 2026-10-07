@@ -84,6 +84,10 @@ const ui = {
   modal: null, // { type, data }
   admin: adminState(),
   authTab: 'login',
+  /* Черновики полей входа/регистрации: окно перерисовывается при обновлении
+     данных хаба, и без черновиков введённый текст пропадал бы вместе со
+     старой разметкой (окно «открывалось пустым»). */
+  authDraft: { name: '', password: '', password2: '' },
   addQuery: '',
   codeValue: '',
   pendingAvatar: null,
@@ -124,6 +128,7 @@ const closeModal = () => {
   ui.avatarDrag = null;
   ui.codeValue = '';
   ui.chatDraft = '';
+  ui.authDraft = { name: '', password: '', password2: '' };
   const root = overlayRoot();
   if (root) root.innerHTML = '';
   /* Слой окон пуст: помнить прежнюю разметку больше нельзя, иначе
@@ -177,12 +182,14 @@ const authModalHtml = () => {
         <label class="field">
           <span class="field__label">Имя игрока</span>
           <input class="input" name="name" type="text" minlength="3" maxlength="16"
-                 autocomplete="username" spellcheck="false" required data-autofocus ${lock} />
+                 autocomplete="username" spellcheck="false" required data-autofocus
+                 data-role="auth-name" value="${escapeHtml(ui.authDraft.name)}" ${lock} />
         </label>
         <label class="field">
           <span class="field__label">Пароль</span>
           <input class="input" name="password" type="password" minlength="6" maxlength="72"
-                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required ${lock} />
+                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required
+                 data-role="auth-password" value="${escapeHtml(ui.authDraft.password)}" ${lock} />
         </label>
         ${
           isLogin
@@ -190,7 +197,8 @@ const authModalHtml = () => {
             : `<label class="field">
           <span class="field__label">Пароль ещё раз</span>
           <input class="input" name="password2" type="password" minlength="6" maxlength="72"
-                 autocomplete="new-password" required ${lock} />
+                 autocomplete="new-password" required
+                 data-role="auth-password2" value="${escapeHtml(ui.authDraft.password2)}" ${lock} />
         </label>`
         }
         <p class="form-error" data-role="form-error" hidden></p>
@@ -889,7 +897,7 @@ const adminLoginHtml = () => {
     <div class="divider" role="separator"></div>
     <p class="hint">${
       hub
-        ? 'На хабе ключ задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске или секрет воркера на хостинге. Если ключ не задан, хаб панель не открывает.'
+        ? `На хабе ключ по умолчанию — <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> (он в открытом исходнике). Владелец мог задать свой: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге — либо сменить ключ после входа, во вкладке «Система».`
         : `Ключ по умолчанию — <code translate="no">${escapeHtml(
             store.DEFAULT_ADMIN_KEY,
           )}</code>. Он подходит только для аккаунтов этого браузера; смените его во вкладке «Система».`
@@ -1130,13 +1138,14 @@ const adminSystemHtml = () => {
     <div class="divider" role="separator"></div>
 
     ${
-      data?.mode === 'hub'
-        ? `<p class="hint">Ключ этого хаба задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге. Смена ключа из панели на хабе выключена — иначе чужой человек с одним входом получил бы все.</p>`
-        : `
+      data?.mode === 'hub' && data?.keyDefault
+        ? `<p class="form-note form-note--warn">Сейчас действует заводской ключ <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> — он в открытом исходнике. Смените его ниже: новый ключ запишется в данные хаба и переживёт перезапуск.</p>`
+        : ''
+    }
     <form class="form" data-form="admin-new-key" novalidate>
       <p class="eyebrow">Ключ администратора</p>
       <p class="form-note">${
-        store.adminKeyIsDefault()
+        (data?.keyDefault ?? store.adminKeyIsDefault())
           ? 'Сейчас действует заводской ключ. Придумайте свой — иначе панель открыта каждому, кто читал инструкцию.'
           : 'Свой ключ установлен. Забыли его — кнопка ниже вернёт заводской.'
       }</p>
@@ -1167,8 +1176,7 @@ const adminSystemHtml = () => {
       <button class="mini-button mini-button--danger" type="button" data-action="admin-wipe">
         ${icon('trash', 'icon--xs')} Очистить локальные аккаунты
       </button>
-    </div>`
-    }`;
+    </div>`;
 };
 
 const adminModalHtml = () => {
@@ -1717,7 +1725,11 @@ const withBusy = async (form, fn) => {
     await fn();
   } catch (error) {
     playSound('error');
-    setFormError(form, error instanceof Error ? error.message : 'Что-то пошло не так.');
+    /* За время запроса окно могло перерисоваться (обновление данных хаба):
+       старый узел формы тогда висит вне документа, и ошибка в нём не видна.
+       Ищем живую форму с тем же data-form. */
+    const live = document.querySelector(`form[data-form="${form.dataset.form}"]`) ?? form;
+    setFormError(live, error instanceof Error ? error.message : 'Что-то пошло не так.');
   } finally {
     submit?.removeAttribute('disabled');
   }
@@ -1983,6 +1995,9 @@ document.addEventListener('input', (event) => {
   if (role === 'admin-key') ui.admin.keyDraft = event.target.value;
   if (role === 'chat-input') ui.chatDraft = event.target.value;
   if (role === 'hub-input') ui.hubDraft = event.target.value;
+  if (role === 'auth-name') ui.authDraft.name = event.target.value;
+  if (role === 'auth-password') ui.authDraft.password = event.target.value;
+  if (role === 'auth-password2') ui.authDraft.password2 = event.target.value;
   if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
   if (role === 'direct-answer') ui.direct.answerDraft = event.target.value;
   if (role === 'code-input') {
@@ -2293,7 +2308,7 @@ const actions = {
   },
 
   'admin-forget-key-run': async () => {
-    store.adminResetKey();
+    await store.adminResetKey();
     ui.modal = { type: 'admin' };
     renderModal({ focus: false });
     toast('Заводской ключ возвращён.');
@@ -2319,7 +2334,10 @@ const actions = {
     toast('Локальные аккаунты очищены.');
   },
 
-  'close-modal': () => closeModal(),
+  'close-modal': () => {
+    closeModal();
+    playSound('close');
+  },
 
   'overlay-down': (el, event) => {
     if (event.target === el) closeModal();
