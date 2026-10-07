@@ -3,13 +3,20 @@
 
    Два бэкенда с одинаковым интерфейсом:
    — local: «база» в localStorage этого браузера (нет сети, mir.html);
-   — hub:   общий хаб локальной сети (serve.mjs поднимает /api/*).
-   Выбор происходит в initBackend(): если по адресу, откуда открыто
-   меню, отвечает хаб — работаем через него, иначе локально.
+   — hub:   общий хаб (serve.mjs на ПК или бесплатный хостинг — /api/*).
+   Выбор происходит в initBackend(), по порядку:
+
+     1. адрес из ссылки `?hub=https://…` — так друг присылает хаб;
+     2. адрес, сохранённый игроком в окне «Общий хаб»;
+     3. адрес, вшитый в сборку (VITE_MIR_HUB) — для APK и mir.html;
+     4. тот адрес, откуда открыта игра;
+     5. ничего из этого не ответило — работаем локально.
 
    Сессия всегда локальная (mir:session): в hub-режиме в ней лежит
-   токен, который выдал хаб при входе. Хеши паролей считаются на
-   клиенте — по сети пароль никогда не ходит.
+   токен, который выдал хаб при входе, и адрес этого хаба — токен
+   чужого хаба бессмысленен, поэтому при смене адреса сессия
+   сбрасывается. Хеши паролей считаются на клиенте — по сети пароль
+   никогда не ходит.
    =========================================================== */
 
 import * as remote from './remote.js';
@@ -18,7 +25,19 @@ const KEYS = {
   users: 'mir:users',
   requests: 'mir:requests',
   session: 'mir:session',
+  hub: 'mir:hub',
 };
+
+/* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
+   Нужен для APK и mir.html — там «адрес страницы» это file://, и
+   узнать хаб больше неоткуда. */
+const BUILT_IN_HUB = (() => {
+  try {
+    return String(import.meta.env?.VITE_MIR_HUB || '').trim();
+  } catch {
+    return '';
+  }
+})();
 
 /* Имена, которые нельзя занять: они используются интерфейсом. */
 const RESERVED_NAMES = new Set(['гость', 'guest', 'игрок', 'player']);
@@ -508,8 +527,73 @@ let backend = localBackend;
 
 export const backendMode = () => backend.mode;
 export const isHub = () => backend.mode === 'hub';
-export const backendLabel = () =>
-  backend.mode === 'hub' ? 'Общий хаб сети' : 'Этот браузер';
+
+/* ---------- адрес хаба ---------------------------------------
+   Хаб бывает трёх сортов, и человеку важно видеть, в каком он мире:
+   свой браузер, адрес страницы (ПК в сети или хостинг) или чужой
+   адрес, введённый руками. */
+
+const HUB_OFF = 'local'; // игрок сам отказался от хаба
+
+const trimSlash = (url) => String(url ?? '').trim().replace(/\/+$/, '');
+
+/** «mir.имя.workers.dev» → «https://mir.имя.workers.dev». */
+export const normalizeHubUrl = (raw) => {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  const withScheme = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  let parsed;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    throw new Error('Это не похоже на адрес. Пример: https://mir.имя.workers.dev');
+  }
+  if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost')
+    throw new Error('В адресе не хватает домена. Пример: https://mir.имя.workers.dev');
+  return trimSlash(`${parsed.origin}${parsed.pathname}`);
+};
+
+/** Страница по https не имеет права дёргать хаб по http — браузер молча режет. */
+const mixedContent = (url) =>
+  typeof location !== 'undefined' && location.protocol === 'https:' && /^http:\/\//i.test(url);
+
+const storedHub = () => trimSlash(storage.getItem(KEYS.hub) || '');
+
+const queryHub = () => {
+  try {
+    return trimSlash(new URLSearchParams(location.search).get('hub') || '');
+  } catch {
+    return '';
+  }
+};
+
+/** Текущий адрес хаба: '' — тот же, что у страницы; null — хаба нет. */
+export const hubUrl = () => (backend.mode === 'hub' ? remote.getBase() : null);
+
+/** Короткое имя хаба для интерфейса. */
+export const hubHost = () => {
+  if (backend.mode !== 'hub') return '';
+  const base = remote.getBase();
+  if (!base) return typeof location !== 'undefined' ? location.host : 'этот адрес';
+  try {
+    return new URL(base).host;
+  } catch {
+    return base;
+  }
+};
+
+/** Адрес, который стоит предложить в поле ввода. */
+export const suggestedHubUrl = () => {
+  if (backend.mode === 'hub' && remote.getBase()) return remote.getBase();
+  if (BUILT_IN_HUB) return BUILT_IN_HUB;
+  if (typeof location !== 'undefined' && /^https?:$/.test(location.protocol)) return location.origin;
+  return '';
+};
+
+export const backendLabel = () => {
+  if (backend.mode !== 'hub') return 'Этот браузер';
+  return remote.getBase() ? `Хаб ${hubHost()}` : 'Общий хаб сети';
+};
 
 const readSession = () => readJSON(KEYS.session, null);
 
@@ -518,30 +602,123 @@ export const getSession = () => {
   return session && getUser(session.userId) ? session : null;
 };
 
+/* Токен выдан конкретным хабом: на другом адресе он мусор. Сессии
+   старых версий поля `hub` не знают — у них хаб определяем по токену. */
+const sessionHub = (session) => {
+  if (!session) return null;
+  if ('hub' in session) return session.hub;
+  return session.token ? '' : null;
+};
+
 remote.setTokenGetter(() => readSession()?.token ?? null);
 
-/** Определяем, есть ли за нами хаб. Вызывается один раз на старте. */
+/** Подключаемся к первому хабу, который отозвался. Один раз на старте. */
 export const initBackend = async () => {
-  if (typeof fetch !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:'))
-    return 'local';
-  try {
-    await remote.pingHub();
-    backend = hubBackend;
-    const session = readSession();
-    if (session?.token) {
-      try {
-        await remote.fetchState();
-      } catch {
-        /* Токен протух (хаб переустановили) — считаем себя гостем. */
-        storage.removeItem(KEYS.session);
-      }
+  if (typeof fetch !== 'function') return 'local';
+  const sameOrigin =
+    typeof location !== 'undefined' && /^https?:$/.test(location.protocol || '');
+
+  /* Ссылка вида …/?hub=https://… — так друг делится своим хабом. */
+  const fromLink = queryHub();
+  if (fromLink) {
+    try {
+      storage.setItem(KEYS.hub, normalizeHubUrl(fromLink));
+    } catch {
+      /* мусор в ссылке игнорируем молча — ниже попробуем остальные адреса */
     }
-    notify();
-    return 'hub';
-  } catch {
-    backend = localBackend;
-    return 'local';
   }
+
+  const saved = storedHub();
+  const candidates = [];
+  const add = (url) => {
+    if (url === null || url === undefined) return;
+    if (url === '' && !sameOrigin) return;
+    if (!candidates.includes(url)) candidates.push(url);
+  };
+
+  if (saved !== HUB_OFF) {
+    add(saved);
+    add(remote.getBase()); // адрес мог выставить скрипт проверки
+    add(BUILT_IN_HUB);
+    add('');
+  }
+
+  for (const url of candidates) {
+    try {
+      await remote.pingHub(url);
+      remote.setBase(url);
+      backend = hubBackend;
+      await resumeSession(url);
+      notify();
+      return 'hub';
+    } catch {
+      /* этот адрес не хаб или недоступен — пробуем следующий */
+    }
+  }
+
+  remote.setBase('');
+  backend = localBackend;
+  if (sessionHub(readSession()) !== null) storage.removeItem(KEYS.session);
+  notify();
+  return 'local';
+};
+
+/* Сессия переживает перезагрузку, только если хаб тот же самый. */
+const resumeSession = async (hub) => {
+  const session = readSession();
+  if (!session) return;
+  if (sessionHub(session) !== hub) {
+    storage.removeItem(KEYS.session);
+    return;
+  }
+  try {
+    await remote.fetchState();
+  } catch (error) {
+    /* Токен протух (хаб переустановили) — считаем себя гостем.
+       Сетевой сбой сессию не трогает: следующий опрос подтянет. */
+    if (error?.status === 401) storage.removeItem(KEYS.session);
+  }
+};
+
+/** Подключиться к хабу по адресу. Возвращает { url, users }. */
+export const connectHub = async (raw) => {
+  const url = normalizeHubUrl(raw);
+  if (!url) throw new Error('Введите адрес хаба.');
+  if (mixedContent(url))
+    throw new Error(
+      'Игра открыта по https, а хаб — по http: браузер такое соединение запретит. Нужен адрес на https.',
+    );
+  let info;
+  try {
+    info = await remote.pingHub(url);
+  } catch (error) {
+    throw new Error(
+      error?.message === 'По этому адресу отвечает не хаб игры.'
+        ? error.message
+        : 'Хаб по этому адресу не отвечает. Проверьте ссылку и интернет.',
+    );
+  }
+  /* Адрес страницы и введённый вручную — один и тот же хаб: не
+     гоняем запросы через полный URL, когда можно остаться «у себя». */
+  const same = typeof location !== 'undefined' && url === trimSlash(location.origin);
+  storage.setItem(KEYS.hub, url);
+  storage.removeItem(KEYS.session); // аккаунты другого хаба — другой мир
+  remote.setBase(same ? '' : url);
+  remote.applyState({ users: [], requests: [] });
+  backend = hubBackend;
+  notify();
+  return { url, users: info.users ?? 0 };
+};
+
+/** Отключиться от хаба и работать на аккаунтах этого браузера. */
+export const disconnectHub = () => {
+  storage.setItem(KEYS.hub, HUB_OFF);
+  storage.removeItem(KEYS.session);
+  remote.setBase('');
+  remote.applyState({ users: [], requests: [] });
+  backend = localBackend;
+  notify();
+  return 'local';
 };
 
 /** Подтянуть свежее состояние с хаба (периодический опрос). */
@@ -603,7 +780,13 @@ const startSession = async (userId, token) => {
   if (prev && prev.userId !== userId) {
     if (backend.mode === 'local') await localBackend.offline(prev.userId);
   }
-  writeJSON(KEYS.session, { userId, token: token ?? null, since: Date.now() });
+  writeJSON(KEYS.session, {
+    userId,
+    token: token ?? null,
+    /* Чей это вход: null — этот браузер, иначе адрес хаба. */
+    hub: backend.mode === 'hub' ? remote.getBase() : null,
+    since: Date.now(),
+  });
 };
 
 export const register = async (name, password) => {

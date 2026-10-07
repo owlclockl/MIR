@@ -8,7 +8,7 @@ import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени. */
 const avatarEl = (user, cls = '') => {
@@ -37,6 +37,7 @@ const ui = {
   confirm: null,
   opener: null,
   chatDraft: '',
+  hubDraft: '',
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
 };
@@ -82,7 +83,9 @@ const authNoteHtml = () => {
   if (!store.storagePersists())
     return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте игру через MIR-Setup.exe или по ссылке хаба.</p>`;
   return `<p class="form-note">${
-    store.isHub() ? 'Аккаунт хранится на общем хабе сети.' : 'Всё хранится локально, в этом браузере.'
+    store.isHub()
+      ? `Аккаунт хранится на общем хабе ${escapeHtml(store.hubHost())}.`
+      : 'Всё хранится локально, в этом браузере.'
   }</p>`;
 };
 
@@ -302,6 +305,9 @@ const profileModalHtml = () => {
         <div class="divider" role="separator"></div>
 
         <div class="dialog__actions dialog__actions--spread">
+          <button class="mini-button" type="button" data-action="open-hub">
+            ${icon('globe', 'icon--xs')} Общий хаб
+          </button>
           <button class="mini-button" type="button" data-action="open-direct">
             ${icon('link', 'icon--xs')} Прямое подключение по коду
           </button>
@@ -309,6 +315,65 @@ const profileModalHtml = () => {
             ${icon('logOut', 'icon--xs')} Выйти из аккаунта
           </button>
         </div>
+      </div>`,
+  });
+};
+
+/* --- Окно «Общий хаб» --- */
+/* Хаб — общий сервер аккаунтов. Раньше он подхватывался только по
+   адресу страницы: открыл ссылку с ПК друга — попал на его хаб,
+   открыл mir.html с флешки — сидишь один. Теперь адрес можно
+   ввести руками: игра из APK, из exe и с флешки подключается к
+   хабу в интернете так же, как вкладка браузера. */
+const hubModalHtml = () => {
+  const connected = store.isHub();
+  const host = store.hubHost();
+  return dialogShell({
+    label: 'Общий хаб',
+    title: 'Общий хаб',
+    size: 'wide',
+    body: `
+      <div class="dialog__body">
+        <div class="link-box">
+          <div class="link-box__text">
+            <p class="eyebrow">Где сейчас аккаунты</p>
+            <span class="link-state link-state--${connected ? 'live' : 'off'}">
+              <span class="dot dot--${connected ? 'live' : 'off'}" aria-hidden="true"></span>${
+                connected ? escapeHtml(host) : 'Только этот браузер'
+              }
+            </span>
+            <p class="link-box__hint">${
+              connected
+                ? 'Аккаунты, друзья и заявки общие для всех, кто играет по этому адресу. Друг с другого конца страны увидит вас в списке.'
+                : 'Аккаунт живёт в этом браузере и никуда не уходит. Чтобы играть с друзьями, подключитесь к общему хабу.'
+            }</p>
+          </div>
+          ${
+            connected
+              ? `<div class="link-box__actions">
+                   <button class="mini-button mini-button--danger" type="button" data-action="hub-disconnect">${icon('linkOff', 'icon--xs')} Отключиться</button>
+                 </div>`
+              : ''
+          }
+        </div>
+
+        <form class="form" data-form="connect-hub" novalidate>
+          <label class="field">
+            <span class="field__label">Адрес хаба</span>
+            <input class="input" name="url" type="text" inputmode="url" spellcheck="false"
+                   autocomplete="off" placeholder="https://mir.имя.workers.dev"
+                   value="${escapeHtml(ui.hubDraft)}" data-role="hub-input" data-autofocus />
+          </label>
+          <p class="form-error" data-role="form-error" hidden></p>
+          <button class="solid-button" type="submit" data-role="submit">
+            <span>Подключиться</span>
+          </button>
+        </form>
+
+        <div class="divider" role="separator"></div>
+
+        <p class="hint">Свой хаб поднимается одной командой — <strong>npm run host</strong>. Она выкладывает игру и хаб на бесплатный хостинг Cloudflare и выдаёт постоянную ссылку: она работает, даже когда ваш компьютер выключен. Полная инструкция — в README, раздел «Игра в интернете».</p>
+        <p class="hint">Ссылкой на хаб делятся как есть — друг вставит её здесь же. У каждого хаба свои аккаунты: при смене адреса нужно войти заново.</p>
       </div>`,
   });
 };
@@ -450,7 +515,7 @@ const linkHint = (friend, link) => {
   if (link === 'connecting') return 'Договариваемся о прямом канале — обычно пара секунд.';
   if (store.presenceOf(friend) === 'offline') return 'Игрок не в сети. Связь поднимется сама, как только он откроет приложение.';
   if (!store.isHub())
-    return 'Этот режим без хаба: соединитесь по коду прямого подключения (кнопка в профиле).';
+    return 'Общий хаб не подключён: соединитесь по коду прямого подключения или подключите хаб — обе кнопки внизу панели друзей.';
   return 'Связи нет. Нажмите «Подключиться» — попытка начнётся заново.';
 };
 
@@ -628,6 +693,9 @@ const renderModal = ({ focus = true } = {}) => {
     case 'direct':
       html = directModalHtml();
       break;
+    case 'hub':
+      html = hubModalHtml();
+      break;
     case 'confirm':
       html = confirmModalHtml();
       break;
@@ -737,6 +805,9 @@ const railHtml = () => {
           <button class="mini-button mini-button--accent" type="button" data-action="open-auth">
             ${icon('user', 'icon--xs')} Войти / создать аккаунт
           </button>
+          <button class="mini-button" type="button" data-action="open-hub">
+            ${icon('globe', 'icon--xs')} ${store.isHub() ? 'Общий хаб подключён' : 'Подключиться к общему хабу'}
+          </button>
         </div>
       </div>`;
   }
@@ -782,6 +853,9 @@ const railHtml = () => {
     </div>
 
     <div class="rail__foot">
+      <button class="mini-button mini-button--wide" type="button" data-action="open-hub">
+        ${icon('globe', 'icon--xs')} Общий хаб
+      </button>
       <button class="mini-button mini-button--wide" type="button" data-action="open-direct">
         ${icon('link', 'icon--xs')} Прямое подключение по коду
       </button>
@@ -952,6 +1026,20 @@ const formHandlers = {
       closeModal();
     }),
 
+  'connect-hub': (form, fields) =>
+    withBusy(form, async () => {
+      const { url, users } = await store.connectHub(fields.url.value);
+      ui.hubDraft = url;
+      setFormError(form, '');
+      renderModal({ focus: false });
+      syncP2P();
+      toast(
+        users > 0
+          ? `Хаб подключён: ${store.hubHost()}. Игроков на нём: ${users}. Войдите или создайте аккаунт.`
+          : `Хаб подключён: ${store.hubHost()}. Вы первый — создайте аккаунт.`,
+      );
+    }),
+
   'change-password': (form, fields) =>
     withBusy(form, async () => {
       await store.changePassword(fields.old.value, fields.next.value);
@@ -1017,6 +1105,7 @@ document.addEventListener('input', (event) => {
     if (me && box) box.innerHTML = searchResultsHtml(me);
   }
   if (role === 'chat-input') ui.chatDraft = event.target.value;
+  if (role === 'hub-input') ui.hubDraft = event.target.value;
   if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
   if (role === 'direct-answer') ui.direct.answerDraft = event.target.value;
   if (role === 'code-input') {
@@ -1076,6 +1165,20 @@ const actions = {
     ui.chatDraft = '';
     openModal('direct');
     p2p.markRead(p2p.MANUAL_ID);
+  },
+
+  'open-hub': () => {
+    ui.hubDraft = store.suggestedHubUrl();
+    openModal('hub');
+  },
+
+  'hub-disconnect': () => {
+    store.disconnectHub();
+    p2p.stop({ quiet: true });
+    p2pRunning = false;
+    ui.hubDraft = store.suggestedHubUrl();
+    renderModal({ focus: false });
+    toast('Хаб отключён — аккаунты снова только в этом браузере.');
   },
 
   'direct-step': (el) => {
@@ -1304,7 +1407,7 @@ render();
 /* Если меню открыто по сети с serve.mjs — подключаемся к общему хабу. */
 if (typeof store.initBackend === 'function') {
   store.initBackend().then((mode) => {
-    if (mode === 'hub') toast('Подключено к общему хабу этой сети.');
+    if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
     syncP2P();
   });
 } else {

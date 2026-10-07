@@ -1,16 +1,21 @@
 /* ===========================================================
-   Клиент хаба: когда меню открыто по сети с serve.mjs,
-   аккаунты общие для всех устройств в сети. Общение — HTTP
-   на тот же источник, состояние зеркалится в cache.
+   Клиент хаба. Хаб — это общий сервер аккаунтов: он может быть
+   тем же адресом, откуда открыта игра (ПК в локальной сети или
+   бесплатный хостинг), а может быть чужим адресом, который игрок
+   ввёл руками — тогда даже mir.html с флешки и APK на телефоне
+   играют вместе с остальными.
+
+   Общение — HTTP на `base`, состояние зеркалится в cache.
    =========================================================== */
 
-let base = ''; // для тестов: setBase('http://127.0.0.1:PORT')
+let base = ''; // '' — тот же адрес, что и страница; иначе полный https://…
 let tokenGetter = () => null;
 let cache = { users: [], requests: [] };
 
 export const setBase = (url) => {
-  base = url;
+  base = url || '';
 };
+export const getBase = () => base;
 export const setTokenGetter = (fn) => {
   tokenGetter = fn;
 };
@@ -41,13 +46,17 @@ const call = async (method, path, body, { timeout = 8000 } = {}) => {
   return data;
 };
 
-export const pingHub = async () => {
-  const response = await fetch(`${base}/api/ping`, {
+/* Проверка «а хаб ли там». Свой адрес отвечает мгновенно, чужой —
+   через полмира, поэтому запас времени разный. */
+export const pingHub = async (url = base, { timeout = url ? 6000 : 1500 } = {}) => {
+  const response = await fetch(`${url}/api/ping`, {
     cache: 'no-store',
-    signal: AbortSignal.timeout(1200),
+    signal: AbortSignal.timeout(timeout),
   });
   if (!response.ok) throw new Error('Хаб недоступен.');
-  return response.json();
+  const data = await response.json();
+  if (data?.hub !== 'mir') throw new Error('По этому адресу отвечает не хаб игры.');
+  return data;
 };
 
 export const getSalt = (name) => call('GET', `/api/salt?name=${encodeURIComponent(name)}`);
