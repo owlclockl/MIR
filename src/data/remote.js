@@ -66,7 +66,22 @@ export const fetchState = async () => applyState(await call('GET', '/api/state')
 export const apiRegister = (payload) => call('POST', '/api/register', payload);
 export const apiLogin = (payload) => call('POST', '/api/login', payload);
 export const apiHeartbeat = () => call('POST', '/api/heartbeat', {});
+
+/* Уход из меню (закрыли вкладку, обновили страницу) — это присутствие,
+   токен устройства хаб оставляет: вход переживает обновление. */
 export const apiOffline = () => call('POST', '/api/offline', { token: tokenGetter() });
+
+/* Явный выход из аккаунта — вот здесь токен отзывается. Токен передаём
+   и заголовком, и телом: к моменту запроса локальная сессия уже убрана
+   (меню сразу показывает гостя), и брать токен «из сессии» поздно —
+   поэтому его запоминают заранее и приносят сюда. */
+export const apiLogout = (token) =>
+  call(
+    'POST',
+    '/api/logout',
+    { token: token ?? tokenGetter() },
+    token ? { headers: { Authorization: `Bearer ${token}` } } : {},
+  );
 export const apiName = (name) => call('POST', '/api/name', { name });
 export const apiPassword = (payload) => call('POST', '/api/password', payload);
 export const apiAvatar = (avatar) => call('POST', '/api/avatar', { avatar });
@@ -108,6 +123,14 @@ export const apiAdminUser = (key, userId, action, payload = {}) =>
     { userId, action, ...payload },
     { headers: adminHeaders(key), timeout: 15_000 },
   );
+
+/** Настройки хаба из панели: пока одно — открыта ли регистрация. */
+export const apiAdminSettings = (key, patch) =>
+  call('POST', '/api/admin/settings', patch, { headers: adminHeaders(key), timeout: 15_000 });
+
+/** Журнал событий: { clear: true } — очистить. */
+export const apiAdminEvents = (key, payload) =>
+  call('POST', '/api/admin/events', payload, { headers: adminHeaders(key), timeout: 15_000 });
 
 export const apiAdminRequest = (key, requestId) =>
   call(

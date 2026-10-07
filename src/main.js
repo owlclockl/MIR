@@ -65,10 +65,16 @@ const ADMIN_TAPS = 5; // щелчков по знаку
 const ADMIN_TAP_WINDOW = 3000; // за это время
 
 const adminState = () => ({
-  tab: 'players', // players | requests | system
+  tab: 'overview', // overview | players | requests | events | system
   query: '',
+  filter: 'all', // all | online | offline | banned
+  sort: 'name', // name | seen | created
+  limit: 60, // сколько строк списка показано
+  eventFilter: 'all', // all | players | admin
   data: null, // снимок от store.adminSnapshot()
   openId: null, // открытая карточка игрока
+  banReason: '', // черновик формы блокировки
+  banHours: '0',
   keyDraft: '',
   nameDraft: '',
   passDraft: '',
@@ -880,10 +886,81 @@ const seenText = (ts) => {
   return formatDate(ts);
 };
 
+/* Точное время события: «14:32» для сегодняшних и «дата 14:32» для
+   вчерашних — по одному взгляду видно, когда это было. Формат
+   собирается один раз: журнал рисует сотню строк подряд. */
+const TIME_FORMAT = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const stampText = (ts) => {
+  if (!ts) return '';
+  const date = new Date(ts);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return sameDay ? TIME_FORMAT.format(date) : `${formatDate(ts)} ${TIME_FORMAT.format(date)}`;
+};
+
+/* Виды блокировок: срок выбирается в карточке игрока, 0 — навсегда. */
+const BAN_HOURS = [
+  ['1', 'на час'],
+  ['24', 'на сутки'],
+  ['168', 'на неделю'],
+  ['720', 'на 30 дней'],
+  ['0', 'навсегда'],
+];
+
+/* Подписи журнала: событие хаба человеческим языком. */
+const EVENT_LABELS = {
+  register: 'Регистрация',
+  login: 'Вход',
+  name: 'Ник изменён',
+  password: 'Пароль изменён',
+  avatar: 'Аватарка обновлена',
+  'avatar-clear': 'Аватарка убрана',
+  request: 'Заявка в друзья',
+  'request-decline': 'Заявка отклонена',
+  friend: 'Стали друзьями',
+  'friend-remove': 'Дружба разорвана',
+  code: 'Новый код-приглашение',
+  'admin:rename': 'Панель: переименование',
+  'admin:password': 'Панель: сброс пароля',
+  'admin:kick': 'Панель: отключение',
+  'admin:ban': 'Панель: блокировка',
+  'admin:unban': 'Панель: разблокировка',
+  'admin:avatar': 'Панель: аватарка',
+  'admin:avatar-clear': 'Панель: аватарка убрана',
+  'admin:code': 'Панель: новый код',
+  'admin:unlink': 'Панель: разрыв дружбы',
+  'admin:unlink-all': 'Панель: все дружбы',
+  'admin:delete': 'Панель: аккаунт удалён',
+  'admin:request-drop': 'Панель: заявка удалена',
+  'admin:key': 'Панель: ключ сменён',
+  'admin:key-reset': 'Панель: заводской ключ',
+  'admin:settings': 'Панель: настройки',
+  'admin:events-clear': 'Панель: журнал очищен',
+  'admin:wipe': 'Панель: локальные аккаунты очищены',
+};
+
+const eventLabel = (kind) => EVENT_LABELS[kind] ?? kind;
+const eventIsAdmin = (kind) => String(kind).startsWith('admin:');
+const untilText = (ts) => (ts ? `до ${formatDate(ts)} ${TIME_FORMAT.format(new Date(ts))}` : 'навсегда');
+
+const adminTabHtml = (id, label) =>
+  `<button class="tab${ui.admin.tab === id ? ' tab--active' : ''}" type="button" role="tab"
+           aria-selected="${ui.admin.tab === id}" data-action="admin-tab" data-tab="${id}">${label}</button>`;
+
+const adminChipHtml = (action, value, label, active) =>
+  `<button class="chip${active ? ' chip--active' : ''}" type="button" data-action="${action}"
+           data-value="${value}" aria-pressed="${active}">${label}</button>`;
+
+const statRow = (key, value) => `
+    <div class="admin-stat">
+      <span class="admin-stat__key">${key}</span>
+      <span class="admin-stat__value" translate="no">${escapeHtml(value)}</span>
+    </div>`;
+
 const adminLoginHtml = () => {
   const hub = store.isHub();
   return `
-    <p class="hint">Служебный раздел: аккаунты, пароли, дружба, состояние хаба. Вход — по ключу администратора.</p>
+    <p class="hint">Служебный раздел: аккаунты, пароли, дружба, журнал и состояние хаба. Вход — по ключу администратора.</p>
     <form class="form" data-form="admin-login" novalidate>
       <label class="field">
         <span class="field__label">Ключ администратора</span>
@@ -904,31 +981,50 @@ const adminLoginHtml = () => {
     }</p>`;
 };
 
-const adminTabHtml = (id, label) =>
-  `<button class="tab${ui.admin.tab === id ? ' tab--active' : ''}" type="button" role="tab"
-           aria-selected="${ui.admin.tab === id}" data-action="admin-tab" data-tab="${id}">${label}</button>`;
+/* Предупреждение о заводском ключе — показывается на «Обзоре», чтобы
+   оно попадалось на глаза сразу после входа. */
+const adminKeyWarningHtml = () => {
+  const isDefault = ui.admin.data?.keyDefault ?? store.adminKeyIsDefault();
+  if (!isDefault) return '';
+  return `<p class="form-note form-note--warn">Действует заводской ключ <code translate="no">${escapeHtml(
+    store.DEFAULT_ADMIN_KEY,
+  )}</code> — он в открытом исходнике, поэтому панель открыта каждому, кто читал инструкцию. Смените его во вкладке «Система».</p>`;
+};
 
-const adminRowHtml = (user) => {
+const adminRowHtml = (user, requestCount = 0) => {
   const me = store.getCurrentUser();
   const offline = user.presence === 'offline';
   const isMe = me?.id === user.id;
+  const ban = user.ban;
   return `
-    <button class="admin-row${offline ? ' admin-row--off' : ''}" type="button" data-action="admin-open" data-id="${user.id}">
+    <button class="admin-row${offline ? ' admin-row--off' : ''}${ban ? ' admin-row--banned' : ''}" type="button" data-action="admin-open" data-id="${user.id}">
       ${adminAvatarEl(user)}
       <span class="admin-row__text">
         <strong class="admin-row__name" translate="no">${escapeHtml(user.name)}${isMe ? ' · вы' : ''}</strong>
-        <small class="admin-row__meta">${PRESENCE[user.presence]?.label ?? 'Не в сети'} · друзей ${user.friends.length}</small>
+        <small class="admin-row__meta">${PRESENCE[user.presence]?.label ?? 'Не в сети'} · друзей ${user.friends.length}${
+          requestCount ? ` · заявок ${requestCount}` : ''
+        } · ${escapeHtml(seenText(user.seenAt))}</small>
       </span>
+      ${ban ? `<span class="admin-badge">заблокирован</span>` : ''}
       <code class="admin-id" translate="no">${escapeHtml(user.id)}</code>
       ${icon('chevron', 'icon--xs')}
     </button>`;
 };
 
+/* Копирование значения из панели: id, кода-приглашения, адреса. */
+const adminCopyHtml = (value, label, title) => `
+  <button class="mini-button" type="button" data-action="admin-copy" data-value="${escapeHtml(value)}"
+          data-label="${escapeHtml(label)}" title="${escapeHtml(title)}">${icon('copy', 'icon--xs')} ${label}</button>`;
+
 const adminCardHtml = (user) => {
+  const data = ui.admin.data;
   const friends = user.friends
-    .map((id) => ui.admin.data?.users.find((item) => item.id === id) ?? { id, name: id, nameKey: id })
+    .map((id) => data?.users.find((item) => item.id === id) ?? { id, name: id, nameKey: id })
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const requests = (data?.requests ?? []).filter((r) => r.from === user.id || r.to === user.id);
+  const nameOf = (id) => data?.users.find((item) => item.id === id)?.name ?? id;
   const offline = user.presence === 'offline';
+  const ban = user.ban;
   return `
     <button class="mini-button" type="button" data-action="admin-back">${icon('chevron', 'icon--xs')} К списку</button>
 
@@ -945,16 +1041,56 @@ const adminCardHtml = (user) => {
           ${PRESENCE[user.presence]?.label ?? 'Не в сети'} · был: ${escapeHtml(seenText(user.seenAt))}
         </p>
         <p class="account__meta">Аккаунт создан ${formatDate(user.createdAt)} · устройств: ${user.devices}</p>
-        <code class="admin-id" translate="no">${escapeHtml(user.id)}</code>
         ${
-          user.inviteCode
-            ? `<p class="account__meta">Код-приглашение: <code class="admin-id" translate="no">${escapeHtml(
-                user.inviteCode,
-              )}</code></p>`
+          ban
+            ? `<p class="account__meta account__meta--danger">${icon('shield', 'icon--xs')} Заблокирован ${
+                ban.reason ? `— ${escapeHtml(ban.reason)}` : '— без указания причины'
+              }, ${escapeHtml(untilText(ban.until))}</p>`
             : ''
         }
+        <code class="admin-id" translate="no">${escapeHtml(user.id)}</code>
       </div>
     </div>
+
+    <div class="dialog__actions dialog__actions--spread">
+      ${adminCopyHtml(user.id, 'Скопировать id', 'Пригодится, чтобы отличить двух игроков с похожими никами')}
+      ${
+        user.inviteCode
+          ? adminCopyHtml(user.inviteCode, 'Скопировать код', `Код-приглашение: ${user.inviteCode}`)
+          : ''
+      }
+    </div>
+
+    <div class="divider" role="separator"></div>
+
+    ${
+      ban
+        ? `<div class="admin-ban">
+             <p class="eyebrow">Блокировка</p>
+             <p class="form-note">Вход закрыт, устройства отключены. Снять блокировку можно в любой момент.</p>
+             <button class="mini-button mini-button--accent" type="button" data-action="admin-unban" data-id="${user.id}">
+               ${icon('check', 'icon--xs')} Снять блокировку
+             </button>
+           </div>`
+        : `<form class="form" data-form="admin-ban" data-id="${user.id}" novalidate>
+             <p class="eyebrow">Заблокировать</p>
+             <p class="form-note">Блокировка закрывает вход и отключает устройства игрока. Она видна в списке и снимается одной кнопкой — удалять аккаунт для этого не нужно.</p>
+             <div class="admin-ban__row">
+               <input class="input" name="reason" type="text" maxlength="140" spellcheck="false"
+                      placeholder="Причина (необязательно)" aria-label="Причина блокировки"
+                      value="${escapeHtml(ui.admin.banReason)}" data-role="admin-ban-reason" />
+               <select class="input input--select" name="hours" aria-label="Срок блокировки"
+                       data-role="admin-ban-hours">
+                 ${BAN_HOURS.map(
+                   ([value, label]) =>
+                     `<option value="${value}"${ui.admin.banHours === value ? ' selected' : ''}>${label}</option>`,
+                 ).join('')}
+               </select>
+               <button class="mini-button mini-button--danger" type="submit">Заблокировать</button>
+             </div>
+             <p class="form-error" data-role="form-error" hidden></p>
+           </form>`
+    }
 
     <div class="divider" role="separator"></div>
 
@@ -1001,6 +1137,32 @@ const adminCardHtml = (user) => {
 
     <div class="divider" role="separator"></div>
 
+    <p class="eyebrow">Заявки в друзья · ${requests.length}</p>
+    ${
+      requests.length
+        ? `<div class="admin-list">${requests
+            .map(
+              (request) => `
+        <div class="admin-row admin-row--static">
+          <span class="admin-row__text">
+            <strong class="admin-row__name" translate="no">${escapeHtml(nameOf(request.from))} → ${escapeHtml(
+              nameOf(request.to),
+            )}</strong>
+            <small class="admin-row__meta">${escapeHtml(seenText(request.at))}</small>
+          </span>
+          <button class="icon-button icon-button--sm icon-button--danger" type="button"
+                  data-action="admin-drop-request" data-id="${request.id}"
+                  aria-label="Удалить заявку" title="Удалить заявку">
+            ${icon('trash')}
+          </button>
+        </div>`,
+            )
+            .join('')}</div>`
+        : '<p class="hint">Заявок нет.</p>'
+    }
+
+    <div class="divider" role="separator"></div>
+
     <p class="eyebrow">Друзья · ${friends.length}</p>
     ${
       friends.length
@@ -1034,61 +1196,128 @@ const adminCardHtml = (user) => {
     }`;
 };
 
+/* Сколько заявок у каждого игрока — считается один раз на список, а
+   не в каждой строке: иначе список из сотни игроков перебирал бы
+   заявки сотню раз. */
+const requestCounts = (requests) => {
+  const map = new Map();
+  for (const request of requests) {
+    map.set(request.from, (map.get(request.from) ?? 0) + 1);
+    map.set(request.to, (map.get(request.to) ?? 0) + 1);
+  }
+  return map;
+};
+
+const ADMIN_FILTERS = [
+  ['all', 'Все'],
+  ['online', 'В сети'],
+  ['offline', 'Офлайн'],
+  ['banned', 'Заблокированы'],
+];
+
+const ADMIN_SORTS = [
+  ['name', 'По имени'],
+  ['seen', 'По визиту'],
+  ['created', 'По дате'],
+];
+
+const adminMatchFilter = (user, filter) => {
+  if (filter === 'online') return user.presence !== 'offline';
+  if (filter === 'offline') return user.presence === 'offline';
+  if (filter === 'banned') return !!user.ban;
+  return true;
+};
+
+const adminSortUsers = (users, sort) => {
+  const list = [...users];
+  if (sort === 'seen') return list.sort((a, b) => (b.seenAt ?? 0) - (a.seenAt ?? 0));
+  if (sort === 'created') return list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  /* «В сети» — вперёд, дальше по имени: так список читается сверху вниз. */
+  return list.sort(
+    (a, b) =>
+      (a.presence === 'offline' ? 1 : 0) - (b.presence === 'offline' ? 1 : 0) ||
+      a.name.localeCompare(b.name, 'ru'),
+  );
+};
+
 const adminPlayersHtml = () => {
-  const users = ui.admin.data?.users ?? [];
+  const data = ui.admin.data;
+  const users = data?.users ?? [];
   const query = ui.admin.query.trim().toLowerCase();
-  const found = users
-    .filter(
+  const counts = requestCounts(data?.requests ?? []);
+  const found = adminSortUsers(
+    users.filter(
       (user) =>
-        !query ||
-        user.name.toLowerCase().includes(query) ||
-        user.id.toLowerCase().includes(query),
-    )
-    .sort((a, b) => {
-      const pa = a.presence === 'offline' ? 1 : 0;
-      const pb = b.presence === 'offline' ? 1 : 0;
-      return pa - pb || a.name.localeCompare(b.name, 'ru');
-    });
-  const shown = found.slice(0, 60);
+        (!query ||
+          user.name.toLowerCase().includes(query) ||
+          user.id.toLowerCase().includes(query) ||
+          String(user.inviteCode || '').toLowerCase().includes(query)) &&
+        adminMatchFilter(user, ui.admin.filter),
+    ),
+    ui.admin.sort,
+  );
+  const shown = found.slice(0, ui.admin.limit);
+  const rest = found.length - shown.length;
   return `
     <div class="field">
-      <span class="field__label">Поиск по имени или id</span>
+      <span class="field__label">Поиск: имя, id или код-приглашение</span>
       <input class="input" type="search" placeholder="Имя игрока…" autocomplete="off" spellcheck="false"
              value="${escapeHtml(ui.admin.query)}" data-role="admin-search" />
+    </div>
+    <div class="admin-chips" role="group" aria-label="Фильтр игроков">
+      ${ADMIN_FILTERS.map(([value, label]) =>
+        adminChipHtml('admin-filter', value, label, ui.admin.filter === value),
+      ).join('')}
+    </div>
+    <div class="admin-chips admin-chips--slim" role="group" aria-label="Порядок игроков">
+      <span class="admin-chips__label">Порядок:</span>
+      ${ADMIN_SORTS.map(([value, label]) =>
+        adminChipHtml('admin-sort', value, label, ui.admin.sort === value),
+      ).join('')}
     </div>
     <div class="admin-list">
       ${
         shown.length
-          ? shown.map(adminRowHtml).join('')
+          ? shown.map((user) => adminRowHtml(user, counts.get(user.id) ?? 0)).join('')
           : '<p class="hint">Никого не нашлось.</p>'
       }
     </div>
+    <p class="hint">Показано ${shown.length} из ${found.length}${
+      found.length !== users.length ? ` (всего аккаунтов ${users.length})` : ''
+    }.</p>
     ${
-      found.length > shown.length
-        ? `<p class="hint">Показаны первые ${shown.length} из ${found.length}. Уточните поиск.</p>`
+      rest > 0
+        ? `<button class="mini-button" type="button" data-action="admin-more">Показать ещё ${Math.min(rest, 60)}</button>`
         : ''
     }`;
 };
 
 const adminRequestsHtml = () => {
-  const requests = ui.admin.data?.requests ?? [];
-  const users = ui.admin.data?.users ?? [];
+  const data = ui.admin.data;
+  const requests = data?.requests ?? [];
+  const users = data?.users ?? [];
   const nameOf = (id) => users.find((user) => user.id === id)?.name ?? id;
   if (!requests.length) return '<p class="hint">Заявок нет.</p>';
   return `
+    <p class="hint">Входящие и исходящие заявки в друзья: можно отклонить, не дожидаясь ответа игрока. Имена открывают карточку.</p>
     <div class="admin-list">
       ${requests
         .map(
           (request) => `
         <div class="admin-row admin-row--static">
           <span class="admin-row__text">
-            <strong class="admin-row__name" translate="no">${escapeHtml(nameOf(request.from))} → ${escapeHtml(
-              nameOf(request.to),
-            )}</strong>
+            <span class="admin-row__name">
+              <button class="admin-link" type="button" data-action="admin-open" data-id="${request.from}"
+                      translate="no">${escapeHtml(nameOf(request.from))}</button>
+              <span class="admin-arrow" aria-hidden="true">→</span>
+              <button class="admin-link" type="button" data-action="admin-open" data-id="${request.to}"
+                      translate="no">${escapeHtml(nameOf(request.to))}</button>
+            </span>
             <small class="admin-row__meta">${escapeHtml(seenText(request.at))}</small>
           </span>
           <button class="icon-button icon-button--sm icon-button--danger" type="button"
-                  data-action="admin-drop-request" data-id="${request.id}" aria-label="Удалить заявку" title="Удалить заявку">
+                  data-action="admin-drop-request" data-id="${request.id}"
+                  aria-label="Удалить заявку" title="Удалить заявку">
             ${icon('trash')}
           </button>
         </div>`,
@@ -1097,30 +1326,142 @@ const adminRequestsHtml = () => {
     </div>`;
 };
 
+const adminEventDetail = (event) => {
+  const parts = [];
+  if (event.name) parts.push(event.name);
+  if (event.targetName || event.targetId) parts.push(`→ ${event.targetName || event.targetId}`);
+  if (event.text) parts.push(`· ${event.text}`);
+  if (event.count) parts.push(`· ${event.count} шт.`);
+  if (event.until) parts.push(`· ${untilText(event.until)}`);
+  return parts.join(' ') || '—';
+};
+
+const adminEventRowHtml = (event) => `
+    <div class="admin-row admin-row--static admin-event">
+      <span class="admin-event__dot${eventIsAdmin(event.kind) ? ' admin-event__dot--admin' : ''}" aria-hidden="true"></span>
+      <span class="admin-row__text">
+        <strong class="admin-row__name">${escapeHtml(eventLabel(event.kind))}</strong>
+        <small class="admin-row__meta" translate="no">${escapeHtml(adminEventDetail(event))}</small>
+      </span>
+      <span class="admin-row__meta admin-event__time" translate="no">${escapeHtml(stampText(event.at))}</span>
+    </div>`;
+
+const adminEventsHtml = () => {
+  const all = ui.admin.data?.events ?? [];
+  const filter = ui.admin.eventFilter;
+  const events = all.filter(
+    (event) => filter === 'all' || (filter === 'admin' ? eventIsAdmin(event.kind) : !eventIsAdmin(event.kind)),
+  );
+  return `
+    <p class="hint">Короткая память хаба: регистрации, входы, дружба и действия панели. Записей: ${all.length}, свежие сверху.</p>
+    <div class="admin-chips" role="group" aria-label="Фильтр журнала">
+      ${adminChipHtml('admin-event-filter', 'all', 'Всё', filter === 'all')}
+      ${adminChipHtml('admin-event-filter', 'players', 'Игроки', filter === 'players')}
+      ${adminChipHtml('admin-event-filter', 'admin', 'Панель', filter === 'admin')}
+    </div>
+    <div class="admin-list">
+      ${events.length ? events.map(adminEventRowHtml).join('') : '<p class="hint">Здесь пока пусто.</p>'}
+    </div>
+    ${
+      all.length
+        ? `<button class="mini-button mini-button--danger" type="button" data-action="admin-events-clear">
+             ${icon('trash', 'icon--xs')} Очистить журнал
+           </button>`
+        : ''
+    }`;
+};
+
+const adminOverviewHtml = () => {
+  const data = ui.admin.data;
+  const stats = data?.stats ?? {};
+  const events = (data?.events ?? []).slice(0, 6);
+  const tile = (key, value, tone = '') => `
+    <div class="admin-tile${tone ? ` admin-tile--${tone}` : ''}">
+      <span class="admin-tile__value" translate="no">${escapeHtml(String(value))}</span>
+      <span class="admin-tile__key">${key}</span>
+    </div>`;
+  const banned = stats.banned ?? 0;
+  return `
+    ${adminKeyWarningHtml()}
+    <div class="admin-tiles">
+      ${tile('аккаунтов', stats.users ?? 0)}
+      ${tile('в сети', stats.online ?? 0)}
+      ${tile('новых за сутки', stats.today ?? 0)}
+      ${tile('были за сутки', stats.activeDay ?? 0)}
+      ${tile('заблокировано', banned, banned ? 'danger' : '')}
+      ${tile('заявок', stats.requests ?? 0)}
+    </div>
+
+    <div class="dialog__actions dialog__actions--spread">
+      <button class="mini-button" type="button" data-action="admin-refresh">
+        ${icon('refresh', 'icon--xs')} Обновить
+      </button>
+      <button class="mini-button" type="button" data-action="admin-export">
+        ${icon('download', 'icon--xs')} Скачать данные
+      </button>
+      <button class="mini-button" type="button" data-action="admin-lock">
+        ${icon('logOut', 'icon--xs')} Заблокировать панель
+      </button>
+    </div>
+
+    <div class="divider" role="separator"></div>
+
+    <p class="eyebrow">Последние события</p>
+    ${
+      events.length
+        ? `<div class="admin-list admin-list--flat">${events.map(adminEventRowHtml).join('')}</div>`
+        : '<p class="hint">Пока ничего не происходило.</p>'
+    }
+    ${
+      (data?.events ?? []).length > events.length
+        ? `<button class="mini-button" type="button" data-action="admin-tab" data-tab="events">
+             ${icon('message', 'icon--xs')} Весь журнал
+           </button>`
+        : ''
+    }
+
+    <div class="divider" role="separator"></div>
+
+    <p class="eyebrow">Настройки</p>
+    ${statRow('Регистрация новых аккаунтов', ui.admin.data?.settings?.registrationOpen === false ? 'закрыта' : 'открыта')}
+    <div class="dialog__actions">
+      <button class="mini-button" type="button" data-action="admin-registration"
+              data-open="${ui.admin.data?.settings?.registrationOpen === false ? '1' : '0'}">
+        ${ui.admin.data?.settings?.registrationOpen === false ? 'Открыть регистрацию' : 'Закрыть регистрацию'}
+      </button>
+      <button class="mini-button" type="button" data-action="admin-tab" data-tab="system">
+        Ключ и диагностика
+      </button>
+    </div>`;
+};
+
 const adminSystemHtml = () => {
   const data = ui.admin.data;
   const local = store.localDataInfo();
   const address = typeof location !== 'undefined' ? location.origin : '';
-  const row = (key, value) => `
-    <div class="admin-stat">
-      <span class="admin-stat__key">${key}</span>
-      <span class="admin-stat__value" translate="no">${escapeHtml(value)}</span>
-    </div>`;
   return `
     <div class="admin-stats">
-      ${row('Режим данных', data?.mode === 'hub' ? 'общий хаб' : 'только этот браузер')}
-      ${row('Адрес хаба', data?.mode === 'hub' ? data.host || address : 'не подключён')}
-      ${row('Аккаунтов на хабе', String(data?.stats?.users ?? 0))}
-      ${row('Из них в сети', String(data?.stats?.online ?? 0))}
-      ${row('Заявок', String(data?.stats?.requests ?? 0))}
-      ${row('Дружб', String(data?.stats?.links ?? 0))}
-      ${row('Аватарок', String(data?.stats?.avatars ?? 0))}
-      ${row('Объём данных', `${Math.round((data?.stats?.bytes ?? 0) / 1024)} КБ`)}
-      ${row('Аккаунтов в браузере', String(local.accounts))}
-      ${row('Данные браузера', `${Math.round(local.bytes / 1024)} КБ · ${local.persists ? 'сохраняются' : 'только до перезагрузки'}`)}
-      ${row('Обновление', navigator.serviceWorker?.controller ? 'service worker активен' : 'не активно')}
-      ${row('Прямая связь', p2p.supported() ? 'WebRTC доступен' : 'WebRTC недоступен')}
-      ${row('Версия', VERSION)}
+      ${statRow('Режим данных', data?.mode === 'hub' ? 'общий хаб' : 'только этот браузер')}
+      ${statRow('Адрес хаба', data?.mode === 'hub' ? data.host || address : 'не подключён')}
+      ${statRow('Аккаунтов на хабе', String(data?.stats?.users ?? 0))}
+      ${statRow('Из них в сети', String(data?.stats?.online ?? 0))}
+      ${statRow('Новых за сутки', String(data?.stats?.today ?? 0))}
+      ${statRow('Новых за неделю', String(data?.stats?.week ?? 0))}
+      ${statRow('Заходили за сутки', String(data?.stats?.activeDay ?? 0))}
+      ${statRow('Заблокировано', String(data?.stats?.banned ?? 0))}
+      ${statRow('Заявок', String(data?.stats?.requests ?? 0))}
+      ${statRow('Дружб', String(data?.stats?.links ?? 0))}
+      ${statRow('Аватарок', String(data?.stats?.avatars ?? 0))}
+      ${statRow('Записей в журнале', String(data?.stats?.events ?? data?.events?.length ?? 0))}
+      ${statRow('Объём данных', `${Math.round((data?.stats?.bytes ?? 0) / 1024)} КБ`)}
+      ${statRow('Аккаунтов в браузере', String(local.accounts))}
+      ${statRow(
+        'Данные браузера',
+        `${Math.round(local.bytes / 1024)} КБ · ${local.persists ? 'сохраняются' : 'только до перезагрузки'}`,
+      )}
+      ${statRow('Обновление', navigator.serviceWorker?.controller ? 'service worker активен' : 'не активно')}
+      ${statRow('Прямая связь', p2p.supported() ? 'WebRTC доступен' : 'WebRTC недоступен')}
+      ${statRow('Версия', VERSION)}
     </div>
 
     <div class="dialog__actions dialog__actions--spread">
@@ -1138,7 +1479,7 @@ const adminSystemHtml = () => {
     <div class="divider" role="separator"></div>
 
     ${
-      data?.mode === 'hub' && data?.keyDefault
+      data?.keyDefault
         ? `<p class="form-note form-note--warn">Сейчас действует заводской ключ <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> — он в открытом исходнике. Смените его ниже: новый ключ запишется в данные хаба и переживёт перезапуск.</p>`
         : ''
     }
@@ -1186,12 +1527,24 @@ const adminModalHtml = () => {
   const body = user
     ? adminCardHtml(user)
     : `
-      <div class="tabs" role="tablist" aria-label="Разделы панели">
+      <div class="tabs tabs--panel" role="tablist" aria-label="Разделы панели">
+        ${adminTabHtml('overview', 'Обзор')}
         ${adminTabHtml('players', `Игроки · ${data.users.length}`)}
         ${adminTabHtml('requests', `Заявки · ${data.requests.length}`)}
+        ${adminTabHtml('events', `Журнал · ${data.events?.length ?? 0}`)}
         ${adminTabHtml('system', 'Система')}
       </div>
-      ${ui.admin.tab === 'players' ? adminPlayersHtml() : ui.admin.tab === 'requests' ? adminRequestsHtml() : adminSystemHtml()}`;
+      ${
+        ui.admin.tab === 'players'
+          ? adminPlayersHtml()
+          : ui.admin.tab === 'requests'
+            ? adminRequestsHtml()
+            : ui.admin.tab === 'events'
+              ? adminEventsHtml()
+              : ui.admin.tab === 'system'
+                ? adminSystemHtml()
+                : adminOverviewHtml()
+      }`;
   return dialogShell({
     label: 'Панель админа',
     title: user ? 'Карточка игрока' : 'Панель админа',
@@ -1783,8 +2136,10 @@ const adminExport = () => {
       mode: data.mode,
       host: data.host || '',
       stats: data.stats,
+      settings: data.settings ?? null,
       users: data.users,
       requests: data.requests,
+      events: data.events ?? [],
     },
     null,
     1,
@@ -1915,6 +2270,17 @@ const formHandlers = {
       await refreshAdmin();
     }),
 
+  'admin-ban': (form, fields) =>
+    withBusy(form, async () => {
+      const hours = Number(fields.hours.value) || 0;
+      await store.adminBan(form.dataset.id, { reason: fields.reason.value.trim(), hours });
+      ui.admin.banReason = '';
+      setFormError(form, '');
+      playSound('success');
+      toast(hours ? 'Аккаунт заблокирован — устройства отключены.' : 'Аккаунт заблокирован навсегда.');
+      await refreshAdmin();
+    }),
+
   'admin-password': (form, fields) =>
     withBusy(form, async () => {
       await store.adminSetPassword(form.dataset.id, fields.password.value);
@@ -1989,6 +2355,8 @@ document.addEventListener('input', (event) => {
     renderModal({ focus: false });
   }
   if (role === 'admin-name') ui.admin.nameDraft = event.target.value;
+  if (role === 'admin-ban-reason') ui.admin.banReason = event.target.value;
+  if (role === 'admin-ban-hours') ui.admin.banHours = event.target.value;
   if (role === 'admin-pass') ui.admin.passDraft = event.target.value;
   if (role === 'admin-new-key') ui.admin.newKeyDraft = event.target.value;
   if (role === 'admin-repeat-key') ui.admin.repeatKeyDraft = event.target.value;
@@ -2224,12 +2592,41 @@ const actions = {
     ui.admin.openId = el.dataset.id;
     ui.admin.nameDraft = '';
     ui.admin.passDraft = '';
+    ui.admin.banReason = '';
     renderModal();
   },
 
   'admin-back': () => {
     ui.admin.openId = null;
+    ui.admin.banReason = '';
     renderModal();
+  },
+
+  'admin-filter': (el) => {
+    ui.admin.filter = el.dataset.value;
+    ui.admin.limit = 60;
+    renderModal({ focus: false });
+  },
+
+  'admin-sort': (el) => {
+    ui.admin.sort = el.dataset.value;
+    ui.admin.limit = 60;
+    renderModal({ focus: false });
+  },
+
+  'admin-event-filter': (el) => {
+    ui.admin.eventFilter = el.dataset.value;
+    renderModal({ focus: false });
+  },
+
+  'admin-more': () => {
+    ui.admin.limit += 60;
+    renderModal({ focus: false });
+  },
+
+  'admin-copy': async (el) => {
+    const ok = await copyText(el.dataset.value);
+    toast(ok ? `${el.dataset.label}: ${el.dataset.value}` : 'Не получилось скопировать — выделите вручную.', ok ? 'ok' : 'error');
   },
 
   'admin-refresh': () => refreshAdmin(),
@@ -2262,6 +2659,40 @@ const actions = {
 
   'admin-unlink-all': (el) =>
     runAdminAction(() => store.adminUserAction(el.dataset.id, 'unlink-all'), 'Все дружбы разорваны.'),
+
+  'admin-unban': (el) =>
+    runAdminAction(() => store.adminUnban(el.dataset.id), 'Блокировка снята — игрок может войти.'),
+
+  'admin-registration': (el) =>
+    runAdminAction(
+      () => store.adminSetRegistration(el.dataset.open === '1'),
+      el.dataset.open === '1' ? 'Регистрация открыта.' : 'Регистрация закрыта — новые аккаунты не создаются.',
+    ),
+
+  'admin-events-clear': () => {
+    ui.confirm = {
+      title: 'Очистить журнал?',
+      text: 'Записи о регистрациях, входах и действиях панели исчезнут. На аккаунты, дружбу и заявки это не влияет.',
+      label: 'Очистить',
+      action: 'admin-events-clear-run',
+      id: '',
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-events-clear-run': async () => {
+    try {
+      await store.adminClearEvents();
+      ui.modal = { type: 'admin' };
+      renderModal();
+      await refreshAdmin();
+      toast('Журнал очищен.');
+    } catch (error) {
+      playSound('error');
+      toast(error instanceof Error ? error.message : 'Не получилось очистить журнал.', 'error');
+    }
+  },
 
   'admin-drop-request': (el) =>
     runAdminAction(() => store.adminRemoveRequest(el.dataset.id), 'Заявка удалена.'),

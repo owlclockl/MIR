@@ -33,6 +33,18 @@
 const MAX_AVATAR_CHARS = 300 * 1024;
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
 
+/* Журнал панели админа: последние события хаба — кто зарегистрировался,
+   вошёл, подружился, кого отключили или заблокировали. Это не логи
+   сервера, а короткая память для владельца: она лежит в данных хаба
+   (значит, переживает перезапуск) и обрезается до MAX_EVENTS записей,
+   чтобы файл данных не рос бесконечно. Пароли и ключи в журнал не
+   попадают — только имена, id и повод. */
+const MAX_EVENTS = 300;
+/* Сколько записей журнала уезжает в панель за один снимок. */
+const MAX_EVENTS_FOR_PANEL = 150;
+const MAX_BAN_REASON = 140;
+const MAX_LOG_TEXT = 160;
+
 /* ---------- сигналинг P2P ----------------------------------
    Хаб сводит друзей напрямую: через него идут только offer/answer/ICE
    (несколько килобайт на соединение), а дальше трафик течёт между
@@ -49,6 +61,7 @@ const INBOX_WAIT_MS = 20_000; // предел длинного опроса
 export const DEFAULT_LIMITS = {
   '/api/register': 10,
   '/api/login': 20,
+  '/api/logout': 30,
   '/api/salt': 30,
   /* Подбор ключа администратора не должен быть быстрым: обычному
      владельцу хватает, а перебору — нет. Лимит стоит на всех
@@ -57,6 +70,8 @@ export const DEFAULT_LIMITS = {
   '/api/admin/state': 60,
   '/api/admin/user': 60,
   '/api/admin/request': 60,
+  '/api/admin/settings': 60,
+  '/api/admin/events': 60,
   /* Сигналинг шумный по своей природе: ICE-кандидаты летят пачками,
      а длинный опрос входящих висит по 20 секунд и сразу повторяется. */
   '/api/p2p/signal': 1200,
@@ -133,6 +148,10 @@ const secretEquals = (a, b) => {
 export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS, adminKey = '' }) {
   db.users ??= [];
   db.requests ??= [];
+  /* Журнал и настройки появились позже остальных данных: у старых хабов
+     этих полей в файле/хранилище ещё нет — дописываем на месте. */
+  if (!Array.isArray(db.events)) db.events = [];
+  db.settings = { registrationOpen: db.settings?.registrationOpen !== false };
 
   /* ---------- сохранение ------------------------------------
      Мутации ждут записи (иначе перезапуск съест регистрацию),
@@ -261,14 +280,59 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       throw httpError(409, 'Это имя занято.');
   };
 
-  const auth = (req) => {
+  /* ---------- журнал событий ----------------------------------
+     Короткая память хаба для панели админа. Пишем только факты,
+     которые владельцу важно видеть: регистрации, входы, дружбу,
+     действия панели. Ничего лишнего — ни паролей, ни ключа. */
+
+  let eventSeq = 0;
+
+  const logEvent = (kind, fields = {}) => {
+    const event = { id: `e_${(eventSeq += 1).toString(36)}`, at: Date.now(), kind };
+    for (const [key, value] of Object.entries(fields)) {
+      if (value === undefined || value === null || value === '') continue;
+      event[key] = typeof value === 'string' ? value.slice(0, MAX_LOG_TEXT) : value;
+    }
+    db.events.push(event);
+    if (db.events.length > MAX_EVENTS) db.events.splice(0, db.events.length - MAX_EVENTS);
+    return event;
+  };
+
+  /* ---------- блокировки аккаунтов ----------------------------
+     Блокировка живёт на самом аккаунте (user.ban), поэтому уезжает
+     вместе с ним при удалении и не требует отдельного списка. Время
+     окончания необязательно: until = 0 — навсегда. Протухшая
+     блокировка считается снятой сама собой. */
+
+  const banOf = (user) => {
+    const ban = user?.ban;
+    if (!ban) return null;
+    if (ban.until && ban.until <= Date.now()) return null;
+    return { reason: ban.reason || '', at: ban.at ?? 0, until: ban.until ?? 0 };
+  };
+
+  const banMessage = (ban) =>
+    ban.reason
+      ? `Аккаунт заблокирован администратором: ${ban.reason}`
+      : 'Аккаунт заблокирован администратором.';
+
+  const settingsShape = () => ({ registrationOpen: db.settings.registrationOpen !== false });
+
+  /* Токен приходит заголовком (обычный путь) либо телом/параметром —
+     так же, как его ищет auth. Нужен и входу, и явному выходу. */
+  const tokenOf = (req) => {
     const header = req.headers?.authorization || req.headers?.Authorization || '';
-    const token = header.startsWith('Bearer ')
-      ? header.slice(7)
-      : req.body?.token || req.query?.get('token') || null;
+    if (header.startsWith('Bearer ')) return header.slice(7);
+    return req.body?.token || req.query?.get('token') || null;
+  };
+
+  const auth = (req) => {
+    const token = tokenOf(req);
     if (!token) throw httpError(401, 'Нет токена сессии — войдите заново.');
     const user = byToken(token);
     if (!user) throw httpError(401, 'Сессия не найдена — войдите заново.');
+    const ban = banOf(user);
+    if (ban) throw httpError(403, banMessage(ban));
     return user;
   };
 
@@ -302,20 +366,36 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     online: !!u.online,
     inviteCode: u.inviteCode ?? null,
     tokens: Array.isArray(u.tokens) ? u.tokens.length : 0,
+    /* null — аккаунт свободен; иначе { reason, at, until } (until = 0 —
+       навсегда). Протухшая блокировка сюда не попадает. */
+    ban: banOf(u),
   });
 
-  const adminStats = () => ({
-    users: db.users.length,
-    online: db.users.filter((u) => u.online && Date.now() - (u.seenAt ?? 0) < 90_000).length,
-    avatars: db.users.filter((u) => u.avatar).length,
-    requests: db.requests.length,
-    links: Math.round(db.users.reduce((sum, u) => sum + (u.friends?.length ?? 0), 0) / 2),
-    bytes: JSON.stringify({ users: db.users, requests: db.requests }).length,
-  });
+  const adminStats = () => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    return {
+      users: db.users.length,
+      online: db.users.filter((u) => u.online && now - (u.seenAt ?? 0) < 90_000).length,
+      avatars: db.users.filter((u) => u.avatar).length,
+      requests: db.requests.length,
+      links: Math.round(db.users.reduce((sum, u) => sum + (u.friends?.length ?? 0), 0) / 2),
+      banned: db.users.filter((u) => banOf(u)).length,
+      today: db.users.filter((u) => now - (u.createdAt ?? 0) < day).length,
+      week: db.users.filter((u) => now - (u.createdAt ?? 0) < day * 7).length,
+      activeDay: db.users.filter((u) => now - (u.seenAt ?? 0) < day).length,
+      events: db.events.length,
+      bytes: JSON.stringify({ users: db.users, requests: db.requests, events: db.events }).length,
+    };
+  };
 
+  /* Снимок для панели. Журнал отдаём свежими записями вперёд — панель
+     показывает его как ленту, и переворачивать её на клиенте незачем. */
   const adminState = () => ({
     users: db.users.map(adminUserShape),
     requests: db.requests,
+    events: db.events.slice(-MAX_EVENTS_FOR_PANEL).reverse(),
+    settings: settingsShape(),
     stats: adminStats(),
     /* Ключ ещё заводской — панель по этому признаку напоминает сменить. */
     key: { isDefault: adminKeyIsDefault() },
@@ -346,6 +426,8 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     'GET /api/state': (req) => stateFor(auth(req)),
 
     'POST /api/register': async (req, body, save) => {
+      if (db.settings.registrationOpen === false)
+        throw httpError(403, 'Регистрация временно закрыта администратором.');
       const name = String(body.name || '').trim();
       validName(name);
       if (byName(name)) throw httpError(409, 'Это имя занято.');
@@ -367,6 +449,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
         online: true,
       };
       db.users.push(user);
+      logEvent('register', { userId: user.id, name: user.name });
       save.now();
       return { token, state: stateFor(user) };
     },
@@ -374,11 +457,16 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     'POST /api/login': async (req, body, save) => {
       const user = byName(body.name);
       if (!user) throw httpError(404, 'Игрок с таким именем не найден.');
+      /* Заблокированному пароль не помогает: сначала говорим про
+         блокировку, иначе он будет думать, что «пароль слетел». */
+      const ban = banOf(user);
+      if (ban) throw httpError(403, banMessage(ban));
       if (body.passHash !== user.passHash) throw httpError(401, 'Неверный пароль.');
       const token = hex(16);
       user.tokens = [...(user.tokens ?? []), token].slice(-TOKEN_TOKENS_PER_USER);
       user.online = true;
       user.seenAt = Date.now();
+      logEvent('login', { userId: user.id, name: user.name });
       save.now();
       return { token, state: stateFor(user) };
     },
@@ -391,10 +479,28 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       return { ok: true };
     },
 
+    /* Игрок закрыл вкладку или свернул приложение: отмечаем его
+       «не в меню», но токен устройства не трогаем. Это важно: браузер
+       присылает beforeunload и при обычном обновлении страницы (F5),
+       а вход должен пережить обновление — иначе игрока выбрасывает из
+       аккаунта после каждого F5. Присутствие и так сгорает само:
+       «в сети» — это online и свежий seenAt. */
     'POST /api/offline': async (req, body, save) => {
       const user = auth(req);
       user.online = false;
-      user.tokens = user.tokens.filter((t) => t !== (body.token || null)) || user.tokens;
+      user.seenAt = Date.now();
+      save.now();
+      return { ok: true };
+    },
+
+    /* Явный выход из аккаунта — вот здесь токен устройства отзывается.
+       Другие устройства игрока продолжают работать: у каждого свой
+       токен. Когда не осталось ни одного, аккаунт уходит из сети. */
+    'POST /api/logout': async (req, body, save) => {
+      const user = auth(req);
+      const token = tokenOf(req);
+      user.tokens = (user.tokens ?? []).filter((t) => t !== token);
+      if (user.tokens.length === 0) user.online = false;
       save.now();
       return { ok: true };
     },
@@ -405,8 +511,10 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       validName(name);
       const owner = byName(name);
       if (owner && owner.id !== user.id) throw httpError(409, 'Это имя занято.');
+      const before = user.name;
       user.name = name;
       user.nameKey = name.toLowerCase();
+      logEvent('name', { userId: user.id, name: user.name, text: before });
       save.now();
       return { state: stateFor(user) };
     },
@@ -420,6 +528,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       user.passHash = body.newHash;
       /* Смена пароля выкидывает остальные устройства. */
       user.tokens = user.tokens.slice(-1);
+      logEvent('password', { userId: user.id, name: user.name });
       save.now();
       return { state: stateFor(user) };
     },
@@ -433,6 +542,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       )
         throw httpError(400, 'Картинка слишком тяжёлая даже после сжатия.');
       user.avatar = avatar;
+      logEvent(avatar ? 'avatar' : 'avatar-clear', { userId: user.id, name: user.name });
       save.now();
       return { state: stateFor(user) };
     },
@@ -454,6 +564,12 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       } else {
         db.requests.push({ id: `r_${hex(6)}`, from: me.id, to: target.id, at: Date.now() });
       }
+      logEvent(accepted ? 'friend' : 'request', {
+        userId: me.id,
+        name: me.name,
+        targetId: target.id,
+        targetName: target.name,
+      });
       save.now();
       return {
         state: stateFor(me),
@@ -468,6 +584,12 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       const from = byId(request.from);
       db.requests = db.requests.filter((r) => r.id !== request.id);
       if (body.accept && from) linkFriends(me, from);
+      logEvent(body.accept ? 'friend' : 'request-decline', {
+        userId: me.id,
+        name: me.name,
+        targetId: from?.id,
+        targetName: from?.name,
+      });
       save.now();
       return {
         state: stateFor(me),
@@ -479,6 +601,12 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       const me = auth(req);
       const friend = byId(body.friendId);
       if (friend) unlinkFriends(me, friend);
+      logEvent('friend-remove', {
+        userId: me.id,
+        name: me.name,
+        targetId: friend?.id,
+        targetName: friend?.name,
+      });
       save.now();
       return { state: stateFor(me), result: { friendName: friend?.name ?? '' } };
     },
@@ -493,6 +621,12 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       if (me.friends.includes(owner.id)) throw httpError(409, `${owner.name} уже у вас в друзьях.`);
       dropRequestsBetween(me.id, owner.id);
       linkFriends(me, owner);
+      logEvent('friend', {
+        userId: me.id,
+        name: me.name,
+        targetId: owner.id,
+        targetName: owner.name,
+      });
       save.now();
       return { state: stateFor(me), result: { ownerId: owner.id, ownerName: owner.name } };
     },
@@ -500,6 +634,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     'POST /api/invite/regen': async (req, body, save) => {
       const me = auth(req);
       me.inviteCode = makeInviteCode();
+      logEvent('code', { userId: me.id, name: me.name });
       save.now();
       return { state: stateFor(me), result: { code: me.inviteCode } };
     },
@@ -526,8 +661,15 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
           validName(name);
           const owner = byName(name);
           if (owner && owner.id !== user.id) throw httpError(409, 'Это имя занято.');
+          const before = user.name;
           user.name = name;
           user.nameKey = name.toLowerCase();
+          logEvent('admin:rename', {
+            by: 'admin',
+            userId: user.id,
+            name: user.name,
+            text: before,
+          });
           break;
         }
         case 'password': {
@@ -538,11 +680,39 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
           /* Сброс пароля администратором выкидывает все устройства. */
           user.tokens = [];
           user.online = false;
+          logEvent('admin:password', { by: 'admin', userId: user.id, name: user.name });
           break;
         }
         case 'kick': {
           user.online = false;
           user.tokens = [];
+          logEvent('admin:kick', { by: 'admin', userId: user.id, name: user.name });
+          break;
+        }
+        case 'ban': {
+          const reason = String(body.reason || '').trim().slice(0, MAX_BAN_REASON);
+          const hours = Math.max(0, Math.min(24 * 365, Number(body.hours) || 0));
+          user.ban = {
+            reason,
+            at: Date.now(),
+            until: hours ? Date.now() + hours * 3_600_000 : 0,
+          };
+          /* Блокировка сразу отключает устройства: иначе игрок с живой
+             сессией доиграл бы до её конца. */
+          user.tokens = [];
+          user.online = false;
+          logEvent('admin:ban', {
+            by: 'admin',
+            userId: user.id,
+            name: user.name,
+            text: reason || (hours ? '' : 'навсегда'),
+            until: user.ban.until,
+          });
+          break;
+        }
+        case 'unban': {
+          delete user.ban;
+          logEvent('admin:unban', { by: 'admin', userId: user.id, name: user.name });
           break;
         }
         case 'avatar': {
@@ -553,26 +723,47 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
           )
             throw httpError(400, 'Картинка слишком тяжёлая даже после сжатия.');
           user.avatar = avatar === null ? null : String(avatar);
+          logEvent(avatar ? 'admin:avatar' : 'admin:avatar-clear', {
+            by: 'admin',
+            userId: user.id,
+            name: user.name,
+          });
           break;
         }
         case 'regen-code': {
           user.inviteCode = makeInviteCode();
+          logEvent('admin:code', { by: 'admin', userId: user.id, name: user.name });
           break;
         }
         case 'unlink': {
           const friend = byId(body.friendId);
           if (friend) unlinkFriends(user, friend);
+          logEvent('admin:unlink', {
+            by: 'admin',
+            userId: user.id,
+            name: user.name,
+            targetId: friend?.id,
+            targetName: friend?.name,
+          });
           break;
         }
         case 'unlink-all': {
+          const count = (user.friends ?? []).length;
           for (const id of [...(user.friends ?? [])]) {
             const friend = byId(id);
             if (friend) unlinkFriends(user, friend);
           }
           user.friends = [];
+          logEvent('admin:unlink-all', {
+            by: 'admin',
+            userId: user.id,
+            name: user.name,
+            count,
+          });
           break;
         }
         case 'delete': {
+          logEvent('admin:delete', { by: 'admin', userId: user.id, name: user.name });
           adminDropUser(user);
           break;
         }
@@ -586,10 +777,50 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     'POST /api/admin/request': async (req, body, save) => {
       adminAuth(req);
       const before = db.requests.length;
+      const dropped = db.requests.find((r) => r.id === body.requestId) ?? null;
       db.requests = db.requests.filter((r) => r.id !== body.requestId);
       if (db.requests.length === before) throw httpError(404, 'Заявка не найдена.');
+      logEvent('admin:request-drop', {
+        by: 'admin',
+        userId: dropped?.from ?? '',
+        name: byId(dropped?.from)?.name ?? '',
+        targetId: dropped?.to ?? '',
+        targetName: byId(dropped?.to)?.name ?? '',
+      });
       save.now();
       return adminState();
+    },
+
+    /* Настройки хаба, которые владелец меняет из панели. Пока это
+       одно: открыта ли регистрация. Закрывают её, когда идёт игра
+       своим кругом, а лишние аккаунты не нужны. */
+    'POST /api/admin/settings': async (req, body, save) => {
+      adminAuth(req);
+      if ('registrationOpen' in (body ?? {})) {
+        const open = body.registrationOpen !== false;
+        const changed = db.settings.registrationOpen !== open;
+        db.settings.registrationOpen = open;
+        if (changed)
+          logEvent('admin:settings', {
+            by: 'admin',
+            text: open ? 'регистрация открыта' : 'регистрация закрыта',
+          });
+      }
+      save.now();
+      return { ok: true, ...adminState() };
+    },
+
+    /* Очистка журнала: владелец приводит память панели в порядок,
+       когда она забита старым шумом. Сама очистка тоже попадает в
+       журнал — чтобы «пусто» не выглядело как «ничего не было». */
+    'POST /api/admin/events': async (req, body, save) => {
+      adminAuth(req);
+      if (body?.clear) {
+        db.events = [];
+        logEvent('admin:events-clear', { by: 'admin' });
+      }
+      save.now();
+      return { ok: true, ...adminState() };
     },
 
     /* Смена ключа панели. Ключ хранится в данных хаба открытым текстом
@@ -600,6 +831,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       adminAuth(req);
       if (body?.reset) {
         db.adminKey = '';
+        logEvent('admin:key-reset', { by: 'admin', text: 'возврат заводского ключа' });
         save.now();
         return { ok: true, ...adminState() };
       }
@@ -609,6 +841,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       if (next === HUB_DEFAULT_ADMIN_KEY)
         throw httpError(400, 'Это заводской ключ — придумайте свой.');
       db.adminKey = next;
+      logEvent('admin:key', { by: 'admin', text: 'ключ панели сменён' });
       save.now();
       return { ok: true, ...adminState() };
     },

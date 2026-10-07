@@ -63,7 +63,20 @@ export class MirHub {
       this.snapshot.set('reqs', JSON.stringify(requests));
       const adminKey = (await state.storage.get('adminKey')) ?? '';
       this.snapshot.set('adminKey', JSON.stringify(adminKey));
-      this.db = { users, requests, adminKey: typeof adminKey === 'string' ? adminKey : '' };
+      /* Настройки хаба и журнал панели: отдельные ключи — они маленькие,
+         но меняются часто (журнал — при каждом событии), а игроков
+         трогать лишний раз нельзя. */
+      const settings = (await state.storage.get('settings')) ?? null;
+      this.snapshot.set('settings', JSON.stringify(settings));
+      const events = (await state.storage.get('events')) ?? [];
+      this.snapshot.set('events', JSON.stringify(events));
+      this.db = {
+        users,
+        requests,
+        adminKey: typeof adminKey === 'string' ? adminKey : '',
+        settings: settings && typeof settings === 'object' ? settings : undefined,
+        events: Array.isArray(events) ? events : [],
+      };
       this.core = createHubCore({
         db: this.db,
         persist: (_db, { immediate }) => this.persist(immediate),
@@ -102,6 +115,17 @@ export class MirHub {
     if (this.snapshot.get('adminKey') !== adminKey) {
       puts.adminKey = this.db.adminKey ?? '';
       this.snapshot.set('adminKey', adminKey);
+    }
+    /* Настройки панели (открыта ли регистрация) и журнал событий. */
+    const settings = JSON.stringify(this.db.settings ?? {});
+    if (this.snapshot.get('settings') !== settings) {
+      puts.settings = this.db.settings ?? {};
+      this.snapshot.set('settings', settings);
+    }
+    const events = JSON.stringify(this.db.events ?? []);
+    if (this.snapshot.get('events') !== events) {
+      puts.events = this.db.events ?? [];
+      this.snapshot.set('events', events);
     }
     const gone = [...this.snapshot.keys()].filter((key) => key.startsWith('u:') && !alive.has(key));
     /* Больше 128 ключей за раз хранилище не принимает. */

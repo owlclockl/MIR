@@ -65,10 +65,21 @@ const sha256 = async (text) => {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 };
 
+/* Хаб пускает 10 регистраций в минуту с одного адреса — это защита от
+   чужих, а не от проверки. Если проверку запустили сразу после такой же
+   (в том числе этого же файла), подождём окно и продолжим: падать на
+   собственном лимите проверка не должна. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const makeAccount = async (name, password) => {
   const salt = hex(16);
   const passHash = await sha256(`${salt}:${password}`);
-  const { status, data } = await call('POST', '/api/register', { body: { name, salt, passHash } });
+  let { status, data } = await call('POST', '/api/register', { body: { name, salt, passHash } });
+  for (let attempt = 0; status === 429 && attempt < 4; attempt += 1) {
+    console.log('  · лимит запросов: ждём 20 секунд и пробуем снова');
+    await sleep(20_000);
+    ({ status, data } = await call('POST', '/api/register', { body: { name, salt, passHash } }));
+  }
   if (status !== 200) throw new Error(`регистрация ${name}: ${status} ${data.error || ''}`);
   const me = data.state.users.find((u) => u.nameKey === name.toLowerCase());
   return { name, password, salt, passHash, token: data.token, id: me.id, invite: me.inviteCode };
@@ -313,6 +324,122 @@ const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body
     body: { userId: pair.id, action: 'delete' },
   });
 
+  /* Блокировка: вход закрыт, живая сессия не работает, снятие возвращает
+     доступ. Заблокированный игрок должен видеть причину, а не «неверный
+     пароль», — иначе он будет сбрасывать пароль вместо обращения к админу. */
+  const blockedUser = await makeAccount(`probeB${n}x`, 'secret654');
+  const ban = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: blockedUser.id, action: 'ban', reason: 'проверка', hours: 1 },
+  });
+  const bannedShape = ban.data.users?.find((u) => u.id === blockedUser.id);
+  expect('панель блокирует аккаунт', ban.status === 200 && !!bannedShape?.ban, ban.data.error);
+  expect(
+    'блокировка помнит причину и срок',
+    bannedShape?.ban?.reason === 'проверка' && bannedShape?.ban?.until > Date.now(),
+    JSON.stringify(bannedShape?.ban),
+  );
+  const bannedLogin = await call('POST', '/api/login', {
+    body: { name: blockedUser.name, passHash: blockedUser.passHash },
+  });
+  expect(
+    'заблокированному вход закрыт (и это видно по причине)',
+    bannedLogin.status === 403 && /заблокирован/i.test(bannedLogin.data.error || ''),
+    `${bannedLogin.status} ${bannedLogin.data.error || ''}`,
+  );
+  const bannedState = await call('GET', '/api/state', { token: blockedUser.token });
+  expect(
+    'сессию заблокированного хаб отзывает сразу (401 или 403)',
+    bannedState.status === 401 || bannedState.status === 403,
+    `${bannedState.status} ${bannedState.data.error || ''}`,
+  );
+
+  const forever = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: blockedUser.id, action: 'ban', hours: 0 },
+  });
+  expect(
+    'блокировка без срока — навсегда',
+    forever.data.users?.find((u) => u.id === blockedUser.id)?.ban?.until === 0,
+  );
+
+  const unban = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: blockedUser.id, action: 'unban' },
+  });
+  expect(
+    'панель снимает блокировку',
+    unban.status === 200 && !unban.data.users.find((u) => u.id === blockedUser.id)?.ban,
+  );
+  const afterUnban = await call('POST', '/api/login', {
+    body: { name: blockedUser.name, passHash: blockedUser.passHash },
+  });
+  expect('после разблокировки вход снова открыт', afterUnban.status === 200 && !!afterUnban.data.token);
+  const staleToken = await call('GET', '/api/state', { token: blockedUser.token });
+  expect(
+    'снятие блокировки не возвращает старую сессию',
+    staleToken.status === 401,
+    `${staleToken.status}`,
+  );
+  await call('POST', '/api/offline', { token: afterUnban.data.token, body: { token: afterUnban.data.token } });
+  await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: blockedUser.id, action: 'delete' },
+  });
+
+  /* Регистрация закрывается и открывается из панели: так владелец
+     перекрывает хабу доступ, когда играет своим кругом. */
+  const closed = await call('POST', '/api/admin/settings', {
+    admin: ADMIN_KEY,
+    body: { registrationOpen: false },
+  });
+  expect(
+    'панель закрывает регистрацию',
+    closed.status === 200 && closed.data.settings?.registrationOpen === false,
+    closed.data.error,
+  );
+  const refused = await call('POST', '/api/register', {
+    body: { name: `probeQ${n}x`, salt: hex(16), passHash: await sha256('secret654') },
+  });
+  expect(
+    'при закрытой регистрации новый аккаунт не создаётся',
+    refused.status === 403,
+    `${refused.status} ${refused.data.error || ''}`,
+  );
+  const reopened = await call('POST', '/api/admin/settings', {
+    admin: ADMIN_KEY,
+    body: { registrationOpen: true },
+  });
+  expect(
+    'панель открывает регистрацию обратно',
+    reopened.status === 200 && reopened.data.settings?.registrationOpen === true,
+  );
+
+  /* Журнал панели: события копятся, свежие впереди, очистка работает. */
+  const journal = await call('POST', '/api/admin/state', { admin: ADMIN_KEY, body: {} });
+  const events = journal.data.events ?? [];
+  const kinds = new Set(events.map((e) => e.kind));
+  expect('журнал панели ведёт записи', Array.isArray(events) && events.length > 0, `записей: ${events.length}`);
+  expect(
+    'в журнале есть регистрация, вход и действия панели',
+    kinds.has('register') && kinds.has('login') && kinds.has('admin:ban') && kinds.has('admin:settings'),
+    [...kinds].slice(0, 10).join(', '),
+  );
+  expect('журнал не выдаёт хеши паролей', !JSON.stringify(events).includes('passHash'));
+  expect(
+    'журнал идёт свежими записями вперёд',
+    events.length < 2 || (events[0].at ?? 0) >= (events[events.length - 1].at ?? 0),
+  );
+
+  const cleared = await call('POST', '/api/admin/events', { admin: ADMIN_KEY, body: { clear: true } });
+  expect(
+    'журнал очищается из панели (и это видно одной записью)',
+    cleared.status === 200 &&
+      cleared.data.events?.length === 1 &&
+      cleared.data.events[0].kind === 'admin:events-clear',
+    `записей: ${cleared.data.events?.length}`,
+  );
+
   /* Смена ключа панели: новый принимается, старый отзывается, короткий
      и заводской отклоняются, сброс возвращает исходный ключ. Ключ хаба
      трогаем только на время проверки и возвращаем обратно. */
@@ -333,15 +460,43 @@ const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body
   expect('после сброса снова исходный ключ', afterReset.status === 200, `${afterReset.status}`);
 }
 
-/* ---------- 7. мелочи ---------- */
+/* ---------- 7. уход из меню и явный выход ----------
 
-const unknown = await call('GET', '/api/нет-такого');
-expect('неизвестный маршрут → 404', unknown.status === 404, unknown.data.error);
+   Разница принципиальная: закрытие вкладки и обновление страницы (F5)
+   отмечают «не в меню», но токен устройства цел — иначе после каждого
+   обновления игрока выбрасывало бы из аккаунта. Отзывает токен только
+   явный выход из аккаунта. */
 
 const offA = await call('POST', '/api/offline', { token: A.token, body: { token: A.token } });
 const offB = await call('POST', '/api/offline', { token: B.token, body: { token: B.token } });
 const offC = await call('POST', '/api/offline', { token: stranger.token, body: { token: stranger.token } });
 expect('выход из сети', offA.status === 200 && offB.status === 200 && offC.status === 200);
+
+const afterOffline = await call('GET', '/api/state', { token: A.token });
+expect(
+  'уход из меню не отзывает сессию: вход переживает обновление страницы',
+  afterOffline.status === 200,
+  `${afterOffline.status} ${afterOffline.data.error || ''}`,
+);
+
+const signedOut = await call('POST', '/api/logout', { token: A.token, body: { token: A.token } });
+expect('явный выход принят', signedOut.status === 200, signedOut.data.error);
+const afterLogout = await call('GET', '/api/state', { token: A.token });
+expect('после явного выхода токен не работает', afterLogout.status === 401, `${afterLogout.status}`);
+
+/* Выход одного устройства не должен трогать другие: у каждого свой токен. */
+const relogin = await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } });
+const secondDevice = relogin.data.token;
+const firstAgain = await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } });
+await call('POST', '/api/logout', { token: firstAgain.data.token, body: { token: firstAgain.data.token } });
+const otherDevice = await call('GET', '/api/state', { token: secondDevice });
+expect('выход на одном устройстве не выкидывает другие', otherDevice.status === 200, `${otherDevice.status}`);
+await call('POST', '/api/offline', { token: secondDevice, body: { token: secondDevice } });
+
+/* ---------- 8. мелочи ---------- */
+
+const unknown = await call('GET', '/api/нет-такого');
+expect('неизвестный маршрут → 404', unknown.status === 404, unknown.data.error);
 
 console.log(failures === 0 ? '\nВСЁ ХОРОШО' : `\nПЛОХО: провалов ${failures}`);
 process.exit(failures === 0 ? 0 : 1);
