@@ -26,16 +26,28 @@ try {
 
 const HUB = (process.argv[2] || 'http://127.0.0.1:8787').replace(/\/+$/, '');
 
+/* Подставные «новости о сборке»: страница обязана решить, что на сервере
+   вышла новая версия, и сказать об этом — не перезагружая игру сама. */
+const SERVER_BUILD = { version: '99.0.0', build: 'deadbeef' };
+const fetchStub = (w) => (input, init) =>
+  String(input).includes('mir-build.json')
+    ? Promise.resolve({ ok: true, json: async () => ({ ...SERVER_BUILD, builtAt: '' }) })
+    : globalThis.fetch(input, init);
+
 const html = readFileSync(fromRoot('mir.html'), 'utf8');
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
   url: 'http://127.0.0.1:9999/',   // «страница» не хаб: его на этом порту нет
   pretendToBeVisual: true,
+  /* fetch нужен уже на старте: приложение сразу проверяет новую сборку. */
+  beforeParse(w) {
+    w.fetch = fetchStub(w);
+  },
 });
 const { window } = dom;
 window.HTMLMediaElement.prototype.play = () => Promise.resolve(); // jsdom не декодирует звуки
 window.HTMLMediaElement.prototype.pause = () => {};
-window.fetch = globalThis.fetch;            // jsdom без fetch — отдаём ему node-овский
+window.fetch = fetchStub(window);           // jsdom без fetch — отдаём ему node-овский
 window.AbortSignal = globalThis.AbortSignal;
 window.crypto.subtle = globalThis.crypto.subtle;
 
@@ -112,11 +124,37 @@ ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail_
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
+/* Обновления: сервер отдаёт сборку 99.0.0, а в странице 0.8.0 — приложение
+   обязано сказать об этом строкой под шапкой. Само оно ничего не
+   перезагружает: перезагрузку выбирает игрок кнопкой. */
+const bar = $('.update-bar');
+ok(
+  'строка обновления появилась и знает версию с сервера',
+  !!bar && !bar.hidden && /99\.0\.0/.test(bar.textContent || ''),
+  bar?.textContent?.replace(/\s+/g, ' ').trim(),
+);
+ok(
+  'в строке есть «Обновить сейчас» и «Позже»',
+  !!$('[data-action="update-apply"]') && !!$('[data-action="update-dismiss"]'),
+);
+click('[data-action="update-dismiss"]');
+await wait(50);
+ok('«Позже» убирает строку', $('[data-region="update"]')?.hidden === true);
+
 /* Проверяем обе группы меню: модальные действия не пересоздают страницу. */
 const shellBeforeMenus = $('.shell');
 click('[data-action="open-settings"]');
 await wait(50);
 ok('обычное меню открывает настройки без перезагрузки', $('.dialog__title')?.textContent === 'Настройки' && $('.shell') === shellBeforeMenus);
+ok(
+  'настройки показывают состояние обновления',
+  /99\.0\.0/.test($('.settings-list')?.textContent || '') && !!$('[data-action="update-apply"]'),
+  $('.settings-list')?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120),
+);
+ok(
+  'уведомления телефона доступны только с service worker',
+  !!$('[data-setting="notify"]') && $('[data-setting="notify"]').disabled === true,
+);
 click('[data-action="close-modal"]');
 click('[data-action="open-hub"]');
 await wait(50);

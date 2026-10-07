@@ -186,11 +186,12 @@ family('панель друзей: шапка, список и подвал — 
   ['.rail__foot', 'padding', 'var(--panel-pad-x)'],
 ]);
 
-family('каркас: сцена, шапка, подвал и тосты — по --pad-x', [
+family('каркас: сцена, шапка, подвал, тосты и строка обновления — по --pad-x', [
   ['.topbar__side', 'padding-inline', 'var(--pad-x)'],
   ['.stage', 'padding', 'var(--pad-x)'],
   ['.footer', 'padding', 'var(--pad-x)'],
   ['.toast-stack', 'left', 'var(--pad-x)'],
+  ['.update-bar', 'padding-inline', 'var(--pad-x)'],
 ]);
 
 family('строки списков: одна плотность --row-pad', [

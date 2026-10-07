@@ -1,6 +1,7 @@
 import './style.css';
 import * as store from './data/store.js';
 import * as p2p from './data/p2p.js';
+import * as update from './data/update.js';
 import {
   createAvatarPreview,
   pickAvatarFile,
@@ -505,9 +506,13 @@ const settingsModalHtml = () => {
           <input class="switch" type="checkbox" data-setting="motion" ${settings.motion ? 'checked' : ''} />
         </label>
         <div class="setting-row">
-          <span><strong>Обновления</strong><small data-role="update-status">Версия ${VERSION}. Проверка выполняется автоматически.</small></span>
-          <button class="mini-button" type="button" data-action="check-update">Проверить</button>
+          <span><strong>Обновления</strong><small>${updateStatusText()}</small></span>
+          <button class="mini-button${update.getUpdateInfo().available ? ' mini-button--accent' : ''}" type="button" data-action="${update.getUpdateInfo().available ? 'update-apply' : 'check-update'}">${update.getUpdateInfo().available ? 'Обновить' : 'Проверить'}</button>
         </div>
+        <label class="setting-row">
+          <span><strong>Уведомления на телефон</strong><small>${notifyHint()}</small></span>
+          <input class="switch" type="checkbox" data-setting="notify" ${settings.notify ? 'checked' : ''} ${update.notificationState().supported ? '' : 'disabled'} />
+        </label>
         <p class="form-note">Настройки сохраняются на этом устройстве. Обновление применяется один раз после загрузки и больше не создаёт цикл перезагрузок.</p>
       </div>`,
   });
@@ -1459,7 +1464,7 @@ const adminSystemHtml = () => {
         'Данные браузера',
         `${Math.round(local.bytes / 1024)} КБ · ${local.persists ? 'сохраняются' : 'только до перезагрузки'}`,
       )}
-      ${statRow('Обновление', navigator.serviceWorker?.controller ? 'service worker активен' : 'не активно')}
+      ${statRow('Обновление', updateDiagnostics())}
       ${statRow('Прямая связь', p2p.supported() ? 'WebRTC доступен' : 'WebRTC недоступен')}
       ${statRow('Версия', VERSION)}
     </div>
@@ -1921,6 +1926,8 @@ document.querySelector('#app').innerHTML = `
       </nav>
 
       <div class="topbar__side topbar__side--end" data-region="account"></div>
+
+      <div class="update-bar" data-region="update" hidden></div>
     </header>
 
     <main id="main" class="stage">
@@ -2002,6 +2009,129 @@ const renderAfterStoreChange = () => {
     renderModal({ focus: false });
 };
 
+/* ---------- обновления --------------------------------------- */
+
+/* Состояние обновления словами. Тексты живут здесь, а не в src/data/update.js:
+   модуль знает про сеть и service worker, а формулировки — дело интерфейса. */
+const updateStatusText = () => {
+  const state = update.getUpdateInfo();
+  const version = state.latest?.version;
+  switch (state.phase) {
+    case 'checking':
+      return 'Проверяем…';
+    case 'downloading':
+      return 'Новая версия скачивается в фоне.';
+    case 'ready':
+      return version ? `Версия ${version} скачана и готова к запуску.` : 'Обновление скачано и готово к запуску.';
+    case 'stale':
+      return version ? `На сервере уже версия ${version}.` : 'На сервере новая версия.';
+    case 'error':
+      return 'Не удалось проверить — проверьте связь с интернетом.';
+    case 'unavailable':
+      return `Версия ${VERSION}. Эта копия обновляется целиком — новой сборкой приложения.`;
+    default:
+      return state.lastCheck
+        ? `Версия ${VERSION}. Проверено в ${TIME_FORMAT.format(state.lastCheck)}.`
+        : `Версия ${VERSION}. Проверка выполняется автоматически.`;
+  }
+};
+
+/* Уведомления телефона: их мало выключить — у них бывает три разных
+   состояния, и игроку важно понимать, какое именно. */
+const notifyHint = () => {
+  const state = update.notificationState();
+  if (!state.supported) return 'Уведомления работают в установленном приложении по https.';
+  if (state.permission === 'denied')
+    return 'Браузер запретил уведомления — разрешите их в настройках.';
+  return state.enabled
+    ? 'Сообщение в шторке телефона, когда выйдет новая версия.'
+    : 'Сказать о новой версии уведомлением телефона, а не только строкой в меню.';
+};
+
+/* Диагностика в панели админа: что с обновлениями прямо сейчас. */
+const updateDiagnostics = () => {
+  const state = update.getUpdateInfo();
+  if (!state.checkable) return 'проверка недоступна: копия открыта с диска';
+  const parts = [
+    state.supported
+      ? navigator.serviceWorker?.controller
+        ? 'service worker активен'
+        : 'service worker зарегистрирован'
+      : 'service worker не активен',
+  ];
+  parts.push(
+    state.available
+      ? state.latest?.version
+        ? `доступна версия ${state.latest.version}`
+        : 'доступна новая версия'
+      : 'обновлений нет',
+  );
+  if (state.lastCheck) parts.push(`проверено в ${TIME_FORMAT.format(state.lastCheck)}`);
+  return parts.join(' · ');
+};
+
+/* Строка обновления висит под шапкой, когда на сервере появилась новая
+   сборка. Сама она ничего не перезагружает: игрок либо жмёт «Обновить
+   сейчас», либо откладывает — и тогда новая версия включится при следующем
+   запуске, как и раньше. */
+const updateBarHtml = (state) => {
+  const version = state.latest?.version ? ` ${state.latest.version}` : '';
+  const text = state.waiting
+    ? version
+      ? `Версия${version} скачана и готова к запуску.`
+      : 'Обновление скачано и готово к запуску.'
+    : `На сервере вышла новая версия${version}.`;
+  return `
+    <p class="update-bar__text">
+      <span class="update-bar__eyebrow">Обновление</span>
+      <span>${escapeHtml(text)}</span>
+    </p>
+    <div class="update-bar__actions">
+      <button class="mini-button mini-button--accent" type="button" data-action="update-apply">Обновить сейчас</button>
+      <button class="mini-button" type="button" data-action="update-dismiss">Позже</button>
+    </div>`;
+};
+
+const renderUpdateBar = () => {
+  const node = document.querySelector('[data-region="update"]');
+  if (!node) return;
+  const state = update.getUpdateInfo();
+  const visible = state.available && !state.dismissed;
+  node.hidden = !visible;
+  setMarkupIfChanged(node, visible ? updateBarHtml(state) : '', 'update');
+};
+
+/* Про новую сборку говорим один раз: тост видно внизу экрана, а на телефоне
+   (если игрок разрешил уведомления) новость приходит в шторку — строка под
+   шапкой сама по себе не бросается в глаза. */
+let announcedBuild = '';
+const announceUpdate = (state) => {
+  if (!state.available || !state.announceKey || state.announceKey === announcedBuild) return;
+  announcedBuild = state.announceKey;
+  const version = state.latest?.version ? ` ${state.latest.version}` : '';
+  if (state.phase === 'ready') toast(`Обновление${version} готово — можно обновить сейчас.`);
+  else toast(`Вышло обновление${version} — обновите страницу.`);
+  update.notifyDevice({
+    title: `Вышло обновление${version}`,
+    body: 'Нажмите, чтобы открыть игру и обновиться.',
+  });
+};
+
+const onUpdateChange = (state) => {
+  renderUpdateBar();
+  announceUpdate(state);
+  if (ui.modal?.type === 'settings') renderModal({ focus: false });
+};
+
+/* Настройка «уведомления на телефон» хранится на устройстве, а разрешение —
+   в браузере: если игрок его отозвал, честнее показать выключенный
+   переключатель, чем обещать уведомления, которых не будет. */
+const restoreNotifications = async () => {
+  if (!store.getSettings().notify) return;
+  const result = await update.setNotify(true);
+  if (result !== 'granted') store.updateSettings({ notify: false });
+};
+
 const refreshLiveLink = (peerId) => {
   const node = [...(overlayRoot()?.querySelectorAll('[data-role="peer-link-state"]') ?? [])]
     .find((item) => item.dataset.peerId === peerId);
@@ -2028,6 +2158,7 @@ const renderAfterPeerChange = (change = {}) => {
 };
 
 store.subscribe(renderAfterStoreChange);
+update.subscribe(onUpdateChange);
 p2p.subscribe(renderAfterPeerChange);
 let knownUnread = 0;
 const notifyIncomingMessage = () => {
@@ -2435,6 +2566,29 @@ document.addEventListener('wheel', (event) => {
 document.addEventListener('change', (event) => {
   const key = event.target.dataset?.setting;
   if (!key) return;
+
+  /* Уведомления телефона — единственная настройка, у которой есть разрешение
+     браузера: его спрашивают только по действию игрока, прямо здесь, и только
+     при включении. Не разрешили — переключатель возвращается на место. */
+  if (key === 'notify') {
+    const wanted = event.target.checked;
+    (async () => {
+      const result = wanted ? await update.setNotify(true, { ask: true }) : await update.setNotify(false);
+      const enabled = result === 'granted';
+      store.updateSettings({ notify: enabled });
+      if (wanted && !enabled) {
+        toast(
+          result === 'unsupported'
+            ? 'Уведомления телефона работают в установленном приложении по https.'
+            : 'Браузер не разрешил уведомления — новость покажет строка под шапкой.',
+          'error',
+        );
+      }
+      renderModal({ focus: false });
+    })();
+    return;
+  }
+
   const value = event.target.type === 'checkbox' ? event.target.checked : Number(event.target.value);
   store.updateSettings({ [key]: value });
   applySettings();
@@ -2478,26 +2632,21 @@ const actions = {
 
   'open-profile': () => openModal('profile'),
   'open-settings': () => openModal('settings'),
+  /* Проверку делает модуль обновлений (src/data/update.js), а текст состояния
+     рисуют настройки из его ответа: так на телефоне, где приложение не
+     закрывают, проверка не заканчивается ничем видимым. */
   'check-update': async () => {
-    const status = document.querySelector('[data-role="update-status"]');
-    if (status) status.textContent = 'Проверяем…';
-    try {
-      const registration = await navigator.serviceWorker?.getRegistration();
-      if (!registration) {
-        if (status) status.textContent = 'Автообновление доступно только по HTTPS или localhost.';
-        return;
-      }
-      await registration.update();
-      if (status)
-        status.textContent = registration.waiting
-          ? 'Обновление скачано. Оно применится при следующем открытии — без перезагрузки страницы.'
-          : `Проверка завершена (${VERSION}). Обновления применяются при следующем запуске.`;
-      playSound('success');
-    } catch {
-      if (status) status.textContent = 'Не удалось проверить. Проверьте интернет.';
-      playSound('error');
-    }
+    const state = await update.check({ manual: true });
+    if (state.phase === 'error') playSound('error');
+    else if (state.available) playSound('success');
   },
+
+  'update-apply': () => {
+    playSound('success');
+    update.apply();
+  },
+
+  'update-dismiss': () => update.dismiss(),
   'open-add-friend': () => {
     ui.addQuery = '';
     ui.codeValue = '';
@@ -2972,20 +3121,14 @@ window.addEventListener('beforeunload', () => {
   p2pRunning = false;
 });
 
-/* PWA: по https/localhost регистрируем service worker — меню становится
-   устанавливаемым приложением и работает офлайн. С file:// (mir.html)
-   и на голом http по локальной сети браузеры SW не разрешают. */
-if (
-  'serviceWorker' in navigator &&
-  (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-) {
-  /* Обновлённый service worker ждёт закрытия текущих вкладок. Никакой
-     controllerchange не вызывает reload: открытая игра не прерывается. */
-  navigator.serviceWorker.register('/sw.js').then((registration) => {
-    registration.update().catch(() => {});
-    setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
-  }).catch(() => {});
-}
+/* PWA и обновления: по https/localhost регистрируем service worker — меню
+   становится устанавливаемым приложением и работает офлайн. С file://
+   (mir.html) и на голом http по локальной сети браузеры SW не разрешают, но
+   проверка новой сборки по серверу работает и там. Модуль обновлений сам
+   решает, что доступно на странице, и сам никогда не перезагружает игру:
+   обновление применяет игрок (кнопка «Обновить») либо следующий запуск. */
+update.start();
+restoreNotifications();
 
 render();
 /* На старте сперва проверяем хаб; только после этого открываем аккаунты.

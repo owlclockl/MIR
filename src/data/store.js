@@ -1128,7 +1128,10 @@ export const changePassword = async (oldPassword, newPassword) => {
 
 /* ---------- настройки интерфейса --------------------------- */
 
-const DEFAULT_SETTINGS = Object.freeze({ sound: true, volume: 0.55, motion: true });
+/* notify — уведомления об обновлениях в шторке телефона: по умолчанию
+   выключены, потому что браузер спрашивает разрешение только один раз и
+   только по действию игрока (переключатель в настройках). */
+const DEFAULT_SETTINGS = Object.freeze({ sound: true, volume: 0.55, motion: true, notify: false });
 
 /* Системная просьба «меньше движения» — заодно и подсказка про слабое
    устройство: анимации там стоят дороже всего. Пока игрок не выбрал
@@ -1147,6 +1150,7 @@ export const getSettings = () => {
     sound: saved.sound !== false,
     volume: Math.max(0, Math.min(1, Number(saved.volume ?? DEFAULT_SETTINGS.volume))),
     motion: saved.motion === undefined ? !systemPrefersCalm() : saved.motion !== false,
+    notify: saved.notify === true,
   };
 };
 
@@ -1154,6 +1158,7 @@ export const updateSettings = (patch) => {
   const next = { ...getSettings(), ...patch };
   next.sound = !!next.sound;
   next.motion = !!next.motion;
+  next.notify = !!next.notify;
   next.volume = Math.max(0, Math.min(1, Number(next.volume) || 0));
   writeJSON(KEYS.settings, next);
   notify();

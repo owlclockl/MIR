@@ -23,6 +23,11 @@ import { join, posix } from 'node:path';
 
 const log = (msg) => console.log(`  · ${msg}`);
 
+/* Файл, по которому приложение узнаёт о новой сборке на сервере: страница
+   сравнивает свою метку сборки с этой. Имя одно на весь проект — сборщик,
+   src/sw.js и src/data/update.js должны говорить про один адрес. */
+export const BUILD_INFO_FILE = 'mir-build.json';
+
 /** Версия приложения: package.json — единственный источник правды. */
 export const appVersion = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
 
@@ -228,16 +233,24 @@ export function mirServiceWorker({ version }) {
 
       /* Список оболочки: документ, манифест, собранные файлы и содержимое
          public/. Имя кэша меняется вместе с содержимым сборки, поэтому
-         устаревший офлайн-кэш физически невозможен. */
+         устаревший офлайн-кэш физически невозможен.
+
+         Новостей о версии (mir-build.json) в списке нет намеренно: это
+         единственный файл, который обязан быть свежим всегда. В кэше он
+         означал бы «сравниваем старую сборку со старой же» — приложение
+         никогда не увидело бы новую (service worker знает про него
+         отдельно, см. src/sw.js). */
       const files = Object.keys(bundle)
-        .filter((name) => name !== 'index.html' && !name.endsWith('.map'))
+        .filter((name) => name !== 'index.html' && name !== BUILD_INFO_FILE && !name.endsWith('.map'))
         .map((name) => `/${name}`);
       const precache = [...new Set(['/', '/manifest.webmanifest', ...publicFiles().map((name) => `/${name}`), ...files])];
 
       const template = readFileSync('src/sw.js', 'utf8');
       const source = template
         .replace('__MIR_CACHE__', cacheName)
-        .replace('__MIR_PRECACHE__', JSON.stringify(precache, null, 2));
+        .replace('__MIR_PRECACHE__', JSON.stringify(precache, null, 2))
+        .replace('__MIR_BUILD__', buildId)
+        .replace('__MIR_VERSION__', version);
       if (/__MIR_[A-Z_]+__/.test(source))
         throw new Error('[mir:service-worker] в src/sw.js остались метки — проверьте шаблон.');
 
@@ -248,7 +261,34 @@ export function mirServiceWorker({ version }) {
         source,
         needsCodeReferenceDependencyInstallation: false,
       };
+
+      /* Метка сборки в разметке и файл новостей для проверки обновлений
+         (src/data/update.js): страница сравнивает своё с серверным. Метка
+         в разметке — тот же buildId, что в имени кэша, поэтому «на сервере
+         то же самое» и «worker уже обновился» — про одно и то же. */
+      const htmlName = Object.keys(bundle).find(
+        (name) => name.endsWith('.html') && bundle[name].type === 'asset',
+      );
+      if (htmlName) {
+        bundle[htmlName].source = String(bundle[htmlName].source).replace(
+          '</head>',
+          `  <meta name="mir-build" content="${buildId}" />\n  </head>`,
+        );
+      } else {
+        this.warn('в сборке нет index.html — проверка обновлений по серверу работать не будет');
+      }
+
+      const buildInfo = { version, build: buildId, builtAt: new Date().toISOString() };
+      bundle[BUILD_INFO_FILE] = {
+        type: 'asset',
+        fileName: BUILD_INFO_FILE,
+        name: BUILD_INFO_FILE,
+        source: `${JSON.stringify(buildInfo, null, 2)}\n`,
+        needsCodeReferenceDependencyInstallation: false,
+      };
+
       log(`sw.js: кэш ${cacheName}, файлов оболочки ${precache.length}`);
+      log(`новости о сборке: /${BUILD_INFO_FILE} (${buildInfo.version}, метка ${buildId})`);
     },
   };
 }

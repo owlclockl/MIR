@@ -18,6 +18,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import vm from 'node:vm';
+import { BUILD_INFO_FILE } from './vite-mir.mjs';
 
 const ROOT_FILES = ['dist', 'mir.html'];
 
@@ -130,6 +131,53 @@ export function checkWeb() {
       new Set(precache).size === precache.length,
       'в списке оболочки нет повторов',
       `${precache.length - new Set(precache).size} лишних`,
+    );
+
+    /* Новости о версии из кэша не отдаются: иначе приложение сравнивало бы
+       старую сборку со старой же и никогда не увидело новую. */
+    add(
+      !precache.includes(`/${BUILD_INFO_FILE}`),
+      `/${BUILD_INFO_FILE} не попал в офлайн-кэш`,
+      `файлов оболочки: ${precache.length}`,
+    );
+    add(
+      /mir:skip-waiting/.test(sw) && /\bskipWaiting\b/.test(sw),
+      'service worker принимает просьбу «обновить сейчас»',
+    );
+  }
+
+  /* Новости о сборке: по этому файлу приложение узнаёт, что на сервере
+     появилась новая версия. Метка одна на все три места — разметку,
+     имя кэша и сам файл: разойдутся — игрок либо не увидит обновление,
+     либо будет видеть его вечно. */
+  if (!existsSync(`dist/${BUILD_INFO_FILE}`)) {
+    add(false, `dist/${BUILD_INFO_FILE} записан сборкой`);
+  } else {
+    let buildInfo = null;
+    try {
+      buildInfo = JSON.parse(readFileSync(`dist/${BUILD_INFO_FILE}`, 'utf8'));
+    } catch {
+      buildInfo = null;
+    }
+    add(
+      buildInfo?.version === expected && /^[0-9a-f]{8}$/.test(buildInfo?.build ?? ''),
+      'новости о сборке: версия и метка на месте',
+      buildInfo ? `${buildInfo.version}, ${buildInfo.build}` : 'файл не разобран',
+    );
+
+    const buildMeta = html.match(/<meta name="mir-build" content="([^"]+)"/);
+    add(
+      buildMeta?.[1] === buildInfo?.build,
+      'метка сборки в разметке совпадает с новостями о сборке',
+      `разметка: ${buildMeta?.[1] ?? '—'}, файл: ${buildInfo?.build ?? '—'}`,
+    );
+
+    const sw = existsSync('dist/sw.js') ? readFileSync('dist/sw.js', 'utf8') : '';
+    const swBuild = sw.match(/const BUILD = '([^']+)'/);
+    add(
+      swBuild?.[1] === buildInfo?.build,
+      'метка сборки в service worker совпадает с новостями о сборке',
+      `worker: ${swBuild?.[1] ?? '—'}, файл: ${buildInfo?.build ?? '—'}`,
     );
   }
 
