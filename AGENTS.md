@@ -205,3 +205,7 @@ WebView, который не смог разобрать основной бан
 
 **Доступность.** У каждой кнопки доступное имя, видимый фокус, логичный порядок
 табуляции, ориентиры `header/nav/main/aside/footer`, одна `h1` на страницу.
+
+## Cloudflare
+
+When interacting with Cloudflare, use the cf CLI unless the project has a Wrangler configuration file. (This project has `wrangler.toml`, so prefer Wrangler for deploys; use `cf` for general Cloudflare API tasks.)
