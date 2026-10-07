@@ -1,7 +1,7 @@
 {
   "name": "mir-game-menu",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -14,11 +14,18 @@
     "build:all": "node scripts/build-all.mjs",
     "icons": "node scripts/icons.mjs",
     "serve": "node server/serve.mjs",
+    "start": "node server/serve.mjs",
     "share": "vite build && node server/serve.mjs",
     "share:public": "vite build && node server/serve.mjs --public",
+    "host": "vite build && npx --yes wrangler@4 deploy",
+    "host:login": "npx --yes wrangler@4 login",
+    "host:dev": "vite build && npx --yes wrangler@4 dev",
+    "host:logs": "npx --yes wrangler@4 tail",
     "doctor": "node scripts/doctor.mjs",
     "logs": "node -e \"import('node:fs').then(fs => console.log(fs.readFileSync('logs/mir-server.log','utf8')))\"",
-    "test:p2p": "node scripts/test-p2p.mjs"
+    "test:p2p": "node scripts/test-p2p.mjs",
+    "test:hub": "node scripts/test-hub.mjs",
+    "test:ui": "node scripts/test-ui.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.9"

@@ -1,0 +1,34 @@
+# Настройки бесплатного хостинга Cloudflare Workers.
+#
+#   npm run host        собрать игру и выложить её в интернет
+#   npm run host:dev    то же самое локально, без выкладывания
+#
+# Что получится: адрес https://mir.ВАШ-АККАУНТ.workers.dev, на
+# котором лежит и сама игра (dist/), и хаб общих аккаунтов (/api/*).
+# Бесплатного тарифа хватает с запасом: 100 000 запросов в сутки,
+# аккаунты и друзья хранятся в Durable Object со SQLite.
+#
+# Имя ниже можно поменять — оно станет первой частью адреса.
+
+name = "mir"
+main = "hosting/cloudflare/worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# Сама игра: статические файлы из dist/. Запросы к /api/* идут мимо
+# них, в код воркера, — иначе хаб перехватывала бы страница игры.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Хаб: общие аккаунты, друзья, заявки, сигналинг P2P.
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "MirHub"
+
+# SQLite-хранилище — единственный вид Durable Object на бесплатном тарифе.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MirHub"]
