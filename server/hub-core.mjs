@@ -112,9 +112,15 @@ export const corsHeaders = () => ({
   'Access-Control-Max-Age': '86400',
 });
 
-/* Ключ администратора панели. Пусто — панель выключена: так ведёт себя
-   хаб на хостинге, если владелец не задал секрет. На ПК-хабе ключ
-   приходит из переменной окружения или из адаптера. */
+/* Ключ администратора панели по умолчанию — заводской, публичный: он в
+   открытом исходнике, поэтому панель сама напоминает его сменить. Владелец
+   хаба может задать свой ключ переменной окружения / секретом воркера
+   (MIR_ADMIN_KEY) или сменить его в панели — тогда ключ хранится в данных
+   хаба и переживает перезапуск. */
+export const HUB_DEFAULT_ADMIN_KEY = 'owlananaslwo';
+const HUB_ADMIN_MIN_KEY = 6;
+
+/* Сравнение секретов без раннего выхода по длине. */
 const secretEquals = (a, b) => {
   const left = String(a ?? '');
   const right = String(b ?? '');
@@ -268,19 +274,22 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
 
   /* ---------- панель админа ----------------------------------
      Служебные маршруты для владельца игры: список аккаунтов и правки.
-     Вход — по ключу MIR_ADMIN_KEY в заголовке X-Mir-Admin. Без ключа
-     маршруты отвечают «панель выключена»: открытой админки на хабе
-     не бывает по умолчанию. Пароли и здесь не ходят открытым текстом —
-     панель присылает готовый salt и хеш. */
+     Вход — по ключу администратора в заголовке X-Mir-Admin.
+
+     Какой ключ действует, в порядке убывания: сменённый через панель
+     (лежит в db.adminKey и сохраняется вместе с данными хаба), затем
+     ключ из переменной окружения / секрета воркера (MIR_ADMIN_KEY),
+     затем заводской HUB_DEFAULT_ADMIN_KEY. Панель на хабе включена
+     всегда — заводской ключ публичный, панель сама напоминает сменить
+     его. Пароли и здесь не ходят открытым текстом — панель присылает
+     готовый salt и хеш. */
+
+  const effectiveAdminKey = () => String(db.adminKey || adminKey || HUB_DEFAULT_ADMIN_KEY).trim();
+  const adminKeyIsDefault = () => !String(db.adminKey || '').trim() && !String(adminKey || '').trim();
 
   const adminAuth = (req) => {
-    if (!adminKey)
-      throw httpError(
-        503,
-        'Владелец хаба не задал ключ администратора — панель на этом хабе выключена.',
-      );
     const given = req.headers?.['x-mir-admin'] || req.headers?.['X-Mir-Admin'] || '';
-    if (!secretEquals(given, adminKey)) throw httpError(403, 'Неверный ключ администратора.');
+    if (!secretEquals(given, effectiveAdminKey())) throw httpError(403, 'Неверный ключ администратора.');
   };
 
   const adminUserShape = (u) => ({
@@ -308,6 +317,8 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     users: db.users.map(adminUserShape),
     requests: db.requests,
     stats: adminStats(),
+    /* Ключ ещё заводской — панель по этому признаку напоминает сменить. */
+    key: { isDefault: adminKeyIsDefault() },
   });
 
   const adminDropUser = (user) => {
@@ -579,6 +590,27 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       if (db.requests.length === before) throw httpError(404, 'Заявка не найдена.');
       save.now();
       return adminState();
+    },
+
+    /* Смена ключа панели. Ключ хранится в данных хаба открытым текстом
+       (как adminKey в файле ПК-хаба): по сети он всё равно идёт по HTTPS,
+       а владелец хаба — доверенное лицо. Сброс (reset) возвращает
+       заводской ключ — запасной вход, если свой забыт. */
+    'POST /api/admin/key': async (req, body, save) => {
+      adminAuth(req);
+      if (body?.reset) {
+        db.adminKey = '';
+        save.now();
+        return { ok: true, ...adminState() };
+      }
+      const next = String(body?.key || '').trim();
+      if (next.length < HUB_ADMIN_MIN_KEY)
+        throw httpError(400, `Ключ короче ${HUB_ADMIN_MIN_KEY} символов — подберите длиннее.`);
+      if (next === HUB_DEFAULT_ADMIN_KEY)
+        throw httpError(400, 'Это заводской ключ — придумайте свой.');
+      db.adminKey = next;
+      save.now();
+      return { ok: true, ...adminState() };
     },
 
     /* --- P2P: сведение друзей напрямую ---------------------- */

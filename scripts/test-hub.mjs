@@ -14,19 +14,19 @@
 
    Проверка ничего не ломает: создаются временные аккаунты с
    случайными именами (probeNNNN — ни с кем не пересекаются), в конце
-   они разлогиниваются. Если владелец задал ключ MIR_ADMIN_KEY, здесь
-   же проверяется панель админа: чужой ключ, переименование, сброс
-   пароля, отключение, разрыв дружбы и удаление — на своих же
-   временных аккаунтах, которые проверка за собой убирает. */
+   они разлогиниваются. Панель админа тоже проверяется: чужой ключ,
+   переименование, сброс пароля, отключение, разрыв дружбы, удаление
+   и смена ключа администратора — на своих же временных аккаунтах,
+   которые проверка за собой убирает, а ключ в конце возвращается
+   к исходному. */
 
 const args = process.argv.slice(2).filter((a) => a !== '--keep');
 const BASE = (args[0] || process.env.MIR_HUB || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 
-/* Ключ панели админа. На ПК-хабе по умолчанию заводской; если владелец
-   задал свой (MIR_ADMIN_KEY) — проверяем его. Хабы без ключа (хостинг
-   без секрета) честно отвечают, что панель выключена, — это тоже
-   проверяется. */
-const ADMIN_KEY = process.env.MIR_ADMIN_KEY || 'mir-admin';
+/* Ключ панели админа. По умолчанию заводской (в открытом исходнике);
+   если владелец задал свой (MIR_ADMIN_KEY или сменил в панели) —
+   проверяем его. Панель на хабе включена всегда. */
+const ADMIN_KEY = process.env.MIR_ADMIN_KEY || 'owlananaslwo';
 
 let failures = 0;
 const ok = (what, detail = '') => console.log(`  ✓ ${what}${detail ? ` — ${detail}` : ''}`);
@@ -213,9 +213,7 @@ expect(
 );
 
 const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body: {} });
-if (adminPing.status === 503)
-  ok('панель на этом хабе выключена владельцем', adminPing.data.error);
-else {
+{
   expect(
     'ключ админа принят',
     adminPing.status === 200 && adminPing.data.ok === true,
@@ -231,6 +229,11 @@ else {
   expect(
     'в снимке панели нет хешей паролей',
     !JSON.stringify(adminState.data).includes('passHash'),
+  );
+  expect(
+    'панель сообщает, заводской ли ключ',
+    adminState.data.key?.isDefault === (ADMIN_KEY === 'owlananaslwo'),
+    `key.isDefault: ${adminState.data.key?.isDefault}`,
   );
 
   const target = await makeAccount(`probeA${n}x`, 'secret321');
@@ -309,6 +312,25 @@ else {
     admin: ADMIN_KEY,
     body: { userId: pair.id, action: 'delete' },
   });
+
+  /* Смена ключа панели: новый принимается, старый отзывается, короткий
+     и заводской отклоняются, сброс возвращает исходный ключ. Ключ хаба
+     трогаем только на время проверки и возвращаем обратно. */
+  const probeKey = `probe-key-${n}`;
+  const changed = await call('POST', '/api/admin/key', { admin: ADMIN_KEY, body: { key: probeKey } });
+  expect('панель меняет ключ администратора', changed.status === 200 && changed.data.ok === true, changed.data.error);
+  const oldKey = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body: {} });
+  expect('старый ключ после смены не пускает', oldKey.status === 403, `${oldKey.status}`);
+  const newKey = await call('POST', '/api/admin/ping', { admin: probeKey, body: {} });
+  expect('новый ключ пускает в панель', newKey.status === 200, `${newKey.status}`);
+  const shortKey = await call('POST', '/api/admin/key', { admin: probeKey, body: { key: 'abc' } });
+  expect('слишком короткий ключ отклонён', shortKey.status === 400, shortKey.data.error);
+  const defaultKey = await call('POST', '/api/admin/key', { admin: probeKey, body: { key: 'owlananaslwo' } });
+  expect('заводской ключ отклонён как новый', defaultKey.status === 400, defaultKey.data.error);
+  const keyReset = await call('POST', '/api/admin/key', { admin: probeKey, body: { reset: true } });
+  expect('сброс возвращает прежний ключ', keyReset.status === 200 && keyReset.data.ok === true, keyReset.data.error);
+  const afterReset = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body: {} });
+  expect('после сброса снова исходный ключ', afterReset.status === 200, `${afterReset.status}`);
 }
 
 /* ---------- 7. мелочи ---------- */

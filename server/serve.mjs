@@ -374,17 +374,20 @@ function onReady(port) {
     console.log('');
     console.log(`  Общий хаб включён: аккаунты, друзья и приглашения общие`);
     console.log(`  для всех в этой сети. Данные: ${hub.dbFile}`);
-    /* Ключ панели админа владелец должен видеть: без него он не войдёт. */
+    /* Ключ панели админа владелец должен видеть: без него он не войдёт.
+       При заводском ключе подсказываем, как сменить — в панели или
+       переменной окружения. */
     console.log('');
     console.log(`  Панель админа: знак игры слева вверху — 5 быстрых щелчков`);
     console.log(`  (или Ctrl+Shift+Alt+A). Ключ: ${hub.adminKey}`);
     if (hub.adminKeyIsDefault && args.public)
       console.log(
         '  ⚠ Публичная ссылка открыта наружу, а ключ панели — заводской.\n' +
-          '    Смените его: MIR_ADMIN_KEY=свой-ключ node serve.mjs --public',
+          '    Смените его в панели (Система → Ключ администратора) или задайте\n' +
+          '    свой: MIR_ADMIN_KEY=свой-ключ node serve.mjs --public',
       );
     else if (hub.adminKeyIsDefault)
-      console.log('  Свой ключ: MIR_ADMIN_KEY=свой-ключ node serve.mjs');
+      console.log('  Свой ключ: в панели (Система → Ключ администратора) или MIR_ADMIN_KEY=свой-ключ');
   }
   console.log('');
   if (!args.public) {

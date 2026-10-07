@@ -140,7 +140,7 @@ $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bu
 await wait(400);
 ok('неверный ключ не пускает в панель', !$('[data-action="admin-tab"]'));
 
-$('[data-role="admin-key"]').value = 'mir-admin';
+$('[data-role="admin-key"]').value = 'owlananaslwo';
 $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
 await wait(600);
 ok('заводской ключ пускает в панель', !!$('[data-action="admin-tab"]'), $('[data-role="form-error"]')?.textContent?.trim());

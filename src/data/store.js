@@ -1103,17 +1103,18 @@ if (typeof window !== 'undefined') {
    здесь же хешем. По умолчанию он равен DEFAULT_ADMIN_KEY, и его
    стоит сменить — панель сама об этом напомнит.
 
-   Режим хаба: общие аккаунты правит хаб, а не браузер. Он сверяет
-   ключ с MIR_ADMIN_KEY (переменная окружения на ПК, секрет воркера
-   на хостинге). Если владелец хаба ключ не задал, хаб отвечает
-   «панель выключена» — открытой админки в интернете не бывает по
-   умолчанию.
+   Режим хаба: общие аккаунты правит хаб, а не браузер. Действует
+   ключ, сменённый через панель (хранится в данных хаба и переживает
+   перезапуск), либо заданный владельцем (MIR_ADMIN_KEY на ПК, секрет
+   воркера на хостинге), либо заводской DEFAULT_ADMIN_KEY. Панель на
+   хабе включена всегда; заводской ключ публичный — панель напоминает
+   сменить его сразу после входа.
 
    Пароли и здесь не ходят открытым текстом: панель считает
    SHA-256(salt:пароль) на месте и отправляет только хеш.
    =========================================================== */
 
-export const DEFAULT_ADMIN_KEY = 'mir-admin';
+export const DEFAULT_ADMIN_KEY = 'owlananaslwo';
 const ADMIN_SALT_FALLBACK = 'mir-admin-salt-v1';
 const ADMIN_MIN_KEY = 6;
 
@@ -1195,6 +1196,8 @@ export const adminSnapshot = async () => {
       users,
       requests,
       stats: data.stats ?? adminStats(users, requests, 0),
+      /* Хаб сам знает, заводской ли сейчас ключ. */
+      keyDefault: data.key?.isDefault === true,
     };
   }
   const users = localBackend.listUsers();
@@ -1205,6 +1208,7 @@ export const adminSnapshot = async () => {
     users: users.map(adminUserShape),
     requests,
     stats: adminStats(users, requests, rawLength(KEYS.users) + rawLength(KEYS.requests)),
+    keyDefault: adminKeyIsDefault(),
   };
 };
 
@@ -1308,24 +1312,27 @@ export const adminRemoveRequest = async (requestId) => {
   notify();
 };
 
-/** Смена ключа администратора. На хабе ключ задаёт его владелец. */
+/** Смена ключа администратора. На хабе новый ключ записывается в данные
+    хаба — он переживает перезапуск и общий для всех устройств владельца. */
 export const adminSetKey = async (next) => {
-  if (backend.mode === 'hub')
-    throw new Error(
-      'На хабе ключ задаёт его владелец: переменная MIR_ADMIN_KEY при запуске или секрет воркера на хостинге.',
-    );
   const key = String(next || '').trim();
   if (key.length < ADMIN_MIN_KEY)
     throw new Error(`Ключ короче ${ADMIN_MIN_KEY} символов — подберите длиннее.`);
   if (key === DEFAULT_ADMIN_KEY) throw new Error('Это заводской ключ — придумайте свой.');
+  if (backend.mode === 'hub') {
+    await remote.apiAdminKey(adminSessionKey, { key });
+    adminSessionKey = key;
+    return;
+  }
   const salt = randomHex(16);
   writeJSON(KEYS.admin, { salt, hash: await hashPassword(salt, key), at: Date.now() });
   adminSessionKey = key;
 };
 
 /** Сбросить заводской ключ (забыли свой — вернуть вход по умолчанию). */
-export const adminResetKey = () => {
-  storage.removeItem(KEYS.admin);
+export const adminResetKey = async () => {
+  if (backend.mode === 'hub') await remote.apiAdminKey(adminSessionKey, { reset: true });
+  else storage.removeItem(KEYS.admin);
   adminSessionKey = DEFAULT_ADMIN_KEY;
 };
 

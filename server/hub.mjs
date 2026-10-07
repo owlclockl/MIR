@@ -14,7 +14,13 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { DEFAULT_LIMITS, corsHeaders, createHubCore, httpError } from './hub-core.mjs';
+import {
+  DEFAULT_LIMITS,
+  corsHeaders,
+  createHubCore,
+  httpError,
+  HUB_DEFAULT_ADMIN_KEY,
+} from './hub-core.mjs';
 
 const MAX_BODY_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 
@@ -27,13 +33,14 @@ const clientIp = (req) =>
   req.socket.remoteAddress ||
   'unknown';
 
-/* Ключ администратора панели. Порядок такой: переменная окружения
-   (MIR_ADMIN_KEY), затем ключ из файла данных, затем заводской. Хаб на
-   ПК живёт в своей сети, поэтому заводской ключ здесь работает «из
-   коробки», а публичную ссылку (--public) serve.mjs помечает
-   предупреждением: там ключ стоит сменить. На хостинге ключа по
-   умолчанию нет вовсе — без секрета панель выключена. */
-export const DEFAULT_ADMIN_KEY = 'mir-admin';
+/* Ключ администратора панели. Порядок такой: ключ, сменённый через
+   панель (лежит в файле данных), затем переменная окружения
+   (MIR_ADMIN_KEY), затем заводской HUB_DEFAULT_ADMIN_KEY. Хаб на ПК
+   живёт в своей сети, поэтому заводской ключ работает «из коробки»,
+   а публичную ссылку (--public) serve.mjs помечает предупреждением:
+   там ключ стоит сменить. На хостинге — то же самое: заводской ключ
+   везде один, владелец меняет его секретом воркера или в панели. */
+export const DEFAULT_ADMIN_KEY = HUB_DEFAULT_ADMIN_KEY;
 
 export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   /* ---------- хранилище ---------- */
@@ -53,12 +60,13 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
 
   const db = load();
 
-  /* Ключ из переменной окружения старше файла: владелец мог сменить его,
-     не трогая данные. Заводской ключ в файл не пишем — иначе он уедет
-     в репозиторий вместе с данными хаба. */
+  /* Ключ из панели (файл данных) старше переменной окружения: владелец
+     мог сменить ключ в панели после того, как задал MIR_ADMIN_KEY.
+     Заводской ключ в файл не пишем — иначе он уедет в репозиторий
+     вместе с данными хаба. Сам ключ разруливает hub-core: панельный,
+     затем из окружения, затем заводской. */
   const envKey = String(adminKey || process.env.MIR_ADMIN_KEY || '').trim();
-  const key = envKey || db.adminKey || DEFAULT_ADMIN_KEY;
-  if (envKey) db.adminKey = envKey;
+  const key = String(db.adminKey || '').trim() || envKey || DEFAULT_ADMIN_KEY;
 
   let saveTimer = null;
   const writeFile = () => {
@@ -81,7 +89,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
     saveTimer.unref?.();
   };
 
-  const core = createHubCore({ db, persist, limits, adminKey: key });
+  const core = createHubCore({ db, persist, limits, adminKey: envKey });
 
   /* ---------- разбор запроса ---------- */
 

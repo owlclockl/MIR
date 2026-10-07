@@ -889,7 +889,7 @@ const adminLoginHtml = () => {
     <div class="divider" role="separator"></div>
     <p class="hint">${
       hub
-        ? 'На хабе ключ задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске или секрет воркера на хостинге. Если ключ не задан, хаб панель не открывает.'
+        ? `На хабе ключ по умолчанию — <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> (он в открытом исходнике). Владелец мог задать свой: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге — либо сменить ключ после входа, во вкладке «Система».`
         : `Ключ по умолчанию — <code translate="no">${escapeHtml(
             store.DEFAULT_ADMIN_KEY,
           )}</code>. Он подходит только для аккаунтов этого браузера; смените его во вкладке «Система».`
@@ -1130,13 +1130,14 @@ const adminSystemHtml = () => {
     <div class="divider" role="separator"></div>
 
     ${
-      data?.mode === 'hub'
-        ? `<p class="hint">Ключ этого хаба задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге. Смена ключа из панели на хабе выключена — иначе чужой человек с одним входом получил бы все.</p>`
-        : `
+      data?.mode === 'hub' && data?.keyDefault
+        ? `<p class="form-note form-note--warn">Сейчас действует заводской ключ <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> — он в открытом исходнике. Смените его ниже: новый ключ запишется в данные хаба и переживёт перезапуск.</p>`
+        : ''
+    }
     <form class="form" data-form="admin-new-key" novalidate>
       <p class="eyebrow">Ключ администратора</p>
       <p class="form-note">${
-        store.adminKeyIsDefault()
+        (data?.keyDefault ?? store.adminKeyIsDefault())
           ? 'Сейчас действует заводской ключ. Придумайте свой — иначе панель открыта каждому, кто читал инструкцию.'
           : 'Свой ключ установлен. Забыли его — кнопка ниже вернёт заводской.'
       }</p>
@@ -1167,8 +1168,7 @@ const adminSystemHtml = () => {
       <button class="mini-button mini-button--danger" type="button" data-action="admin-wipe">
         ${icon('trash', 'icon--xs')} Очистить локальные аккаунты
       </button>
-    </div>`
-    }`;
+    </div>`;
 };
 
 const adminModalHtml = () => {
@@ -2303,7 +2303,7 @@ const actions = {
   },
 
   'admin-forget-key-run': async () => {
-    store.adminResetKey();
+    await store.adminResetKey();
     ui.modal = { type: 'admin' };
     renderModal({ focus: false });
     toast('Заводской ключ возвращён.');
