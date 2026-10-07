@@ -18,7 +18,7 @@ import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import './lib/root.mjs';
-import { buildSingleHtml } from './build-single.mjs';
+import { buildWeb } from './lib/build.mjs';
 
 const OUT_DIR = 'dist-app';
 const CS_SOURCE = join('scripts', 'win', 'MirSetup.cs');
@@ -29,7 +29,9 @@ console.log('--- Сборка MIR для Windows (.exe) ---');
 
 /* ---------- 1. свежая сборка сайта -------------------------------- */
 
-await buildSingleHtml();
+/* Установщик раздаёт dist/ своим локальным сервером (см. MirSetup.cs):
+   модульная веб-сборка здесь и нужна, однофайловый mir.html — нет. */
+await buildWeb();
 
 /* ---------- 2. архив с сайтом ------------------------------------- */
 

@@ -14,16 +14,40 @@ import { configureSounds, playSound } from './ui/sound.js';
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.6.0';
+/* Версию подставляет сборщик из package.json (define в vite.config.js) —
+   один источник правды вместо четырёх файлов, которые надо не забыть
+   обновить вместе. Запасное значение нужно лишь для чтения модуля без
+   сборки (например, из тестов). */
+const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
 
-/* Аватар: загруженная картинка или инициалы на цвете из имени. */
-const avatarEl = (user, cls = '') => {
-  const offline = store.presenceOf(user) === 'offline';
+/* Аватар: загруженная картинка или инициалы на цвете из имени.
+
+   Разметка аватарки кешируется. Причина простая: data URL аватарки —
+   это десятки килобайт, и панель друзей, собранная заново, каждый раз
+   вклеивала их в строку разметки. Теперь для неизменившейся картинки
+   берётся готовая строка: сравнение `===` по одной и той же строке
+   мгновенно, а копирования мегабайтов base64 не происходит вовсе. */
+const avatarMarkupCache = new Map(); // ключ → { avatar, html }
+
+const buildAvatarEl = (user, cls, offline) => {
   const off = offline ? ' avatar--dim' : '';
   if (user.avatar)
     return `<span class="avatar avatar--img${cls ? ` ${cls}` : ''}${off}"><img src="${user.avatar}" alt="" /></span>`;
   const hue = nameHue(user.nameKey);
   return `<span class="avatar${cls ? ` ${cls}` : ''}${off}" style="background:hsl(${hue} 26% 30%);color:hsl(${hue} 45% 87%)" aria-hidden="true">${escapeHtml(user.name.slice(0, 2).toUpperCase())}</span>`;
+};
+
+const avatarEl = (user, cls = '') => {
+  const offline = store.presenceOf(user) === 'offline';
+  const avatar = user.avatar ?? null;
+  const key = `${user.id}|${cls}|${offline ? 'off' : 'on'}`;
+  const cached = avatarMarkupCache.get(key);
+  if (cached && cached.avatar === avatar) return cached.html;
+  const html = buildAvatarEl(user, cls, offline);
+  /* Кеш не должен расти бесконечно, если по поиску прошло много людей. */
+  if (avatarMarkupCache.size > 400) avatarMarkupCache.clear();
+  avatarMarkupCache.set(key, { avatar, html });
+  return html;
 };
 
 const PRESENCE = {
@@ -32,10 +56,33 @@ const PRESENCE = {
   offline: { label: 'Не в сети', modifier: 'off' },
 };
 
+/* ---------- скрытая панель админа ----------------------------
+   Служебный раздел: аккаунты, пароли, дружба, диагностика. В меню
+   его не видно — вход через знак игры, сочетание клавиш или адрес
+   с `#admin`, а дальше спрашивается ключ администратора. */
+
+const ADMIN_TAPS = 5; // щелчков по знаку
+const ADMIN_TAP_WINDOW = 3000; // за это время
+
+const adminState = () => ({
+  tab: 'players', // players | requests | system
+  query: '',
+  data: null, // снимок от store.adminSnapshot()
+  openId: null, // открытая карточка игрока
+  keyDraft: '',
+  nameDraft: '',
+  passDraft: '',
+  newKeyDraft: '',
+  repeatKeyDraft: '',
+  error: '',
+  busy: false,
+});
+
 /* ---------- модальные окна ---------------------------------- */
 
 const ui = {
   modal: null, // { type, data }
+  admin: adminState(),
   authTab: 'login',
   addQuery: '',
   codeValue: '',
@@ -52,6 +99,12 @@ const ui = {
 };
 
 let backendReady = store.isBackendInitialized?.() ?? false;
+
+/* Разметка, которая сейчас лежит в слое окон. Сравниваем строки между
+   собой, а не с `innerHTML`: окно с аватаркой — это десятки килобайт
+   base64, и сериализация DOM на каждое обновление данных была заметной
+   работой впустую. */
+let renderedModalHtml = '';
 
 const overlayRoot = () => document.querySelector('#overlay-root');
 
@@ -73,6 +126,9 @@ const closeModal = () => {
   ui.chatDraft = '';
   const root = overlayRoot();
   if (root) root.innerHTML = '';
+  /* Слой окон пуст: помнить прежнюю разметку больше нельзя, иначе
+     следующее такое же окно посчитает, что оно уже нарисовано. */
+  renderedModalHtml = '';
   if (ui.opener && document.contains(ui.opener)) ui.opener.focus();
   ui.opener = null;
 };
@@ -539,10 +595,15 @@ const linkStateHtml = (peerId) => {
     </span>`;
 };
 
+/* Формат времени создаётся один раз: на длинной переписке сборка
+   нового Intl.DateTimeFormat на каждое сообщение заметно тормозила
+   открытие окна друга. */
+const CLOCK = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
 const chatRowHtml = (message) => `
   <div class="chat__row${message.mine ? ' chat__row--mine' : ''}">
     <p class="chat__bubble">${escapeHtml(message.text)}</p>
-    <small class="chat__meta">${new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(message.at))}${message.via === 'relay' ? ' · через хаб' : ''}</small>
+    <small class="chat__meta">${CLOCK.format(new Date(message.at))}${message.via === 'relay' ? ' · через хаб' : ''}</small>
   </div>`;
 
 const chatHtml = (peerId, { placeholder }) => {
@@ -791,6 +852,348 @@ const confirmModalHtml = () => dialogShell({
     </div>`,
 });
 
+/* --- Служебная панель --- */
+/* Аватарка в списках панели — только инициалы: держать в разметке
+   сотни data URL незачем, а карточка игрока показывает картинку
+   целиком. */
+const adminAvatarEl = (user, cls = 'avatar--sm') => {
+  const hue = nameHue(user.nameKey ?? user.name);
+  return `<span class="avatar ${cls}" style="background:hsl(${hue} 26% 30%);color:hsl(${hue} 45% 87%)" aria-hidden="true">${escapeHtml(
+    String(user.name).slice(0, 2).toUpperCase(),
+  )}</span>`;
+};
+
+const seenText = (ts) => {
+  if (!ts) return 'нет отметки';
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'только что';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} мин назад`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} ч назад`;
+  return formatDate(ts);
+};
+
+const adminLoginHtml = () => {
+  const hub = store.isHub();
+  return `
+    <p class="hint">Служебный раздел: аккаунты, пароли, дружба, состояние хаба. Вход — по ключу администратора.</p>
+    <form class="form" data-form="admin-login" novalidate>
+      <label class="field">
+        <span class="field__label">Ключ администратора</span>
+        <input class="input" name="key" type="password" autocomplete="off" spellcheck="false"
+               value="${escapeHtml(ui.admin.keyDraft)}" data-role="admin-key" data-autofocus required />
+      </label>
+      <p class="form-error" data-role="form-error" hidden></p>
+      <button class="solid-button" type="submit" data-role="submit">${icon('shield', 'icon--xs')}<span>Войти в панель</span></button>
+    </form>
+    ${ui.admin.error ? `<p class="form-note form-note--warn">${escapeHtml(ui.admin.error)}</p>` : ''}
+    <div class="divider" role="separator"></div>
+    <p class="hint">${
+      hub
+        ? 'На хабе ключ задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске или секрет воркера на хостинге. Если ключ не задан, хаб панель не открывает.'
+        : `Ключ по умолчанию — <code translate="no">${escapeHtml(
+            store.DEFAULT_ADMIN_KEY,
+          )}</code>. Он подходит только для аккаунтов этого браузера; смените его во вкладке «Система».`
+    }</p>`;
+};
+
+const adminTabHtml = (id, label) =>
+  `<button class="tab${ui.admin.tab === id ? ' tab--active' : ''}" type="button" role="tab"
+           aria-selected="${ui.admin.tab === id}" data-action="admin-tab" data-tab="${id}">${label}</button>`;
+
+const adminRowHtml = (user) => {
+  const me = store.getCurrentUser();
+  const offline = user.presence === 'offline';
+  const isMe = me?.id === user.id;
+  return `
+    <button class="admin-row${offline ? ' admin-row--off' : ''}" type="button" data-action="admin-open" data-id="${user.id}">
+      ${adminAvatarEl(user)}
+      <span class="admin-row__text">
+        <strong class="admin-row__name" translate="no">${escapeHtml(user.name)}${isMe ? ' · вы' : ''}</strong>
+        <small class="admin-row__meta">${PRESENCE[user.presence]?.label ?? 'Не в сети'} · друзей ${user.friends.length}</small>
+      </span>
+      <code class="admin-id" translate="no">${escapeHtml(user.id)}</code>
+      ${icon('chevron', 'icon--xs')}
+    </button>`;
+};
+
+const adminCardHtml = (user) => {
+  const friends = user.friends
+    .map((id) => ui.admin.data?.users.find((item) => item.id === id) ?? { id, name: id, nameKey: id })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const offline = user.presence === 'offline';
+  return `
+    <button class="mini-button" type="button" data-action="admin-back">${icon('chevron', 'icon--xs')} К списку</button>
+
+    <div class="account">
+      <div class="account__avatar">${
+        user.avatar
+          ? `<span class="avatar avatar--img avatar--lg"><img src="${user.avatar}" alt="" /></span>`
+          : adminAvatarEl(user, 'avatar--lg')
+      }</div>
+      <div class="account__main">
+        <p class="account__name" translate="no">${escapeHtml(user.name)}</p>
+        <p class="account__meta">
+          <span class="dot dot--${offline ? 'off' : 'live'}" aria-hidden="true"></span>
+          ${PRESENCE[user.presence]?.label ?? 'Не в сети'} · был: ${escapeHtml(seenText(user.seenAt))}
+        </p>
+        <p class="account__meta">Аккаунт создан ${formatDate(user.createdAt)} · устройств: ${user.devices}</p>
+        <code class="admin-id" translate="no">${escapeHtml(user.id)}</code>
+        ${
+          user.inviteCode
+            ? `<p class="account__meta">Код-приглашение: <code class="admin-id" translate="no">${escapeHtml(
+                user.inviteCode,
+              )}</code></p>`
+            : ''
+        }
+      </div>
+    </div>
+
+    <div class="divider" role="separator"></div>
+
+    <form class="form" data-form="admin-rename" data-id="${user.id}" novalidate>
+      <p class="eyebrow">Никнейм</p>
+      <div class="code-form__row">
+        <input class="input" name="name" type="text" minlength="3" maxlength="16" spellcheck="false"
+               value="${escapeHtml(ui.admin.nameDraft || user.name)}" data-role="admin-name" />
+        <button class="mini-button mini-button--accent" type="submit">Переименовать</button>
+      </div>
+      <p class="form-error" data-role="form-error" hidden></p>
+    </form>
+
+    <form class="form" data-form="admin-password" data-id="${user.id}" novalidate>
+      <p class="eyebrow">Новый пароль</p>
+      <div class="code-form__row">
+        <input class="input" name="password" type="text" minlength="6" maxlength="72" autocomplete="off"
+               spellcheck="false" placeholder="минимум 6 символов"
+               value="${escapeHtml(ui.admin.passDraft)}" data-role="admin-pass" />
+        <button class="mini-button mini-button--accent" type="submit">Сбросить пароль</button>
+      </div>
+      <p class="form-error" data-role="form-error" hidden></p>
+      <p class="form-note">Отправляется только хеш — сам пароль никуда не уходит. Входы игрока отзываются.</p>
+    </form>
+
+    <div class="divider" role="separator"></div>
+
+    <div class="dialog__actions dialog__actions--spread">
+      <button class="mini-button" type="button" data-action="admin-regen-code" data-id="${user.id}">
+        ${icon('refresh', 'icon--xs')} Новый код
+      </button>
+      <button class="mini-button" type="button" data-action="admin-avatar-clear" data-id="${user.id}" ${
+        user.avatar ? '' : 'disabled'
+      }>
+        ${icon('camera', 'icon--xs')} Убрать аватарку
+      </button>
+      <button class="mini-button" type="button" data-action="admin-kick" data-id="${user.id}">
+        ${icon('power', 'icon--xs')} Отключить
+      </button>
+      <button class="mini-button mini-button--danger" type="button" data-action="admin-delete" data-id="${user.id}">
+        ${icon('trash', 'icon--xs')} Удалить аккаунт
+      </button>
+    </div>
+
+    <div class="divider" role="separator"></div>
+
+    <p class="eyebrow">Друзья · ${friends.length}</p>
+    ${
+      friends.length
+        ? `<div class="admin-list">${friends
+            .map(
+              (friend) => `
+        <div class="admin-row admin-row--static">
+          ${adminAvatarEl(friend)}
+          <span class="admin-row__text">
+            <strong class="admin-row__name" translate="no">${escapeHtml(friend.name)}</strong>
+            <small class="admin-row__meta">${
+              PRESENCE[friend.presence]?.label ?? 'Не в сети'
+            } · был: ${escapeHtml(seenText(friend.seenAt))}</small>
+          </span>
+          <button class="icon-button icon-button--sm icon-button--danger" type="button"
+                  data-action="admin-unlink" data-id="${user.id}" data-friend="${friend.id}"
+                  aria-label="Разорвать дружбу с ${escapeHtml(friend.name)}" title="Разорвать дружбу">
+            ${icon('linkOff')}
+          </button>
+        </div>`,
+            )
+            .join('')}</div>`
+        : '<p class="hint">Друзей нет.</p>'
+    }
+    ${
+      friends.length
+        ? `<button class="mini-button mini-button--danger" type="button" data-action="admin-unlink-all" data-id="${user.id}">
+             Разорвать все дружбы
+           </button>`
+        : ''
+    }`;
+};
+
+const adminPlayersHtml = () => {
+  const users = ui.admin.data?.users ?? [];
+  const query = ui.admin.query.trim().toLowerCase();
+  const found = users
+    .filter(
+      (user) =>
+        !query ||
+        user.name.toLowerCase().includes(query) ||
+        user.id.toLowerCase().includes(query),
+    )
+    .sort((a, b) => {
+      const pa = a.presence === 'offline' ? 1 : 0;
+      const pb = b.presence === 'offline' ? 1 : 0;
+      return pa - pb || a.name.localeCompare(b.name, 'ru');
+    });
+  const shown = found.slice(0, 60);
+  return `
+    <div class="field">
+      <span class="field__label">Поиск по имени или id</span>
+      <input class="input" type="search" placeholder="Имя игрока…" autocomplete="off" spellcheck="false"
+             value="${escapeHtml(ui.admin.query)}" data-role="admin-search" />
+    </div>
+    <div class="admin-list">
+      ${
+        shown.length
+          ? shown.map(adminRowHtml).join('')
+          : '<p class="hint">Никого не нашлось.</p>'
+      }
+    </div>
+    ${
+      found.length > shown.length
+        ? `<p class="hint">Показаны первые ${shown.length} из ${found.length}. Уточните поиск.</p>`
+        : ''
+    }`;
+};
+
+const adminRequestsHtml = () => {
+  const requests = ui.admin.data?.requests ?? [];
+  const users = ui.admin.data?.users ?? [];
+  const nameOf = (id) => users.find((user) => user.id === id)?.name ?? id;
+  if (!requests.length) return '<p class="hint">Заявок нет.</p>';
+  return `
+    <div class="admin-list">
+      ${requests
+        .map(
+          (request) => `
+        <div class="admin-row admin-row--static">
+          <span class="admin-row__text">
+            <strong class="admin-row__name" translate="no">${escapeHtml(nameOf(request.from))} → ${escapeHtml(
+              nameOf(request.to),
+            )}</strong>
+            <small class="admin-row__meta">${escapeHtml(seenText(request.at))}</small>
+          </span>
+          <button class="icon-button icon-button--sm icon-button--danger" type="button"
+                  data-action="admin-drop-request" data-id="${request.id}" aria-label="Удалить заявку" title="Удалить заявку">
+            ${icon('trash')}
+          </button>
+        </div>`,
+        )
+        .join('')}
+    </div>`;
+};
+
+const adminSystemHtml = () => {
+  const data = ui.admin.data;
+  const local = store.localDataInfo();
+  const address = typeof location !== 'undefined' ? location.origin : '';
+  const row = (key, value) => `
+    <div class="admin-stat">
+      <span class="admin-stat__key">${key}</span>
+      <span class="admin-stat__value" translate="no">${escapeHtml(value)}</span>
+    </div>`;
+  return `
+    <div class="admin-stats">
+      ${row('Режим данных', data?.mode === 'hub' ? 'общий хаб' : 'только этот браузер')}
+      ${row('Адрес хаба', data?.mode === 'hub' ? data.host || address : 'не подключён')}
+      ${row('Аккаунтов на хабе', String(data?.stats?.users ?? 0))}
+      ${row('Из них в сети', String(data?.stats?.online ?? 0))}
+      ${row('Заявок', String(data?.stats?.requests ?? 0))}
+      ${row('Дружб', String(data?.stats?.links ?? 0))}
+      ${row('Аватарок', String(data?.stats?.avatars ?? 0))}
+      ${row('Объём данных', `${Math.round((data?.stats?.bytes ?? 0) / 1024)} КБ`)}
+      ${row('Аккаунтов в браузере', String(local.accounts))}
+      ${row('Данные браузера', `${Math.round(local.bytes / 1024)} КБ · ${local.persists ? 'сохраняются' : 'только до перезагрузки'}`)}
+      ${row('Обновление', navigator.serviceWorker?.controller ? 'service worker активен' : 'не активно')}
+      ${row('Прямая связь', p2p.supported() ? 'WebRTC доступен' : 'WebRTC недоступен')}
+      ${row('Версия', VERSION)}
+    </div>
+
+    <div class="dialog__actions dialog__actions--spread">
+      <button class="mini-button" type="button" data-action="admin-refresh">
+        ${icon('refresh', 'icon--xs')} Обновить
+      </button>
+      <button class="mini-button" type="button" data-action="admin-export">
+        ${icon('download', 'icon--xs')} Скачать данные
+      </button>
+      <button class="mini-button" type="button" data-action="admin-lock">
+        ${icon('logOut', 'icon--xs')} Заблокировать панель
+      </button>
+    </div>
+
+    <div class="divider" role="separator"></div>
+
+    ${
+      data?.mode === 'hub'
+        ? `<p class="hint">Ключ этого хаба задаёт его владелец: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге. Смена ключа из панели на хабе выключена — иначе чужой человек с одним входом получил бы все.</p>`
+        : `
+    <form class="form" data-form="admin-new-key" novalidate>
+      <p class="eyebrow">Ключ администратора</p>
+      <p class="form-note">${
+        store.adminKeyIsDefault()
+          ? 'Сейчас действует заводской ключ. Придумайте свой — иначе панель открыта каждому, кто читал инструкцию.'
+          : 'Свой ключ установлен. Забыли его — кнопка ниже вернёт заводской.'
+      }</p>
+      <div class="form__grid">
+        <label class="field">
+          <span class="field__label">Новый ключ</span>
+          <input class="input" name="next" type="password" autocomplete="new-password" spellcheck="false"
+                 minlength="6" value="${escapeHtml(ui.admin.newKeyDraft)}" data-role="admin-new-key" />
+        </label>
+        <label class="field">
+          <span class="field__label">Повторите</span>
+          <input class="input" name="repeat" type="password" autocomplete="new-password" spellcheck="false"
+                 minlength="6" value="${escapeHtml(ui.admin.repeatKeyDraft)}" data-role="admin-repeat-key" />
+        </label>
+      </div>
+      <p class="form-error" data-role="form-error" hidden></p>
+      <div class="dialog__actions">
+        <button class="mini-button mini-button--accent" type="submit">Сменить ключ</button>
+        <button class="mini-button" type="button" data-action="admin-forget-key">Вернуть заводской</button>
+      </div>
+    </form>
+
+    <div class="divider" role="separator"></div>
+
+    <div class="danger-zone">
+      <p class="eyebrow">Аккаунты этого браузера</p>
+      <p class="form-note">Локальные аккаунты (${local.accounts}) не связаны с хабом. Очистка убирает их со всеми заявками и дружбой — на хабе ничего не меняется.</p>
+      <button class="mini-button mini-button--danger" type="button" data-action="admin-wipe">
+        ${icon('trash', 'icon--xs')} Очистить локальные аккаунты
+      </button>
+    </div>`
+    }`;
+};
+
+const adminModalHtml = () => {
+  const data = ui.admin.data;
+  if (!data) return dialogShell({ label: 'Панель админа', title: 'Панель админа', size: 'wide', body: adminLoginHtml() });
+  const user = ui.admin.openId ? data.users.find((item) => item.id === ui.admin.openId) : null;
+  const body = user
+    ? adminCardHtml(user)
+    : `
+      <div class="tabs" role="tablist" aria-label="Разделы панели">
+        ${adminTabHtml('players', `Игроки · ${data.users.length}`)}
+        ${adminTabHtml('requests', `Заявки · ${data.requests.length}`)}
+        ${adminTabHtml('system', 'Система')}
+      </div>
+      ${ui.admin.tab === 'players' ? adminPlayersHtml() : ui.admin.tab === 'requests' ? adminRequestsHtml() : adminSystemHtml()}`;
+  return dialogShell({
+    label: 'Панель админа',
+    title: user ? 'Карточка игрока' : 'Панель админа',
+    size: 'wide',
+    body: `<div class="dialog__body">${
+      ui.admin.busy ? '<p class="hint">Обновляем данные…</p>' : ''
+    }${body}</div>`,
+  });
+};
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
 
 /* Раскладывает превью точно по тому же квадратному окну, которое сохранит canvas. */
@@ -842,6 +1245,7 @@ const renderModal = ({ focus = true } = {}) => {
   if (!root) return;
   if (!ui.modal) {
     if (root.innerHTML) root.innerHTML = '';
+    renderedModalHtml = '';
     return;
   }
   let html = '';
@@ -873,6 +1277,21 @@ const renderModal = ({ focus = true } = {}) => {
     case 'confirm':
       html = confirmModalHtml();
       break;
+    case 'admin':
+      html = adminModalHtml();
+      break;
+  }
+
+  /* Проверяем и себя, и слой окон: разметку мог стереть closeModal или
+     другой код, а сверять `innerHTML` целиком (с аватарками) дорого. */
+  const changed = renderedModalHtml !== html || !root.querySelector('.dialog');
+  /* Разметка та же — окно уже на экране. Обновлять нечего, но если
+     окно только что открыли, фокус всё равно надо поставить. */
+  if (!changed) {
+    if (!focus) return;
+    const keep = root.querySelector('[data-autofocus]') || root.querySelector('input, button');
+    keep?.focus();
+    return;
   }
 
   const previous = root.querySelector('.dialog');
@@ -891,14 +1310,22 @@ const renderModal = ({ focus = true } = {}) => {
     ? oldLog.scrollTop + oldLog.clientHeight >= oldLog.scrollHeight - 16
     : true;
   const logScroll = focus ? 0 : oldLog?.scrollTop ?? 0;
-  const changed = root.innerHTML !== html;
 
-  if (changed) root.innerHTML = html;
+  root.innerHTML = html;
+  renderedModalHtml = html;
+
+  /* Окно перерисовали из-за новых данных (пришло сообщение, сменился
+     статус друга) — это не «открытие», и въезжать заново ему не надо:
+     повторная анимация читалась как подтормаживание интерфейса. */
+  if (!focus) {
+    root.querySelector('.overlay')?.setAttribute('data-static', '');
+    root.querySelector('.dialog')?.setAttribute('data-static', '');
+  }
 
   const dialog = root.querySelector('.dialog');
-  if (dialog && changed) dialog.scrollTop = dialogScroll;
+  if (dialog) dialog.scrollTop = dialogScroll;
   const log = root.querySelector('[data-role="chat-list"]');
-  if (log && changed) log.scrollTop = wasAtLogBottom ? log.scrollHeight : logScroll;
+  if (log) log.scrollTop = wasAtLogBottom ? log.scrollHeight : logScroll;
 
   if (ui.modal.type === 'avatar-preview') {
     const image = root.querySelector('[data-role="avatar-editor-image"]');
@@ -906,7 +1333,7 @@ const renderModal = ({ focus = true } = {}) => {
     else image?.addEventListener('load', updateAvatarEditor, { once: true });
   }
 
-  if (!focus && changed && activeIsInside) {
+  if (!focus && activeIsInside) {
     let target = activeRole
       ? root.querySelector(`[data-role="${activeRole}"]`)
       : activeSetting
@@ -1117,7 +1544,7 @@ document.querySelector('#app').innerHTML = `
           ${icon('settings')}
         </button>
         <p class="brand" translate="no">
-          <span class="brand__mark" aria-hidden="true">${icon('sigil')}</span>
+          <span class="brand__mark" data-action="admin-tap" aria-hidden="true">${icon('sigil')}</span>
           <span class="brand__name" lang="en">
             <span class="brand__line">${TITLE.lead}</span>
             <span class="brand__line brand__line--muted">${TITLE.tail}</span>
@@ -1175,8 +1602,17 @@ const applySettings = () => {
 applySettings();
 store.subscribe(applySettings);
 
-const setMarkupIfChanged = (node, html) => {
-  if (!node || node.innerHTML === html) return;
+/* Что уже нарисовано в области. Раньше «изменилось ли» выяснялось
+   чтением `node.innerHTML`: браузер заново собирал строку всей панели —
+   вместе с аватарками это сотни килобайт на каждую проверку (а проверок
+   за одно действие бывает несколько). Теперь мы помним, какую разметку
+   сами и положили, и сравниваем строку со строкой. */
+const renderedRegions = new Map(); // область → последняя разметка
+
+const setMarkupIfChanged = (node, html, region) => {
+  if (!node) return;
+  if (renderedRegions.get(region) === html) return;
+  renderedRegions.set(region, html);
   const active = document.activeElement;
   const hadFocus = node.contains(active);
   const action = hadFocus ? active.dataset?.action : '';
@@ -1189,8 +1625,8 @@ const setMarkupIfChanged = (node, html) => {
 };
 
 const renderRegions = () => {
-  setMarkupIfChanged(document.querySelector('[data-region="account"]'), accountSlotHtml());
-  setMarkupIfChanged(document.querySelector('[data-region="rail"]'), railHtml());
+  setMarkupIfChanged(document.querySelector('[data-region="account"]'), accountSlotHtml(), 'account');
+  setMarkupIfChanged(document.querySelector('[data-region="rail"]'), railHtml(), 'rail');
 };
 
 const render = () => {
@@ -1198,7 +1634,7 @@ const render = () => {
   if (ui.modal) renderModal({ focus: false });
 };
 
-const storeModalTypes = new Set(['profile', 'add-friend', 'friend', 'hub']);
+const storeModalTypes = new Set(['profile', 'add-friend', 'friend', 'hub', 'admin']);
 const renderAfterStoreChange = () => {
   renderRegions();
   if (ui.modal && (storeModalTypes.has(ui.modal.type) || (ui.modal.type === 'auth' && backendReady)))
@@ -1213,12 +1649,16 @@ const refreshLiveLink = (peerId) => {
 };
 
 const renderAfterPeerChange = (change = {}) => {
-  renderRegions();
-  if (!ui.modal) return;
+  /* Замер задержки приходит от каждого открытого канала раз в пять
+     секунд. К списку друзей он отношения не имеет — трогаем только
+     подпись связи: иначе панель пересобиралась по несколько раз в
+     секунду, и меню подтормаживало на ровном месте. */
   if (change.type === 'rtt') {
     refreshLiveLink(change.peerId);
     return;
   }
+  renderRegions();
+  if (!ui.modal) return;
   const affectsFriend = ui.modal.type === 'friend' &&
     (!change.peerId || change.peerId === ui.modal.data);
   const affectsManual = ui.modal.type === 'direct' &&
@@ -1280,6 +1720,93 @@ const withBusy = async (form, fn) => {
     setFormError(form, error instanceof Error ? error.message : 'Что-то пошло не так.');
   } finally {
     submit?.removeAttribute('disabled');
+  }
+};
+
+/* ---------- панель админа: загрузка и действия --------------- */
+
+const refreshAdmin = async () => {
+  ui.admin.busy = true;
+  renderModal({ focus: false });
+  try {
+    ui.admin.data = await store.adminSnapshot();
+    ui.admin.error = '';
+  } catch (error) {
+    ui.admin.error = error instanceof Error ? error.message : 'Хаб не ответил.';
+  } finally {
+    ui.admin.busy = false;
+    renderModal({ focus: false });
+  }
+};
+
+/** Открыть служебный раздел (знак игры, Ctrl+Shift+Alt+A или #admin). */
+const openAdminGate = () => {
+  ui.admin = adminState();
+  ui.modal = { type: 'admin' };
+  renderModal();
+  /* Ключ этой вкладки уже вводили — данные можно подтянуть сразу. */
+  if (store.adminKey()) refreshAdmin();
+};
+
+/* Разметка панели меняется от собственных щелчков — перерисовываем её
+   сразу, не дожидаясь следующего события данных. */
+const runAdminAction = async (fn, message) => {
+  try {
+    await fn();
+    if (message) toast(message);
+  } catch (error) {
+    playSound('error');
+    toast(error instanceof Error ? error.message : 'Не получилось.', 'error');
+    return;
+  }
+  await refreshAdmin();
+};
+
+const adminExport = () => {
+  const data = ui.admin.data;
+  if (!data) return;
+  const payload = JSON.stringify(
+    {
+      exportedAt: new Date().toISOString(),
+      mode: data.mode,
+      host: data.host || '',
+      stats: data.stats,
+      users: data.users,
+      requests: data.requests,
+    },
+    null,
+    1,
+  );
+  const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `mir-admin-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  toast('Копия данных скачана.');
+};
+
+let adminTaps = [];
+
+/** Считаем быстрые щелчки по знаку игры: пять подряд открывают панель. */
+const registerAdminTap = () => {
+  const now = Date.now();
+  adminTaps = [...adminTaps.filter((at) => now - at < ADMIN_TAP_WINDOW), now];
+  if (adminTaps.length < ADMIN_TAPS) return false;
+  adminTaps = [];
+  return true;
+};
+
+const adminFromUrl = () => {
+  try {
+    const hash = String(location.hash || '').replace(/^#/, '').toLowerCase();
+    const query = new URLSearchParams(location.search);
+    const flag = (query.get('admin') || '').toLowerCase();
+    return hash === 'admin' || flag === '1' || flag === 'true';
+  } catch {
+    return false;
   }
 };
 
@@ -1355,6 +1882,49 @@ const formHandlers = {
     document.querySelector('[data-role="chat-input"]')?.focus();
   },
 
+  'admin-login': (form, fields) =>
+    withBusy(form, async () => {
+      ui.admin.keyDraft = fields.key.value;
+      await store.adminLogin(fields.key.value);
+      ui.admin.error = '';
+      setFormError(form, '');
+      playSound('success');
+      await refreshAdmin();
+      renderModal();
+    }),
+
+  'admin-rename': (form, fields) =>
+    withBusy(form, async () => {
+      const name = fields.name.value.trim();
+      await store.adminUserAction(form.dataset.id, 'rename', { name });
+      ui.admin.nameDraft = '';
+      setFormError(form, '');
+      toast(`Никнейм изменён на ${name}.`);
+      await refreshAdmin();
+    }),
+
+  'admin-password': (form, fields) =>
+    withBusy(form, async () => {
+      await store.adminSetPassword(form.dataset.id, fields.password.value);
+      ui.admin.passDraft = '';
+      setFormError(form, '');
+      playSound('success');
+      toast('Пароль обновлён — старые входы этого игрока отозваны.');
+      await refreshAdmin();
+    }),
+
+  'admin-new-key': (form, fields) =>
+    withBusy(form, async () => {
+      if (fields.next.value !== fields.repeat.value) throw new Error('Ключи не совпадают.');
+      await store.adminSetKey(fields.next.value);
+      ui.admin.newKeyDraft = '';
+      ui.admin.repeatKeyDraft = '';
+      setFormError(form, '');
+      playSound('success');
+      toast('Ключ администратора сменён. Запомните его — восстановления нет.');
+      renderModal({ focus: false });
+    }),
+
   'direct-accept': (form) =>
     withBusy(form, async () => {
       const area = form.querySelector('[data-role="direct-offer"]');
@@ -1402,6 +1972,15 @@ document.addEventListener('input', (event) => {
     const box = document.querySelector('[data-role="friend-results"]');
     if (me && box) box.innerHTML = searchResultsHtml(me);
   }
+  if (role === 'admin-search') {
+    ui.admin.query = event.target.value;
+    renderModal({ focus: false });
+  }
+  if (role === 'admin-name') ui.admin.nameDraft = event.target.value;
+  if (role === 'admin-pass') ui.admin.passDraft = event.target.value;
+  if (role === 'admin-new-key') ui.admin.newKeyDraft = event.target.value;
+  if (role === 'admin-repeat-key') ui.admin.repeatKeyDraft = event.target.value;
+  if (role === 'admin-key') ui.admin.keyDraft = event.target.value;
   if (role === 'chat-input') ui.chatDraft = event.target.value;
   if (role === 'hub-input') ui.hubDraft = event.target.value;
   if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
@@ -1614,6 +2193,132 @@ const actions = {
     toast('Прямая связь разорвана.');
   },
 
+  /* --- панель админа --- */
+
+  'admin-tap': () => {
+    if (registerAdminTap()) openAdminGate();
+  },
+
+  'admin-tab': (el) => {
+    ui.admin.tab = el.dataset.tab;
+    ui.admin.openId = null;
+    renderModal();
+  },
+
+  'admin-open': (el) => {
+    ui.admin.openId = el.dataset.id;
+    ui.admin.nameDraft = '';
+    ui.admin.passDraft = '';
+    renderModal();
+  },
+
+  'admin-back': () => {
+    ui.admin.openId = null;
+    renderModal();
+  },
+
+  'admin-refresh': () => refreshAdmin(),
+  'admin-export': () => adminExport(),
+
+  'admin-lock': () => {
+    store.adminLogout();
+    ui.admin = adminState();
+    renderModal({ focus: false });
+    toast('Панель заблокирована — ключ спросят заново.');
+  },
+
+  'admin-kick': (el) =>
+    runAdminAction(() => store.adminUserAction(el.dataset.id, 'kick'), 'Игрок отключён от хаба.'),
+
+  'admin-regen-code': (el) =>
+    runAdminAction(
+      () => store.adminUserAction(el.dataset.id, 'regen-code'),
+      'Выдан новый код-приглашение — старый больше не действует.',
+    ),
+
+  'admin-avatar-clear': (el) =>
+    runAdminAction(() => store.adminUserAction(el.dataset.id, 'avatar', { avatar: null }), 'Аватарка убрана.'),
+
+  'admin-unlink': (el) =>
+    runAdminAction(
+      () => store.adminUserAction(el.dataset.id, 'unlink', { friendId: el.dataset.friend }),
+      'Дружба разорвана.',
+    ),
+
+  'admin-unlink-all': (el) =>
+    runAdminAction(() => store.adminUserAction(el.dataset.id, 'unlink-all'), 'Все дружбы разорваны.'),
+
+  'admin-drop-request': (el) =>
+    runAdminAction(() => store.adminRemoveRequest(el.dataset.id), 'Заявка удалена.'),
+
+  'admin-delete': (el) => {
+    const user = ui.admin.data?.users.find((item) => item.id === el.dataset.id);
+    if (!user) return;
+    ui.confirm = {
+      title: 'Удалить аккаунт?',
+      text: `${user.name} пропадёт совсем: вход перестанет работать, друзья и заявки исчезнут. Вернуть аккаунт не получится.`,
+      label: 'Удалить',
+      action: 'admin-delete-run',
+      id: user.id,
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-delete-run': async (el) => {
+    try {
+      const name = ui.admin.data?.users.find((item) => item.id === el.dataset.id)?.name ?? 'Аккаунт';
+      await store.adminUserAction(el.dataset.id, 'delete');
+      ui.admin.openId = null;
+      ui.modal = { type: 'admin' };
+      renderModal();
+      await refreshAdmin();
+      toast(`${name} удалён.`);
+    } catch (error) {
+      playSound('error');
+      toast(error instanceof Error ? error.message : 'Не получилось удалить.', 'error');
+    }
+  },
+
+  'admin-forget-key': () => {
+    ui.confirm = {
+      title: 'Вернуть заводской ключ?',
+      text: `Панель снова будет открываться ключом ${store.DEFAULT_ADMIN_KEY} — то есть каждым, кто читал инструкцию. Меняйте ключ, если игра не в одиночку.`,
+      label: 'Вернуть',
+      action: 'admin-forget-key-run',
+      id: '',
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-forget-key-run': async () => {
+    store.adminResetKey();
+    ui.modal = { type: 'admin' };
+    renderModal({ focus: false });
+    toast('Заводской ключ возвращён.');
+  },
+
+  'admin-wipe': () => {
+    ui.confirm = {
+      title: 'Очистить локальные аккаунты?',
+      text: `Все аккаунты этого браузера (${store.localDataInfo().accounts}) исчезнут вместе с заявками и дружбой. На хабе ничего не изменится.`,
+      label: 'Очистить',
+      action: 'admin-wipe-run',
+      id: '',
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-wipe-run': async () => {
+    await store.adminWipeLocal();
+    ui.modal = { type: 'admin' };
+    renderModal();
+    await refreshAdmin();
+    toast('Локальные аккаунты очищены.');
+  },
+
   'close-modal': () => closeModal(),
 
   'overlay-down': (el, event) => {
@@ -1749,6 +2454,14 @@ document.addEventListener('click', (event) => {
 
 /* ---------- клавиатура: Esc и ловушка фокуса ------------------ */
 
+/* Служебный вход с клавиатуры: Ctrl+Shift+Alt+A. Проверяем по `code`,
+   чтобы сочетание работало и на русской раскладке. */
+document.addEventListener('keydown', (event) => {
+  if (!(event.ctrlKey && event.shiftKey && event.altKey && event.code === 'KeyA')) return;
+  event.preventDefault();
+  openAdminGate();
+});
+
 document.addEventListener('keydown', (event) => {
   if (!ui.modal) return;
   if (ui.modal.type === 'avatar-preview' && event.target.matches?.('[data-role="avatar-frame"]')) {
@@ -1842,5 +2555,9 @@ const initializeConnection = async () => {
   store.heartbeat();
   if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
   syncP2P();
+  /* Ссылка с `#admin` (или `?admin=1`) открывает панель сразу: так в неё
+     удобно заходить на телефоне, где нет ни клавиатуры, ни пяти щелчков
+     по знаку. Ключ всё равно спросят. */
+  if (adminFromUrl()) openAdminGate();
 };
 initializeConnection();

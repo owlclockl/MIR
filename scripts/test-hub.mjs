@@ -12,13 +12,21 @@
      npm run test:hub -- https://адрес      # хаб на хостинге
      npm run test:hub -- --keep             # не убирать за собой
 
-   Проверка ничего не ломает: создаются два временных аккаунта с
-   случайными именами, в конце они разлогиниваются. Аккаунты на
-   хабе остаются (удаления аккаунтов в игре нет) — имена вида
-   `probeNNNN` ни с кем не пересекаются. */
+   Проверка ничего не ломает: создаются временные аккаунты с
+   случайными именами (probeNNNN — ни с кем не пересекаются), в конце
+   они разлогиниваются. Если владелец задал ключ MIR_ADMIN_KEY, здесь
+   же проверяется панель админа: чужой ключ, переименование, сброс
+   пароля, отключение, разрыв дружбы и удаление — на своих же
+   временных аккаунтах, которые проверка за собой убирает. */
 
 const args = process.argv.slice(2).filter((a) => a !== '--keep');
 const BASE = (args[0] || process.env.MIR_HUB || 'http://127.0.0.1:4173').replace(/\/+$/, '');
+
+/* Ключ панели админа. На ПК-хабе по умолчанию заводской; если владелец
+   задал свой (MIR_ADMIN_KEY) — проверяем его. Хабы без ключа (хостинг
+   без секрета) честно отвечают, что панель выключена, — это тоже
+   проверяется. */
+const ADMIN_KEY = process.env.MIR_ADMIN_KEY || 'mir-admin';
 
 let failures = 0;
 const ok = (what, detail = '') => console.log(`  ✓ ${what}${detail ? ` — ${detail}` : ''}`);
@@ -27,7 +35,7 @@ const bad = (what, detail = '') => {
   console.log(`  × ${what}${detail ? ` — ${detail}` : ''}`);
 };
 
-const call = async (method, path, { body, token, timeout = 30_000 } = {}) => {
+const call = async (method, path, { body, token, admin, timeout = 30_000 } = {}) => {
   const response = await fetch(`${BASE}${path}`, {
     method,
     cache: 'no-store',
@@ -35,6 +43,7 @@ const call = async (method, path, { body, token, timeout = 30_000 } = {}) => {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(admin ? { 'X-Mir-Admin': admin } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -194,7 +203,115 @@ expect('чужому сигналить нельзя', notFriend.status === 403,
 const empty = await call('GET', '/api/p2p/inbox', { token: A.token });
 expect('пустой ящик отвечает сразу', empty.status === 200 && Array.isArray(empty.data.messages));
 
-/* ---------- 6. мелочи ---------- */
+/* ---------- 6. панель админа ---------- */
+
+const adminBadKey = await call('POST', '/api/admin/ping', { admin: 'wrong-key-000', body: {} });
+expect(
+  'чужой ключ в панель не пускает',
+  adminBadKey.status === 403 || adminBadKey.status === 429,
+  `${adminBadKey.status} ${adminBadKey.data.error || ''}`,
+);
+
+const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body: {} });
+if (adminPing.status === 503)
+  ok('панель на этом хабе выключена владельцем', adminPing.data.error);
+else {
+  expect(
+    'ключ админа принят',
+    adminPing.status === 200 && adminPing.data.ok === true,
+    `игроков: ${adminPing.data.stats?.users}`,
+  );
+
+  const adminState = await call('POST', '/api/admin/state', { admin: ADMIN_KEY, body: {} });
+  expect(
+    'панель видит игроков и заявки',
+    adminState.status === 200 && Array.isArray(adminState.data.users) && Array.isArray(adminState.data.requests),
+    `игроков: ${adminState.data.users?.length}, заявок: ${adminState.data.requests?.length}`,
+  );
+  expect(
+    'в снимке панели нет хешей паролей',
+    !JSON.stringify(adminState.data).includes('passHash'),
+  );
+
+  const target = await makeAccount(`probeA${n}x`, 'secret321');
+  const renamed = (target.name + 'r').slice(0, 16);
+  const rename = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: target.id, action: 'rename', name: renamed },
+  });
+  expect(
+    'панель переименовывает игрока',
+    rename.status === 200 && rename.data.users.some((u) => u.id === target.id && u.name === renamed),
+    rename.data.error,
+  );
+
+  const nextSalt = hex(16);
+  const nextHash = await sha256(`${nextSalt}:adminpass1`);
+  const reset = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: target.id, action: 'password', salt: nextSalt, hash: nextHash },
+  });
+  expect('панель сбрасывает пароль без открытого текста', reset.status === 200, reset.data.error);
+  const relogin = await call('POST', '/api/login', { body: { name: renamed, passHash: nextHash } });
+  expect(
+    'после сброса вход идёт с новым паролем',
+    relogin.status === 200 && relogin.data.token,
+    `старым: ${(await call('POST', '/api/login', { body: { name: renamed, passHash: target.passHash } })).status}`,
+  );
+
+  const kick = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: target.id, action: 'kick' },
+  });
+  const kicked = kick.data.users?.find((u) => u.id === target.id);
+  expect('панель отключает игрока от хаба', kick.status === 200 && kicked && !kicked.online && kicked.tokens === 0);
+
+  /* Дружба и её разрыв: сводим два временных аккаунта и разводим панелью. */
+  const pair = await makeAccount(`probeF${n}x`, 'secret321');
+  const friend = await makeAccount(`probeG${n}x`, 'secret321');
+  await call('POST', '/api/invite/use', { token: friend.token, body: { code: pair.invite } });
+  const linked = await call('GET', '/api/state', { token: pair.token });
+  expect(
+    'перед разрывом они друзья',
+    linked.data.users?.find((u) => u.id === pair.id)?.friends.includes(friend.id) === true,
+    linked.data.error,
+  );
+  const unlink = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: pair.id, action: 'unlink', friendId: friend.id },
+  });
+  expect(
+    'панель разрывает дружбу с обеих сторон',
+    unlink.status === 200 &&
+      !unlink.data.users.find((u) => u.id === pair.id).friends.includes(friend.id) &&
+      !unlink.data.users.find((u) => u.id === friend.id).friends.includes(pair.id),
+  );
+
+  const drop = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: friend.id, action: 'delete' },
+  });
+  expect(
+    'панель удаляет аккаунт',
+    drop.status === 200 && !drop.data.users.some((u) => u.id === friend.id),
+  );
+  const gone = await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: friend.id, action: 'delete' },
+  });
+  expect('повторное удаление → 404', gone.status === 404, gone.data.error);
+
+  await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: target.id, action: 'delete' },
+  });
+  await call('POST', '/api/admin/user', {
+    admin: ADMIN_KEY,
+    body: { userId: pair.id, action: 'delete' },
+  });
+}
+
+/* ---------- 7. мелочи ---------- */
 
 const unknown = await call('GET', '/api/нет-такого');
 expect('неизвестный маршрут → 404', unknown.status === 404, unknown.data.error);

@@ -51,6 +51,7 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
   '.otf': 'font/otf',
+  '.wav': 'audio/wav',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.webm': 'video/webm',
@@ -373,6 +374,17 @@ function onReady(port) {
     console.log('');
     console.log(`  Общий хаб включён: аккаунты, друзья и приглашения общие`);
     console.log(`  для всех в этой сети. Данные: ${hub.dbFile}`);
+    /* Ключ панели админа владелец должен видеть: без него он не войдёт. */
+    console.log('');
+    console.log(`  Панель админа: знак игры слева вверху — 5 быстрых щелчков`);
+    console.log(`  (или Ctrl+Shift+Alt+A). Ключ: ${hub.adminKey}`);
+    if (hub.adminKeyIsDefault && args.public)
+      console.log(
+        '  ⚠ Публичная ссылка открыта наружу, а ключ панели — заводской.\n' +
+          '    Смените его: MIR_ADMIN_KEY=свой-ключ node serve.mjs --public',
+      );
+    else if (hub.adminKeyIsDefault)
+      console.log('  Свой ключ: MIR_ADMIN_KEY=свой-ключ node serve.mjs');
   }
   console.log('');
   if (!args.public) {

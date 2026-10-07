@@ -25,7 +25,7 @@ export const applyState = (state) => {
 export const getUsers = () => cache.users;
 export const getRequests = () => cache.requests;
 
-const call = async (method, path, body, { timeout = 8000 } = {}) => {
+const call = async (method, path, body, { timeout = 8000, headers = null } = {}) => {
   const token = tokenGetter();
   const response = await fetch(`${base}${path}`, {
     method,
@@ -34,6 +34,7 @@ const call = async (method, path, body, { timeout = 8000 } = {}) => {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(headers ?? {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -84,3 +85,34 @@ export const apiSignal = (batch) => call('POST', '/api/p2p/signal', { batch }, {
 
 export const apiInbox = ({ wait = true } = {}) =>
   call('GET', `/api/p2p/inbox${wait ? '?wait=1' : ''}`, null, { timeout: wait ? 30_000 : 8000 });
+
+/* ---------- админ-панель -------------------------------------
+   Ключ администратора уходит на хаб в заголовке — в адресе ему не
+   место (адреса попадают в логи и историю). Проверяет ключ хаб:
+   на ПК это переменная MIR_ADMIN_KEY, на хостинге — секрет воркера.
+   Если владелец хаба ключ не задал, хаб отвечает, что панель
+   выключена, — чужой человек в неё не войдёт. */
+
+const adminHeaders = (key) => ({ 'X-Mir-Admin': String(key || '') });
+
+export const apiAdminPing = (key) =>
+  call('POST', '/api/admin/ping', {}, { headers: adminHeaders(key), timeout: 10_000 });
+
+export const apiAdminState = (key) =>
+  call('POST', '/api/admin/state', {}, { headers: adminHeaders(key), timeout: 15_000 });
+
+export const apiAdminUser = (key, userId, action, payload = {}) =>
+  call(
+    'POST',
+    '/api/admin/user',
+    { userId, action, ...payload },
+    { headers: adminHeaders(key), timeout: 15_000 },
+  );
+
+export const apiAdminRequest = (key, requestId) =>
+  call(
+    'POST',
+    '/api/admin/request',
+    { requestId },
+    { headers: adminHeaders(key), timeout: 15_000 },
+  );

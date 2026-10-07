@@ -127,6 +127,31 @@ await wait(150);
 click('[data-action="hub-disconnect"]');
 await wait(300);
 ok('после отключения — локальный режим', /Только этот браузер/.test($('.link-state')?.textContent || ''), $('.link-state')?.textContent?.trim());
+/* Скрытая панель админа: вход по знаку игры и заводскому ключу.
+   Проверяем в локальном режиме — там панель работает без хаба. */
+const brandMark = $('[data-action="admin-tap"]');
+ok('знак игры — потайная кнопка панели', !!brandMark);
+for (let i = 0; i < 5; i += 1) click('[data-action="admin-tap"]');
+await wait(100);
+ok('пять щелчков по знаку открывают вход в панель', !!$('form[data-form="admin-login"]'), $('.dialog__title')?.textContent);
+
+$('[data-role="admin-key"]').value = 'не-тот-ключ';
+$('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(400);
+ok('неверный ключ не пускает в панель', !$('[data-action="admin-tab"]'));
+
+$('[data-role="admin-key"]').value = 'mir-admin';
+$('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(600);
+ok('заводской ключ пускает в панель', !!$('[data-action="admin-tab"]'), $('[data-role="form-error"]')?.textContent?.trim());
+ok('в панели виден список игроков', !!$('[data-role="admin-search"]'));
+click('[data-action="admin-tab"][data-tab="system"]');
+await wait(150);
+ok('диагностика показывает локальный режим', /только этот браузер/.test($('.admin-stats')?.textContent || ''));
+click('[data-action="close-modal"]');
+await wait(100);
+ok('панель закрывается, меню на месте', !$('.dialog') && !!$('.shell'));
+
 ok('ошибок в консоли по-прежнему нет', errors.length === 0, errors.join(' | '));
 
 console.log(bad ? '\nПЛОХО' : '\nВСЁ ХОРОШО');

@@ -10,12 +10,15 @@ export const nameHue = (key) => {
   return h;
 };
 
-export const formatDate = (ts) =>
-  new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(ts));
+/* Формат даты собирается один раз: списки показывают десятки дат
+   подряд, а создание Intl.DateTimeFormat само по себе небыстрое. */
+const DATE_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
+export const formatDate = (ts) => DATE_FORMAT.format(new Date(ts));
 
 export const copyText = async (text) => {
   if (navigator.clipboard?.writeText) {
