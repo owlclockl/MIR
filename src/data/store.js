@@ -428,6 +428,11 @@ const localBackend = {
   async offline(userId) {
     this.updateUser(userId, { online: false });
   },
+  /* В локальном режиме «сессия» — это запись в этом же браузере, и её
+     убирает store.logout: бэкенду остаётся только погасить присутствие. */
+  async logout(userId) {
+    this.updateUser(userId, { online: false });
+  },
 
   async setName(userId, name) {
     validNameOrThrow(name);
@@ -607,6 +612,13 @@ const hubBackend = {
 
   async offline() {
     await remote.apiOffline();
+  },
+
+  /* Сессию передаёт вызывающий: к этому моменту локальная запись уже
+     убрана (меню сразу показывает гостя), и читать её здесь поздно —
+     токен нужно было запомнить заранее. */
+  async logout(session) {
+    await remote.apiLogout(session?.token);
   },
 
   async setName(userId, name) {
@@ -793,6 +805,37 @@ const sameHub = (a, b) => {
 remote.setTokenGetter(() => readSession()?.token ?? null);
 
 /** Сначала подключаемся к подходящему хабу, локальное хранилище — офлайн-резерв. */
+/* Одна отложенная попытка догнать хаб после неудачного запуска. Нужна
+   ровно для одного случая: страница перезагружена, хаб ещё не ответил,
+   приложение ушло в локальный режим — а сессия игрока жива. Без этой
+   попытки человек видел «гостя» и думал, что его выкинуло из аккаунта. */
+let hubRetryTimer = null;
+
+const scheduleHubRetry = (candidates) => {
+  if (hubRetryTimer || !readSession()) return;
+  hubRetryTimer = setTimeout(async () => {
+    hubRetryTimer = null;
+    /* За время ожидания могли подключиться сами (или вручную) либо
+       отказаться от хаба — тогда ничего не делаем. */
+    if (backend.mode === 'hub' || storedHub() === HUB_OFF) return;
+    for (const url of candidates) {
+      try {
+        await remote.pingHub(url, { timeout: url ? 8000 : 6000 });
+        remote.setBase(url);
+        backend = hubBackend;
+        await resumeSession(url);
+        backendInitialized = true;
+        notify();
+        return;
+      } catch {
+        /* не ответил — оставляем как есть, локальный режим работает */
+      }
+    }
+  }, 3000);
+  /* В Node (проверки) таймер не должен держать процесс живым. */
+  hubRetryTimer?.unref?.();
+};
+
 export const initBackend = async () => {
   const sameOrigin =
     typeof location !== 'undefined' && /^https?:$/.test(location.protocol || '');
@@ -829,7 +872,11 @@ export const initBackend = async () => {
 
   for (const url of candidates) {
     try {
-      await remote.pingHub(url);
+      /* Хабу на адресе страницы даём чуть больше времени: страница уже
+         открылась, значит адрес живой, а хаб мог быть «холодным»
+         (только что проснулся воркер, туннель поднимался) — полторы
+         секунды его не хватало, и игрок попадал в локальный режим. */
+      await remote.pingHub(url, { timeout: url ? 6000 : 4000 });
       remote.setBase(url);
       backend = hubBackend;
       await resumeSession(url);
@@ -844,6 +891,11 @@ export const initBackend = async () => {
   /* Не зависаем без сети: хаб всегда пробуем первым, а local — запасной путь. */
   remote.setBase('');
   backend = localBackend;
+  /* Хаб не ответил за отведённое время — но у игрока, который уже был в
+     аккаунте, есть шанс вернуться: холодный воркер или поднимающийся
+     туннель отвечают через несколько секунд. Одна тихая попытка, и
+     только если игрок сам не отказался от хаба. */
+  scheduleHubRetry(candidates);
   /* Сессию не трогаем: хаб мог быть временно недоступен, а аккаунт — на
      хабе. В локальном режиме она не действует (игрок виден гостем), но
      переживёт перезагрузку, когда хаб снова ответит — иначе сбой сети
@@ -980,6 +1032,9 @@ export const heartbeat = () => {
   backend.beat(session.userId).catch(() => {});
 };
 
+/* Уход из меню: вкладку закрыли или страницу обновили. Токен устройства
+   при этом НЕ отзывается — иначе обычное обновление страницы выбрасывало
+   бы игрока из аккаунта (браузер присылает beforeunload и на F5). */
 export const markOffline = () => {
   const session = readSession();
   if (!session) return;
@@ -1034,10 +1089,19 @@ export const login = async (name, password) => {
   return getUser(user.id) ?? user;
 };
 
+/* Явный выход: локальную сессию убираем сразу (меню должно показать
+   гостя не дожидаясь сети), а хаб просим отозвать токен этого
+   устройства — остальные входы игрока остаются рабочими. Не ответил —
+   не беда: токен всё равно уедет из этого браузера вместе с сессией. */
 export const logout = () => {
-  markOffline();
+  const session = readSession();
   storage.removeItem(KEYS.session);
   notify();
+  if (!session) return;
+  const revoke = typeof backend.logout === 'function'
+    ? backend.logout(session)
+    : backend.offline(session.userId);
+  Promise.resolve(revoke).catch(() => {});
 };
 
 export const changeName = async (name) => {

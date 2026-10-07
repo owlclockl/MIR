@@ -41,6 +41,36 @@ window.crypto.subtle = globalThis.crypto.subtle;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* Отдельная «страница» на том же mir.html — для проверок перезагрузки:
+   браузер отдаёт ей ту же localStorage, что была у прошлой страницы. */
+const bootPage2 = (saved, pageUrl = `${HUB}/`) => {
+  const origin = new URL(pageUrl).origin;
+  return new JSDOM(html, {
+    runScripts: 'dangerously',
+    url: pageUrl,
+    pretendToBeVisual: true,
+    beforeParse(w) {
+      w.HTMLMediaElement.prototype.play = () => Promise.resolve();
+      w.HTMLMediaElement.prototype.pause = () => {};
+      /* В браузере относительные запросы (хаб «у себя») ходят на адрес
+         страницы; fetch из Node так не умеет — подставляем origin. */
+      w.fetch = (input, init) => globalThis.fetch(new URL(String(input), origin).href, init);
+      w.AbortSignal = globalThis.AbortSignal;
+      w.crypto.subtle = globalThis.crypto.subtle;
+      for (const [key, value] of Object.entries(saved ?? {})) w.localStorage.setItem(key, value);
+    },
+  });
+};
+
+const dumpStorage = (w) => {
+  const out = {};
+  for (let i = 0; i < w.localStorage.length; i += 1) {
+    const key = w.localStorage.key(i);
+    out[key] = w.localStorage.getItem(key);
+  }
+  return out;
+};
+
 /* Хаб пускает 10 регистраций в минуту с одного адреса — это защита от
    чужих, а не от проверки. Если проверку запустили сразу после такой же
    (или после `test:hub`), регистрация упирается в лимит: ждём окно и
@@ -244,41 +274,28 @@ click('[data-action="close-modal"]');
 await wait(100);
 ok('панель закрывается, меню на месте', !$('.dialog') && !!$('.shell'));
 
+/* Панель блокировала локальный аккаунт, а блокировка отзывает сессию —
+   входим заново: это и проверка обычного входа, и подготовка к проверке
+   «локальный режим переживает обновление» ниже. */
+click('[data-action="open-auth"]');
+await wait(150);
+{
+  const loginForm = $('form[data-form="login"]');
+  loginForm.elements.name.value = localName;
+  loginForm.elements.password.value = 'secret123';
+  loginForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await wait(700);
+}
+ok('вход в локальный аккаунт работает', ($('.profile')?.textContent || '').includes(localName), $('[data-role="form-error"]')?.textContent?.trim() || 'гость');
+if ($('[data-action="close-modal"]')) click('[data-action="close-modal"]');
+await wait(100);
+
 /* Перезагрузка страницы не должна выкидывать из аккаунта. Регрессия:
    страница открыта на адресе хаба, хаб подключён через окно «Общий хаб»
    (сессия записывает хаб как «тот же адрес», а в хранилище — полный URL);
    раньше при перезагрузке адреса не сходились и сессию удаляли. */
 {
-  const pageUrl = `${HUB}/`;
-  const bootPage = (saved) => {
-    const origin = new URL(pageUrl).origin;
-    const d = new JSDOM(html, {
-      runScripts: 'dangerously',
-      url: pageUrl,
-      pretendToBeVisual: true,
-      beforeParse(w) {
-        w.HTMLMediaElement.prototype.play = () => Promise.resolve();
-        w.HTMLMediaElement.prototype.pause = () => {};
-        /* В браузере относительные запросы (хаб «у себя») ходят на адрес
-           страницы; fetch из Node так не умеет — подставляем origin. */
-        w.fetch = (input, init) => globalThis.fetch(new URL(String(input), origin).href, init);
-        w.AbortSignal = globalThis.AbortSignal;
-        w.crypto.subtle = globalThis.crypto.subtle;
-        for (const [key, value] of Object.entries(saved ?? {})) w.localStorage.setItem(key, value);
-      },
-    });
-    return d;
-  };
-  const dumpStorage = (w) => {
-    const out = {};
-    for (let i = 0; i < w.localStorage.length; i += 1) {
-      const key = w.localStorage.key(i);
-      out[key] = w.localStorage.getItem(key);
-    }
-    return out;
-  };
-
-  const first = bootPage(null);
+  const first = bootPage2(null);
   const w1 = first.window;
   const errs1 = [];
   w1.addEventListener('error', (e) => errs1.push(e.message));
@@ -313,17 +330,58 @@ ok('панель закрывается, меню на месте', !$('.dialog'
     name: reloadName,
   });
   ok('перезагрузка: аккаунт создан, страница на адресе хаба', reloadRegistered, q1('.profile')?.textContent?.trim());
+  /* Обновление страницы браузер сопровождает beforeunload — приложение на
+     нём отмечает «вышел из меню». Раньше вместе с этим хаб отзывал токен
+     устройства, и после F5 игрока выбрасывало из аккаунта. Без этой
+     строки проверка была непохожа на настоящую перезагрузку. */
+  w1.dispatchEvent(new w1.Event('beforeunload'));
+  await wait(600);
   const saved = dumpStorage(w1);
+  ok('«закрытие» вкладки не выбрасывает из аккаунта сразу', (q1('.profile')?.textContent || '').includes(reloadName));
   first.window.close();
 
-  const second = bootPage(saved); // «перезагрузка» той же страницы
+  const second = bootPage2(saved); // «перезагрузка» той же страницы
   const w2 = second.window;
   const errs2 = [];
   w2.addEventListener('error', (e) => errs2.push(e.message));
   await wait(3500);
   ok('перезагрузка: вход в аккаунт сохранился', (w2.document.querySelector('.profile')?.textContent || '').includes(reloadName), w2.document.querySelector('.profile')?.textContent?.trim() || 'гость');
   ok('перезагрузка: ошибок в консоли нет', errs1.length === 0 && errs2.length === 0, [...errs1, ...errs2].join(' | '));
+
+  /* А вот явный выход обязан убрать сессию и отозвать токен: иначе
+     «Выйти» на этом устройстве оставлял бы вход открытым. */
+  const q2 = (sel) => w2.document.querySelector(sel);
+  const click2 = (sel) => {
+    const el = q2(sel);
+    if (!el) throw new Error(`нет элемента ${sel}`);
+    el.dispatchEvent(new w2.MouseEvent('click', { bubbles: true }));
+  };
+  click2('[data-action="open-profile"]');
+  await wait(200);
+  click2('[data-action="logout"]');
+  await wait(1500);
+  const afterLogout = dumpStorage(w2);
+  ok('«Выйти» убирает сессию из браузера', !afterLogout['mir:session']);
+  const oldToken = JSON.parse(saved['mir:session']).token;
+  const tokenCheck = await fetch(`${HUB}/api/state`, { headers: { Authorization: `Bearer ${oldToken}` } });
+  ok('«Выйти» отзывает токен устройства на хабе', tokenCheck.status === 401, `${tokenCheck.status}`);
+  ok('после выхода меню показывает гостя', !(w2.document.querySelector('.profile')?.textContent || '').includes(reloadName));
   second.window.close();
+}
+
+/* Локальный режим (mir.html на флешке, APK без хаба): вход тоже обязан
+   переживать обновление — здесь сессия и аккаунты лежат в одном месте. */
+{
+  const localSaved = dumpStorage(window);
+  const localPage = bootPage2(localSaved, 'http://127.0.0.1:9999/');
+  const w3 = localPage.window;
+  const errs3 = [];
+  w3.addEventListener('error', (e) => errs3.push(e.message));
+  await wait(3000);
+  const text = w3.document.querySelector('.profile')?.textContent || '';
+  ok('локальный режим: вход переживает обновление', text.includes(localName), text.replace(/\s+/g, ' ').trim() || 'гость');
+  ok('локальный режим: ошибок в консоли нет', errs3.length === 0, errs3.join(' | '));
+  localPage.window.close();
 }
 
 ok('ошибок в консоли по-прежнему нет', errors.length === 0, errors.join(' | '));

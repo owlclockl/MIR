@@ -61,6 +61,7 @@ const INBOX_WAIT_MS = 20_000; // предел длинного опроса
 export const DEFAULT_LIMITS = {
   '/api/register': 10,
   '/api/login': 20,
+  '/api/logout': 30,
   '/api/salt': 30,
   /* Подбор ключа администратора не должен быть быстрым: обычному
      владельцу хватает, а перебору — нет. Лимит стоит на всех
@@ -317,11 +318,16 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
 
   const settingsShape = () => ({ registrationOpen: db.settings.registrationOpen !== false });
 
-  const auth = (req) => {
+  /* Токен приходит заголовком (обычный путь) либо телом/параметром —
+     так же, как его ищет auth. Нужен и входу, и явному выходу. */
+  const tokenOf = (req) => {
     const header = req.headers?.authorization || req.headers?.Authorization || '';
-    const token = header.startsWith('Bearer ')
-      ? header.slice(7)
-      : req.body?.token || req.query?.get('token') || null;
+    if (header.startsWith('Bearer ')) return header.slice(7);
+    return req.body?.token || req.query?.get('token') || null;
+  };
+
+  const auth = (req) => {
+    const token = tokenOf(req);
     if (!token) throw httpError(401, 'Нет токена сессии — войдите заново.');
     const user = byToken(token);
     if (!user) throw httpError(401, 'Сессия не найдена — войдите заново.');
@@ -473,10 +479,28 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       return { ok: true };
     },
 
+    /* Игрок закрыл вкладку или свернул приложение: отмечаем его
+       «не в меню», но токен устройства не трогаем. Это важно: браузер
+       присылает beforeunload и при обычном обновлении страницы (F5),
+       а вход должен пережить обновление — иначе игрока выбрасывает из
+       аккаунта после каждого F5. Присутствие и так сгорает само:
+       «в сети» — это online и свежий seenAt. */
     'POST /api/offline': async (req, body, save) => {
       const user = auth(req);
       user.online = false;
-      user.tokens = user.tokens.filter((t) => t !== (body.token || null)) || user.tokens;
+      user.seenAt = Date.now();
+      save.now();
+      return { ok: true };
+    },
+
+    /* Явный выход из аккаунта — вот здесь токен устройства отзывается.
+       Другие устройства игрока продолжают работать: у каждого свой
+       токен. Когда не осталось ни одного, аккаунт уходит из сети. */
+    'POST /api/logout': async (req, body, save) => {
+      const user = auth(req);
+      const token = tokenOf(req);
+      user.tokens = (user.tokens ?? []).filter((t) => t !== token);
+      if (user.tokens.length === 0) user.online = false;
       save.now();
       return { ok: true };
     },

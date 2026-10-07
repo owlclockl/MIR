@@ -460,15 +460,43 @@ const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body
   expect('после сброса снова исходный ключ', afterReset.status === 200, `${afterReset.status}`);
 }
 
-/* ---------- 7. мелочи ---------- */
+/* ---------- 7. уход из меню и явный выход ----------
 
-const unknown = await call('GET', '/api/нет-такого');
-expect('неизвестный маршрут → 404', unknown.status === 404, unknown.data.error);
+   Разница принципиальная: закрытие вкладки и обновление страницы (F5)
+   отмечают «не в меню», но токен устройства цел — иначе после каждого
+   обновления игрока выбрасывало бы из аккаунта. Отзывает токен только
+   явный выход из аккаунта. */
 
 const offA = await call('POST', '/api/offline', { token: A.token, body: { token: A.token } });
 const offB = await call('POST', '/api/offline', { token: B.token, body: { token: B.token } });
 const offC = await call('POST', '/api/offline', { token: stranger.token, body: { token: stranger.token } });
 expect('выход из сети', offA.status === 200 && offB.status === 200 && offC.status === 200);
+
+const afterOffline = await call('GET', '/api/state', { token: A.token });
+expect(
+  'уход из меню не отзывает сессию: вход переживает обновление страницы',
+  afterOffline.status === 200,
+  `${afterOffline.status} ${afterOffline.data.error || ''}`,
+);
+
+const signedOut = await call('POST', '/api/logout', { token: A.token, body: { token: A.token } });
+expect('явный выход принят', signedOut.status === 200, signedOut.data.error);
+const afterLogout = await call('GET', '/api/state', { token: A.token });
+expect('после явного выхода токен не работает', afterLogout.status === 401, `${afterLogout.status}`);
+
+/* Выход одного устройства не должен трогать другие: у каждого свой токен. */
+const relogin = await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } });
+const secondDevice = relogin.data.token;
+const firstAgain = await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } });
+await call('POST', '/api/logout', { token: firstAgain.data.token, body: { token: firstAgain.data.token } });
+const otherDevice = await call('GET', '/api/state', { token: secondDevice });
+expect('выход на одном устройстве не выкидывает другие', otherDevice.status === 200, `${otherDevice.status}`);
+await call('POST', '/api/offline', { token: secondDevice, body: { token: secondDevice } });
+
+/* ---------- 8. мелочи ---------- */
+
+const unknown = await call('GET', '/api/нет-такого');
+expect('неизвестный маршрут → 404', unknown.status === 404, unknown.data.error);
 
 console.log(failures === 0 ? '\nВСЁ ХОРОШО' : `\nПЛОХО: провалов ${failures}`);
 process.exit(failures === 0 ? 0 : 1);
