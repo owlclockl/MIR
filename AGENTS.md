@@ -146,8 +146,8 @@ npm run host       # выложить игру и хаб на бесплатны
 npm run host:dev   # тот же хостинг локально (workerd), без выкладывания
 npm run host:secret  # задать секрет воркера MIR_ADMIN_KEY (панель админа)
 npm run host:secrets # список секретов воркера
-npm run sounds     # звуки интерфейса из пакета uisfx (набор по умолчанию),
-                   # другой набор: npm run sounds -- glass
+npm run sounds     # звуки интерфейса из пакета uisfx (набор «Glass» по умолчанию),
+                   # другой набор: npm run sounds -- zen
 npm run test:p2p   # проверка прямой связи: два клиента, живой WebRTC
 npm run test:hub   # проверка хаба по адресу: аккаунты, друзья, сигналинг
 npm run test:ui    # смоук-проверка mir.html в jsdom: окна, кнопки, хаб, панель админа

@@ -84,6 +84,10 @@ const ui = {
   modal: null, // { type, data }
   admin: adminState(),
   authTab: 'login',
+  /* Черновики полей входа/регистрации: окно перерисовывается при обновлении
+     данных хаба, и без черновиков введённый текст пропадал бы вместе со
+     старой разметкой (окно «открывалось пустым»). */
+  authDraft: { name: '', password: '', password2: '' },
   addQuery: '',
   codeValue: '',
   pendingAvatar: null,
@@ -124,6 +128,7 @@ const closeModal = () => {
   ui.avatarDrag = null;
   ui.codeValue = '';
   ui.chatDraft = '';
+  ui.authDraft = { name: '', password: '', password2: '' };
   const root = overlayRoot();
   if (root) root.innerHTML = '';
   /* Слой окон пуст: помнить прежнюю разметку больше нельзя, иначе
@@ -177,12 +182,14 @@ const authModalHtml = () => {
         <label class="field">
           <span class="field__label">Имя игрока</span>
           <input class="input" name="name" type="text" minlength="3" maxlength="16"
-                 autocomplete="username" spellcheck="false" required data-autofocus ${lock} />
+                 autocomplete="username" spellcheck="false" required data-autofocus
+                 data-role="auth-name" value="${escapeHtml(ui.authDraft.name)}" ${lock} />
         </label>
         <label class="field">
           <span class="field__label">Пароль</span>
           <input class="input" name="password" type="password" minlength="6" maxlength="72"
-                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required ${lock} />
+                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required
+                 data-role="auth-password" value="${escapeHtml(ui.authDraft.password)}" ${lock} />
         </label>
         ${
           isLogin
@@ -190,7 +197,8 @@ const authModalHtml = () => {
             : `<label class="field">
           <span class="field__label">Пароль ещё раз</span>
           <input class="input" name="password2" type="password" minlength="6" maxlength="72"
-                 autocomplete="new-password" required ${lock} />
+                 autocomplete="new-password" required
+                 data-role="auth-password2" value="${escapeHtml(ui.authDraft.password2)}" ${lock} />
         </label>`
         }
         <p class="form-error" data-role="form-error" hidden></p>
@@ -1717,7 +1725,11 @@ const withBusy = async (form, fn) => {
     await fn();
   } catch (error) {
     playSound('error');
-    setFormError(form, error instanceof Error ? error.message : 'Что-то пошло не так.');
+    /* За время запроса окно могло перерисоваться (обновление данных хаба):
+       старый узел формы тогда висит вне документа, и ошибка в нём не видна.
+       Ищем живую форму с тем же data-form. */
+    const live = document.querySelector(`form[data-form="${form.dataset.form}"]`) ?? form;
+    setFormError(live, error instanceof Error ? error.message : 'Что-то пошло не так.');
   } finally {
     submit?.removeAttribute('disabled');
   }
@@ -1983,6 +1995,9 @@ document.addEventListener('input', (event) => {
   if (role === 'admin-key') ui.admin.keyDraft = event.target.value;
   if (role === 'chat-input') ui.chatDraft = event.target.value;
   if (role === 'hub-input') ui.hubDraft = event.target.value;
+  if (role === 'auth-name') ui.authDraft.name = event.target.value;
+  if (role === 'auth-password') ui.authDraft.password = event.target.value;
+  if (role === 'auth-password2') ui.authDraft.password2 = event.target.value;
   if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
   if (role === 'direct-answer') ui.direct.answerDraft = event.target.value;
   if (role === 'code-input') {
@@ -2065,16 +2080,6 @@ const pickAndPreviewAvatar = async () => {
   let file;
   try {
     file = await pickAvatarFile();
-  } catch {
-    return;
-  }
-  if (!file) return;
-  try {
-    releaseAvatarPreview(ui.pendingAvatar);
-    ui.pendingAvatar = createAvatarPreview(file);
-    ui.pendingAvatarFile = file;
-    ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
-    ui.avatarDrag = null;
   } catch {
     return;
   }
