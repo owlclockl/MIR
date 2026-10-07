@@ -40,7 +40,27 @@ window.AbortSignal = globalThis.AbortSignal;
 window.crypto.subtle = globalThis.crypto.subtle;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Хаб пускает 10 регистраций в минуту с одного адреса — это защита от
+   чужих, а не от проверки. Если проверку запустили сразу после такой же
+   (или после `test:hub`), регистрация упирается в лимит: ждём окно и
+   повторяем, но так же не проходим дальше, если ошибка другая.
+   count() и submit() — чтобы работать и в основном окне, и в отдельном. */
+const registerWithRetry = async ({ count, submit, name, tries = 4 }) => {
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    submit(name);
+    await wait(2500);
+    const profile = count('.profile')?.textContent || '';
+    if (profile.includes(name)) return true;
+    const error = count('[data-role="form-error"]')?.textContent || '';
+    if (!/Слишком много запросов/.test(error)) return false;
+    console.log('  · лимит регистраций хаба: ждём 20 секунд и пробуем снова');
+    await wait(20_000);
+  }
+  return false;
+};
 const $ = (sel) => window.document.querySelector(sel);
+const $$ = (sel) => [...window.document.querySelectorAll(sel)];
 const click = (sel) => {
   const el = $(sel);
   if (!el) throw new Error(`нет элемента ${sel}`);
@@ -99,14 +119,19 @@ await wait(100);
 click('[data-action="auth-tab"][data-tab="register"]');
 await wait(100);
 const name = `ui${Math.floor(Math.random() * 9000) + 1000}`;
-const form = $('form[data-form="register"]');
-form.elements.name.value = name;
-form.elements.password.value = 'secret123';
-form.elements.password2.value = 'secret123';
-form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-await wait(2500);
+const registered = await registerWithRetry({
+  count: (sel) => window.document.querySelector(sel),
+  submit: (who) => {
+    const node = $('form[data-form="register"]');
+    node.elements.name.value = who;
+    node.elements.password.value = 'secret123';
+    node.elements.password2.value = 'secret123';
+    node.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  },
+  name,
+});
 
-ok('аккаунт создан на хабе', ($('.profile')?.textContent || '').includes(name), $('.profile')?.textContent?.trim());
+ok('аккаунт создан на хабе', registered, $('.profile')?.textContent?.trim() || $('[data-role="form-error"]')?.textContent?.trim());
 click('[data-action="open-profile"]');
 await wait(200);
 ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new URL(HUB).host}`.replace(/\./g, '\\.')).test($('.account__meta')?.textContent || ''), $('.account__meta')?.textContent?.trim());
@@ -127,6 +152,26 @@ await wait(150);
 click('[data-action="hub-disconnect"]');
 await wait(300);
 ok('после отключения — локальный режим', /Только этот браузер/.test($('.link-state')?.textContent || ''), $('.link-state')?.textContent?.trim());
+/* Локальный аккаунт: панель должна видеть его в списке, помнить в
+   журнале и позволять заблокировать. Регистрируемся в обычном окне —
+   как человек, без заглядывания внутрь store. */
+click('[data-action="open-auth"]');
+await wait(100);
+click('[data-action="auth-tab"][data-tab="register"]');
+await wait(100);
+const localName = `loc${Math.floor(Math.random() * 9000) + 1000}`;
+const localForm = $('form[data-form="register"]');
+localForm.elements.name.value = localName;
+localForm.elements.password.value = 'secret123';
+localForm.elements.password2.value = 'secret123';
+localForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(600);
+ok('локальный аккаунт создан', ($('.profile')?.textContent || '').includes(localName), $('.profile')?.textContent?.trim());
+/* После успешной регистрации окно закрывается само — жмём «закрыть»
+   только если оно ещё открыто. */
+if ($('[data-action="close-modal"]')) click('[data-action="close-modal"]');
+await wait(100);
+
 /* Скрытая панель админа: вход по знаку игры и заводскому ключу.
    Проверяем в локальном режиме — там панель работает без хаба. */
 const brandMark = $('[data-action="admin-tap"]');
@@ -142,12 +187,59 @@ ok('неверный ключ не пускает в панель', !$('[data-ac
 
 $('[data-role="admin-key"]').value = 'owlananaslwo';
 $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-await wait(600);
+await wait(700);
 ok('заводской ключ пускает в панель', !!$('[data-action="admin-tab"]'), $('[data-role="form-error"]')?.textContent?.trim());
-ok('в панели виден список игроков', !!$('[data-role="admin-search"]'));
-click('[data-action="admin-tab"][data-tab="system"]');
+
+/* Обзор: сводные числа и настройки — первое, что видит владелец. */
+ok('панель открывается на обзоре со сводкой', !!$('.admin-tiles'), $('.admin-tile__key')?.textContent?.trim());
+ok('на обзоре видна настройка регистрации', !!$('[data-action="admin-registration"]'));
+const panelTabs = $$('.tabs--panel [data-action="admin-tab"]');
+ok('в панели пять вкладок', panelTabs.length === 5, panelTabs.map((el) => el.dataset.tab).join(', '));
+
+/* Игроки: поиск, фильтры и карточка с блокировкой. */
+click('[data-action="admin-tab"][data-tab="players"]');
+await wait(200);
+ok('во вкладке «Игроки» есть поиск и фильтры', !!$('[data-role="admin-search"]') && !!$('[data-action="admin-filter"]'));
+ok('локальный аккаунт виден в списке', ($('.admin-list')?.textContent || '').includes(localName));
+
+$('[data-role="admin-search"]').value = localName;
+$('[data-role="admin-search"]').dispatchEvent(new window.Event('input', { bubbles: true }));
+await wait(200);
+const playerRow = $$('.admin-list [data-action="admin-open"]').find((el) => el.textContent.includes(localName));
+ok('поиск находит игрока', !!playerRow, playerRow?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80));
+
+playerRow.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+await wait(200);
+ok('карточка игрока открылась', $('.dialog__title')?.textContent === 'Карточка игрока', $('.dialog__title')?.textContent);
+ok('в карточке есть форма блокировки', !!$('form[data-form="admin-ban"]') && !!$('[data-role="admin-ban-reason"]'));
+
+$('[data-role="admin-ban-reason"]').value = 'проверка интерфейса';
+$('[data-role="admin-ban-reason"]').dispatchEvent(new window.Event('input', { bubbles: true }));
+$('form[data-form="admin-ban"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(500);
+ok('панель блокирует игрока', !!$('[data-action="admin-unban"]'), $('.account__meta--danger')?.textContent?.trim());
+
+click('[data-action="admin-unban"]');
+await wait(500);
+ok('панель снимает блокировку', !$('[data-action="admin-unban"]') && !!$('form[data-form="admin-ban"]'));
+
+/* Журнал: регистрация и действия панели записаны. */
+click('[data-action="admin-back"]');
+await wait(200);
+click('[data-action="admin-tab"][data-tab="events"]');
+await wait(200);
+const journal = $('.admin-list')?.textContent || '';
+ok('журнал показывает события', /Регистрация/.test(journal), journal.replace(/\s+/g, ' ').trim().slice(0, 90));
+ok('в журнале видно, кого блокировали', /блокировка/i.test(journal));
+click('[data-action="admin-event-filter"][data-value="admin"]');
 await wait(150);
+ok('фильтр журнала оставляет только панель', !/Регистрация/.test($('.admin-list')?.textContent || '') && /блокировка/i.test($('.admin-list')?.textContent || ''));
+
+/* Система: диагностика и ключ. */
+click('[data-action="admin-tab"][data-tab="system"]');
+await wait(200);
 ok('диагностика показывает локальный режим', /только этот браузер/.test($('.admin-stats')?.textContent || ''));
+ok('диагностика знает про журнал и регистрацию', /Записей в журнале/.test($('.admin-stats')?.textContent || ''));
 click('[data-action="close-modal"]');
 await wait(100);
 ok('панель закрывается, меню на месте', !$('.dialog') && !!$('.shell'));
@@ -209,13 +301,18 @@ ok('панель закрывается, меню на месте', !$('.dialog'
   click1('[data-action="auth-tab"][data-tab="register"]');
   await wait(100);
   const reloadName = `rl${Math.floor(Math.random() * 9000) + 1000}`;
-  const rform = q1('form[data-form="register"]');
-  rform.elements.name.value = reloadName;
-  rform.elements.password.value = 'secret123';
-  rform.elements.password2.value = 'secret123';
-  rform.dispatchEvent(new w1.Event('submit', { bubbles: true, cancelable: true }));
-  await wait(2500);
-  ok('перезагрузка: аккаунт создан, страница на адресе хаба', (q1('.profile')?.textContent || '').includes(reloadName), q1('.profile')?.textContent?.trim());
+  const reloadRegistered = await registerWithRetry({
+    count: q1,
+    submit: (who) => {
+      const node = q1('form[data-form="register"]');
+      node.elements.name.value = who;
+      node.elements.password.value = 'secret123';
+      node.elements.password2.value = 'secret123';
+      node.dispatchEvent(new w1.Event('submit', { bubbles: true, cancelable: true }));
+    },
+    name: reloadName,
+  });
+  ok('перезагрузка: аккаунт создан, страница на адресе хаба', reloadRegistered, q1('.profile')?.textContent?.trim());
   const saved = dumpStorage(w1);
   first.window.close();
 

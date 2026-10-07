@@ -52,9 +52,13 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
         users: parsed.users ?? [],
         requests: parsed.requests ?? [],
         adminKey: typeof parsed.adminKey === 'string' ? parsed.adminKey : '',
+        /* Настройки панели (открыта ли регистрация) и журнал событий.
+           Файлы старых версий этих полей не знают — ядро дополнит. */
+        settings: parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : undefined,
+        events: Array.isArray(parsed.events) ? parsed.events : [],
       };
     } catch {
-      return { users: [], requests: [], adminKey: '' };
+      return { users: [], requests: [], adminKey: '', events: [] };
     }
   };
 

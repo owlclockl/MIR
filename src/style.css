@@ -2167,6 +2167,22 @@ input[type='search']::-webkit-search-cancel-button {
 
 /* ---------- Скрытая панель админа ------------------------------ */
 
+.tabs--panel {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.tabs--panel::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs--panel .tab {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
 .admin-list {
   display: flex;
   flex-direction: column;
@@ -2176,6 +2192,189 @@ input[type='search']::-webkit-search-cancel-button {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+/* Журнал на «Обзоре» — короткая лента без своей прокрутки: окно и так
+   прокручивается, а вложенная полоса выглядела бы как второй экран. */
+.admin-list--flat {
+  max-height: none;
+  overflow: visible;
+}
+
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-2);
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--box-pad);
+  border: 1px solid var(--line);
+  background: var(--fill);
+}
+
+.admin-tile__value {
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-tile__key {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.admin-tile--danger {
+  border-color: var(--danger-line);
+  background: var(--danger-fill);
+}
+
+.admin-tile--danger .admin-tile__value {
+  color: var(--danger);
+}
+
+.admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.admin-chips--slim {
+  color: var(--text-faint);
+}
+
+.admin-chips__label {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.chip {
+  padding: var(--sp-6) var(--sp-10);
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  background: var(--fill);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms var(--ease),
+    border-color 150ms var(--ease),
+    background-color 150ms var(--ease);
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: var(--fill-hover);
+}
+
+.chip--active,
+.chip--active:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: var(--fill-active);
+}
+
+.admin-badge {
+  padding: var(--sp-4) var(--sp-8);
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
+  background: var(--danger-fill);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+button.admin-row--banned .admin-row__name {
+  color: var(--danger);
+}
+
+.admin-event {
+  gap: var(--row-gap);
+}
+
+.admin-event__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 50%;
+}
+
+.admin-event__dot--admin {
+  border-color: var(--warn);
+  background: var(--warn-glow);
+}
+
+.admin-event__time {
+  white-space: nowrap;
+}
+
+.admin-link {
+  padding: 0;
+  color: var(--text-soft);
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-link:hover {
+  color: var(--text);
+}
+
+.admin-arrow {
+  color: var(--text-faint);
+}
+
+.admin-ban {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-10);
+}
+
+.account__meta--danger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--danger);
+}
+
+.admin-ban__row {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+.admin-ban__row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-ban__row .input--select {
+  flex: none;
+  width: auto;
+  cursor: pointer;
+}
+
+.admin-ban__row .mini-button {
+  flex: none;
 }
 
 .admin-row {
@@ -2268,6 +2467,16 @@ button.admin-row:hover {
   padding: var(--sp-14);
   border: 1px solid var(--danger-line);
   background: var(--danger-fill);
+}
+
+@media (max-width: 680px) {
+  .admin-ban__row {
+    flex-direction: column;
+  }
+
+  .admin-ban__row .input--select {
+    width: 100%;
+  }
 }
 
 @media (max-width: 430px) {

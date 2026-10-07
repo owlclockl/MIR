@@ -31,6 +31,11 @@ const KEYS = {
   hub: 'mir:hub',
   settings: 'mir:settings',
   admin: 'mir:admin',
+  /* Настройки служебной панели (пока одно: открыта ли регистрация)
+     и журнал событий — в локальном режиме они лежат здесь, в режиме
+     хаба приходят снимком от хаба. */
+  hubSettings: 'mir:hub-settings',
+  events: 'mir:events',
 };
 
 /* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
@@ -276,6 +281,28 @@ const validatePassword = (password) => {
   if (password.length > 72) throw new Error('Пароль: максимум 72 символа.');
 };
 
+/* ---------- блокировки аккаунтов ----------------------------
+   Блокировка лежит на самом аккаунте (user.ban) и повторяет правило
+   хаба один в один: до срока (until) или навсегда (until = 0).
+   Протухшая блокировка считается снятой сама собой — снимать её
+   руками не нужно. */
+
+export const banOf = (user) => {
+  const ban = user?.ban;
+  if (!ban) return null;
+  if (ban.until && ban.until <= Date.now()) return null;
+  return { reason: ban.reason || '', at: ban.at ?? 0, until: ban.until ?? 0 };
+};
+
+export const banMessage = (ban) =>
+  ban?.reason
+    ? `Аккаунт заблокирован администратором: ${ban.reason}`
+    : 'Аккаунт заблокирован администратором.';
+
+/* Сколько записей журнала держим: столько же, сколько хаб. */
+const MAX_EVENTS = 300;
+const MAX_LOG_TEXT = 160;
+
 export const normalizeInviteInput = (code) =>
   String(code || '')
     .toUpperCase()
@@ -299,6 +326,26 @@ const linkFriendsIn = (users, aId, bId) => {
    чем раз в 15 секунд: свежесть присутствия от этого не страдает,
    а лишней работы в разы меньше. */
 const PRESENCE_WRITE_MS = 15_000;
+
+/* Настройки панели и журнал событий этого браузера: тот же смысл,
+   что у хаба, только данные лежат в localStorage. Нужны, чтобы панель
+   вела себя одинаково в обоих режимах. */
+const localSettings = () => readJSON(KEYS.hubSettings, {});
+const localSettingsShape = () => ({ registrationOpen: localSettings().registrationOpen !== false });
+const saveLocalSettings = (patch) => writeJSON(KEYS.hubSettings, { ...localSettings(), ...patch });
+
+let localEventSeq = 0;
+const localLogEvent = (kind, fields = {}) => {
+  const events = readJSON(KEYS.events, []);
+  const event = { id: `e_${(localEventSeq += 1).toString(36)}`, at: Date.now(), kind };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null || value === '') continue;
+    event[key] = typeof value === 'string' ? value.slice(0, MAX_LOG_TEXT) : value;
+  }
+  events.push(event);
+  writeJSON(KEYS.events, events.slice(-MAX_EVENTS));
+  return event;
+};
 
 const localBackend = {
   mode: 'local',
@@ -331,6 +378,8 @@ const localBackend = {
   },
 
   async registerAccount({ name, salt, passHash }) {
+    if (localSettingsShape().registrationOpen === false)
+      throw new Error('Регистрация временно закрыта администратором.');
     validNameOrThrow(name);
     if (this.findByName(name)) throw new Error('Это имя занято.');
     const user = {
@@ -347,13 +396,19 @@ const localBackend = {
       online: true,
     };
     this.saveUsers([...this.listUsers(), user]);
+    localLogEvent('register', { userId: user.id, name: user.name });
     return { user, token: null };
   },
 
   async checkLogin({ name, passHash }) {
     const user = this.findByName(name);
     if (!user) throw new Error('Игрок с таким именем не найден.');
+    /* Заблокированному пароль не помогает: сначала говорим про
+       блокировку, иначе он будет думать, что «пароль слетел». */
+    const ban = banOf(user);
+    if (ban) throw new Error(banMessage(ban));
     if (user.passHash !== passHash) throw new Error('Неверный пароль.');
+    localLogEvent('login', { userId: user.id, name: user.name });
     return { user, token: null };
   },
 
@@ -378,7 +433,9 @@ const localBackend = {
     validNameOrThrow(name);
     const owner = this.findByName(name);
     if (owner && owner.id !== userId) throw new Error('Это имя занято.');
+    const before = this.listUsers().find((u) => u.id === userId)?.name;
     this.updateUser(userId, { name: name.trim(), nameKey: name.trim().toLowerCase() });
+    localLogEvent('name', { userId, name: name.trim(), text: before });
     return {};
   },
 
@@ -387,11 +444,14 @@ const localBackend = {
     if (!user) throw new Error('Вы не вошли в аккаунт.');
     if (user.passHash !== oldHash) throw new Error('Текущий пароль не подходит.');
     this.updateUser(userId, { salt: nextSalt, passHash: nextHash });
+    localLogEvent('password', { userId, name: user.name });
     return {};
   },
 
   async setAvatar(userId, dataUrl) {
+    const name = this.listUsers().find((u) => u.id === userId)?.name;
     this.updateUser(userId, { avatar: dataUrl || null });
+    localLogEvent(dataUrl ? 'avatar' : 'avatar-clear', { userId, name });
     return {};
   },
 
@@ -411,12 +471,24 @@ const localBackend = {
       this.saveRequests(this.listRequests().filter((r) => r.id !== reciprocal.id));
       linkFriendsIn(users, fromId, toId);
       this.saveUsers(users);
+      localLogEvent('friend', {
+        userId: me.id,
+        name: me.name,
+        targetId: target.id,
+        targetName: target.name,
+      });
       return { result: { accepted: true, targetId: target.id, targetName: target.name } };
     }
     this.saveRequests([
       ...this.listRequests(),
       { id: `r_${randomHex(6)}`, from: fromId, to: toId, at: Date.now() },
     ]);
+    localLogEvent('request', {
+      userId: me.id,
+      name: me.name,
+      targetId: target.id,
+      targetName: target.name,
+    });
     return { result: { accepted: false, targetId: target.id, targetName: target.name } };
   },
 
@@ -430,6 +502,13 @@ const localBackend = {
       linkFriendsIn(users, request.from, userId);
       this.saveUsers(users);
     }
+    const me = users.find((u) => u.id === userId);
+    localLogEvent(accept ? 'friend' : 'request-decline', {
+      userId,
+      name: me?.name,
+      targetId: from?.id,
+      targetName: from?.name,
+    });
     return { result: { accepted: accept, fromId: request.from, fromName: from?.name ?? '' } };
   },
 
@@ -441,6 +520,12 @@ const localBackend = {
         user.friends = user.friends.filter((id) => id !== userId && id !== friendId);
     }
     this.saveUsers(users);
+    localLogEvent('friend-remove', {
+      userId,
+      name: users.find((u) => u.id === userId)?.name,
+      targetId: friend?.id,
+      targetName: friend?.name,
+    });
     return { result: { friendName: friend?.name ?? '' } };
   },
 
@@ -465,12 +550,19 @@ const localBackend = {
     );
     linkFriendsIn(users, userId, owner.id);
     this.saveUsers(users);
+    localLogEvent('friend', {
+      userId,
+      name: me.name,
+      targetId: owner.id,
+      targetName: owner.name,
+    });
     return { result: { ownerId: owner.id, ownerName: owner.name } };
   },
 
   async regenCode(userId) {
     const inviteCode = makeInviteCode();
     this.updateUser(userId, { inviteCode });
+    localLogEvent('code', { userId, name: this.listUsers().find((u) => u.id === userId)?.name });
     return { result: { code: inviteCode } };
   },
 
@@ -772,9 +864,10 @@ const resumeSession = async (hub) => {
   try {
     await remote.fetchState();
   } catch (error) {
-    /* Токен протух (хаб переустановили) — считаем себя гостем.
-       Сетевой сбой сессию не трогает: следующий опрос подтянет. */
-    if (error?.status === 401) storage.removeItem(KEYS.session);
+    /* Токен протух (хаб переустановили) или аккаунт заблокирован
+       администратором — считаем себя гостем. Сетевой сбой сессию
+       не трогает: следующий опрос подтянет. */
+    if (error?.status === 401 || error?.status === 403) storage.removeItem(KEYS.session);
   }
 };
 
@@ -840,7 +933,9 @@ export const refreshRemote = async () => {
     /* Игнорируем меняющийся heartbeat, но отлавливаем смену idle/offline. */
     if (before !== after) notify();
   } catch (error) {
-    if (error?.status === 401) {
+    /* 403 приходит заблокированному аккаунту: сессию убираем, и вход
+       объяснит причину. */
+    if (error?.status === 401 || error?.status === 403) {
       storage.removeItem(KEYS.session);
       notify();
     }
@@ -859,7 +954,15 @@ export const findUserByName = (name) => {
 
 export const getCurrentUser = () => {
   const session = getSession();
-  return session ? getUser(session.userId) : null;
+  if (!session) return null;
+  const user = getUser(session.userId);
+  /* На хабе блокировку сторожит сам хаб (403 на любой запрос), но в
+     локальном режиме сессия и база лежат рядом: проверяем здесь. */
+  if (user && backend.mode === 'local' && banOf(user)) {
+    storage.removeItem(KEYS.session);
+    return null;
+  }
+  return user;
 };
 
 /* ---------- присутствие ------------------------------------ */
@@ -1189,16 +1292,29 @@ const adminUserShape = (user) => ({
   presence: presenceOf(user),
   inviteCode: user.inviteCode ?? null,
   devices: Array.isArray(user.tokens) ? user.tokens.length : 0,
+  ban: banOf(user),
 });
 
-const adminStats = (users, requests, bytes) => ({
-  users: users.length,
-  online: users.filter((user) => presenceOf(user) !== 'offline').length,
-  avatars: users.filter((user) => user.avatar).length,
-  requests: requests.length,
-  links: Math.round(users.reduce((sum, user) => sum + (user.friends?.length ?? 0), 0) / 2),
-  bytes,
-});
+const adminStats = (users, requests, bytes, events = 0) => {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  return {
+    users: users.length,
+    online: users.filter((user) => presenceOf(user) !== 'offline').length,
+    avatars: users.filter((user) => user.avatar).length,
+    requests: requests.length,
+    links: Math.round(users.reduce((sum, user) => sum + (user.friends?.length ?? 0), 0) / 2),
+    banned: users.filter((user) => banOf(user)).length,
+    today: users.filter((user) => now - (user.createdAt ?? 0) < day).length,
+    week: users.filter((user) => now - (user.createdAt ?? 0) < day * 7).length,
+    activeDay: users.filter((user) => now - (user.seenAt ?? 0) < day).length,
+    events,
+    bytes,
+  };
+};
+
+/** Снимок журнала для панели: свежие записи вперёд (как у хаба). */
+const panelEvents = (events) => events.slice(-150).reverse();
 
 const rawLength = (key) => {
   try {
@@ -1214,24 +1330,35 @@ export const adminSnapshot = async () => {
     const data = await remote.apiAdminState(adminSessionKey);
     const users = (data.users ?? []).map(adminUserShape);
     const requests = data.requests ?? [];
+    const events = data.events ?? [];
     return {
       mode: 'hub',
       host: hubHost(),
       users,
       requests,
-      stats: data.stats ?? adminStats(users, requests, 0),
+      events,
+      settings: data.settings ?? { registrationOpen: true },
+      stats: data.stats ?? adminStats(users, requests, 0, events.length),
       /* Хаб сам знает, заводской ли сейчас ключ. */
       keyDefault: data.key?.isDefault === true,
     };
   }
   const users = localBackend.listUsers();
   const requests = localBackend.listRequests();
+  const events = readJSON(KEYS.events, []);
   return {
     mode: 'local',
     host: '',
     users: users.map(adminUserShape),
     requests,
-    stats: adminStats(users, requests, rawLength(KEYS.users) + rawLength(KEYS.requests)),
+    events: panelEvents(events),
+    settings: localSettingsShape(),
+    stats: adminStats(
+      users,
+      requests,
+      rawLength(KEYS.users) + rawLength(KEYS.requests) + rawLength(KEYS.events),
+      events.length,
+    ),
     keyDefault: adminKeyIsDefault(),
   };
 };
@@ -1253,8 +1380,10 @@ const localAdminAction = (userId, action, payload = {}) => {
       validateName(name);
       const owner = users.find((item) => item.nameKey === name.toLowerCase() && item.id !== userId);
       if (owner) throw new Error('Это имя занято.');
+      const before = user.name;
       user.name = name;
       user.nameKey = name.toLowerCase();
+      localLogEvent('admin:rename', { by: 'admin', userId, name, text: before });
       break;
     }
     case 'password': {
@@ -1263,11 +1392,36 @@ const localAdminAction = (userId, action, payload = {}) => {
       user.salt = payload.salt;
       user.passHash = payload.hash;
       user.token = null; // старые входы отзываются
+      localLogEvent('admin:password', { by: 'admin', userId, name: user.name });
       break;
     }
     case 'kick': {
       user.online = false;
       user.token = null;
+      localLogEvent('admin:kick', { by: 'admin', userId, name: user.name });
+      break;
+    }
+    case 'ban': {
+      const reason = String(payload.reason || '').trim().slice(0, 140);
+      const hours = Math.max(0, Math.min(24 * 365, Number(payload.hours) || 0));
+      user.ban = { reason, at: Date.now(), until: hours ? Date.now() + hours * 3_600_000 : 0 };
+      /* Блокировка сразу отключает входы: иначе игрок с живой сессией
+         доиграл бы до её конца. */
+      user.online = false;
+      user.token = null;
+      localLogEvent('admin:ban', {
+        by: 'admin',
+        userId,
+        name: user.name,
+        text: reason,
+        until: user.ban.until,
+      });
+      if (readSession()?.userId === userId) storage.removeItem(KEYS.session);
+      break;
+    }
+    case 'unban': {
+      delete user.ban;
+      localLogEvent('admin:unban', { by: 'admin', userId, name: user.name });
       break;
     }
     case 'avatar': {
@@ -1275,21 +1429,37 @@ const localAdminAction = (userId, action, payload = {}) => {
       if (avatar !== null && !String(avatar).startsWith('data:image/'))
         throw new Error('Аватарка должна быть картинкой.');
       user.avatar = avatar === null ? null : String(avatar);
+      localLogEvent(avatar ? 'admin:avatar' : 'admin:avatar-clear', {
+        by: 'admin',
+        userId,
+        name: user.name,
+      });
       break;
     }
     case 'regen-code': {
       user.inviteCode = makeInviteCode();
+      localLogEvent('admin:code', { by: 'admin', userId, name: user.name });
       break;
     }
     case 'unlink': {
       const friendId = String(payload.friendId || '');
+      const friend = users.find((item) => item.id === friendId);
       dropLink(user.id, friendId);
       dropLink(friendId, user.id);
+      localLogEvent('admin:unlink', {
+        by: 'admin',
+        userId,
+        name: user.name,
+        targetId: friendId,
+        targetName: friend?.name,
+      });
       break;
     }
     case 'unlink-all': {
+      const count = user.friends.length;
       for (const friendId of [...user.friends]) dropLink(friendId, user.id);
       user.friends = [];
+      localLogEvent('admin:unlink-all', { by: 'admin', userId, name: user.name, count });
       break;
     }
     case 'delete': {
@@ -1299,6 +1469,7 @@ const localAdminAction = (userId, action, payload = {}) => {
       localBackend.saveRequests(
         localBackend.listRequests().filter((r) => r.from !== userId && r.to !== userId),
       );
+      localLogEvent('admin:delete', { by: 'admin', userId, name: user.name });
       if (readSession()?.userId === userId) storage.removeItem(KEYS.session);
       notify();
       return;
@@ -1327,12 +1498,53 @@ export const adminSetPassword = async (userId, password) => {
   await adminUserAction(userId, 'password', { salt, hash });
 };
 
+/** Заблокировать аккаунт: reason — повод, hours — срок (0 — навсегда). */
+export const adminBan = async (userId, { reason = '', hours = 0 } = {}) =>
+  adminUserAction(userId, 'ban', { reason, hours });
+
+/** Снять блокировку. */
+export const adminUnban = async (userId) => adminUserAction(userId, 'unban');
+
+/** Открыть или закрыть регистрацию на хабе (в локальном режиме — здесь же). */
+export const adminSetRegistration = async (open) => {
+  if (backend.mode === 'hub') {
+    await remote.apiAdminSettings(adminSessionKey, { registrationOpen: !!open });
+    return;
+  }
+  saveLocalSettings({ registrationOpen: !!open });
+  localLogEvent('admin:settings', {
+    by: 'admin',
+    text: open ? 'регистрация открыта' : 'регистрация закрыта',
+  });
+  notify();
+};
+
+/** Очистить журнал панели. */
+export const adminClearEvents = async () => {
+  if (backend.mode === 'hub') {
+    await remote.apiAdminEvents(adminSessionKey, { clear: true });
+    return;
+  }
+  writeJSON(KEYS.events, []);
+  localLogEvent('admin:events-clear', { by: 'admin' });
+  notify();
+};
+
 export const adminRemoveRequest = async (requestId) => {
   if (backend.mode === 'hub') {
     await remote.apiAdminRequest(adminSessionKey, requestId);
     return;
   }
+  const request = localBackend.listRequests().find((r) => r.id === requestId);
+  const nameOf = (id) => localBackend.listUsers().find((u) => u.id === id)?.name;
   localBackend.saveRequests(localBackend.listRequests().filter((r) => r.id !== requestId));
+  localLogEvent('admin:request-drop', {
+    by: 'admin',
+    userId: request?.from,
+    name: nameOf(request?.from),
+    targetId: request?.to,
+    targetName: nameOf(request?.to),
+  });
   notify();
 };
 
@@ -1370,8 +1582,10 @@ export const localDataInfo = () => ({
 
 /** Полная очистка локальных аккаунтов и заявок этого браузера. */
 export const adminWipeLocal = async () => {
+  const count = localBackend.listUsers().length;
   localBackend.saveUsers([]);
   localBackend.saveRequests([]);
   storage.removeItem(KEYS.session);
+  localLogEvent('admin:wipe', { by: 'admin', count });
   notify();
 };

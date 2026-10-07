@@ -109,6 +109,14 @@ export const apiAdminUser = (key, userId, action, payload = {}) =>
     { headers: adminHeaders(key), timeout: 15_000 },
   );
 
+/** Настройки хаба из панели: пока одно — открыта ли регистрация. */
+export const apiAdminSettings = (key, patch) =>
+  call('POST', '/api/admin/settings', patch, { headers: adminHeaders(key), timeout: 15_000 });
+
+/** Журнал событий: { clear: true } — очистить. */
+export const apiAdminEvents = (key, payload) =>
+  call('POST', '/api/admin/events', payload, { headers: adminHeaders(key), timeout: 15_000 });
+
 export const apiAdminRequest = (key, requestId) =>
   call(
     'POST',
