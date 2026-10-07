@@ -1,25 +1,21 @@
 /* ===========================================================
    Прямая связь между игроками (P2P).
 
-   Зачем: друзьям не нужен чужой сервер. Как только оба открыли
-   приложение, устройства соединяются напрямую через WebRTC —
-   данные идут от компьютера к компьютеру, минуя хаб.
+   Основной путь — общий хаб: он хранит аккаунты и доставляет сообщения.
+   WebRTC/P2P поднимается автоматически в фоне как вторичный канал и
+   используется напрямую только как резерв, если хаб временно недоступен.
+   Так домашний NAT не мешает друзьям оставаться на связи.
 
-   Два способа свести собеседников:
+   Автоматический резерв:
+   1. Хаб сводит игроков через offer/answer/ICE и остаётся основным
+      транспортом сообщений (`/api/p2p/*`).
+   2. Параллельно WebRTC пробует прямой канал; сообщения переключаются
+      на него только при ошибке доставки через хаб.
+   3. Ручное подключение по коду — отдельный последний вариант без хаба,
+      например для двух однофайловых `mir.html`.
 
-   1. Через хаб (`server/hub.mjs`, маршруты `/api/p2p/*`). Хаб
-      передаёт только offer/answer/ICE — несколько килобайт на
-      соединение. Дальше трафик течёт напрямую. Это основной путь:
-      соединение поднимается само, без единого нажатия.
-   2. По коду, без какого-либо сервера вообще. Один создаёт код,
-      второй вставляет его у себя и возвращает ответный код.
-      Работает даже в однофайловом `mir.html`, открытом с флешки.
-
-   Если NAT у обоих строгий и прямой канал не поднялся, сообщения
-   не теряются: они идут запасным путём через хаб (состояние
-   «через хаб»), а попытки пробиться продолжаются в фоне. Поэтому
-   связь в интерфейсе либо «напрямую», либо «через хаб», но
-   работает всегда, пока игрок в сети.
+   Поэтому состояние «через хаб» — штатное основное подключение, а не
+   ошибка или деградация. P2P — дополнительный маршрут.
 
    Наружу модуль отдаёт: start/stop, статус пары, историю
    сообщений, отправку и подписку на изменения.
@@ -72,11 +68,13 @@ let inboxLoop = null;
 let tickTimer = null;
 let outbox = [];
 let flushTimer = null;
+let flushing = false;
+let signalEpoch = 0;
 
-const emit = () => {
+const emit = (change = {}) => {
   for (const fn of listeners) {
     try {
-      fn();
+      fn(change);
     } catch {
       /* Подписчик упал — остальные не должны пострадать. */
     }
@@ -122,7 +120,7 @@ export const markRead = (peerId) => {
   const list = history.get(peerId);
   if (!list?.some((m) => !m.mine && !m.read)) return;
   for (const m of list) m.read = true;
-  emit();
+  emit({ type: 'read', peerId });
 };
 
 /* ---------- запись пира --------------------------------------- */
@@ -138,6 +136,8 @@ const blankPeer = (peerId) => ({
   dc: null,
   polite: false, // true — мы отвечаем, false — мы звоним
   pending: [], // ICE-кандидаты до установки remoteDescription
+  directReady: false, // P2P готов, но при активном хабе остаётся резервным
+  secondaryDisabled: false,
   tries: 0,
   retryAt: 0,
   startedAt: 0,
@@ -169,14 +169,23 @@ const setState = (peer, state) => {
     peer.since = 0;
     peer.rtt = null;
   }
-  emit();
+  emit({ type: 'status', peerId: peer.id });
 };
 
-/** Состояние связи с игроком: { state, rtt, since, name }. */
+/** Состояние связи с игроком: { state, rtt, since, name, directReady }. */
 export const status = (peerId) => {
   const peer = peers.get(peerId);
   if (!peer)
-    return { state: 'offline', rtt: null, since: 0, name: '', failReason: null, gather: null };
+    return {
+      state: 'offline',
+      rtt: null,
+      since: 0,
+      name: '',
+      failReason: null,
+      gather: null,
+      directReady: false,
+      secondaryDisabled: false,
+    };
   return {
     state: peer.state,
     rtt: peer.rtt,
@@ -184,6 +193,8 @@ export const status = (peerId) => {
     name: peer.name,
     failReason: peer.failReason,
     gather: peer.gather,
+    directReady: peer.directReady,
+    secondaryDisabled: peer.secondaryDisabled,
   };
 };
 
@@ -193,37 +204,76 @@ export const liveCount = () =>
 
 /* ---------- отправка сигналов через хаб ----------------------- */
 
+const scheduleFlush = (delay = TIMING.flush) => {
+  if (flushTimer || flushing || outbox.length === 0) return;
+  flushTimer = setTimeout(flushSignals, delay);
+};
+
 const queueSignal = (to, kind, data) => {
-  if (!store.isHub()) return;
+  if (!store.isHub()) return false;
   outbox.push({ to, kind, data });
-  if (flushTimer) return;
-  flushTimer = setTimeout(flushSignals, TIMING.flush);
+  scheduleFlush();
+  return true;
+};
+
+const sendDirect = (peer, payload) => {
+  if (peer.dc?.readyState !== 'open') return false;
+  try {
+    peer.dc.send(JSON.stringify(payload));
+    return true;
+  } catch {
+    /* Канал закрылся между проверкой и отправкой. */
+    return false;
+  }
 };
 
 async function flushSignals() {
   flushTimer = null;
-  if (outbox.length === 0) return;
+  if (flushing || outbox.length === 0) return;
+  flushing = true;
+  const epoch = signalEpoch;
   const batch = outbox.splice(0, 32);
+  const retry = [];
   try {
     await remote.apiSignal(batch);
   } catch {
-    /* Хаб моргнул — сигналы этой попытки пропали, но цикл повторит
-       соединение целиком. Переотправлять устаревший SDP вредно. */
+    /* Не теряем сообщения: сначала пробуем вторичный P2P, иначе повторяем
+       только пользовательские сообщения через хаб. Устаревший SDP не повторяем. */
+    if (epoch === signalEpoch) {
+      for (const signal of batch) {
+        if (signal.kind !== 'relay' || signal.data?.t !== 'chat') continue;
+        const peer = peers.get(signal.to);
+        if (peer && sendDirect(peer, signal.data)) {
+          const ownMessage = (history.get(peer.id) ?? []).find((message) => message.id === signal.data.id);
+          if (ownMessage && ownMessage.via !== 'direct') {
+            ownMessage.via = 'direct';
+            emit({ type: 'transport', peerId: peer.id });
+          }
+        } else {
+          retry.push(signal);
+        }
+      }
+    }
+  } finally {
+    flushing = false;
+    if (epoch !== signalEpoch) {
+      if (outbox.length) scheduleFlush();
+      return;
+    }
+    if (retry.length) outbox.unshift(...retry);
+    if (outbox.length) scheduleFlush(retry.length ? TIMING.retryBase : TIMING.flush);
   }
-  if (outbox.length > 0 && !flushTimer) flushTimer = setTimeout(flushSignals, TIMING.flush);
 }
 
 /* ---------- канал данных --------------------------------------- */
 
 const sendRaw = (peer, payload) => {
-  if (peer.dc?.readyState === 'open') {
-    try {
-      peer.dc.send(JSON.stringify(payload));
-      return 'direct';
-    } catch {
-      /* Канал оборвался между проверкой и отправкой — уходим в запасной. */
-    }
+  /* Чат идёт через хаб первым. Прямой канал — резерв на случай ошибки API. */
+  if (!peer.manual && store.isHub() && payload?.t === 'chat') {
+    queueSignal(peer.id, 'relay', payload);
+    return 'relay';
   }
+  if (sendDirect(peer, payload)) return 'direct';
   if (!peer.manual && store.isHub()) {
     queueSignal(peer.id, 'relay', payload);
     return 'relay';
@@ -236,7 +286,7 @@ const handlePayload = (peer, payload, via) => {
   switch (payload.t) {
     case 'hello':
       peer.name = String(payload.name || '').slice(0, 32);
-      emit();
+      emit({ type: 'name', peerId: peer.id });
       break;
     case 'ping':
       sendRaw(peer, { t: 'pong', n: payload.n, at: payload.at });
@@ -244,20 +294,22 @@ const handlePayload = (peer, payload, via) => {
     case 'pong':
       peer.lastPong = now();
       if (typeof payload.at === 'number') peer.rtt = Math.max(0, now() - payload.at);
-      emit();
+      emit({ type: 'rtt', peerId: peer.id });
       break;
     case 'chat': {
       const text = String(payload.text || '').slice(0, MESSAGE_LIMIT);
       if (!text) return;
+      const id = String(payload.id || rid());
+      if ((history.get(peer.id) ?? []).some((message) => message.id === id)) return;
       pushHistory(peer.id, {
-        id: payload.id || rid(),
+        id,
         mine: false,
         text,
         at: payload.at || now(),
         via,
         read: false,
       });
-      emit();
+      emit({ type: 'message', peerId: peer.id });
       break;
     }
     default:
@@ -288,7 +340,9 @@ const attachChannel = (peer, dc) => {
     peer.tries = 0;
     peer.rtt = null;
     peer.failReason = null;
-    setState(peer, 'direct');
+    peer.directReady = true;
+    setState(peer, !peer.manual && store.isHub() ? 'relay' : 'direct');
+    emit({ type: 'status', peerId: peer.id });
     const me = store.getCurrentUser();
     sendRaw(peer, { t: 'hello', name: me?.name ?? '' });
     sendRaw(peer, { t: 'ping', n: ++peer.pingSeq, at: now() });
@@ -305,8 +359,9 @@ const attachChannel = (peer, dc) => {
   };
   dc.onclose = () => {
     if (peer.closing) return;
-    /* Прямой канал закрылся: пока он поднимается заново, сообщения
-       пойдут через хаб — для игрока связь не прерывается. */
+    peer.directReady = false;
+    emit({ type: 'status', peerId: peer.id });
+    /* Хаб остаётся основным маршрутом, даже если резервный P2P закрылся. */
     if (peer.state === 'direct') setState(peer, store.isHub() && !peer.manual ? 'relay' : 'offline');
     restart(peer);
   };
@@ -318,6 +373,7 @@ const attachChannel = (peer, dc) => {
 /* ---------- соединение ----------------------------------------- */
 
 const teardown = (peer, { silent = false } = {}) => {
+  const wasDirectReady = peer.directReady;
   peer.closing = true;
   clearInterval(peer.pingTimer);
   clearTimeout(peer.guardTimer);
@@ -336,8 +392,10 @@ const teardown = (peer, { silent = false } = {}) => {
   peer.dc = null;
   peer.pc = null;
   peer.pending = [];
+  peer.directReady = false;
   peer.closing = false;
   if (!silent) setState(peer, 'offline');
+  else if (wasDirectReady) emit({ type: 'status', peerId: peer.id });
 };
 
 const scheduleRetry = (peer) => {
@@ -352,9 +410,15 @@ function restart(peer) {
     teardown(peer);
     return;
   }
-  const keepRelay = store.isHub() && peer.state !== 'offline';
-  teardown(peer, { silent: keepRelay });
-  if (keepRelay) setState(peer, 'relay');
+  if (peer.secondaryDisabled) {
+    const keepHub = store.isHub();
+    teardown(peer, { silent: keepHub });
+    setState(peer, keepHub ? 'relay' : 'offline');
+    return;
+  }
+  const keepHub = store.isHub() && peer.state !== 'offline';
+  teardown(peer, { silent: keepHub });
+  if (keepHub) setState(peer, 'relay');
   scheduleRetry(peer);
 }
 
@@ -504,10 +568,17 @@ const maintain = () => {
     wanted.add(friend.id);
     const peer = peerRecord(friend.id);
     peer.name = peer.name || friend.name;
+    if (peer.secondaryDisabled) {
+      if (peer.pc || peer.dc) teardown(peer, { silent: true });
+      if (peer.state !== 'relay') setState(peer, 'relay');
+      continue;
+    }
+    if (peer.state === 'offline') setState(peer, 'relay'); // хаб доступен сразу, P2P поднимается в фоне
+    if (!supported()) continue; // сообщения всё равно идут через хаб, даже без WebRTC
     if (peer.pc || peer.dc?.readyState === 'open') continue;
     if (now() < peer.retryAt) continue;
     if (iAmCaller(friend.id)) startCall(peer);
-    else if (peer.state === 'offline') setState(peer, 'connecting'); // ждём звонка
+    else if (peer.state !== 'relay') setState(peer, 'relay'); // ждём звонка через хаб
   }
 
   /* Ушедших в офлайн отпускаем: держать мёртвые соединения незачем. */
@@ -538,7 +609,7 @@ const runInbox = async () => {
 
 /** Включить прямую связь. Безопасно вызывать повторно. */
 export const start = () => {
-  if (running || !supported()) return;
+  if (running) return;
   running = true;
   maintain();
   tickTimer = setInterval(maintain, TIMING.tick);
@@ -546,40 +617,48 @@ export const start = () => {
   emit();
 };
 
-/** Выключить и попрощаться со всеми (выход из аккаунта, закрытие вкладки). */
-export const stop = ({ quiet = false } = {}) => {
+/** Выключить все каналы и очистить очередь текущей сессии. */
+export const stop = () => {
   running = false;
+  /* Не переносим неотправленные сообщения в следующую сессию/к другому аккаунту. */
+  signalEpoch += 1;
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = null;
+  outbox = [];
   clearInterval(tickTimer);
   tickTimer = null;
   inboxLoop = null;
-  for (const [peerId, peer] of peers) {
-    if (!quiet && !peer.manual && store.isHub()) queueSignal(peerId, 'bye', null);
-    teardown(peer);
-  }
-  if (!quiet) flushSignals();
+  for (const peer of peers.values()) teardown(peer);
   peers.clear();
   history.clear();
   emit();
 };
 
-/** Повторить попытку прямо сейчас (кнопка «Подключиться»). */
+/** Перезапустить вторичный P2P-канал, не затрагивая основной хаб. */
 export const reconnect = (peerId) => {
   const peer = peerRecord(peerId);
   if (peer.manual) return;
-  teardown(peer);
+  peer.secondaryDisabled = false;
+  teardown(peer, { silent: store.isHub() });
   peer.tries = 0;
   peer.retryAt = 0;
+  if (store.isHub()) setState(peer, 'relay');
   maintain();
 };
 
-/** Разорвать связь с игроком до следующей попытки. */
+/** Отключить только P2P-резерв. Основной обмен через хаб продолжает работать. */
 export const disconnect = (peerId) => {
   const peer = peers.get(peerId);
   if (!peer) return;
-  if (!peer.manual && store.isHub()) queueSignal(peerId, 'bye', null);
+  if (!peer.manual && store.isHub()) {
+    peer.secondaryDisabled = true;
+    teardown(peer, { silent: true });
+    peer.retryAt = 0;
+    setState(peer, 'relay');
+    return;
+  }
   teardown(peer);
   peer.retryAt = now() + TIMING.retryMax;
-  flushSignals();
 };
 
 /** Отправить текст. Возвращает путь доставки: 'direct' | 'relay' | null. */
@@ -591,7 +670,7 @@ export const send = (peerId, text) => {
   const via = sendRaw(peer, { t: 'chat', id, text: clean, at: now() });
   if (!via) return null;
   pushHistory(peerId, { id, mine: true, text: clean, at: now(), via, read: true });
-  emit();
+  emit({ type: 'message', peerId });
   return via;
 };
 

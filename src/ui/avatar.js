@@ -61,8 +61,11 @@ export const releaseAvatarPreview = (url) => {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 };
 
-/** Кадрирует картинку. x/y — положение кадра 0…100, zoom — 1…2.5. */
-export const processAvatarFile = async (file, { x = 50, y = 50, zoom = 1 } = {}) => {
+/** Кадрирует картинку. x/y — положение 0…100, zoom — 1…3, rotation — шаги по 90°. */
+export const processAvatarFile = async (
+  file,
+  { x = 50, y = 50, zoom = 1, rotation = 0 } = {},
+) => {
   if (!file) return null;
   validateFile(file);
   let bitmap;
@@ -72,27 +75,47 @@ export const processAvatarFile = async (file, { x = 50, y = 50, zoom = 1 } = {})
     throw new Error('Не удалось прочитать картинку.');
   }
 
-  const width = bitmap.width;
-  const height = bitmap.height;
-  const safeZoom = Math.max(1, Math.min(2.5, Number(zoom) || 1));
-  const baseSide = Math.min(width, height);
-  const sourceSide = baseSide / safeZoom;
-  const px = Math.max(0, Math.min(100, Number(x) || 0)) / 100;
-  const py = Math.max(0, Math.min(100, Number(y) || 0)) / 100;
-  const sx = (width - sourceSide) * px;
-  const sy = (height - sourceSide) * py;
+  try {
+    const width = bitmap.width;
+    const height = bitmap.height;
+    const turns = Math.round((Number(rotation) || 0) / 90);
+    const safeRotation = (((turns % 4) + 4) % 4) * 90;
+    const orientedWidth = safeRotation % 180 ? height : width;
+    const orientedHeight = safeRotation % 180 ? width : height;
+    const safeZoom = Math.max(1, Math.min(3, Number(zoom) || 1));
+    const baseSide = Math.min(orientedWidth, orientedHeight);
+    const sourceSide = baseSide / safeZoom;
+    const px = Math.max(0, Math.min(100, Number(x) || 0)) / 100;
+    const py = Math.max(0, Math.min(100, Number(y) || 0)) / 100;
+    const sx = (orientedWidth - sourceSide) * px;
+    const sy = (orientedHeight - sourceSide) * py;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = AVATAR_SIZE;
-  canvas.height = AVATAR_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Браузер не умеет обрабатывать картинки.');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, sx, sy, sourceSide, sourceSide, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
-  bitmap.close?.();
+    let source = bitmap;
+    if (safeRotation !== 0) {
+      const rotated = document.createElement('canvas');
+      rotated.width = orientedWidth;
+      rotated.height = orientedHeight;
+      const rotateCtx = rotated.getContext('2d');
+      if (!rotateCtx) throw new Error('Браузер не умеет поворачивать картинки.');
+      rotateCtx.translate(orientedWidth / 2, orientedHeight / 2);
+      rotateCtx.rotate((safeRotation * Math.PI) / 180);
+      rotateCtx.drawImage(bitmap, -width / 2, -height / 2);
+      source = rotated;
+    }
 
-  /* WebP заметно легче PNG; старые браузеры вернут PNG автоматически. */
-  const webp = canvas.toDataURL('image/webp', 0.88);
-  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
+    const canvas = document.createElement('canvas');
+    canvas.width = AVATAR_SIZE;
+    canvas.height = AVATAR_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Браузер не умеет обрабатывать картинки.');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, sx, sy, sourceSide, sourceSide, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+
+    /* WebP заметно легче PNG; старые браузеры вернут PNG автоматически. */
+    const webp = canvas.toDataURL('image/webp', 0.88);
+    return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
+  } finally {
+    bitmap.close?.();
+  }
 };

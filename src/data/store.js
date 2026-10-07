@@ -10,7 +10,10 @@
      2. адрес, сохранённый игроком в окне «Общий хаб»;
      3. адрес, вшитый в сборку (VITE_MIR_HUB) — для APK и mir.html;
      4. тот адрес, откуда открыта игра;
-     5. ничего из этого не ответило — работаем локально.
+     5. если ни один хаб не ответил — локальный режим как офлайн-резерв.
+
+   Каждый запуск сначала проверяет хаб. Предыдущий выбор «локально» действует
+   только до закрытия приложения и не блокирует повторное подключение при старте.
 
    Сессия всегда локальная (mir:session): в hub-режиме в ней лежит
    токен, который выдал хаб при входе, и адрес этого хаба — токен
@@ -539,9 +542,12 @@ const hubBackend = {
    =========================================================== */
 
 let backend = localBackend;
+let backendInitialized = false;
 
 export const backendMode = () => backend.mode;
 export const isHub = () => backend.mode === 'hub';
+/** Завершилась ли начальная проверка хаба (успешно или с офлайн-резервом). */
+export const isBackendInitialized = () => backendInitialized;
 
 /* ---------- адрес хаба ---------------------------------------
    Хаб бывает трёх сортов, и человеку важно видеть, в каком он мире:
@@ -599,7 +605,10 @@ export const hubHost = () => {
 
 /** Адрес, который стоит предложить в поле ввода. */
 export const suggestedHubUrl = () => {
-  if (backend.mode === 'hub' && remote.getBase()) return remote.getBase();
+  if (backend.mode === 'hub') {
+    if (remote.getBase()) return remote.getBase();
+    if (typeof location !== 'undefined' && /^https?:$/.test(location.protocol)) return location.origin;
+  }
   if (BUILT_IN_HUB) return BUILT_IN_HUB;
   if (typeof location !== 'undefined' && /^https?:$/.test(location.protocol)) return location.origin;
   return '';
@@ -627,11 +636,15 @@ const sessionHub = (session) => {
 
 remote.setTokenGetter(() => readSession()?.token ?? null);
 
-/** Подключаемся к первому хабу, который отозвался. Один раз на старте. */
+/** Сначала подключаемся к подходящему хабу, локальное хранилище — офлайн-резерв. */
 export const initBackend = async () => {
-  if (typeof fetch !== 'function') return 'local';
   const sameOrigin =
     typeof location !== 'undefined' && /^https?:$/.test(location.protocol || '');
+
+  if (typeof fetch !== 'function') {
+    backendInitialized = true;
+    return 'local';
+  }
 
   /* Ссылка вида …/?hub=https://… — так друг делится своим хабом. */
   const fromLink = queryHub();
@@ -646,17 +659,17 @@ export const initBackend = async () => {
   const saved = storedHub();
   const candidates = [];
   const add = (url) => {
-    if (url === null || url === undefined) return;
+    if (url === null || url === undefined || url === HUB_OFF) return;
     if (url === '' && !sameOrigin) return;
     if (!candidates.includes(url)) candidates.push(url);
   };
 
-  if (saved !== HUB_OFF) {
-    add(saved);
-    add(remote.getBase()); // адрес мог выставить скрипт проверки
-    add(BUILT_IN_HUB);
-    add('');
-  }
+  /* «Локально» — только явное переключение для текущего запуска. После
+     перезапуска снова сначала проверяем сохранённый/вшитый/страничный хаб. */
+  if (saved !== HUB_OFF) add(saved);
+  add(remote.getBase()); // адрес мог выставить скрипт проверки
+  add(BUILT_IN_HUB);
+  add('');
 
   for (const url of candidates) {
     try {
@@ -664,6 +677,7 @@ export const initBackend = async () => {
       remote.setBase(url);
       backend = hubBackend;
       await resumeSession(url);
+      backendInitialized = true;
       notify();
       return 'hub';
     } catch {
@@ -671,9 +685,11 @@ export const initBackend = async () => {
     }
   }
 
+  /* Не зависаем без сети: хаб всегда пробуем первым, а local — запасной путь. */
   remote.setBase('');
   backend = localBackend;
   if (sessionHub(readSession()) !== null) storage.removeItem(KEYS.session);
+  backendInitialized = true;
   notify();
   return 'local';
 };
@@ -721,27 +737,37 @@ export const connectHub = async (raw) => {
   remote.setBase(same ? '' : url);
   remote.applyState({ users: [], requests: [] });
   backend = hubBackend;
+  backendInitialized = true;
   notify();
   return { url, users: info.users ?? 0 };
 };
 
-/** Отключиться от хаба и работать на аккаунтах этого браузера. */
+/** Отключиться от хаба и работать на аккаунтах этого браузера до следующего запуска. */
 export const disconnectHub = () => {
   storage.setItem(KEYS.hub, HUB_OFF);
   storage.removeItem(KEYS.session);
   remote.setBase('');
   remote.applyState({ users: [], requests: [] });
   backend = localBackend;
+  backendInitialized = true;
   notify();
   return 'local';
 };
+
+const remoteSnapshot = () => JSON.stringify({
+  users: remote.getUsers().map((user) => ({ ...user, seenAt: presenceOf(user) })),
+  requests: remote.getRequests(),
+});
 
 /** Подтянуть свежее состояние с хаба (периодический опрос). */
 export const refreshRemote = async () => {
   if (backend.mode !== 'hub') return;
   try {
+    const before = remoteSnapshot();
     await remote.fetchState();
-    notify();
+    const after = remoteSnapshot();
+    /* Игнорируем меняющийся heartbeat, но отлавливаем смену idle/offline. */
+    if (before !== after) notify();
   } catch (error) {
     if (error?.status === 401) {
       storage.removeItem(KEYS.session);

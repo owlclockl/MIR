@@ -14,7 +14,7 @@ import { configureSounds, playSound } from './ui/sound.js';
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
 const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени. */
 const avatarEl = (user, cls = '') => {
@@ -41,7 +41,8 @@ const ui = {
   codeValue: '',
   pendingAvatar: null,
   pendingAvatarFile: null,
-  avatarCrop: { x: 50, y: 50, zoom: 1 },
+  avatarCrop: { x: 50, y: 50, zoom: 1, rotation: 0 },
+  avatarDrag: null,
   confirm: null,
   opener: null,
   chatDraft: '',
@@ -49,6 +50,8 @@ const ui = {
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
 };
+
+let backendReady = store.isBackendInitialized?.() ?? false;
 
 const overlayRoot = () => document.querySelector('#overlay-root');
 
@@ -64,7 +67,8 @@ const closeModal = () => {
   releaseAvatarPreview(ui.pendingAvatar);
   ui.pendingAvatar = null;
   ui.pendingAvatarFile = null;
-  ui.avatarCrop = { x: 50, y: 50, zoom: 1 };
+  ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
+  ui.avatarDrag = null;
   ui.codeValue = '';
   ui.chatDraft = '';
   const root = overlayRoot();
@@ -91,6 +95,8 @@ const dialogShell = ({ label, title, size = '', body }) => `
    Firefox и Safari, запрет данных сайтов), честно говорим об этом: иначе
    человек создаст аккаунт и потеряет его при перезагрузке. */
 const authNoteHtml = () => {
+  if (!backendReady)
+    return `<p class="form-note">Подключаемся к общему хабу… Вход станет доступен после проверки.</p>`;
   if (!store.storagePersists())
     return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте игру через MIR-Setup.exe или по ссылке хаба.</p>`;
   return `<p class="form-note">${
@@ -102,6 +108,7 @@ const authNoteHtml = () => {
 
 const authModalHtml = () => {
   const isLogin = ui.authTab === 'login';
+  const lock = backendReady ? '' : 'disabled';
   return dialogShell({
     label: isLogin ? 'Вход в аккаунт' : 'Создание аккаунта',
     title: isLogin ? 'С возвращением' : 'Новый аккаунт',
@@ -114,12 +121,12 @@ const authModalHtml = () => {
         <label class="field">
           <span class="field__label">Имя игрока</span>
           <input class="input" name="name" type="text" minlength="3" maxlength="16"
-                 autocomplete="username" spellcheck="false" required data-autofocus />
+                 autocomplete="username" spellcheck="false" required data-autofocus ${lock} />
         </label>
         <label class="field">
           <span class="field__label">Пароль</span>
           <input class="input" name="password" type="password" minlength="6" maxlength="72"
-                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required />
+                 autocomplete="${isLogin ? 'current-password' : 'new-password'}" required ${lock} />
         </label>
         ${
           isLogin
@@ -127,11 +134,11 @@ const authModalHtml = () => {
             : `<label class="field">
           <span class="field__label">Пароль ещё раз</span>
           <input class="input" name="password2" type="password" minlength="6" maxlength="72"
-                 autocomplete="new-password" required />
+                 autocomplete="new-password" required ${lock} />
         </label>`
         }
         <p class="form-error" data-role="form-error" hidden></p>
-        <button class="solid-button" type="submit" data-role="submit">
+        <button class="solid-button" type="submit" data-role="submit" ${lock}>
           <span>${isLogin ? 'Войти' : 'Создать аккаунт'}</span>
         </button>
         ${authNoteHtml()}
@@ -350,8 +357,10 @@ const profileModalHtml = () => {
    ввести руками: игра из APK, из exe и с флешки подключается к
    хабу в интернете так же, как вкладка браузера. */
 const hubModalHtml = () => {
-  const connected = store.isHub();
+  const ready = store.isBackendInitialized?.() ?? backendReady;
+  const connected = ready && store.isHub();
   const host = store.hubHost();
+  const stateClass = !ready ? 'warn' : connected ? 'live' : 'off';
   return dialogShell({
     label: 'Общий хаб',
     title: 'Общий хаб',
@@ -361,15 +370,17 @@ const hubModalHtml = () => {
         <div class="link-box">
           <div class="link-box__text">
             <p class="eyebrow">Где сейчас аккаунты</p>
-            <span class="link-state link-state--${connected ? 'live' : 'off'}">
-              <span class="dot dot--${connected ? 'live' : 'off'}" aria-hidden="true"></span>${
-                connected ? escapeHtml(host) : 'Только этот браузер'
+            <span class="link-state link-state--${stateClass}">
+              <span class="dot dot--${stateClass}" aria-hidden="true"></span>${
+                !ready ? 'Проверяем общий хаб…' : connected ? escapeHtml(host) : 'Только этот браузер'
               }
             </span>
             <p class="link-box__hint">${
-              connected
-                ? 'Аккаунты, друзья и заявки общие для всех, кто играет по этому адресу. Друг с другого конца страны увидит вас в списке.'
-                : 'Аккаунт живёт в этом браузере и никуда не уходит. Чтобы играть с друзьями, подключитесь к общему хабу.'
+              !ready
+                ? 'При запуске сначала проверяется общий хаб. Если он не отвечает, игра откроется в локальном офлайн-режиме.'
+                : connected
+                  ? 'Аккаунты, друзья и заявки общие для всех, кто играет по этому адресу. Друг с другого конца страны увидит вас в списке.'
+                  : 'Аккаунт живёт в этом браузере и никуда не уходит. Чтобы играть с друзьями, подключитесь к общему хабу.'
             }</p>
           </div>
           ${
@@ -386,11 +397,11 @@ const hubModalHtml = () => {
             <span class="field__label">Адрес хаба</span>
             <input class="input" name="url" type="text" inputmode="url" spellcheck="false"
                    autocomplete="off" placeholder="https://mir.имя.workers.dev"
-                   value="${escapeHtml(ui.hubDraft)}" data-role="hub-input" data-autofocus />
+                   value="${escapeHtml(ui.hubDraft)}" data-role="hub-input" data-autofocus ${ready ? '' : 'disabled'} />
           </label>
           <p class="form-error" data-role="form-error" hidden></p>
-          <button class="solid-button" type="submit" data-role="submit">
-            <span>Подключиться</span>
+          <button class="solid-button" type="submit" data-role="submit" ${ready ? '' : 'disabled'}>
+            <span>${ready ? 'Подключиться' : 'Проверяем хаб…'}</span>
           </button>
         </form>
 
@@ -432,40 +443,81 @@ const settingsModalHtml = () => {
   });
 };
 
-/* --- Окно превью аватарки --- */
-const avatarPreviewHtml = () => `
-  <div class="overlay" data-action="overlay-down">
-    <section class="dialog" role="dialog" aria-modal="true" aria-label="Новая аватарка">
-      <header class="dialog__head">
-        <h2 class="dialog__title">Новая аватарка</h2>
-        <button class="icon-button icon-button--sm" type="button" data-action="close-modal" aria-label="Закрыть">
-          ${icon('x')}
-        </button>
-      </header>
-      <div class="dialog__body avatar-editor">
-        <div class="avatar-editor__frame">
-          <img class="avatar-editor__img" src="${ui.pendingAvatar}" alt="Предпросмотр аватарки"
-               style="object-position:${ui.avatarCrop.x}% ${ui.avatarCrop.y}%;transform:scale(${ui.avatarCrop.zoom})" />
-          <span class="avatar-editor__guide" aria-hidden="true"></span>
-        </div>
-        <div class="avatar-editor__controls">
-          <label class="field">
-            <span class="field__label">Масштаб</span>
-            <input class="range" type="range" min="1" max="2.5" step="0.05" value="${ui.avatarCrop.zoom}" data-role="avatar-zoom" />
-          </label>
-          <div class="form__grid">
-            <label class="field"><span class="field__label">По горизонтали</span><input class="range" type="range" min="0" max="100" value="${ui.avatarCrop.x}" data-role="avatar-x" /></label>
-            <label class="field"><span class="field__label">По вертикали</span><input class="range" type="range" min="0" max="100" value="${ui.avatarCrop.y}" data-role="avatar-y" /></label>
+/* --- Современный редактор аватарки: перетаскивание, зум и точная настройка --- */
+const avatarPreviewHtml = () => dialogShell({
+  label: 'Редактор аватарки',
+  title: 'Настроить аватарку',
+  size: 'avatar',
+  body: `
+    <div class="dialog__body avatar-editor">
+      <div class="avatar-editor__workspace">
+        <div class="avatar-editor__canvas-wrap">
+          <div class="avatar-editor__frame" data-role="avatar-frame" role="group" tabindex="0"
+               aria-label="Кадр аватарки. Перетаскивайте изображение, стрелки на клавиатуре двигают кадр."
+               aria-describedby="avatar-editor-help">
+            <img class="avatar-editor__img" data-role="avatar-editor-image" src="${ui.pendingAvatar}"
+                 alt="Исходная фотография для кадрирования" draggable="false" />
+            <span class="avatar-editor__grid" aria-hidden="true"></span>
+            <span class="avatar-editor__center" aria-hidden="true"></span>
           </div>
+          <p class="avatar-editor__tip" id="avatar-editor-help">Перетащите фото, чтобы выбрать кадр. Колёсико мыши меняет масштаб.</p>
         </div>
-        <p class="hint">Передвигайте кадр ползунками. Сохраняется чёткая версия 192×192.</p>
+
+        <aside class="avatar-editor__panel" aria-label="Настройки кадрирования">
+          <div class="avatar-editor__sample">
+            <div class="avatar-editor__sample-frame" data-role="avatar-sample-frame">
+              <img class="avatar-editor__sample-img" data-role="avatar-sample-image" src="${ui.pendingAvatar}"
+                   alt="Так будет выглядеть аватарка в игре" draggable="false" />
+            </div>
+            <div class="avatar-editor__sample-meta">
+              <p class="eyebrow">В игре</p>
+              <p class="avatar-editor__sample-size">Квадрат · 192 × 192</p>
+            </div>
+          </div>
+
+          <label class="field avatar-editor__zoom">
+            <span class="avatar-editor__label-line">
+              <span class="field__label">Масштаб</span>
+              <output class="avatar-editor__zoom-value" data-role="avatar-zoom-value">${Math.round(ui.avatarCrop.zoom * 100)}%</output>
+            </span>
+            <input class="range" type="range" min="1" max="3" step="0.05" value="${ui.avatarCrop.zoom}"
+                   data-role="avatar-zoom" aria-label="Масштаб изображения" />
+          </label>
+          <div class="avatar-editor__zoom-actions" aria-label="Управление масштабом">
+            <button class="mini-button" type="button" data-action="avatar-zoom-out" aria-label="Уменьшить масштаб">−</button>
+            <button class="mini-button" type="button" data-action="avatar-zoom-in" aria-label="Увеличить масштаб">+</button>
+            <button class="mini-button" type="button" data-action="avatar-rotate-left" aria-label="Повернуть влево">↶ Поворот</button>
+          </div>
+
+          <details class="avatar-editor__details">
+            <summary>Точная настройка положения</summary>
+            <div class="avatar-editor__fine-controls">
+              <label class="field">
+                <span class="field__label">По горизонтали</span>
+                <input class="range" type="range" min="0" max="100" step="1" value="${ui.avatarCrop.x}"
+                       data-role="avatar-x" aria-label="Положение по горизонтали" />
+              </label>
+              <label class="field">
+                <span class="field__label">По вертикали</span>
+                <input class="range" type="range" min="0" max="100" step="1" value="${ui.avatarCrop.y}"
+                       data-role="avatar-y" aria-label="Положение по вертикали" />
+              </label>
+            </div>
+          </details>
+
+          <button class="mini-button avatar-editor__reset" type="button" data-action="avatar-reset">Сбросить кадр</button>
+        </aside>
+      </div>
+
+      <div class="avatar-editor__footer">
+        <p class="hint">Исходник не меняется. Сохраняется оптимизированная WebP-копия; если браузер старый — PNG.</p>
         <div class="dialog__actions">
-          <button class="mini-button" type="button" data-action="pick-avatar">Выбрать другую</button>
-          <button class="solid-button" type="button" data-action="save-avatar" data-autofocus><span>Сохранить</span></button>
+          <button class="mini-button" type="button" data-action="pick-avatar">Выбрать другое</button>
+          <button class="solid-button" type="button" data-action="save-avatar" data-autofocus><span>Сохранить аватарку</span></button>
         </div>
       </div>
-    </section>
-  </div>`;
+    </div>`,
+});
 
 /* --- Прямая связь: общие кусочки разметки --- */
 
@@ -482,7 +534,7 @@ const linkStateHtml = (peerId) => {
   const { state, rtt } = p2p.status(peerId);
   const view = LINK[state] ?? LINK.offline;
   const ms = state === 'direct' && typeof rtt === 'number' ? ` · ${rtt} мс` : '';
-  return `<span class="link-state link-state--${view.modifier}">
+  return `<span class="link-state link-state--${view.modifier}" data-role="peer-link-state" data-peer-id="${escapeHtml(peerId)}">
       <span class="dot dot--${view.modifier}" aria-hidden="true"></span>${view.label}${ms}
     </span>`;
 };
@@ -543,16 +595,16 @@ const friendModalHtml = (friendId) => {
 
         <div class="link-box">
           <div class="link-box__text">
-            <p class="eyebrow">Прямая связь</p>
+            <p class="eyebrow">Основной канал</p>
             ${linkStateHtml(friendId)}
             <p class="link-box__hint">${escapeHtml(linkHint(friend, link))}</p>
           </div>
           <div class="link-box__actions">
             ${
               link === 'offline'
-                ? `<button class="mini-button mini-button--accent" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('link', 'icon--xs')} Подключиться</button>`
-                : `<button class="mini-button" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('refresh', 'icon--xs')} Переподключить</button>
-                   <button class="mini-button mini-button--danger" type="button" data-action="p2p-disconnect" data-id="${friend.id}">${icon('linkOff', 'icon--xs')} Отключить</button>`
+                ? `<button class="mini-button mini-button--accent" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('link', 'icon--xs')} Подключить P2P-резерв</button>`
+                : `<button class="mini-button" type="button" data-action="p2p-connect" data-id="${friend.id}">${icon('refresh', 'icon--xs')} Перезапустить P2P</button>
+                   <button class="mini-button mini-button--danger" type="button" data-action="p2p-disconnect" data-id="${friend.id}">${icon('linkOff', 'icon--xs')} Отключить P2P</button>`
             }
           </div>
         </div>
@@ -561,7 +613,7 @@ const friendModalHtml = (friendId) => {
           placeholder:
             link === 'offline'
               ? 'Сообщения появятся, когда оба будете в приложении.'
-              : 'Напишите первым — сообщения идут прямо на устройство друга.',
+              : 'Основной маршрут — через общий хаб. P2P подключается автоматически как резерв.',
         })}
 
         <div class="divider" role="separator"></div>
@@ -576,10 +628,19 @@ const friendModalHtml = (friendId) => {
 /* Короткое объяснение под статусом: человеку важно понимать, почему
    связи нет и что с этим делать. */
 const linkHint = (friend, link) => {
-  if (!p2p.supported()) return 'Этот браузер не умеет прямые соединения — обновите его.';
+  if (!p2p.supported())
+    return store.isHub()
+      ? 'Сообщения идут через хаб. Этот браузер не поддерживает WebRTC, поэтому P2P-резерв недоступен.'
+      : 'Этот браузер не поддерживает WebRTC, а общий хаб не подключён.';
   if (link === 'direct') return 'Данные идут напрямую между устройствами, сервер не участвует.';
-  if (link === 'relay')
-    return 'Прямой путь закрыт домашним роутером — сообщения идут через хаб, попытки пробиться продолжаются.';
+  if (link === 'relay') {
+    const peer = p2p.status(friend.id);
+    if (peer.secondaryDisabled) return 'Основной маршрут через общий хаб работает. Дополнительный P2P-канал отключён вручную.';
+    const directReady = peer.directReady;
+    return directReady
+      ? 'Основной маршрут — общий хаб. Прямой P2P-канал уже готов и останется резервом на случай сбоя хаба.'
+      : 'Основной маршрут — общий хаб. P2P подключается в фоне и станет резервом, если хаб временно недоступен.';
+  }
   if (link === 'connecting') return 'Договариваемся о прямом канале — обычно пара секунд.';
   if (store.presenceOf(friend) === 'offline') return 'Игрок не в сети. Связь поднимется сама, как только он откроет приложение.';
   if (!store.isHub())
@@ -622,8 +683,7 @@ const directModalHtml = () => {
     body: `
       <div class="dialog__body">
         <p class="hint">
-          Связь между двумя устройствами без сервера: один создаёт код приглашения,
-          второй вставляет его у себя и отдаёт ответный код. Коды длинные — копируйте кнопкой.
+          Резервный способ без хаба: один создаёт код приглашения, второй вставляет его у себя и отдаёт ответный код. Для обычной игры сначала подключается общий хаб; этот режим нужен, если хаб недоступен.
         </p>
 
         <div class="link-box">
@@ -731,14 +791,57 @@ const confirmModalHtml = () => dialogShell({
     </div>`,
 });
 
-/* focus: ставить ли фокус внутрь окна. При открытии — да; при
-   фоновой перерисовке (пришло сообщение, сменился статус) — нет,
-   иначе фокус прыгал бы с кнопки на кнопку каждые несколько секунд. */
+const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
+
+/* Раскладывает превью точно по тому же квадратному окну, которое сохранит canvas. */
+const updateAvatarEditor = () => {
+  const root = overlayRoot();
+  const image = root?.querySelector('[data-role="avatar-editor-image"]');
+  if (!image?.naturalWidth || !image?.naturalHeight) return;
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const rotation = ((Math.round(ui.avatarCrop.rotation / 90) % 4) + 4) % 4 * 90;
+  const rotated = rotation % 180 !== 0;
+  const sourceWidth = rotated ? height : width;
+  const sourceHeight = rotated ? width : height;
+  const zoom = clamp(ui.avatarCrop.zoom, 1, 3);
+  const sourceSide = Math.min(sourceWidth, sourceHeight) / zoom;
+  const sx = (sourceWidth - sourceSide) * clamp(ui.avatarCrop.x, 0, 100) / 100;
+  const sy = (sourceHeight - sourceSide) * clamp(ui.avatarCrop.y, 0, 100) / 100;
+
+  for (const [frameRole, imageRole] of [
+    ['avatar-frame', 'avatar-editor-image'],
+    ['avatar-sample-frame', 'avatar-sample-image'],
+  ]) {
+    const frame = root.querySelector(`[data-role="${frameRole}"]`);
+    const target = root.querySelector(`[data-role="${imageRole}"]`);
+    const frameSize = frame?.clientWidth;
+    if (!frameSize || !target) continue;
+    const scale = frameSize / sourceSide;
+    target.style.width = `${width * scale}px`;
+    target.style.height = `${height * scale}px`;
+    target.style.left = `${(sourceWidth / 2 - sx) * scale}px`;
+    target.style.top = `${(sourceHeight / 2 - sy) * scale}px`;
+    target.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+  }
+
+  const zoomInput = root.querySelector('[data-role="avatar-zoom"]');
+  const xInput = root.querySelector('[data-role="avatar-x"]');
+  const yInput = root.querySelector('[data-role="avatar-y"]');
+  const zoomValue = root.querySelector('[data-role="avatar-zoom-value"]');
+  if (zoomInput) zoomInput.value = String(zoom);
+  if (xInput) xInput.value = String(Math.round(ui.avatarCrop.x));
+  if (yInput) yInput.value = String(Math.round(ui.avatarCrop.y));
+  if (zoomValue) zoomValue.textContent = `${Math.round(zoom * 100)}%`;
+};
+
+/* Окно обновляется только когда его разметка действительно изменилась.
+   Периодические пульсы и ответы хаба не должны заменять живой DOM под руками. */
 const renderModal = ({ focus = true } = {}) => {
   const root = overlayRoot();
   if (!root) return;
   if (!ui.modal) {
-    root.innerHTML = '';
+    if (root.innerHTML) root.innerHTML = '';
     return;
   }
   let html = '';
@@ -771,10 +874,58 @@ const renderModal = ({ focus = true } = {}) => {
       html = confirmModalHtml();
       break;
   }
-  root.innerHTML = html;
-  /* Переписка всегда показывает последнее сообщение. */
+
+  const previous = root.querySelector('.dialog');
+  const active = document.activeElement;
+  const activeIsInside = !!active && root.contains(active);
+  const activeRole = activeIsInside ? active.dataset?.role : '';
+  const activeSetting = activeIsInside ? active.dataset?.setting : '';
+  const activeAction = activeIsInside ? active.dataset?.action : '';
+  const activeId = activeIsInside ? active.dataset?.id : '';
+  const selection = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+    ? { start: active.selectionStart, end: active.selectionEnd }
+    : null;
+  const dialogScroll = focus ? 0 : previous?.scrollTop ?? 0;
+  const oldLog = root.querySelector('[data-role="chat-list"]');
+  const wasAtLogBottom = !focus && oldLog
+    ? oldLog.scrollTop + oldLog.clientHeight >= oldLog.scrollHeight - 16
+    : true;
+  const logScroll = focus ? 0 : oldLog?.scrollTop ?? 0;
+  const changed = root.innerHTML !== html;
+
+  if (changed) root.innerHTML = html;
+
+  const dialog = root.querySelector('.dialog');
+  if (dialog && changed) dialog.scrollTop = dialogScroll;
   const log = root.querySelector('[data-role="chat-list"]');
-  if (log) log.scrollTop = log.scrollHeight;
+  if (log && changed) log.scrollTop = wasAtLogBottom ? log.scrollHeight : logScroll;
+
+  if (ui.modal.type === 'avatar-preview') {
+    const image = root.querySelector('[data-role="avatar-editor-image"]');
+    if (image?.complete && image.naturalWidth) updateAvatarEditor();
+    else image?.addEventListener('load', updateAvatarEditor, { once: true });
+  }
+
+  if (!focus && changed && activeIsInside) {
+    let target = activeRole
+      ? root.querySelector(`[data-role="${activeRole}"]`)
+      : activeSetting
+        ? root.querySelector(`[data-setting="${activeSetting}"]`)
+        : activeAction
+          ? [...root.querySelectorAll('[data-action]')].find(
+              (item) => item.dataset.action === activeAction && item.dataset.id === activeId,
+            )
+          : null;
+    if (target && !target.disabled) {
+      target.focus({ preventScroll: true });
+      if (selection && target.setSelectionRange) {
+        try {
+          target.setSelectionRange(selection.start, selection.end);
+        } catch { /* range inputs and some mobile keyboards do not expose a selection */ }
+      }
+    }
+  }
+
   if (!focus) return;
   const focusTarget = root.querySelector('[data-autofocus]') || root.querySelector('input, button');
   focusTarget?.focus();
@@ -785,6 +936,9 @@ const renderModal = ({ focus = true } = {}) => {
 /* ---------- верхняя панель: аккаунт -------------------------- */
 
 const accountSlotHtml = () => {
+  if (!backendReady) {
+    return `<p class="status"><span class="dot dot--warn" aria-hidden="true"></span><span>Подключаемся к хабу…</span></p>`;
+  }
   const me = store.getCurrentUser();
   if (!me) {
     return `
@@ -859,6 +1013,21 @@ const friendRowHtml = (friend) => {
 };
 
 const railHtml = () => {
+  if (!backendReady) {
+    return `
+      <div class="rail__head">
+        <div class="rail__heading">
+          <p class="eyebrow">Сообщество</p>
+          <h2 class="rail__title">Общий хаб</h2>
+        </div>
+      </div>
+      <div class="rail__list">
+        <div class="empty">
+          <p class="empty__title">Проверяем подключение</p>
+          <p class="empty__text">Сначала приложение ищет общий хаб. Вход и регистрация откроются после проверки, чтобы аккаунт сразу попал в правильный мир.</p>
+        </div>
+      </div>`;
+  }
   const me = store.getCurrentUser();
 
   if (!me) {
@@ -1006,34 +1175,59 @@ const applySettings = () => {
 applySettings();
 store.subscribe(applySettings);
 
+const setMarkupIfChanged = (node, html) => {
+  if (!node || node.innerHTML === html) return;
+  const active = document.activeElement;
+  const hadFocus = node.contains(active);
+  const action = hadFocus ? active.dataset?.action : '';
+  const id = hadFocus ? active.dataset?.id : '';
+  node.innerHTML = html;
+  if (!hadFocus || !action) return;
+  const replacement = [...node.querySelectorAll('[data-action]')]
+    .find((item) => item.dataset.action === action && item.dataset.id === id);
+  replacement?.focus({ preventScroll: true });
+};
+
 const renderRegions = () => {
-  document.querySelector('[data-region="account"]').innerHTML = accountSlotHtml();
-  document.querySelector('[data-region="rail"]').innerHTML = railHtml();
+  setMarkupIfChanged(document.querySelector('[data-region="account"]'), accountSlotHtml());
+  setMarkupIfChanged(document.querySelector('[data-region="rail"]'), railHtml());
 };
 
 const render = () => {
   renderRegions();
-  /* Открытое окно пересобираем — данные в нём могли устареть. */
-  if (ui.modal && ui.modal.type !== 'auth' && ui.modal.type !== 'avatar-preview') {
-    const active = document.activeElement;
-    const keepFocus =
-      (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
-      active.dataset.role
-        ? { role: active.dataset.role, pos: active.selectionStart }
-        : null;
-    renderModal({ focus: false });
-    if (keepFocus) {
-      const input = overlayRoot()?.querySelector(`[data-role="${keepFocus.role}"]`);
-      if (input) {
-        input.focus();
-        input.setSelectionRange?.(keepFocus.pos, keepFocus.pos);
-      }
-    }
-  }
+  if (ui.modal) renderModal({ focus: false });
 };
 
-store.subscribe(render);
-p2p.subscribe(render);
+const storeModalTypes = new Set(['profile', 'add-friend', 'friend', 'hub']);
+const renderAfterStoreChange = () => {
+  renderRegions();
+  if (ui.modal && (storeModalTypes.has(ui.modal.type) || (ui.modal.type === 'auth' && backendReady)))
+    renderModal({ focus: false });
+};
+
+const refreshLiveLink = (peerId) => {
+  const node = [...(overlayRoot()?.querySelectorAll('[data-role="peer-link-state"]') ?? [])]
+    .find((item) => item.dataset.peerId === peerId);
+  const html = linkStateHtml(peerId);
+  if (node && node.outerHTML !== html) node.outerHTML = html;
+};
+
+const renderAfterPeerChange = (change = {}) => {
+  renderRegions();
+  if (!ui.modal) return;
+  if (change.type === 'rtt') {
+    refreshLiveLink(change.peerId);
+    return;
+  }
+  const affectsFriend = ui.modal.type === 'friend' &&
+    (!change.peerId || change.peerId === ui.modal.data);
+  const affectsManual = ui.modal.type === 'direct' &&
+    (!change.peerId || change.peerId === p2p.MANUAL_ID);
+  if (affectsFriend || affectsManual) renderModal({ focus: false });
+};
+
+store.subscribe(renderAfterStoreChange);
+p2p.subscribe(renderAfterPeerChange);
 let knownUnread = 0;
 const notifyIncomingMessage = () => {
   const me = store.getCurrentUser();
@@ -1197,14 +1391,10 @@ document.addEventListener('submit', (event) => {
 document.addEventListener('input', (event) => {
   const role = event.target.dataset?.role;
   if (role === 'avatar-zoom' || role === 'avatar-x' || role === 'avatar-y') {
-    if (role === 'avatar-zoom') ui.avatarCrop.zoom = Number(event.target.value);
-    if (role === 'avatar-x') ui.avatarCrop.x = Number(event.target.value);
-    if (role === 'avatar-y') ui.avatarCrop.y = Number(event.target.value);
-    const image = document.querySelector('.avatar-editor__img');
-    if (image) {
-      image.style.objectPosition = `${ui.avatarCrop.x}% ${ui.avatarCrop.y}%`;
-      image.style.transform = `scale(${ui.avatarCrop.zoom})`;
-    }
+    if (role === 'avatar-zoom') ui.avatarCrop.zoom = clamp(event.target.value, 1, 3);
+    if (role === 'avatar-x') ui.avatarCrop.x = clamp(event.target.value, 0, 100);
+    if (role === 'avatar-y') ui.avatarCrop.y = clamp(event.target.value, 0, 100);
+    updateAvatarEditor();
   }
   if (role === 'friend-search') {
     ui.addQuery = event.target.value;
@@ -1223,6 +1413,62 @@ document.addEventListener('input', (event) => {
     ui.codeValue = formatted;
   }
 });
+
+document.addEventListener('pointerdown', (event) => {
+  if (ui.modal?.type !== 'avatar-preview' || event.button > 0) return;
+  const frame = event.target.closest('[data-role="avatar-frame"]');
+  const image = frame?.querySelector('[data-role="avatar-editor-image"]');
+  if (!frame || !image?.naturalWidth || !image.naturalHeight) return;
+  const rotation = ((Math.round(ui.avatarCrop.rotation / 90) % 4) + 4) % 4 * 90;
+  const sourceWidth = rotation % 180 ? image.naturalHeight : image.naturalWidth;
+  const sourceHeight = rotation % 180 ? image.naturalWidth : image.naturalHeight;
+  const sourceSide = Math.min(sourceWidth, sourceHeight) / clamp(ui.avatarCrop.zoom, 1, 3);
+  ui.avatarDrag = {
+    pointerId: event.pointerId,
+    frame,
+    startX: event.clientX,
+    startY: event.clientY,
+    cropX: ui.avatarCrop.x,
+    cropY: ui.avatarCrop.y,
+    sourceWidth,
+    sourceHeight,
+    sourceSide,
+  };
+  frame.classList.add('is-dragging');
+  frame.focus({ preventScroll: true });
+  try {
+    frame.setPointerCapture?.(event.pointerId);
+  } catch { /* pointer capture недоступен в некоторых WebView */ }
+  event.preventDefault();
+});
+
+document.addEventListener('pointermove', (event) => {
+  const drag = ui.avatarDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const frameSize = drag.frame.clientWidth;
+  const scale = frameSize / drag.sourceSide;
+  const rangeX = drag.sourceWidth - drag.sourceSide;
+  const rangeY = drag.sourceHeight - drag.sourceSide;
+  if (rangeX > 0) ui.avatarCrop.x = clamp(drag.cropX - (event.clientX - drag.startX) / scale / rangeX * 100, 0, 100);
+  if (rangeY > 0) ui.avatarCrop.y = clamp(drag.cropY - (event.clientY - drag.startY) / scale / rangeY * 100, 0, 100);
+  updateAvatarEditor();
+  event.preventDefault();
+});
+
+const endAvatarDrag = (event) => {
+  if (!ui.avatarDrag || ui.avatarDrag.pointerId !== event.pointerId) return;
+  ui.avatarDrag.frame.classList.remove('is-dragging');
+  ui.avatarDrag = null;
+};
+document.addEventListener('pointerup', endAvatarDrag);
+document.addEventListener('pointercancel', endAvatarDrag);
+
+document.addEventListener('wheel', (event) => {
+  if (ui.modal?.type !== 'avatar-preview' || !event.target.closest('[data-role="avatar-frame"]')) return;
+  event.preventDefault();
+  ui.avatarCrop.zoom = clamp(ui.avatarCrop.zoom + (event.deltaY < 0 ? 0.1 : -0.1), 1, 3);
+  updateAvatarEditor();
+}, { passive: false });
 
 document.addEventListener('change', (event) => {
   const key = event.target.dataset?.setting;
@@ -1248,7 +1494,8 @@ const pickAndPreviewAvatar = async () => {
     releaseAvatarPreview(ui.pendingAvatar);
     ui.pendingAvatar = createAvatarPreview(file);
     ui.pendingAvatarFile = file;
-    ui.avatarCrop = { x: 50, y: 50, zoom: 1 };
+    ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
+    ui.avatarDrag = null;
     ui.modal = { type: 'avatar-preview' };
     renderModal();
   } catch (error) {
@@ -1274,10 +1521,16 @@ const actions = {
     if (status) status.textContent = 'Проверяем…';
     try {
       const registration = await navigator.serviceWorker?.getRegistration();
-      await registration?.update();
-      if (status) status.textContent = registration?.waiting ? 'Обновление готово — применяем…' : `Установлена свежая версия ${VERSION}.`;
-      if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      else playSound('success');
+      if (!registration) {
+        if (status) status.textContent = 'Автообновление доступно только по HTTPS или localhost.';
+        return;
+      }
+      await registration.update();
+      if (status)
+        status.textContent = registration.waiting
+          ? 'Обновление скачано. Оно применится при следующем открытии — без перезагрузки страницы.'
+          : `Проверка завершена (${VERSION}). Обновления применяются при следующем запуске.`;
+      playSound('success');
     } catch {
       if (status) status.textContent = 'Не удалось проверить. Проверьте интернет.';
       playSound('error');
@@ -1308,7 +1561,7 @@ const actions = {
 
   'hub-disconnect': () => {
     store.disconnectHub();
-    p2p.stop({ quiet: true });
+    p2p.stop();
     p2pRunning = false;
     ui.hubDraft = store.suggestedHubUrl();
     renderModal({ focus: false });
@@ -1419,6 +1672,22 @@ const actions = {
   },
 
   'pick-avatar': () => pickAndPreviewAvatar(),
+  'avatar-zoom-out': () => {
+    ui.avatarCrop.zoom = clamp(Math.round((ui.avatarCrop.zoom - 0.1) * 20) / 20, 1, 3);
+    updateAvatarEditor();
+  },
+  'avatar-zoom-in': () => {
+    ui.avatarCrop.zoom = clamp(Math.round((ui.avatarCrop.zoom + 0.1) * 20) / 20, 1, 3);
+    updateAvatarEditor();
+  },
+  'avatar-rotate-left': () => {
+    ui.avatarCrop.rotation = (ui.avatarCrop.rotation + 270) % 360;
+    updateAvatarEditor();
+  },
+  'avatar-reset': () => {
+    ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
+    updateAvatarEditor();
+  },
 
   'save-avatar': async () => {
     try {
@@ -1482,6 +1751,18 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (!ui.modal) return;
+  if (ui.modal.type === 'avatar-preview' && event.target.matches?.('[data-role="avatar-frame"]')) {
+    const step = event.shiftKey ? 5 : 1;
+    if (event.key === 'ArrowLeft') ui.avatarCrop.x = clamp(ui.avatarCrop.x - step, 0, 100);
+    else if (event.key === 'ArrowRight') ui.avatarCrop.x = clamp(ui.avatarCrop.x + step, 0, 100);
+    else if (event.key === 'ArrowUp') ui.avatarCrop.y = clamp(ui.avatarCrop.y - step, 0, 100);
+    else if (event.key === 'ArrowDown') ui.avatarCrop.y = clamp(ui.avatarCrop.y + step, 0, 100);
+    else if (event.key === 'r' || event.key === 'R') ui.avatarCrop.rotation = (ui.avatarCrop.rotation + 270) % 360;
+    else return;
+    event.preventDefault();
+    updateAvatarEditor();
+    return;
+  }
   if (event.key === 'Escape') {
     closeModal();
     return;
@@ -1506,14 +1787,10 @@ document.addEventListener('keydown', (event) => {
 
 /* ---------- присутствие и запуск ------------------------------ */
 
-store.heartbeat();
 setInterval(() => store.heartbeat(), 30_000);
-/* Раз в полминуты перерисовываем панели: статусы друзей стареют сами.
-   Открытые окна не трогаем — там могут быть поля ввода. */
-setInterval(() => {
-  if (!ui.modal) render();
-  else renderRegions();
-}, 30_000);
+/* Раз в полминуты обновляем присутствие, но сравниваем разметку: если данные
+   не изменились, ни панели, ни открытые формы не пересоздаются. */
+setInterval(renderAfterStoreChange, 30_000);
 /* В hub-режиме опрашиваем общий сервер: друзья и заявки с других
    устройств появляются сами. Чаще, когда вкладка видима. */
 setInterval(() => {
@@ -1529,7 +1806,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', () => store.heartbeat());
 window.addEventListener('beforeunload', () => {
   store.markOffline();
-  p2p.stop({ quiet: true });
+  p2p.stop();
   p2pRunning = false;
 });
 
@@ -1540,31 +1817,30 @@ if (
   'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
 ) {
-  /* Обновляемся без вечного reload-цикла: перезагрузка разрешена ровно
-     один раз для конкретной версии и только если страницу уже контролировал SW. */
-  const hadController = !!navigator.serviceWorker.controller;
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    const key = `mir:updated:${VERSION}`;
-    if (!hadController || reloading || sessionStorage.getItem(key)) return;
-    reloading = true;
-    sessionStorage.setItem(key, '1');
-    location.reload();
-  });
+  /* Обновлённый service worker ждёт закрытия текущих вкладок. Никакой
+     controllerchange не вызывает reload: открытая игра не прерывается. */
   navigator.serviceWorker.register('/sw.js').then((registration) => {
     registration.update().catch(() => {});
     setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
-    if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
   }).catch(() => {});
 }
 
 render();
-/* Если меню открыто по сети с serve.mjs — подключаемся к общему хабу. */
-if (typeof store.initBackend === 'function') {
-  store.initBackend().then((mode) => {
-    if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
-    syncP2P();
-  });
-} else {
+/* На старте сперва проверяем хаб; только после этого открываем аккаунты.
+   Если сеть недоступна, store включает локальный офлайн-резерв. */
+const initializeConnection = async () => {
+  let mode = 'local';
+  try {
+    mode = await store.initBackend();
+  } catch {
+    /* Проверка не должна оставлять страницу заблокированной. */
+    mode = store.backendMode?.() ?? 'local';
+  }
+  backendReady = store.isBackendInitialized?.() ?? true;
+  renderRegions();
+  if (ui.modal) renderModal({ focus: false });
+  store.heartbeat();
+  if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
   syncP2P();
-}
+};
+initializeConnection();
