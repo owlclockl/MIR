@@ -34,6 +34,44 @@ export const BLOCK_NAMES = Object.freeze({
   [BLOCK.SNOW]: 'снег',
 });
 
+export const BIOME = Object.freeze({
+  DEEP_OCEAN: 0,
+  COASTAL_WATER: 1,
+  COAST: 2,
+  GRASSLAND: 3,
+  FOREST: 4,
+  DESERT: 5,
+  TAIGA: 6,
+  TUNDRA: 7,
+  HIGHLANDS: 8,
+});
+
+export const BIOME_NAMES = Object.freeze({
+  [BIOME.DEEP_OCEAN]: 'глубокий океан',
+  [BIOME.COASTAL_WATER]: 'прибрежные воды',
+  [BIOME.COAST]: 'побережье',
+  [BIOME.GRASSLAND]: 'равнины',
+  [BIOME.FOREST]: 'лес',
+  [BIOME.DESERT]: 'засушливые земли',
+  [BIOME.TAIGA]: 'тайга',
+  [BIOME.TUNDRA]: 'тундра',
+  [BIOME.HIGHLANDS]: 'горные земли',
+});
+
+/* Профили меняют сами континенты и климат, а не только раскраску карты. */
+export const LANDSCAPE_PRESETS = Object.freeze({
+  mainland: Object.freeze({ label: 'Материковый', radius: 1, relief: 1 }),
+  islands: Object.freeze({ label: 'Островной', radius: 0.84, relief: 0.82 }),
+  highlands: Object.freeze({ label: 'Горный', radius: 0.96, relief: 1.48 }),
+});
+
+export const CLIMATE_PRESETS = Object.freeze({
+  temperate: Object.freeze({ label: 'Умеренный', temperature: 0, moisture: 0 }),
+  lush: Object.freeze({ label: 'Влажный', temperature: 0.03, moisture: 0.2 }),
+  arid: Object.freeze({ label: 'Засушливый', temperature: 0.14, moisture: -0.27 }),
+  frozen: Object.freeze({ label: 'Холодный', temperature: -0.28, moisture: 0.04 }),
+});
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => t * t * (3 - 2 * t);
@@ -91,6 +129,21 @@ const mulberry32 = (seed) => {
   };
 };
 
+const NAME_HEADS = ['Ар', 'Бел', 'Валь', 'Грей', 'Дор', 'Эль', 'Фар', 'Ил', 'Кел', 'Лор', 'Мир', 'Нор', 'Ор', 'Сел', 'Тир', 'Эс'];
+const NAME_TAILS = ['валь', 'вин', 'дар', 'дор', 'рин', 'лис', 'мир', 'таль', 'нар', 'эль', 'ион', 'ар', 'ора', 'ен'];
+const makeName = (random, used) => {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const name = `${NAME_HEADS[Math.floor(random() * NAME_HEADS.length)]}${NAME_TAILS[Math.floor(random() * NAME_TAILS.length)]}`;
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+  }
+  const fallback = `Край ${used.size + 1}`;
+  used.add(fallback);
+  return fallback;
+};
+
 const normalizedConfig = (options = {}) => {
   const seed = String(options.seed ?? '').trim() || 'MIR';
   const continents = Math.round(clamp(options.continents ?? 4, 1, MAX_CONTINENTS));
@@ -98,11 +151,16 @@ const normalizedConfig = (options = {}) => {
   const requestedVoxelSize = Number(options.voxelSize ?? 1.25);
   const voxelSize = allowedVoxelSizes.includes(requestedVoxelSize) ? requestedVoxelSize : 1.25;
   const earthMultiples = Math.round(clamp(options.earthMultiples ?? 2, 2, 10));
-  return { seed, continents, voxelSize, earthMultiples };
+  const requestedLandscape = String(options.landscape ?? 'mainland');
+  const requestedClimate = String(options.climate ?? 'temperate');
+  const landscape = LANDSCAPE_PRESETS[requestedLandscape] ? requestedLandscape : 'mainland';
+  const climate = CLIMATE_PRESETS[requestedClimate] ? requestedClimate : 'temperate';
+  return { seed, continents, voxelSize, earthMultiples, landscape, climate };
 };
 
-const buildContinentCenters = (seed, count) => {
+const buildContinentCenters = (seed, count, landscape) => {
   const random = mulberry32(seed ^ 0xc2b2ae35);
+  const names = new Set();
   const columns = Math.ceil(Math.sqrt(count));
   const rows = Math.ceil(count / columns);
   const centers = [];
@@ -112,13 +170,15 @@ const buildContinentCenters = (seed, count) => {
     const row = Math.floor(index / columns);
     const cellWidth = 1 / columns;
     const cellHeight = 1 / rows;
-    const rx = cellWidth * (0.345 + random() * 0.025);
-    const rz = cellHeight * (0.345 + random() * 0.025);
+    const radiusScale = LANDSCAPE_PRESETS[landscape].radius;
+    const rx = cellWidth * (0.345 + random() * 0.025) * radiusScale;
+    const rz = cellHeight * (0.345 + random() * 0.025) * radiusScale;
     const jitterX = (random() - 0.5) * cellWidth * 0.08;
     const jitterZ = (random() - 0.5) * cellHeight * 0.08;
 
     centers.push(Object.freeze({
       id: index + 1,
+      name: makeName(random, names),
       x: (column + 0.5) * cellWidth + jitterX,
       z: (row + 0.5) * cellHeight + jitterZ,
       rx,
@@ -128,6 +188,49 @@ const buildContinentCenters = (seed, count) => {
   }
 
   return Object.freeze(centers);
+};
+
+const buildRivers = (seed, centers, sampleAtNormalized) => {
+  const random = mulberry32(seed ^ 0x7f4a7c15);
+  const names = new Set();
+  return Object.freeze(centers.map((center, index) => {
+    const startX = center.x + (random() - 0.5) * center.rx * 0.36;
+    const startZ = center.z + (random() - 0.5) * center.rz * 0.36;
+    const angle = random() * Math.PI * 2;
+    const endX = clamp(center.x + Math.cos(angle) * center.rx * 0.92, 0.015, 0.985);
+    const endZ = clamp(center.z + Math.sin(angle) * center.rz * 0.92, 0.015, 0.985);
+    const dx = endX - startX;
+    const dz = endZ - startZ;
+    const bend = (random() - 0.5) * Math.min(center.rx, center.rz) * 0.9;
+    const perpendicularX = -dz;
+    const perpendicularZ = dx;
+    const control1 = {
+      x: startX + dx * 0.34 + perpendicularX * bend,
+      z: startZ + dz * 0.34 + perpendicularZ * bend,
+    };
+    const control2 = {
+      x: startX + dx * 0.72 - perpendicularX * bend * 0.62,
+      z: startZ + dz * 0.72 - perpendicularZ * bend * 0.62,
+    };
+    const points = [];
+    const steps = 72;
+    for (let step = 0; step <= steps; step += 1) {
+      const t = step / steps;
+      const inverse = 1 - t;
+      const x = clamp(
+        inverse ** 3 * startX + 3 * inverse ** 2 * t * control1.x + 3 * inverse * t ** 2 * control2.x + t ** 3 * endX,
+        0.002,
+        0.998,
+      );
+      const z = clamp(
+        inverse ** 3 * startZ + 3 * inverse ** 2 * t * control1.z + 3 * inverse * t ** 2 * control2.z + t ** 3 * endZ,
+        0.002,
+        0.998,
+      );
+      points.push(Object.freeze({ x, z, land: sampleAtNormalized(x, z).land }));
+    }
+    return Object.freeze({ id: index + 1, name: makeName(random, names), points: Object.freeze(points) });
+  }));
 };
 
 /** Создаёт описание мира и его ленивые методы доступа к вокселям. */
@@ -141,7 +244,9 @@ export const createWorld = (options = {}) => {
   const widthMeters = cellsPerSide * config.voxelSize;
   const areaKm2 = (widthMeters * widthMeters) / 1_000_000;
   const chunksPerSide = Math.ceil(cellsPerSide / CHUNK_SIZE);
-  const centers = buildContinentCenters(seedHash, config.continents);
+  const centers = buildContinentCenters(seedHash, config.continents, config.landscape);
+  const landscape = LANDSCAPE_PRESETS[config.landscape];
+  const climate = CLIMATE_PRESETS[config.climate];
   const chunks = new Map();
   const columnsPerChunk = CHUNK_SIZE * CHUNK_SIZE;
   const blocksPerChunk = columnsPerChunk * WORLD_HEIGHT;
@@ -180,15 +285,36 @@ export const createWorld = (options = {}) => {
       const largeRelief = fractalNoise(seedHash ^ 0x68bc21eb, nx * 14, nz * 14, 4);
       const smallRelief = fractalNoise(seedHash ^ 0x02e5be93, nx * 86, nz * 86, 3);
       const height = Math.round(clamp(
-        37 + continentalDepth * 34 + (largeRelief - 0.5) * 17 + (smallRelief - 0.5) * 5,
+        37 + continentalDepth * 34 + (largeRelief - 0.5) * 17 * landscape.relief + (smallRelief - 0.5) * 5 * landscape.relief,
         SEA_LEVEL + 1,
         WORLD_HEIGHT - 8,
       ));
-      const surfaceMaterial = height >= 70
-        ? BLOCK.SNOW
-        : continentalDepth < 0.08 || height < 43
-          ? BLOCK.SAND
-          : BLOCK.GRASS;
+      const humidityField = fractalNoise(seedHash ^ 0x165667b1, nx * 12, nz * 12, 4);
+      const moisture = clamp(0.18 + humidityField * 0.82 + climate.moisture, 0, 1);
+      const latitude = Math.abs(nz - 0.5) * 2;
+      const altitudeCooling = Math.max(0, height - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL) * 0.32;
+      const temperature = clamp(1 - latitude * 0.62 - altitudeCooling + climate.temperature, 0, 1);
+      const nearCoast = continentalDepth < 0.105 || height <= SEA_LEVEL + 8;
+      const biome = nearCoast
+        ? BIOME.COAST
+        : height >= 69
+          ? BIOME.HIGHLANDS
+          : temperature < 0.2
+            ? BIOME.TUNDRA
+            : temperature < 0.36
+              ? BIOME.TAIGA
+              : temperature > 0.58 && moisture < 0.3
+                ? BIOME.DESERT
+                : moisture > 0.64
+                  ? BIOME.FOREST
+                  : BIOME.GRASSLAND;
+      const surfaceMaterial = biome === BIOME.HIGHLANDS
+        ? height >= 79 ? BLOCK.SNOW : BLOCK.STONE
+        : biome === BIOME.TUNDRA
+          ? BLOCK.SNOW
+          : biome === BIOME.DESERT || biome === BIOME.COAST
+            ? BLOCK.SAND
+            : BLOCK.GRASS;
       return {
         land: true,
         continent: continentId,
@@ -198,11 +324,15 @@ export const createWorld = (options = {}) => {
         surfaceMaterial,
         topMaterial: surfaceMaterial,
         waterDepth: 0,
+        biome,
+        temperature,
+        moisture,
       };
     }
 
     const basin = fractalNoise(seedHash ^ 0x967a889b, nx * 48, nz * 48, 3);
     const height = Math.round(clamp(8 + basin * 23, 3, SEA_LEVEL - 1));
+    const waterDepth = SEA_LEVEL - height;
     return {
       land: false,
       continent: 0,
@@ -211,9 +341,14 @@ export const createWorld = (options = {}) => {
       topY: SEA_LEVEL,
       surfaceMaterial: height >= 27 ? BLOCK.SAND : BLOCK.STONE,
       topMaterial: BLOCK.WATER,
-      waterDepth: SEA_LEVEL - height,
+      waterDepth,
+      biome: waterDepth > 14 ? BIOME.DEEP_OCEAN : BIOME.COASTAL_WATER,
+      temperature: 0,
+      moisture: 0,
     };
   };
+
+  const rivers = buildRivers(seedHash, centers, sampleNormalized);
 
   const sampleColumn = (x, z) => {
     const worldX = Math.floor(Number(x));
@@ -254,6 +389,7 @@ export const createWorld = (options = {}) => {
       surfaceMaterials: new Uint8Array(columnsPerChunk),
       topMaterials: new Uint8Array(columnsPerChunk),
       waterFlags: new Uint8Array(columnsPerChunk),
+      biomes: new Uint8Array(columnsPerChunk),
     };
 
     for (let localZ = 0; localZ < CHUNK_SIZE; localZ += 1) {
@@ -272,6 +408,7 @@ export const createWorld = (options = {}) => {
         chunk.surfaceMaterials[columnIndex] = terrain.surfaceMaterial;
         chunk.topMaterials[columnIndex] = terrain.topMaterial;
         chunk.waterFlags[columnIndex] = terrain.land ? 0 : 1;
+        chunk.biomes[columnIndex] = terrain.biome;
 
         const columnOffset = columnIndex;
         for (let y = 0; y <= terrain.height; y += 1) {
@@ -318,6 +455,7 @@ export const createWorld = (options = {}) => {
       topMaterial: chunk.topMaterials[index],
       water,
       waterDepth: water ? SEA_LEVEL - terrainHeight : 0,
+      biome: chunk.biomes[index],
     };
   };
 
@@ -357,6 +495,7 @@ export const createWorld = (options = {}) => {
     worldHeight: WORLD_HEIGHT,
     seaLevel: SEA_LEVEL,
     continentCenters: centers,
+    rivers,
     sampleAtNormalized: sampleNormalized,
     sampleColumn,
     getChunk,
