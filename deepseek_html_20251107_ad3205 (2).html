@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelMaster World & RTS Unit Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box }
+        body { font-family:Inter, sans-serif; background:#0d1117; color:#c9d1d9; overflow:hidden; height:100vh }
+        #gameCanvas { position:fixed; inset:0; image-rendering:pixelated; background:#3b82f6; cursor:grab; z-index:1 }
+        #gameCanvas.dragging { cursor:grabbing }
+        .pixel-ui { position:relative; z-index:10; pointer-events:none }
+        .pixel-panel { background:rgba(22,27,34,0.95); border:3px solid #374151; padding:12px; pointer-events:auto }
+        .pixel-button{ background:#374151; border:2px solid #6B7280; color:#fff; padding:8px 12px; cursor:pointer }
+        .pixel-input,.pixel-select{ background:#1F2937; border:2px solid #374151; color:#fff; padding:6px 8px }
+        .debug-info{ position:fixed; bottom:10px; left:10px; background:rgba(0,0,0,0.6); padding:6px; font-size:11px; z-index:1000 }
+    </style>
+</head>
+<body>
+
+<div id="apiModal" class="modal-overlay hidden">
+    <div class="modal-content pixel-panel">
+        <h3 id="modalTitle"></h3>
+        <div id="modalBody"></div>
+        <button onclick="document.getElementById('apiModal').classList.add('hidden')" class="pixel-button w-full bg-red-700">Закрыть</button>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div class="pixel-ui">
+    <div class="ui-center-top pixel-panel" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10">
+        <h1 class="text-2xl font-bold text-[#58a6ff]">PixelMaster World</h1>
+        <p class="text-sm text-gray-400">RTS/RPG Adventure — оптимизированная версия</p>
+    </div>
+
+    <div class="ui-bottom-left" style="position:fixed;left:20px;bottom:20px;z-index:10">
+        <div class="pixel-panel w-80">
+            <h2 class="text-xl font-semibold mb-3 text-emerald-400">Статус Аватара</h2>
+            <div id="avatarStatus" class="space-y-1 text-sm"></div>
+            <div class="mt-3 text-xs text-gray-400">WASD: Движение | Q: Копать | E: Строить</div>
+        </div>
+    </div>
+
+    <div class="ui-bottom-right" style="position:fixed;right:20px;bottom:20px;z-index:10">
+        <div class="pixel-panel w-80">
+            <h2 class="text-xl font-semibold mb-3 text-white">Создать Юнита</h2>
+            <form id="add-unit-form" class="grid grid-cols-1 gap-2">
+                <input type="text" id="unit-name" required placeholder="Имя" class="pixel-input" value="ТестовыйЮнит">
+                <select id="unit-class" required class="pixel-select">
+                    <option>Воин</option>
+                    <option>Лучник</option>
+                    <option>Маг</option>
+                    <option>Разведчик</option>
+                    <option>Целитель</option>
+                </select>
+                <select id="unit-ai-mode" class="pixel-select">
+                    <option value="idle">Ожидание</option>
+                    <option value="follow">Следовать</option>
+                    <option value="protect">Защищать</option>
+                    <option value="explore">Исследовать</option>
+                    <option value="patrol">Патрулировать</option>
+                </select>
+                <button type="submit" class="pixel-button">🛠️ Создать</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="debugInfo" class="debug-info hidden"></div>
+
+<script>
+// Улучшенная и оптимизированная игровая логика
+(() => {
+    'use strict';
+
+    // Константы
+    const DEFAULT_TILE_SIZE = 8;
+    const CHUNK_SIZE = 16;
+    const WATER_LEVEL = 10;
+    const MAX_HEIGHT = 20;
+    const UNIT_MAX_HP = 100;
+    const AI_TICK_RATE = 250; // мс (частый, но небольшой)
+
+    // Canvas
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let CANVAS_WIDTH = window.innerWidth;
+    let CANVAS_HEIGHT = window.innerHeight;
+    canvas.width = CANVAS_WIDTH; canvas.height = CANVAS_HEIGHT;
+
+    // World
+    const WorldChunks = new Map(); // key: "cx,cy" -> {map: Int16Array(CHUNK_SIZE*CHUNK_SIZE)}
+
+    function chunkKey(cx, cy) { return cx + ',' + cy; }
+
+    function genChunk(cx, cy) {
+        const arr = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+            for (let y = 0; y < CHUNK_SIZE; y++) {
+                const wx = cx * CHUNK_SIZE + x;
+                const wy = cy * CHUNK_SIZE + y;
+                const h = Math.floor((noise2D(wx, wy, 0.03, 5, 0.5) + 1) / 2 * MAX_HEIGHT);
+                arr[x + y * CHUNK_SIZE] = Math.max(0, Math.min(MAX_HEIGHT, h));
+            }
+        }
+        const obj = { x:cx, y:cy, map:arr };
+        WorldChunks.set(chunkKey(cx,cy), obj);
+        return obj;
+    }
+
+    function getChunk(cx, cy) {
+        const k = chunkKey(cx,cy);
+        if (!WorldChunks.has(k)) return genChunk(cx, cy);
+        return WorldChunks.get(k);
+    }
+
+    function toChunkCoords(n) { return Math.floor(n / CHUNK_SIZE); }
+    function toLocal(n) { let v = n % CHUNK_SIZE; if (v<0) v += CHUNK_SIZE; return v; }
+    function getTileData(wx, wy) {
+        const cx = toChunkCoords(wx); const cy = toChunkCoords(wy);
+        const ch = getChunk(cx,cy);
+        const lx = toLocal(wx); const ly = toLocal(wy);
+        return { height: ch.map[lx + ly * CHUNK_SIZE] };
+    }
+
+    // Noise (improved caching via interpolated noise)
+    function randomHash(x, y) {
+        let n = x * 374761393 + y * 668265263;
+        n = (n ^ (n >> 13)) * 1274126177;
+        n = (n ^ (n >> 16));
+        return (n & 0x7fffffff) / 1073741824.0 - 1.0;
+    }
+    function lerp(a,b,t){return a+(b-a)*t}
+    function smoothStep(t){return t*t*(3-2*t)}
+    function getInterpolatedNoise(x,y){
+        const ix = Math.floor(x), iy = Math.floor(y);
+        const fx = x - ix, fy = y - iy;
+        const v1 = randomHash(ix, iy);
+        const v2 = randomHash(ix+1, iy);
+        const v3 = randomHash(ix, iy+1);
+        const v4 = randomHash(ix+1, iy+1);
+        const i1 = lerp(v1, v2, smoothStep(fx));
+        const i2 = lerp(v3, v4, smoothStep(fx));
+        return lerp(i1, i2, smoothStep(fy));
+    }
+    function noise2D(x,y,scale=0.03,octaves=4,persistence=0.5){
+        let total=0, freq=1, amp=1, max=0;
+        for(let i=0;i<octaves;i++){ total += getInterpolatedNoise(x*scale*freq, y*scale*freq)*amp; max+=amp; amp*=persistence; freq*=2; }
+        return total/max;
+    }
+
+    // Camera & view
+    let CameraX = 0, CameraY = 0, ZoomLevel = 1.0;
+
+    // Avatar
+    const Avatar = { x:0, y:0, h:0, stamina:100 };
+
+    // Units and occupancy map for fast collision
+    const Units = new Map(); // id -> unit
+    const Occupancy = new Map(); // key "x,y" -> unitId
+    let unitCounter = 1;
+
+    function occKey(x,y){return x+','+y}
+    function setOccupied(x,y,id){ Occupancy.set(occKey(x,y), id); }
+    function clearOccupied(x,y){ Occupancy.delete(occKey(x,y)); }
+    function getOccupied(x,y){ return Occupancy.get(occKey(x,y)); }
+
+    function isTileFree(x,y, excludingId=null){
+        if (Avatar.x === x && Avatar.y === y) return false;
+        const occ = getOccupied(x,y);
+        if (!occ) return true;
+        if (excludingId && occ === excludingId) return true;
+        return false;
+    }
+
+    // Efficient neighbor generation for pathfinding
+    function neighbors(x,y){
+        return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    }
+
+    // A* pathfinding (grid) with height constraints
+    function heuristic(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
+
+    function findPath(startX,startY,goalX,goalY, excludingId=null, maxSearch=10000){
+        // Simple A* using arrays (ok for modest sizes). Avoid heavy allocations by reusing maps.
+        const openSet = new TinyHeap((a,b)=>a.f-b.f);
+        const startKey = startX+','+startY;
+        openSet.push({x:startX,y:startY,g:0,f:heuristic(startX,startY,goalX,goalY),came:null});
+        const gScore = new Map(); gScore.set(startKey, 0);
+        const cameFrom = new Map();
+        let explored = 0;
+
+        while(openSet.size()>0 && explored++ < maxSearch){
+            const current = openSet.pop();
+            if (current.x===goalX && current.y===goalY) {
+                // reconstruct
+                const path = [];
+                let cur = current;
+                while(cur){ path.push([cur.x,cur.y]); cur = cur.came; }
+                path.reverse(); return path;
+            }
+            for(const nb of neighbors(current.x,current.y)){
+                const nx = nb[0], ny = nb[1];
+                const tile = getTileData(nx, ny);
+                const curTile = getTileData(current.x, current.y);
+                if (tile.height - curTile.height > 1) continue; // too steep
+                const occ = getOccupied(nx, ny);
+                if (occ && occ !== excludingId && !(nx===goalX && ny===goalY)) continue;
+                const tentativeG = current.g + 1;
+                const key = nx+','+ny;
+                if (!gScore.has(key) || tentativeG < gScore.get(key)){
+                    gScore.set(key, tentativeG);
+                    const f = tentativeG + heuristic(nx,ny,goalX,goalY);
+                    const node = {x:nx,y:ny,g:tentativeG,f:f,came:current};
+                    openSet.push(node);
+                }
+            }
+        }
+        return null; // no path
+    }
+
+    // Minimal binary heap for A*
+    function TinyHeap(cmp){ this.cmp = cmp; this.data = []; }
+    TinyHeap.prototype.push = function(v){ this.data.push(v); let i=this.data.length-1; while(i>0){ const p=(i-1)>>1; if(this.cmp(this.data[p],this.data[i])<=0) break; [this.data[p],this.data[i]]=[this.data[i],this.data[p]]; i=p; } }
+    TinyHeap.prototype.pop = function(){ if(this.data.length===0) return null; const r=this.data[0]; const last=this.data.pop(); if(this.data.length>0){ this.data[0]=last; let i=0; while(true){ let l=2*i+1,rp=2*i+2,small=i; if(l<this.data.length && this.cmp(this.data[l],this.data[small])<0) small=l; if(rp<this.data.length && this.cmp(this.data[rp],this.data[small])<0) small=rp; if(small===i) break; [this.data[i],this.data[small]]=[this.data[small],this.data[i]]; i=small; } } return r; }
+    TinyHeap.prototype.size = function(){ return this.data.length; }
+
+    // Units
+    function createUnit(name, unitClass, aiMode='idle'){
+        const spawn = findFreeTileNear(Avatar.x, Avatar.y, 6);
+        if (!spawn) { flashMessage('Нет места для спавна юнита'); return null; }
+        const id = 'u'+(unitCounter++);
+        const u = { id, name, unitClass, health:100, attack:10, x:spawn.x, y:spawn.y, h:spawn.h, aiMode, path:null, status:'idle' };
+        Units.set(id,u); setOccupied(u.x,u.y,id);
+        updateUnitSidebar(); return u;
+    }
+
+    function removeUnit(id){ const u = Units.get(id); if(!u) return; clearOccupied(u.x,u.y); Units.delete(id); updateUnitSidebar(); }
+
+    // find free tile near center
+    function findFreeTileNear(cx, cy, radius=3){
+        for(let r=1;r<=radius;r++){
+            for(let dx=-r;dx<=r;dx++){
+                for(let dy=-r;dy<=r;dy++){
+                    if(Math.abs(dx)===r||Math.abs(dy)===r){ const x=cx+dx,y=cy+dy; const t=getTileData(x,y); if(t.height>=WATER_LEVEL && isTileFree(x,y)) return {x,y,h:t.height}; }
+                }
+            }
+        }
+        return null;
+    }
+
+    // Movement using path if available
+    function stepUnitAlongPath(u){
+        if(!u.path || u.path.length<=1) { u.path = null; return true; }
+        const next = u.path[1]; // index 0 is current
+        if (!isTileFree(next[0], next[1], u.id)) { u.path = null; return false; }
+        clearOccupied(u.x,u.y); u.x = next[0]; u.y = next[1]; setOccupied(u.x,u.y,u.id);
+        u.h = getTileData(u.x,u.y).height; u.path.shift(); return u.path.length===1;
+    }
+
+    // Attempt to move unit to target using A*
+    function moveUnitTo(u, tx, ty){
+        if (u.path && u.path.length>0 && u.path[u.path.length-1][0]===tx && u.path[u.path.length-1][1]===ty) return; // already heading
+        const path = findPath(u.x,u.y,tx,ty,u.id,2000);
+        if (path && path.length>1) { u.path = path; u.status='moving'; } else { u.path = null; u.status='stuck'; }
+    }
+
+    // AI: simple behavior per aiMode
+    function runAI(){
+        Units.forEach(u => {
+            if (u.health<=0) return;
+            switch(u.aiMode){
+                case 'idle': u.status='idle'; u.path=null; break;
+                case 'follow': {
+                    const dist = Math.hypot(u.x-Avatar.x,u.y-Avatar.y);
+                    if (dist>6) moveUnitTo(u, Avatar.x + Math.floor((Math.random()*3)-1), Avatar.y + Math.floor((Math.random()*3)-1));
+                    break;
+                }
+                case 'protect': {
+                    const targetX = Avatar.x + Math.floor((Math.random()*5)-2);
+                    const targetY = Avatar.y + Math.floor((Math.random()*5)-2);
+                    moveUnitTo(u,targetX,targetY);
+                    break;
+                }
+                case 'explore': {
+                    if (!u.path) {
+                        const angle = Math.random()*Math.PI*2; const dist = 6 + Math.floor(Math.random()*8);
+                        moveUnitTo(u, Math.round(u.x + Math.cos(angle)*dist), Math.round(u.y + Math.sin(angle)*dist));
+                    }
+                    break;
+                }
+                case 'patrol': {
+                    if (!u.patrolCenter) u.patrolCenter={x:u.x,y:u.y};
+                    if (!u.path) { const angle=Math.random()*Math.PI*2; const d=3+Math.floor(Math.random()*6); moveUnitTo(u, Math.round(u.patrolCenter.x+Math.cos(angle)*d), Math.round(u.patrolCenter.y+Math.sin(angle)*d)); }
+                    break;
+                }
+            }
+        });
+    }
+
+    // Update units movement per tick
+    function updateUnitsStep(){
+        Units.forEach(u=>{
+            if (u.path && u.path.length>1) stepUnitAlongPath(u);
+        });
+    }
+
+    // Rendering
+    function getTileColor(h){
+        if (h < WATER_LEVEL){ const depth = WATER_LEVEL - h; const blue = Math.min(255,128+depth*10); return `rgb(0,64,${blue})`; }
+        const hh = h - WATER_LEVEL; if (hh<=1) return '#f7d08a'; if (hh<5) return '#4ade80'; if (hh<10) return '#65a30d'; if (hh<MAX_HEIGHT-2) return '#9ca3af'; return '#F8FAFC';
+    }
+
+    function render(){
+        const tileSize = Math.max(1, Math.round(DEFAULT_TILE_SIZE * ZoomLevel));
+        const tilesX = Math.ceil(CANVAS_WIDTH / tileSize)+2; const tilesY = Math.ceil(CANVAS_HEIGHT / tileSize)+2;
+        const screenWorldX = CameraX - tilesX/2; const screenWorldY = CameraY - tilesY/2;
+
+        ctx.fillStyle = '#3b82f6'; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+
+        const startX = Math.floor(screenWorldX)-1; const startY = Math.floor(screenWorldY)-1;
+        const endX = startX + tilesX+2; const endY = startY + tilesY+2;
+
+        for(let wx=startX; wx<=endX; wx++){
+            for(let wy=startY; wy<=endY; wy++){
+                const t = getTileData(wx,wy);
+                const color = (t.height <= window.MAX_VISIBLE_HEIGHT) ? getTileColor(t.height) : '#111';
+                const sx = Math.round((wx - screenWorldX) * tileSize); const sy = Math.round((wy - screenWorldY) * tileSize);
+                ctx.fillStyle = color; ctx.fillRect(sx,sy,tileSize,tileSize);
+            }
+        }
+
+        // Units
+        Units.forEach(u=>{
+            if (u.h > window.MAX_VISIBLE_HEIGHT) return;
+            const sx = Math.round((u.x - screenWorldX) * tileSize); const sy = Math.round((u.y - screenWorldY) * tileSize);
+            ctx.fillStyle = '#FFD700'; ctx.fillRect(sx,sy,tileSize,tileSize);
+            ctx.fillStyle = 'white'; const dot = Math.max(1, Math.floor(tileSize/3)); ctx.fillRect(sx+Math.floor((tileSize-dot)/2), sy+Math.floor((tileSize-dot)/2), dot, dot);
+            // health bar
+            const ratio = Math.max(0, u.health) / UNIT_MAX_HP; const bw = Math.max(1, Math.floor(tileSize*0.8)); const bh=2; ctx.fillStyle='#333'; ctx.fillRect(sx+Math.floor(tileSize*0.1), sy-6, bw, bh); ctx.fillStyle = ratio>0.5? '#10B981' : ratio>0.2? '#FBBF24' : '#EF4444'; ctx.fillRect(sx+Math.floor(tileSize*0.1), sy-6, Math.max(0,Math.floor(bw*ratio)), bh);
+        });
+
+        // Avatar
+        if (Avatar.h <= window.MAX_VISIBLE_HEIGHT){ const sx = Math.round((Avatar.x - screenWorldX) * tileSize); const sy = Math.round((Avatar.y - screenWorldY) * tileSize); ctx.fillStyle='#DC2626'; ctx.fillRect(sx,sy,tileSize,tileSize); ctx.fillStyle='white'; const d = Math.max(1,Math.floor(tileSize/3)); ctx.fillRect(sx+Math.floor((tileSize-d)/2), sy+Math.floor((tileSize-d)/2), d, d); }
+    }
+
+    // Messages & UI updates throttled
+    let messageTimer = null;
+    function flashMessage(msg, timeout=2500){ const box = document.getElementById('messageBox'); if(!box){ console.log(msg); return; } box.innerHTML = msg; box.classList.remove('hidden'); if(messageTimer) clearTimeout(messageTimer); messageTimer = setTimeout(()=>{ box.innerHTML=''; box.classList.add('hidden'); }, timeout); }
+
+    function updateAvatarStatus(){ const el = document.getElementById('avatarStatus'); el.innerHTML = `<div><strong>Координаты:</strong> (${Avatar.x}, ${Avatar.y})</div><div><strong>Высота:</strong> ${Avatar.h}</div><div><strong>Выносливость:</strong> ${Math.floor(Avatar.stamina)}%</div><div><strong>Юнитов:</strong> ${Units.size}</div>`; }
+
+    function updateUnitSidebar(){ const el = document.getElementById('units-list-sidebar'); const count = document.getElementById('unit-count'); if(count) count.textContent = Units.size; if(!el) return; el.innerHTML=''; Units.forEach(u=>{ const div = document.createElement('div'); div.className='p-2 rounded-lg bg-gray-800'; div.textContent = `${u.name} (${u.unitClass}) - ${u.status}`; div.onclick = ()=>{ SelectedUnits.clear(); SelectedUnits.add(u.id); updateSelectedUnitPanel(); }; el.appendChild(div); }); }
+
+    function updateSelectedUnitPanel(){ const panel = document.getElementById('selectedUnitPanel'); if(!panel) return; if(SelectedUnits.size>0){ panel.classList.remove('hidden'); } else panel.classList.add('hidden'); }
+
+    // Selection
+    const SelectedUnits = new Set();
+
+    // Input handling
+    const Keys = {};
+    window.addEventListener('keydown', e=>{ if(document.activeElement.tagName==='INPUT') return; const k=e.key.toLowerCase(); Keys[k]=true; if(k==='q'){ const t=getTileData(Avatar.x,Avatar.y); if(t.height>0){ const cx=toChunkCoords(Avatar.x), cy=toChunkCoords(Avatar.y); const lx=toLocal(Avatar.x), ly=toLocal(Avatar.y); const ch = getChunk(cx,cy); ch.map[lx + ly*CHUNK_SIZE] = Math.max(0,ch.map[lx + ly*CHUNK_SIZE]-1); Avatar.h = ch.map[lx + ly*CHUNK_SIZE]; } } if(k==='e'){ const t=getTileData(Avatar.x,Avatar.y); if(t.height<MAX_HEIGHT){ const cx=toChunkCoords(Avatar.x), cy=toChunkCoords(Avatar.y); const lx=toLocal(Avatar.x), ly=toLocal(Avatar.y); const ch = getChunk(cx,cy); ch.map[lx + ly*CHUNK_SIZE] = Math.min(MAX_HEIGHT,ch.map[lx + ly*CHUNK_SIZE]+1); Avatar.h = ch.map[lx + ly*CHUNK_SIZE]; } } if(k==='escape'){ SelectedUnits.clear(); updateSelectedUnitPanel(); } });
+    window.addEventListener('keyup', e=>{ Keys[e.key.toLowerCase()]=false; });
+
+    // Mouse / camera
+    let isDragging=false, lastMX=0, lastMY=0, isSelecting=false, selStart=null, selEnd=null;
+    canvas.addEventListener('mousedown', e=>{
+        if(e.button===0){ const rect=canvas.getBoundingClientRect(); lastMX=e.clientX; lastMY=e.clientY; isDragging=true; canvas.classList.add('dragging'); }
+    });
+    window.addEventListener('mouseup', e=>{ if(e.button===0){ isDragging=false; canvas.classList.remove('dragging'); if(isSelecting){ isSelecting=false; selStart=selEnd=null; } } });
+    window.addEventListener('mousemove', e=>{ if(isDragging){ const dx=(e.clientX-lastMX), dy=(e.clientY-lastMY); lastMX=e.clientX; lastMY=e.clientY; const tileSize = Math.max(1, Math.round(DEFAULT_TILE_SIZE*ZoomLevel)); CameraX -= dx/tileSize; CameraY -= dy/tileSize; } });
+    canvas.addEventListener('wheel', e=>{ e.preventDefault(); ZoomLevel *= e.deltaY<0?1.1:1/1.1; ZoomLevel=Math.max(0.3,Math.min(3,ZoomLevel)); });
+    canvas.addEventListener('contextmenu', e=>{ e.preventDefault(); const rect=canvas.getBoundingClientRect(); const tileSize = Math.max(1, Math.round(DEFAULT_TILE_SIZE*ZoomLevel)); const tilesPerViewX = CANVAS_WIDTH/tileSize; const tilesPerViewY = CANVAS_HEIGHT/tileSize; const worldX = Math.floor((e.clientX-rect.left)/tileSize + (CameraX - tilesPerViewX/2)); const worldY = Math.floor((e.clientY-rect.top)/tileSize + (CameraY - tilesPerViewY/2)); if(SelectedUnits.size>0){ const free = findFreeTilesForGroup(worldX, worldY, SelectedUnits.size, 4); if(free.length<SelectedUnits.size) { flashMessage('Недостаточно места'); return; } let i=0; SelectedUnits.forEach(id=>{ const u = Units.get(id); if(u){ const t = free[i++]; moveUnitTo(u, t.x, t.y); } }); flashMessage('Юниты направлены'); return; } // single click target for avatar
+        Destination = {x:worldX,y:worldY}; flashMessage(`Цель: (${worldX},${worldY})`);
+    });
+
+    // Find multiple free tiles
+    function findFreeTilesForGroup(cx,cy,count,radius){ const tiles=[]; for(let r=1;r<=radius && tiles.length<count;r++){ for(let dx=-r;dx<=r && tiles.length<count;dx++){ for(let dy=-r;dy<=r && tiles.length<count;dy++){ if(Math.abs(dx)===r||Math.abs(dy)===r){ const x=cx+dx,y=cy+dy; const t=getTileData(x,y); if(t.height>=WATER_LEVEL && isTileFree(x,y)) tiles.push({x,y,h:t.height}); } } } } return tiles; }
+
+    // Simple UI handlers
+    document.getElementById('add-unit-form').addEventListener('submit', e=>{ e.preventDefault(); const name=document.getElementById('unit-name').value||'Unit'; const cls=document.getElementById('unit-class').value; const ai=document.getElementById('unit-ai-mode').value; createUnit(name, cls, ai); updateUnitSidebar(); });
+
+    document.getElementById('units-list-sidebar')?.addEventListener('click', ()=>{});
+
+    // Throttled AI using interval
+    setInterval(()=>{ runAI(); }, AI_TICK_RATE);
+    setInterval(()=>{ updateUnitsStep(); }, 120);
+
+    // Destination movement for avatar
+    let Destination = null;
+    function attemptAvatarKeyboardMove(){ let dx=(Keys['d']?1:0)-(Keys['a']?1:0); let dy=(Keys['s']?1:0)-(Keys['w']?1:0); if(dx===0 && dy===0) return; Destination=null; const nx=Avatar.x+dx, ny=Avatar.y+dy; const tile=getTileData(nx,ny); if(tile.height - Avatar.h > 1) { flashMessage('Слишком круто'); return; } if(!isTileFree(nx,ny)) { flashMessage('Клетка занята'); return; } Avatar.x=nx; Avatar.y=ny; Avatar.h=tile.height; }
+
+    // Main loop
+    let lastRender=0; const FPS=30; function loop(ts){ if(ts-lastRender > 1000/FPS){ // avatar destination movement
+            if(Destination){ if(Avatar.x!==Destination.x || Avatar.y!==Destination.y){ const dx=Math.sign(Destination.x-Avatar.x), dy=Math.sign(Destination.y-Avatar.y); const nx=Avatar.x+dx, ny=Avatar.y+dy; const tile=getTileData(nx,ny); if(tile.height - Avatar.h <=1 && isTileFree(nx,ny)){ Avatar.x=nx; Avatar.y=ny; Avatar.h=tile.height; } else Destination=null; } else Destination=null; } else attemptAvatarKeyboardMove(); updateAvatarStatus(); render(); lastRender=ts; }
+        requestAnimationFrame(loop);
+    }
+
+    // Init: find spawn
+    function findSafeSpawn(){ let x=0,y=0, t; for(let r=0; r<CHUNK_SIZE*10; r++){ t=getTileData(x,y); if(t.height>=WATER_LEVEL+1) break; x++; if(x>r){ x=-r; y++; } } Avatar.x=x; Avatar.y=y; Avatar.h=t.height; CameraX=Avatar.x; CameraY=Avatar.y; }
+
+    // Utilities used by UI
+    window.MAX_VISIBLE_HEIGHT = MAX_HEIGHT;
+
+    // Create some test units after init
+    function createTestUnits(){ createUnit('Воин','Воин','follow'); createUnit('Лучник','Лучник','protect'); createUnit('Маг','Маг','explore'); }
+
+    // Expose some functions
+    window.flashMessage = flashMessage;
+    window.getTileData = getTileData;
+    window.Units = Units;
+    window.SelectedUnits = SelectedUnits;
+
+    // Visible height slider handling
+    const heightSlider = document.getElementById('heightSlider'); if(heightSlider){ window.MAX_VISIBLE_HEIGHT = parseInt(heightSlider.value); heightSlider.addEventListener('input', e=>{ window.MAX_VISIBLE_HEIGHT = parseInt(e.target.value); document.getElementById('visibleHeightOutput').textContent = window.MAX_VISIBLE_HEIGHT; }); }
+
+    // Small helper to update debug info
+    function updateDebug(){ const dbg = document.getElementById('debugInfo'); if(!dbg) return; dbg.innerHTML = `Av:(${Avatar.x},${Avatar.y}) Units:${Units.size} Chunks:${WorldChunks.size} Cam:(${CameraX.toFixed(1)},${CameraY.toFixed(1)}) Zoom:${ZoomLevel.toFixed(2)}`; }
+    setInterval(updateDebug,500);
+
+    // Start
+    findSafeSpawn(); updateAvatarStatus(); createTestUnits(); requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
