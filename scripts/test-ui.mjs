@@ -138,12 +138,28 @@ const fmgHtml = fmgResponse.ok ? await fmgResponse.text() : '';
 const fmgScript = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
 const fmgScriptResponse = fmgScript ? await fetch(new URL(fmgScript, `${HUB}/`).href) : null;
 const fmgThemeResponse = await fetch(`${HUB}/fmg/mir-theme.css`);
+const fmgTheme = fmgThemeResponse.ok ? await fmgThemeResponse.text() : '';
+const fmgIconsResponse = await fetch(`${HUB}/fmg/icons.css`);
+const fmgIconsCss = fmgIconsResponse.ok ? await fmgIconsResponse.text() : '';
+const legacyIconClasses = new Set([...fmgIconsCss.matchAll(/\.icon-([a-z0-9-]+):(before|after)/g)].map((match) => match[1]));
+const lucideIconClasses = new Set([...fmgTheme.matchAll(/\.icon-([a-z0-9-]+)::before/g)].map((match) => match[1]));
+const textMarkerIcons = new Set(['a', 'f', 'i', 'if', 'n', 'r', 's', 'w', 'half']);
+const unmappedFmgIcons = [...legacyIconClasses].filter((name) => !lucideIconClasses.has(name) && !textMarkerIcons.has(name));
+const fmgLicenseResponse = await fetch(`${HUB}/fmg/LUCIDE-LICENSE.txt`);
 const fmgStyleResponse = await fetch(`${HUB}/fmg/styles/night.json`);
 const fmgWorkerResponse = await fetch(`${HUB}/fmg/sw.js`);
 const mirWorkerResponse = await fetch(`${HUB}/sw.js`);
 const mirWorker = mirWorkerResponse.ok ? await mirWorkerResponse.text() : '';
 ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>MIR — [^<]*(?:Azgaar|Azgaar|карт)[^<]*<\/title>/i.test(fmgHtml));
 ok('веб-редактор получает MIR-тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
+ok(
+  'Azgaar переведён на единый Lucide SVG-пак, включая кнопки боевых меню',
+  fmgTheme.includes('Lucide 1.53.0') && fmgTheme.includes('.icon-button-melee::before')
+    && fmgTheme.includes('mask: var(--mir-lucide-mask)') && fmgTheme.includes('data:image/svg+xml')
+    && fmgIconsResponse.ok && unmappedFmgIcons.length === 0
+    && fmgLicenseResponse.ok && /ISC License/.test(await fmgLicenseResponse.text()),
+  `классов Font Awesome: ${legacyIconClasses.size}, не переведены: ${unmappedFmgIcons.join(', ') || 'нет'}`,
+);
 ok('FMG не регистрирует вложенный worker, общий worker MIR обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
 
 /* Веб-бандл открываем отдельно от mir.html: проверяем, что полноэкранный
@@ -230,6 +246,13 @@ ok(
     && $('.world-slot-tab.is-active')?.dataset.tab === 'master'
     && $('.world-slot-tab[data-tab="player"]') !== null,
 );
+ok(
+  'слоты и переключатель ролей используют Lucide SVG',
+  $$('[data-action="world-slot-tab"]').every((button) => button.querySelector('svg.icon'))
+    && $$('.world-slot-card__ghost svg.icon').length === 6
+    && $$('[data-action="world-slot-create"] svg.icon').length === 6
+    && $('.world-slot-tab[data-tab="master"]')?.getAttribute('aria-label')?.includes('из 6 слотов'),
+);
 ok('на вкладке мастера пустой слот предлагает создать карту', $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Создать карту'));
 click('[data-action="world-slot-tab"][data-tab="player"]');
 await wait(40);
@@ -247,7 +270,8 @@ await wait(60);
 ok(
   'экран создания карты даёт seed, кнопку создания и отсылку к Azgaar',
   !!$('[data-world-setting="seed"]') && !!$('[data-action="world-generate"]')
-    && /Azgaar/.test($('.world-config .world-field__hint')?.textContent || '')
+    && /Seed определяет/.test($('.world-config .world-field__hint')?.textContent || '')
+    && !!$('.world-generate svg.icon')
     && !$('[data-world-setting="continents"]') && !$('[data-world-setting="climate"]')
 );
 ok('экран создания объявляет полные функции мастера', /ПОЛНЫЕ ФУНКЦИИ/.test($('.world-mode-panel')?.textContent || ''));
@@ -265,6 +289,15 @@ ok(
     && !!$('[data-action="world-export"]') && !!$('[data-action="world-export-image"]') && !!$('[data-action="world-new"]')
     && /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '')
     && !!$('[data-action="world-layer"]') && !!$('[data-role="world-focus-map"]'),
+);
+ok(
+  'слои, зум и камера используют единый набор SVG-иконок',
+  $$('[data-action="world-layer"]').length === 6
+    && $$('[data-action="world-layer"] svg.icon').length === 6
+    && $$('[data-action="world-map-zoom"] svg.icon').length === 2
+    && $$('[data-action="world-move"] svg.icon').length === 4
+    && !!$('.world-map-crosshair svg.icon')
+    && !!$('.world-camera-home svg.icon'),
 );
 ok('ошибок отрисовки нет', errors.length === 0, errors.join(' | '));
 click('[data-action="world-slots"]');

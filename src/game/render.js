@@ -41,6 +41,27 @@ const rgb = (hex) => {
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 };
 
+const FALLBACK_RGB = rgb('#52645a');
+const BIOME_RGB = Object.freeze(Object.fromEntries(Object.entries(BIOME_COLORS).map(([key, color]) => [key, rgb(color)])));
+const MATERIAL_RGB = Object.freeze(Object.fromEntries(Object.entries(MATERIAL_COLORS).map(([key, color]) => [key, rgb(color)])));
+const voxelColumnBuffers = new WeakMap();
+
+const getVoxelColumns = (canvas, world, originX, originZ, viewSide) => {
+  const size = viewSide + 2;
+  let columns = voxelColumnBuffers.get(canvas);
+  if (!columns || columns.length !== size) {
+    columns = Array.from({ length: size }, () => new Array(size));
+    voxelColumnBuffers.set(canvas, columns);
+  }
+  for (let localZ = 0; localZ < size; localZ += 1) {
+    const row = columns[localZ];
+    const z = originZ + localZ - 1;
+    for (let localX = 0; localX < size; localX += 1)
+      row[localX] = world.getColumn(originX + localX - 1, z);
+  }
+  return columns;
+};
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const scaleRgb = (color, factor) =>
   `rgb(${color.map((channel) => Math.max(0, Math.min(255, Math.round(channel * factor)))).join(',')})`;
@@ -412,7 +433,7 @@ const polygon = (context, points, fill, stroke = null) => {
 };
 
 const materialColor = (material, x, z, shade = 1) => {
-  const color = rgb(MATERIAL_COLORS[material] ?? '#52645a');
+  const color = MATERIAL_RGB[material] ?? FALLBACK_RGB;
   const variationHash = (Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263)) >>> 0;
   const variation = (0.92 + (variationHash % 13) / 100) * shade;
   return scaleRgb(color, variation);
@@ -420,7 +441,7 @@ const materialColor = (material, x, z, shade = 1) => {
 
 const getSurfaceColor = (column, x, z) => {
   if (column.water) return materialColor(column.topMaterial, x, z);
-  const color = rgb(BIOME_COLORS[column.biome] ?? MATERIAL_COLORS[column.topMaterial] ?? '#52645a');
+  const color = BIOME_RGB[column.biome] ?? MATERIAL_RGB[column.topMaterial] ?? FALLBACK_RGB;
   const variationHash = (Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263)) >>> 0;
   return scaleRgb(color, 0.92 + (variationHash % 13) / 100);
 };
@@ -443,12 +464,7 @@ export const drawVoxelView = (canvas, world, camera) => {
   const verticalScale = 1.15 * zoom;
   const centerX = width / 2;
   const centerY = height / 2 + 14;
-  const columns = Array.from({ length: viewSide + 2 }, (_, localZ) =>
-    Array.from({ length: viewSide + 2 }, (_, localX) => world.getColumn(
-      originX + localX - 1,
-      originZ + localZ - 1,
-    )),
-  );
+  const columns = getVoxelColumns(canvas, world, originX, originZ, viewSide);
 
   const gradient = context.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, '#172126');

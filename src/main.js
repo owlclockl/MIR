@@ -1948,12 +1948,12 @@ const worldRiverWord = (count) => {
   return 'рек';
 };
 const WORLD_MAP_LAYERS = [
-  ['biomes', 'Биомы'],
-  ['relief', 'Рельеф'],
-  ['height', 'Высоты'],
-  ['politics', 'Государства'],
-  ['cultures', 'Культуры'],
-  ['tectonics', 'Тектоника'],
+  ['biomes', 'Биомы', 'leaf'],
+  ['relief', 'Рельеф', 'mountain'],
+  ['height', 'Высоты', 'mountainSnow'],
+  ['politics', 'Государства', 'flag'],
+  ['cultures', 'Культуры', 'users'],
+  ['tectonics', 'Тектоника', 'layers'],
 ];
 const WORLD_MAP_LEGENDS = {
   biomes: [['ocean', 'океан'], ['forest', 'леса'], ['land', 'равнины'], ['sand', 'сухие земли'], ['snow', 'горы'], ['river', 'реки']],
@@ -1965,7 +1965,7 @@ const WORLD_MAP_LEGENDS = {
 };
 const worldLayerControlsHtml = (active) => `
   <div class="world-layer-switch" role="group" aria-label="Слой карты">
-    ${WORLD_MAP_LAYERS.map(([value, label]) => `<button class="world-layer-button${value === active ? ' is-active' : ''}" type="button" data-action="world-layer" data-layer="${value}" aria-pressed="${value === active}">${label}</button>`).join('')}
+    ${WORLD_MAP_LAYERS.map(([value, label, glyph]) => `<button class="world-layer-button${value === active ? ' is-active' : ''}" type="button" data-action="world-layer" data-layer="${value}" aria-pressed="${value === active}">${icon(glyph, 'icon--xs')}<span>${label}</span></button>`).join('')}
   </div>`;
 const worldMapLegendHtml = (layer) => `
   <div class="world-legend" data-role="world-legend" aria-hidden="true">
@@ -1988,7 +1988,7 @@ const worldStateDetailsHtml = (world, selectedStateId) => {
   if (!state) {
     return `
       <div class="world-state-empty">
-        <span class="world-state-empty__mark" aria-hidden="true">⌖</span>
+        <span class="world-state-empty__mark" aria-hidden="true">${icon('crosshair', 'icon--lg')}</span>
         <strong>Территория не выбрана</strong>
         <span>Щёлкните по карте, чтобы получить разведданные по государству.</span>
       </div>`;
@@ -2022,36 +2022,6 @@ const worldStateDetailsHtml = (world, selectedStateId) => {
           : '<div class="world-settlement-row"><i aria-hidden="true"></i><span>Поселений не обнаружено</span><small>—</small></div>'
       }
     </div>`;
-};
-
-const worldStatsHtml = (world) => `
-  <div class="world-stats" aria-label="Параметры мира">
-    <div class="world-stat"><span>Площадь</span><strong data-world-stat="area">${worldInteger(world.areaKm2)} км²</strong></div>
-    <div class="world-stat"><span>К Земле</span><strong data-world-stat="ratio">${world.earthRatio.toFixed(2).replace('.', ',')}×</strong></div>
-    <div class="world-stat"><span>Сторона карты</span><strong data-world-stat="side">${worldInteger(world.widthMeters / 1000)} км</strong></div>
-    <div class="world-stat"><span>Материки</span><strong data-world-stat="continents">${world.continents} / ${MAX_CONTINENTS}</strong></div>
-    <div class="world-stat"><span>Государства</span><strong data-world-stat="states">${world.states.length}</strong></div>
-    <div class="world-stat"><span>Поселения</span><strong data-world-stat="settlements">${world.settlements.length}</strong></div>
-    <div class="world-stat"><span>Поверхностные блоки</span><strong data-world-stat="voxels">≈ ${worldScientific(world.surfaceVoxelCount)}</strong></div>
-    <div class="world-stat"><span>Всего чанков</span><strong data-world-stat="chunks">≈ ${worldScientific(world.chunkCount)}</strong></div>
-  </div>`;
-
-const updateWorldStats = (root, world) => {
-  if (!root || !world) return;
-  const values = {
-    area: `${worldInteger(world.areaKm2)} км²`,
-    ratio: `${world.earthRatio.toFixed(2).replace('.', ',')}×`,
-    side: `${worldInteger(world.widthMeters / 1000)} км`,
-    continents: `${world.continents} / ${MAX_CONTINENTS}`,
-    states: String(world.states.length),
-    settlements: String(world.settlements.length),
-    voxels: `≈ ${worldScientific(world.surfaceVoxelCount)}`,
-    chunks: `≈ ${worldScientific(world.chunkCount)}`,
-  };
-  for (const [name, value] of Object.entries(values)) {
-    const node = root.querySelector(`[data-world-stat="${name}"]`);
-    if (node) node.textContent = value;
-  }
 };
 
 /* ---------- слоты карт ---------------------------------------
@@ -2104,7 +2074,7 @@ const saveWorldSlots = (slots) => {
 const worldSlotEntryTitle = (config) => `Мир ${config.seed}`;
 
 const writeWorldSlot = (role, index, config) => {
-  if (!WORLD_SLOT_ROLES.includes(role) || !Number.isInteger(index)) return false;
+  if (!WORLD_SLOT_ROLES.includes(role) || !Number.isInteger(index) || index < 0 || index >= WORLD_SLOT_COUNT) return false;
   const slots = loadWorldSlots();
   slots[role][index] = {
     title: worldSlotEntryTitle(config),
@@ -2115,7 +2085,7 @@ const writeWorldSlot = (role, index, config) => {
 };
 
 const removeWorldSlot = (role, index) => {
-  if (!WORLD_SLOT_ROLES.includes(role) || !Number.isInteger(index)) return false;
+  if (!WORLD_SLOT_ROLES.includes(role) || !Number.isInteger(index) || index < 0 || index >= WORLD_SLOT_COUNT) return false;
   const slots = loadWorldSlots();
   slots[role][index] = null;
   return saveWorldSlots(slots);
@@ -2168,10 +2138,17 @@ const buildWorldModel = () => {
   session.screen = 'explore';
 };
 
+const worldSlotDateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 const worldSlotDateHtml = (savedAt) => {
   if (!savedAt) return '';
   try {
-    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(savedAt));
+    return worldSlotDateFormatter.format(new Date(savedAt));
   } catch {
     return formatDate(savedAt);
   }
@@ -2179,34 +2156,49 @@ const worldSlotDateHtml = (savedAt) => {
 
 const worldSlotCardHtml = (role, index, entry) => {
   const player = role === 'player';
+  const number = String(index + 1).padStart(2, '0');
   if (!entry) {
     return `
-      <article class="world-slot-card world-slot-card--empty" data-slot-role="${role}" data-slot-index="${index}">
-        <div class="world-slot-card__ghost" aria-hidden="true"><span>${index + 1}</span></div>
+      <article class="world-slot-card world-slot-card--empty" data-slot-role="${role}" data-slot-index="${index}" role="listitem">
+        <header class="world-slot-card__head">
+          <span class="world-slot-card__index">МИР · ${number}</span>
+          <span class="world-slot-card__state"><i aria-hidden="true"></i>Свободен</span>
+        </header>
+        <div class="world-slot-card__ghost" aria-hidden="true">
+          ${icon('map', 'icon--lg')}
+          <span>Пустой слот</span>
+        </div>
         <div class="world-slot-body">
-          <p class="world-slot-body__title">Слот ${index + 1} · пусто</p>
+          <p class="world-slot-body__title">Слот ${index + 1}</p>
           <p class="world-slot-body__hint">${player ? 'Войдите в карту мастера по seed или файлу.' : 'Создайте карту — она займёт этот слот.'}</p>
         </div>
         <div class="world-slot-actions">
           <button class="mini-button mini-button--accent" type="button" data-action="world-slot-create" data-slot-index="${index}">
-            ${player ? 'Войти в карту' : 'Создать карту'}
+            ${icon(player ? 'eye' : 'plus', 'icon--xs')}<span>${player ? 'Войти в карту' : 'Создать карту'}</span>
           </button>
-          ${player ? `<button class="mini-button" type="button" data-action="world-slot-import" data-slot-index="${index}">Из файла</button>` : ''}
+          ${player ? `<button class="mini-button world-slot-import" type="button" data-action="world-slot-import" data-slot-index="${index}" aria-label="Загрузить файл в слот ${index + 1}" title="Загрузить из файла">${icon('fileDown', 'icon--xs')}<span>Из файла</span></button>` : ''}
         </div>
       </article>`;
   }
   return `
-    <article class="world-slot-card" data-slot-role="${role}" data-slot-index="${index}">
-      <canvas class="world-slot-thumb" data-role="world-slot-thumb" data-slot-role="${role}" data-slot-index="${index}" width="360" height="180" aria-label="Превью карты слота ${index + 1}"></canvas>
+    <article class="world-slot-card world-slot-card--filled" data-slot-role="${role}" data-slot-index="${index}" role="listitem">
+      <header class="world-slot-card__head">
+        <span class="world-slot-card__index">МИР · ${number}</span>
+        <span class="world-slot-card__state world-slot-card__state--filled"><i aria-hidden="true"></i>Сохранён</span>
+      </header>
+      <div class="world-slot-card__media">
+        <canvas class="world-slot-thumb" data-role="world-slot-thumb" data-slot-role="${role}" data-slot-index="${index}" width="360" height="180" aria-label="Превью карты слота ${index + 1}"></canvas>
+        <span class="world-slot-card__media-mark" aria-hidden="true">${icon('map', 'icon--xs')}</span>
+      </div>
       <div class="world-slot-body">
         <p class="world-slot-body__title" translate="no">${escapeHtml(entry.title || worldSlotEntryTitle(entry.config))}</p>
         <p class="world-slot-body__meta"><code translate="no">${escapeHtml(entry.config.seed)}</code><span>${worldSlotDateHtml(entry.savedAt)}</span></p>
       </div>
       <div class="world-slot-actions">
         <button class="mini-button mini-button--accent" type="button" data-action="world-slot-open" data-slot-index="${index}">
-          ${player ? 'Играть' : 'Вести карту'}
+          ${icon(player ? 'eye' : 'play', 'icon--xs')}<span>${player ? 'Играть' : 'Вести карту'}</span>
         </button>
-        <button class="mini-button mini-button--danger" type="button" data-action="world-slot-clear" data-slot-index="${index}" aria-label="Очистить слот ${index + 1}" title="Очистить слот">${icon('x', 'icon--xs')}</button>
+        <button class="mini-button mini-button--danger world-slot-clear" type="button" data-action="world-slot-clear" data-slot-index="${index}" aria-label="Очистить слот ${index + 1}" title="Очистить слот">${icon('trash', 'icon--xs')}</button>
       </div>
     </article>`;
 };
@@ -2219,17 +2211,22 @@ const worldSlotsHtml = (session) => {
     <div class="world-shell world-shell--slots">
       <section class="world-card world-slots">
         <header class="world-slots__head">
-          <div>
-            <div class="world-card__eyebrow">Слоты карт</div>
-            <h2>${player ? 'Играйте в готовые миры' : 'Ведите свои миры'}</h2>
+          <div class="world-slots__intro">
+            <p class="world-card__eyebrow"><span>Картотека</span><span class="world-slots__total">6 ячеек</span></p>
+            <h2>${player ? 'Выберите карту для входа' : 'Выберите мир для управления'}</h2>
             <p class="world-slots__lead">${player
-              ? 'Вкладка игрока: шесть слотов под карты, к которым вы подключаетесь. Функции на карте урезаны — только просмотр.'
-              : 'Вкладка мастера: шесть слотов под карты, которые вы ведёте. Функции на карте полные — от генерации до редактора.'}</p>
+              ? 'Войдите по seed мастера или загрузите карту из файла. В режиме игрока доступны просмотр и навигация.'
+              : 'Создайте карту в свободном слоте или продолжите работу с сохранённым миром.'}</p>
           </div>
           <div class="world-slot-tabs" role="tablist" aria-label="Роль в игре">
-            ${WORLD_SLOT_ROLES.map(
-              (value) => `<button class="world-slot-tab${value === role ? ' is-active' : ''}" type="button" role="tab" data-action="world-slot-tab" data-tab="${value}" aria-selected="${value === role}">${WORLD_ROLE_LABELS[value]}</button>`,
-            ).join('')}
+            ${WORLD_SLOT_ROLES.map((value) => {
+              const selected = value === role;
+              const count = slots[value].filter(Boolean).length;
+              const label = WORLD_ROLE_LABELS[value];
+              return `<button class="world-slot-tab${selected ? ' is-active' : ''}" type="button" role="tab" data-action="world-slot-tab" data-tab="${value}" aria-selected="${selected}" aria-label="${label}, занято ${count} из ${WORLD_SLOT_COUNT} слотов">
+                ${icon(value === 'master' ? 'crown' : 'eye', 'icon--xs')}<span>${label}</span><span class="world-slot-tab__count" aria-hidden="true">${count}<i>/ ${WORLD_SLOT_COUNT}</i></span>
+              </button>`;
+            }).join('')}
           </div>
         </header>
         <div class="world-slot-grid" role="list" aria-label="Слоты: ${WORLD_ROLE_LABELS[role]}">
@@ -2242,8 +2239,8 @@ const worldSlotsHtml = (session) => {
 const worldModeToolsHtml = (player) => `
   <section class="world-card world-mode-panel">
     <header class="world-card__heading world-card__heading--compact">
-      <div><p class="world-card__eyebrow">Режим карты</p><h3>${player ? 'Игрок' : 'Мастер'}</h3></div>
-      <span class="world-tag">${player ? 'УРЕЗАННЫЕ ФУНКЦИИ' : 'ПОЛНЫЕ ФУНКЦИИ'}</span>
+      <div><p class="world-card__eyebrow">Роль доступа</p><h3>${icon(player ? 'eye' : 'crown', 'icon--sm')}<span>${player ? 'Игрок' : 'Мастер'}</span></h3></div>
+      <span class="world-tag world-tag--mode">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'УРЕЗАННЫЕ ФУНКЦИИ' : 'ПОЛНЫЕ ФУНКЦИИ'}</span></span>
     </header>
     <ul class="world-mode-list">
       ${(player
@@ -2275,29 +2272,29 @@ const worldSetupHtml = (session) => {
   return `
     <div class="world-shell world-shell--setup world-shell--azgaar">
       <section class="world-card world-config">
-        <div class="world-card__eyebrow">${slotLabel} · ${WORLD_ROLE_LABELS[session.mode]}</div>
+        <div class="world-config__kicker"><span class="world-config__step">${slot ? String(slot.index + 1).padStart(2, '0') : icon('plus', 'icon--xs')}</span><span>${slotLabel} · ${WORLD_ROLE_LABELS[session.mode]}</span></div>
         <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
         <p class="world-fmg-description">${player
-          ? 'Укажите seed карты, которую ведёт мастер, или загрузите файл карты. Заполненный слот откроется в режиме игрока.'
-          : 'Карта займёт слот и откроется в полном режиме мастера. MIR передаст seed и в генератор Azgaar.'}</p>
+          ? 'Введите seed от мастера или загрузите файл карты. Доступ игрока ограничен просмотром и навигацией.'
+          : 'Карта займёт этот слот и откроется в режиме мастера. Один seed воспроизводит один и тот же мир.'}</p>
         <label class="field world-field">
           <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
             <input class="input input--code" type="text" maxlength="48" autocomplete="off" spellcheck="false"
                    data-role="world-seed" data-world-setting="seed" value="${escapeHtml(config.seed)}" />
-            ${player ? '' : `<button class="icon-button icon-button--sm" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('refresh', 'icon--xs')}</button>`}
+            ${player ? '' : `<button class="icon-button icon-button--sm world-seed-random" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('dices', 'icon--xs')}</button>`}
           </span>
           <span class="world-field__hint">${player
-            ? 'Seed выдаёт мастер карты. Та же строка воспроизводит ту же карту.'
-            : 'Укажите seed или сгенерируйте случайный. Настройки и правила карты задаются в Azgaar.'}</span>
+            ? 'Seed выдаёт мастер. Введите его без изменений — мир будет тем же.'
+            : 'Seed определяет рельеф, биомы, материки и чанки карты.'}</span>
         </label>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
-          <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon('play', 'icon--xs')}
+          <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
         </button>
         ${player
-          ? `<button class="ghost-button ghost-button--inline world-slot-import-button" type="button" data-action="world-slot-import" data-slot-index="${slot?.index ?? 0}">${icon('download', 'icon--xs')}<span>Загрузить файл карты</span></button>`
+          ? `<button class="ghost-button ghost-button--inline world-slot-import-button" type="button" data-action="world-slot-import" data-slot-index="${slot?.index ?? 0}">${icon('fileDown', 'icon--xs')}<span>Загрузить файл карты</span></button>`
           : HAS_AZGAAR_EDITOR
-            ? `<button class="ghost-button ghost-button--inline world-slot-import-button" type="button" data-action="world-fmg-open">${icon('globe', 'icon--xs')}<span>Открыть генератор Azgaar</span></button>`
+            ? `<button class="ghost-button ghost-button--inline world-slot-import-button" type="button" data-action="world-fmg-open">${icon('map', 'icon--xs')}<span>Открыть редактор карт</span></button>`
             : ''}
       </section>
       ${worldModeToolsHtml(player)}
@@ -2313,18 +2310,18 @@ const worldExploreHtml = (session) => {
         <header class="world-map-toolbar">
           <div class="world-map-toolbar__title"><p class="world-card__eyebrow">Оперативный атлас</p><h3>Поверхность мира</h3></div>
           <div class="world-camera-tools world-camera-tools--map" role="group" aria-label="Масштаб стратегической карты">
-            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="-1" aria-label="Отдалить стратегическую карту">−</button>
+            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="-1" aria-label="Отдалить стратегическую карту" title="Отдалить">${icon('minus', 'icon--xs')}</button>
             <span data-role="world-map-zoom">${Math.round((session.camera?.mapZoom ?? 2) * 100)}%</span>
-            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="1" aria-label="Приблизить стратегическую карту">+</button>
-            <button class="mini-button world-camera-home" type="button" data-action="world-camera-home">К центру</button>
+            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="1" aria-label="Приблизить стратегическую карту" title="Приблизить">${icon('plus', 'icon--xs')}</button>
+            <button class="mini-button world-camera-home" type="button" data-action="world-camera-home">${icon('crosshair', 'icon--xs')}<span>К центру</span></button>
           </div>
         </header>
         ${worldLayerControlsHtml(session.layer)}
         <div class="world-map-viewport" data-role="world-map-frame">
           <canvas class="world-map-canvas world-map-canvas--focus" data-role="world-focus-map" width="1440" height="900" tabindex="0" aria-label="Стратегическая карта. Перетаскивайте мышью, колесо меняет масштаб, WASD двигает камеру."></canvas>
           <div class="world-map-hud world-map-hud--top" aria-hidden="true"><span class="world-map-hud__live"><i></i>СИСТЕМА КАРТЫ · АКТИВНА</span><span>${escapeHtml(world.seed)}</span></div>
-          <div class="world-map-hud world-map-hud--bottom" aria-hidden="true"><span>СЕВЕР ↑</span><span>DRAG ПАНОРАМИРОВАНИЕ · WHEEL МАСШТАБ</span></div>
-          <div class="world-map-crosshair" aria-hidden="true"><i></i><b></b></div>
+          <div class="world-map-hud world-map-hud--bottom" aria-hidden="true"><span class="world-map-north">${icon('arrowUp', 'icon--xs')}<span>СЕВЕР</span></span><span>ПЕРЕТАСКИВАНИЕ · КОЛЕСО — МАСШТАБ</span></div>
+          <span class="world-map-crosshair" aria-hidden="true">${icon('crosshair', 'icon--lg')}</span>
         </div>
         <div class="world-map-legendline">
           ${worldMapLegendHtml(session.layer)}
@@ -2332,16 +2329,16 @@ const worldExploreHtml = (session) => {
         </div>
         <div class="world-map-actions">
           ${player
-            ? `<span class="world-status"><i class="world-status__dot world-status__dot--player"></i>Режим игрока · только просмотр</span>`
-            : `<span class="world-status"><i class="world-status__dot"></i>Мир сгенерирован · чанки подгружаются по запросу</span>
-          <button class="mini-button" type="button" data-action="world-edit-config">Настройки мира</button>`}
+            ? `<span class="world-status"><i class="world-status__dot world-status__dot--player"></i>${icon('eye', 'icon--xs')}<span>Режим игрока · только просмотр</span></span>`
+            : `<span class="world-status"><i class="world-status__dot"></i>${icon('check', 'icon--xs')}<span>Карта активна · чанки загружаются по запросу</span></span>
+          <button class="mini-button" type="button" data-action="world-edit-config">${icon('settings', 'icon--xs')}<span>Настроить</span></button>`}
         </div>
       </section>
 
       <aside class="world-side-column world-side-column--studio">
         <section class="world-card world-minimap-panel">
           <header class="world-card__heading world-card__heading--compact">
-            <div><p class="world-card__eyebrow">Полная проекция</p><h3>Навигация</h3></div>
+            <div><p class="world-card__eyebrow">Полная проекция</p><h3>${icon('map', 'icon--sm')}<span>Навигация</span></h3></div>
             <span class="world-tag">${world.continentCenters.length} МАТЕРИКА</span>
           </header>
           <canvas class="world-map-canvas world-map-canvas--overview" data-role="world-map" width="720" height="360" tabindex="0" aria-label="Мини-карта всего мира. Щелкните, чтобы переместить камеру."></canvas>
@@ -2350,12 +2347,12 @@ const worldExploreHtml = (session) => {
 
         <section class="world-card world-terrain-panel">
           <header class="world-card__heading world-card__heading--compact">
-            <div><p class="world-card__eyebrow">Обзор местности</p><h3>Воксельная сцена</h3></div>
+            <div><p class="world-card__eyebrow">Обзор местности</p><h3>${icon('mountain', 'icon--sm')}<span>Воксельная сцена</span></h3></div>
             <div class="world-camera-tools" role="group" aria-label="Масштаб воксельной камеры">
-              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="-1" aria-label="Отдалить вид местности">−</button>
+              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="-1" aria-label="Отдалить вид местности" title="Отдалить">${icon('minus', 'icon--xs')}</button>
               <span data-role="world-zoom">100%</span>
-              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="1" aria-label="Приблизить вид местности">+</button>
-              <button class="world-camera-button" type="button" data-action="world-camera-home" aria-label="К точке старта">⌖</button>
+              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="1" aria-label="Приблизить вид местности" title="Приблизить">${icon('plus', 'icon--xs')}</button>
+              <button class="world-camera-button" type="button" data-action="world-camera-home" aria-label="К точке старта" title="К точке старта">${icon('crosshair', 'icon--xs')}</button>
             </div>
           </header>
           <canvas class="world-voxel-canvas" data-role="world-viewport" width="900" height="560" aria-label="Изометрическая воксельная сцена. Перетаскивайте мышью для панорамирования камеры."></canvas>
@@ -2368,23 +2365,23 @@ const worldExploreHtml = (session) => {
 
         <section class="world-card world-state-panel">
           <header class="world-card__heading world-card__heading--compact">
-            <div><p class="world-card__eyebrow">Разведданные</p><h3>Выбранная территория</h3></div>
-            <button class="mini-button" type="button" data-action="world-clear-selection">Сбросить</button>
+            <div><p class="world-card__eyebrow">Разведданные</p><h3>${icon('landmark', 'icon--sm')}<span>Выбранная территория</span></h3></div>
+            <button class="mini-button" type="button" data-action="world-clear-selection">${icon('x', 'icon--xs')}<span>Сбросить</span></button>
           </header>
           <div class="world-state-details" data-role="world-state-details">${worldStateDetailsHtml(world, session.selectedStateId)}</div>
         </section>
 
         <section class="world-card world-controls-panel">
-          <div class="world-control-copy"><p class="world-card__eyebrow">Камера RTS</p><span>WASD / стрелки · Shift — быстрее</span></div>
+          <div class="world-control-copy"><p class="world-card__eyebrow">${icon('crosshair', 'icon--xs')}<span>Камера RTS</span></p><span>WASD / стрелки · Shift — быстрее</span></div>
           <div class="world-controls" role="group" aria-label="Быстрое перемещение камеры">
             <span aria-hidden="true"></span>
-            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="-1" aria-label="Переместить камеру на север">↑</button>
+            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="-1" aria-label="Переместить камеру на север" title="На север">${icon('arrowUp', 'icon--sm')}</button>
             <span aria-hidden="true"></span>
-            <button class="world-control" type="button" data-action="world-move" data-dx="-1" data-dz="0" aria-label="Переместить камеру на запад">←</button>
-            <button class="world-control world-control--center" type="button" data-action="world-camera-home" aria-label="Вернуть камеру к точке старта">⌖</button>
-            <button class="world-control" type="button" data-action="world-move" data-dx="1" data-dz="0" aria-label="Переместить камеру на восток">→</button>
+            <button class="world-control" type="button" data-action="world-move" data-dx="-1" data-dz="0" aria-label="Переместить камеру на запад" title="На запад">${icon('arrowLeft', 'icon--sm')}</button>
+            <button class="world-control world-control--center" type="button" data-action="world-camera-home" aria-label="Вернуть камеру к точке старта" title="К точке старта">${icon('crosshair', 'icon--sm')}</button>
+            <button class="world-control" type="button" data-action="world-move" data-dx="1" data-dz="0" aria-label="Переместить камеру на восток" title="На восток">${icon('arrowRight', 'icon--sm')}</button>
             <span aria-hidden="true"></span>
-            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="1" aria-label="Переместить камеру на юг">↓</button>
+            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="1" aria-label="Переместить камеру на юг" title="На юг">${icon('arrowDown', 'icon--sm')}</button>
             <span aria-hidden="true"></span>
           </div>
         </section>
@@ -2399,7 +2396,7 @@ const worldFmgOverlayHtml = (session, seed) => {
       <div class="world-fmg-shell">
         <header class="world-fmg-heading">
           <div class="world-fmg-seed"><span>SEED</span><code data-role="world-fmg-seed">${escapeHtml(seed)}</code></div>
-          <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас MIR">${icon('chevron', 'world-back-icon')}<span>Атлас MIR</span></button>
+          <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас MIR">${icon('chevronLeft', 'icon--xs')}<span>Атлас MIR</span></button>
         </header>
         <iframe class="world-fmg-frame" data-role="world-fmg-frame"
           src="${escapeHtml(frameUrl)}" title="Редактор карт"
@@ -2429,29 +2426,29 @@ const worldPageHtml = () => {
       : `${session.slot ? `СЛОТ ${session.slot.index + 1}` : 'НОВАЯ КАРТА'} · ${WORLD_ROLE_LABELS[session.mode].toUpperCase()}`;
   const modeChip = slotsScreen
     ? ''
-    : `<span class="world-mode-chip${player ? ' world-mode-chip--player' : ''}">${player ? 'ИГРОК' : 'МАСТЕР'}</span>`;
+    : `<span class="world-mode-chip${player ? ' world-mode-chip--player' : ''}">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ИГРОК' : 'МАСТЕР'}</span></span>`;
   const toSlotsButton = slotsScreen
     ? ''
-    : `<button class="world-topbar-button" type="button" data-action="world-slots">${icon('chevron', 'icon--xs world-back-icon')}<span>К слотам</span></button>`;
+    : `<button class="world-topbar-button" type="button" data-action="world-slots">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
   const roleActions = player
     ? ''
     : exploring
       ? `
-            <button class="world-topbar-button" type="button" data-action="world-new">${icon('refresh', 'icon--xs')}<span>Новый мир</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-new">${icon('dices', 'icon--xs')}<span>Новый мир</span></button>
             <button class="world-topbar-button" type="button" data-action="world-save">${icon('save', 'icon--xs')}<span>Сохранить</span></button>
-            <button class="world-topbar-button" type="button" data-action="world-export">${icon('download', 'icon--xs')}<span>Экспорт</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-export">${icon('fileDown', 'icon--xs')}<span>Экспорт</span></button>
             <button class="world-topbar-button" type="button" data-action="world-export-image">${icon('camera', 'icon--xs')}<span>Снимок</span></button>`
       : `
-            <button class="world-topbar-button" type="button" data-action="world-load">${icon('download', 'icon--xs')}<span>Загрузить seed</span></button>
-            <button class="world-topbar-button" type="button" data-action="world-random-seed">${icon('refresh', 'icon--xs')}<span>Новый seed</span></button>`;
+            <button class="world-topbar-button" type="button" data-action="world-load">${icon('folderOpen', 'icon--xs')}<span>Загрузить seed</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-random-seed">${icon('dices', 'icon--xs')}<span>Новый seed</span></button>`;
   const fmgButton = master && !slotsScreen && HAS_AZGAAR_EDITOR
-    ? `\n          <button class="world-topbar-button world-fmg-open" type="button" data-action="world-fmg-open" aria-label="Открыть полный редактор карт Azgaar" title="Открыть полный редактор карт Azgaar">${icon('globe', 'icon--xs')}<span>Azgaar FMG</span></button>`
+    ? `\n          <button class="world-topbar-button world-fmg-open" type="button" data-action="world-fmg-open" aria-label="Открыть полный редактор карт Azgaar" title="Открыть полный редактор карт Azgaar">${icon('map', 'icon--xs')}<span>Редактор карт</span></button>`
     : '';
   return `
     <div class="world-app" role="application" aria-label="Редактор мира MIR">
       <header class="world-topbar">
         <div class="world-topbar__identity">
-          <button class="world-back-button" type="button" data-action="world-exit" aria-label="Вернуться в главное меню" title="В меню">${icon('chevron', 'world-back-icon')}</button>
+          <button class="world-back-button" type="button" data-action="world-exit" aria-label="Вернуться в главное меню" title="В меню">${icon('chevronLeft', 'icon--sm')}</button>
           <span class="world-brand-mark">${icon('sigil')}</span>
           <div class="world-brand-copy"><span>THE CIVILIZATION OF THE SAGES</span><strong>${title}</strong></div>
           ${modeChip}
@@ -2462,10 +2459,10 @@ const worldPageHtml = () => {
         </div>
         <div class="world-topbar__actions">
           ${toSlotsButton}${roleActions}${fmgButton}
-          <button class="world-exit-button" type="button" data-action="world-exit">В главное меню</button>
+          <button class="world-exit-button" type="button" data-action="world-exit">${icon('logOut', 'icon--xs')}<span>В меню</span></button>
         </div>
       </header>
-      <main class="world-page-body" data-role="world-page-body">
+      <main class="world-page-body world-page-body--${slotsScreen ? 'slots' : exploring ? 'explore' : 'setup'}" data-role="world-page-body">
         ${slotsScreen ? worldSlotsHtml(session) : exploring ? worldExploreHtml(session) : worldSetupHtml(session)}
       </main>
       <input class="world-file-input" type="file" accept="application/json,.json" data-role="world-file" tabindex="-1" aria-hidden="true" />
@@ -2592,34 +2589,69 @@ const updateWorldReadouts = () => {
   if (zoomNode) zoomNode.textContent = `${Math.round(camera.zoom * 100)}%`;
 };
 
-/* Превью слотов: маленькая карта мира из конфига слота. Каждый канвас
-   рисуется один раз (data-drawn), а модели кешируются — повторная
-   перерисовка экрана слотов не пересчитывает растры. */
-const worldSlotModelCache = new Map();
+/* Превью слотов: растровая мини-карта кешируется отдельно от DOM-canvas.
+   Переключение ролей повторно использует готовые пиксели, а первая отрисовка
+   идёт по одному слоту за кадр/idle-задачу, чтобы не блокировать ввод. */
+const worldSlotThumbCache = new Map();
+const worldSlotThumbQueue = [];
+let worldSlotThumbScheduled = false;
+let worldDrawFrame = 0;
+
+const worldSlotThumbKey = (role, index, config) =>
+  `${role}:${index}:${JSON.stringify(normalizeWorldConfig(config))}`;
+
+const scheduleWorldSlotThumb = () => {
+  if (worldSlotThumbScheduled || !worldSlotThumbQueue.length) return;
+  worldSlotThumbScheduled = true;
+  const drawNext = () => {
+    worldSlotThumbScheduled = false;
+    const job = worldSlotThumbQueue.shift();
+    if (job && job.root.contains(job.canvas)) {
+      const { canvas, role, index, entry } = job;
+      const key = worldSlotThumbKey(role, index, entry.config);
+      let preview = worldSlotThumbCache.get(key);
+      if (preview) {
+        worldSlotThumbCache.delete(key);
+        worldSlotThumbCache.set(key, preview);
+      } else {
+        preview = document.createElement('canvas');
+        preview.width = canvas.width;
+        preview.height = canvas.height;
+        const model = createWorld({ ...entry.config });
+        drawWorldMap(preview, model, null, 'biomes', true);
+        worldSlotThumbCache.set(key, preview);
+        if (worldSlotThumbCache.size > WORLD_SLOT_COUNT * WORLD_SLOT_ROLES.length) {
+          worldSlotThumbCache.delete(worldSlotThumbCache.keys().next().value);
+        }
+      }
+      try {
+        const context = canvas.getContext('2d');
+        context?.clearRect(0, 0, canvas.width, canvas.height);
+        context?.drawImage(preview, 0, 0, canvas.width, canvas.height);
+        canvas.dataset.drawn = '1';
+      } catch { /* превью необязательно для входа в сохранённую карту */ }
+      delete canvas.dataset.drawQueued;
+    }
+    if (worldSlotThumbQueue.length) scheduleWorldSlotThumb();
+  };
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(drawNext, { timeout: 500 });
+  else if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(drawNext);
+  else window.setTimeout(drawNext, 0);
+};
 
 const drawWorldSlotThumbs = (root) => {
   if (!root) return;
   const slots = loadWorldSlots();
-  const canvases = [...root.querySelectorAll('canvas[data-role="world-slot-thumb"]')];
-  if (!canvases.length) return;
-  requestAnimationFrame(() => {
-    for (const canvas of canvases) {
-      if (canvas.dataset.drawn === '1') continue;
-      const role = canvas.dataset.slotRole;
-      const index = Number(canvas.dataset.slotIndex);
-      const entry = slots[role]?.[index];
-      if (!entry) continue;
-      const key = `${role}:${index}:${entry.config.seed}`;
-      let model = worldSlotModelCache.get(key);
-      if (!model) {
-        model = createWorld({ ...entry.config });
-        if (worldSlotModelCache.size > WORLD_SLOT_COUNT * 2) worldSlotModelCache.clear();
-        worldSlotModelCache.set(key, model);
-      }
-      drawWorldMap(canvas, model, null, 'biomes', true);
-      canvas.dataset.drawn = '1';
-    }
-  });
+  for (const canvas of root.querySelectorAll('canvas[data-role="world-slot-thumb"]')) {
+    if (canvas.dataset.drawn === '1' || canvas.dataset.drawQueued === '1') continue;
+    const role = canvas.dataset.slotRole;
+    const index = Number(canvas.dataset.slotIndex);
+    const entry = slots[role]?.[index];
+    if (!entry) continue;
+    canvas.dataset.drawQueued = '1';
+    worldSlotThumbQueue.push({ root, canvas, role, index, entry });
+  }
+  scheduleWorldSlotThumb();
 };
 
 const drawWorldSession = () => {
@@ -2636,19 +2668,30 @@ const drawWorldSession = () => {
   updateWorldReadouts();
 };
 
+const scheduleWorldSessionDraw = () => {
+  if (worldDrawFrame) return;
+  const draw = () => {
+    worldDrawFrame = 0;
+    drawWorldSession();
+  };
+  worldDrawFrame = typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame(draw)
+    : window.setTimeout(draw, 16);
+};
+
 const moveWorldCamera = (dx, dz) => {
   if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore' || !ui.world.model) return;
   const { model, camera } = ui.world;
   camera.x = Math.max(0, Math.min(model.widthCells - 1, camera.x + dx));
   camera.z = Math.max(0, Math.min(model.depthCells - 1, camera.z + dz));
-  drawWorldSession();
+  scheduleWorldSessionDraw();
 };
 
 const changeWorldZoom = (direction) => {
   if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore') return;
   ui.world.camera.zoom = clamp(ui.world.camera.zoom * (direction > 0 ? 1.2 : 1 / 1.2), 0.6, 2.5);
   ui.world.camera.zoom = Math.round(ui.world.camera.zoom * 100) / 100;
-  drawWorldSession();
+  scheduleWorldSessionDraw();
 };
 
 const changeWorldMapZoom = (direction, canvas = null, clientX = null, clientY = null) => {
@@ -2674,7 +2717,7 @@ const resetWorldCamera = () => {
   ui.world.camera.z = ui.world.spawn.z;
   ui.world.camera.zoom = 1;
   ui.world.camera.mapZoom = 2.1;
-  drawWorldSession();
+  scheduleWorldSessionDraw();
 };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -3800,7 +3843,7 @@ document.addEventListener('wheel', (event) => {
     event.preventDefault();
     ui.world.camera.zoom = clamp(ui.world.camera.zoom * Math.exp(-event.deltaY * 0.0015), 0.6, 2.5);
     ui.world.camera.zoom = Math.round(ui.world.camera.zoom * 100) / 100;
-    drawWorldSession();
+    scheduleWorldSessionDraw();
     return;
   }
   if (ui.modal?.type !== 'avatar-preview' || !event.target.closest?.('[data-role="avatar-frame"]')) return;
@@ -4043,7 +4086,7 @@ const actions = {
     }
     const legend = worldRoot()?.querySelector('[data-role="world-legend"]');
     if (legend) legend.outerHTML = worldMapLegendHtml(layer);
-    drawWorldSession();
+    scheduleWorldSessionDraw();
   },
 
   'world-generate': () => {
@@ -4648,7 +4691,7 @@ document.addEventListener('click', (event) => {
       const details = worldRoot()?.querySelector('[data-role="world-state-details"]');
       if (details) details.innerHTML = worldStateDetailsHtml(ui.world.model, ui.world.selectedStateId);
       mapCanvas.focus({ preventScroll: true });
-      drawWorldSession();
+      scheduleWorldSessionDraw();
     }
     return;
   }
