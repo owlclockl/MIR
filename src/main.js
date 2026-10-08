@@ -11,6 +11,8 @@ import {
 import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
+import { BLOCK_NAMES, EARTH_SURFACE_KM2, MAX_CONTINENTS, createWorld } from './game/world.js';
+import { drawVoxelView, drawWorldMap } from './game/render.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -111,6 +113,7 @@ const ui = {
   hubDraft: '',
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
+  world: null, // настройки генерации или текущая сессия voxel-world
 };
 
 let backendReady = store.isBackendInitialized?.() ?? false;
@@ -1897,6 +1900,255 @@ const adminModalHtml = () => {
   });
 };
 
+const worldInteger = (value) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(value);
+const worldSuperscript = (value) => String(value).replace(/[0-9-]/g, (digit) => ({
+  '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+  '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻',
+}[digit]));
+const worldScientific = (value) => {
+  const [mantissa, exponent] = Number(value).toExponential(1).split('e');
+  return `${mantissa.replace('.', ',')} × 10${worldSuperscript(Number(exponent))}`;
+};
+const worldContinentWord = (count) => {
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'континентов';
+  const mod10 = count % 10;
+  if (mod10 === 1) return 'континент';
+  if (mod10 >= 2 && mod10 <= 4) return 'континента';
+  return 'континентов';
+};
+const worldContinentLabel = (count) => `${count} ${worldContinentWord(count)}`;
+const worldSeed = () => {
+  const value = new Uint32Array(1);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(value);
+  else value[0] = (Date.now() ^ Math.floor(Math.random() * 0xffff_ffff)) >>> 0;
+  return `MIR-${value[0].toString(16).toUpperCase().padStart(8, '0')}`;
+};
+
+const worldStatsHtml = (world) => `
+  <div class="world-stats" aria-label="Параметры мира">
+    <div class="world-stat"><span>Площадь</span><strong data-world-stat="area">${worldInteger(world.areaKm2)} км²</strong></div>
+    <div class="world-stat"><span>К Земле</span><strong data-world-stat="ratio">${world.earthRatio.toFixed(2).replace('.', ',')}×</strong></div>
+    <div class="world-stat"><span>Сторона карты</span><strong data-world-stat="side">${worldInteger(world.widthMeters / 1000)} км</strong></div>
+    <div class="world-stat"><span>Континенты</span><strong data-world-stat="continents">${world.continents} / ${MAX_CONTINENTS}</strong></div>
+    <div class="world-stat"><span>Поверхностные блоки</span><strong data-world-stat="voxels">≈ ${worldScientific(world.surfaceVoxelCount)}</strong></div>
+    <div class="world-stat"><span>Всего чанков</span><strong data-world-stat="chunks">≈ ${worldScientific(world.chunkCount)}</strong></div>
+  </div>`;
+
+const updateWorldStats = (root, world) => {
+  if (!root || !world) return;
+  const values = {
+    area: `${worldInteger(world.areaKm2)} км²`,
+    ratio: `${world.earthRatio.toFixed(2).replace('.', ',')}×`,
+    side: `${worldInteger(world.widthMeters / 1000)} км`,
+    continents: `${world.continents} / ${MAX_CONTINENTS}`,
+    voxels: `≈ ${worldScientific(world.surfaceVoxelCount)}`,
+    chunks: `≈ ${worldScientific(world.chunkCount)}`,
+  };
+  for (const [name, value] of Object.entries(values)) {
+    const node = root.querySelector(`[data-world-stat="${name}"]`);
+    if (node) node.textContent = value;
+  }
+};
+
+const createWorldSession = (config = null) => {
+  const settings = config ?? { seed: worldSeed(), continents: 4, voxelSize: 1.25, earthMultiples: 2 };
+  const preview = createWorld(settings);
+  return {
+    screen: 'setup',
+    config: { seed: preview.seed, continents: preview.continents, voxelSize: preview.voxelSize, earthMultiples: preview.earthMultiples },
+    preview,
+    model: null,
+    position: null,
+  };
+};
+
+const worldSetupHtml = (session) => {
+  const world = session.preview;
+  const config = session.config;
+  const continentOptions = Array.from({ length: MAX_CONTINENTS }, (_, index) => index + 1)
+    .map((count) => `<option value="${count}"${count === config.continents ? ' selected' : ''}>${worldContinentLabel(count)}</option>`)
+    .join('');
+  const voxelOptions = [1, 1.25, 1.5]
+    .map((size) => `<option value="${size}"${size === config.voxelSize ? ' selected' : ''}>${String(size).replace('.', ',')} м</option>`)
+    .join('');
+  const areaOptions = [2, 4, 8]
+    .map((factor) => `<option value="${factor}"${factor === config.earthMultiples ? ' selected' : ''}>${factor}× Земли · ${worldInteger(EARTH_SURFACE_KM2 * factor)} км²</option>`)
+    .join('');
+
+  return `
+    <div class="world-shell world-shell--setup">
+      <section class="world-card world-config">
+        <div class="world-card__eyebrow">Параметры генерации</div>
+        <label class="field world-field">
+          <span class="field__label">Seed мира</span>
+          <input class="input input--code" type="text" maxlength="48" autocomplete="off" spellcheck="false"
+                 data-role="world-seed" data-world-setting="seed" value="${escapeHtml(config.seed)}" />
+          <span class="world-field__hint">Один и тот же seed создаёт одинаковую карту и чанки.</span>
+        </label>
+        <label class="field world-field">
+          <span class="field__label">Число континентов</span>
+          <select class="input" data-role="world-continents" data-world-setting="continents">${continentOptions}</select>
+        </label>
+        <label class="field world-field">
+          <span class="field__label">Размер одного вокселя</span>
+          <select class="input" data-role="world-voxel-size" data-world-setting="voxelSize">${voxelOptions}</select>
+          <span class="world-field__hint" data-role="world-voxel-hint">Один блок — куб ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} м.</span>
+        </label>
+        <label class="field world-field">
+          <span class="field__label">Площадь мира</span>
+          <select class="input" data-role="world-area" data-world-setting="earthMultiples">${areaOptions}</select>
+          <span class="world-field__hint">Минимум — вдвое больше площади поверхности Земли.</span>
+        </label>
+        <div class="world-callout">
+          ${icon('globe', 'icon--xs')}
+          <p>Весь мир не загружается разом: игра создаёт только чанки рядом с игроком.</p>
+        </div>
+        <button class="solid-button world-generate" type="button" data-action="world-generate">
+          <span>Сгенерировать и войти</span>${icon('play', 'icon--xs')}
+        </button>
+      </section>
+
+      <section class="world-card world-preview">
+        <header class="world-card__heading">
+          <div><p class="world-card__eyebrow">Предпросмотр генератора</p><h3>Карта мира</h3></div>
+          <span class="world-tag">${worldContinentLabel(config.continents).replace('континент', 'материк')}</span>
+        </header>
+        <canvas class="world-map-canvas" data-role="world-preview-map" width="960" height="480" aria-label="Предварительный вид сгенерированной карты"></canvas>
+        <div class="world-legend" aria-hidden="true"><span><i class="world-legend__swatch world-legend__swatch--ocean"></i>океан</span><span><i class="world-legend__swatch world-legend__swatch--land"></i>суша</span><span><i class="world-legend__swatch world-legend__swatch--snow"></i>горные области</span></div>
+        ${worldStatsHtml(world)}
+        <p class="world-footnote">Площадь вычисляется по размеру вокселя. Миллионы миллиардов блоков не хранятся в памяти — они строятся по seed по мере исследования.</p>
+      </section>
+    </div>`;
+};
+
+const worldExploreHtml = (session) => {
+  const world = session.model;
+  return `
+    <div class="world-shell world-shell--explore">
+      <section class="world-card world-map-panel">
+        <header class="world-card__heading">
+          <div><p class="world-card__eyebrow">Глобальная карта</p><h3>Континенты и океаны</h3></div>
+          <span class="world-tag">Seed · ${escapeHtml(world.seed)}</span>
+        </header>
+        <canvas class="world-map-canvas world-map-canvas--interactive" data-role="world-map" width="960" height="480" tabindex="0" aria-label="Карта мира. Нажмите на карту, чтобы переместиться."></canvas>
+        <p class="world-map-hint">Нажмите на карту для быстрого перемещения. Воксели вокруг позиции генерируются из чанков.</p>
+        ${worldStatsHtml(world)}
+        <div class="world-map-actions">
+          <span class="world-status"><i class="world-status__dot"></i>Мир создан</span>
+          <button class="mini-button" type="button" data-action="world-new">Новый мир</button>
+        </div>
+      </section>
+
+      <div class="world-side-column">
+        <section class="world-card world-terrain-panel">
+          <header class="world-card__heading world-card__heading--compact">
+            <div><p class="world-card__eyebrow">Исследование чанка</p><h3>Поверхность вокселями</h3></div>
+            <span class="world-tag">${world.chunkSize} × ${world.chunkSize} × ${world.worldHeight}</span>
+          </header>
+          <canvas class="world-voxel-canvas" data-role="world-viewport" width="900" height="600" aria-label="Изометрический вид воксельной местности вокруг игрока"></canvas>
+          <div class="world-readouts">
+            <div><span>Координаты</span><strong data-role="world-position">—</strong></div>
+            <div><span>Местность</span><strong data-role="world-biome">—</strong></div>
+            <div><span>Загружено чанков</span><strong data-role="world-loaded">—</strong></div>
+          </div>
+        </section>
+
+        <section class="world-card world-controls-panel">
+          <div class="world-control-copy"><p class="world-card__eyebrow">Перемещение</p><span>WASD / стрелки</span></div>
+          <div class="world-controls" role="group" aria-label="Перемещение по миру">
+            <span aria-hidden="true"></span>
+            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="-1" aria-label="Двигаться на север">↑</button>
+            <span aria-hidden="true"></span>
+            <button class="world-control" type="button" data-action="world-move" data-dx="-1" data-dz="0" aria-label="Двигаться на запад">←</button>
+            <button class="world-control world-control--center" type="button" data-action="world-move" data-dx="0" data-dz="0" aria-label="Остаться на месте">•</button>
+            <button class="world-control" type="button" data-action="world-move" data-dx="1" data-dz="0" aria-label="Двигаться на восток">→</button>
+            <span aria-hidden="true"></span>
+            <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="1" aria-label="Двигаться на юг">↓</button>
+            <span aria-hidden="true"></span>
+          </div>
+        </section>
+      </div>
+    </div>`;
+};
+
+const worldModalHtml = () => {
+  if (!ui.world) return '';
+  const exploring = ui.world.screen === 'explore' && ui.world.model;
+  return dialogShell({
+    label: exploring ? 'Процедурный voxel-мир' : 'Создание процедурного мира',
+    title: exploring ? 'Исследование мира' : 'Создание мира',
+    size: 'world',
+    body: exploring ? worldExploreHtml(ui.world) : worldSetupHtml(ui.world),
+  });
+};
+
+const refreshWorldPreview = () => {
+  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'setup') return;
+  const root = overlayRoot();
+  const field = (name) => root?.querySelector(`[data-world-setting="${name}"]`);
+  const seedField = field('seed');
+  const seed = seedField?.value.trim() || worldSeed();
+  if (seedField && !seedField.value.trim()) seedField.value = seed;
+  const config = {
+    seed,
+    continents: Number(field('continents')?.value ?? ui.world.config.continents),
+    voxelSize: Number(field('voxelSize')?.value ?? ui.world.config.voxelSize),
+    earthMultiples: Number(field('earthMultiples')?.value ?? ui.world.config.earthMultiples),
+  };
+  ui.world.config = config;
+  ui.world.preview = createWorld(config);
+  updateWorldStats(root, ui.world.preview);
+  const tag = root?.querySelector('.world-preview .world-tag');
+  if (tag) {
+    const count = config.continents;
+    tag.textContent = worldContinentLabel(count).replace('континент', 'материк');
+  }
+  const hint = root?.querySelector('.world-field__hint[data-role="world-voxel-hint"]');
+  if (hint) hint.textContent = `Один блок — куб ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} м.`;
+  drawWorldMap(root?.querySelector('[data-role="world-preview-map"]'), ui.world.preview);
+};
+
+const updateWorldReadouts = () => {
+  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore' || !ui.world.model) return;
+  const root = overlayRoot();
+  const { model, position } = ui.world;
+  const column = model.getColumn(position.x, position.z);
+  const chunkX = Math.floor(position.x / model.chunkSize);
+  const chunkZ = Math.floor(position.z / model.chunkSize);
+  const positionNode = root?.querySelector('[data-role="world-position"]');
+  const biomeNode = root?.querySelector('[data-role="world-biome"]');
+  const loadedNode = root?.querySelector('[data-role="world-loaded"]');
+  if (positionNode) positionNode.textContent = `X ${worldInteger(position.x)} · Z ${worldInteger(position.z)}`;
+  if (biomeNode && column) {
+    const surface = BLOCK_NAMES[column.topMaterial] ?? 'воксель';
+    biomeNode.textContent = column.water ? `Океан · дно: ${BLOCK_NAMES[column.surfaceMaterial]}` : `${surface} · чанк ${chunkX}, ${chunkZ}`;
+  }
+  if (loadedNode) loadedNode.textContent = `${model.loadedChunkCount()} / ${worldScientific(model.chunkCount)}`;
+};
+
+const drawWorldSession = () => {
+  if (ui.modal?.type !== 'world' || !ui.world) return;
+  const root = overlayRoot();
+  if (ui.world.screen === 'setup') {
+    drawWorldMap(root?.querySelector('[data-role="world-preview-map"]'), ui.world.preview);
+    return;
+  }
+  drawWorldMap(root?.querySelector('[data-role="world-map"]'), ui.world.model, ui.world.position);
+  drawVoxelView(root?.querySelector('[data-role="world-viewport"]'), ui.world.model, ui.world.position);
+  updateWorldReadouts();
+};
+
+const moveWorldPlayer = (dx, dz) => {
+  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore' || !ui.world.model) return;
+  const model = ui.world.model;
+  ui.world.position = {
+    x: Math.max(0, Math.min(model.widthCells - 1, ui.world.position.x + dx)),
+    z: Math.max(0, Math.min(model.depthCells - 1, ui.world.position.z + dz)),
+  };
+  drawWorldSession();
+};
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
 
 /* Раскладывает превью точно по тому же квадратному окну, которое сохранит canvas. */
@@ -1983,6 +2235,9 @@ const renderModal = ({ focus = true } = {}) => {
     case 'admin':
       html = adminModalHtml();
       break;
+    case 'world':
+      html = worldModalHtml();
+      break;
   }
 
   /* Проверяем и себя, и слой окон: разметку мог стереть closeModal или
@@ -1991,6 +2246,7 @@ const renderModal = ({ focus = true } = {}) => {
   /* Разметка та же — окно уже на экране. Обновлять нечего, но если
      окно только что открыли, фокус всё равно надо поставить. */
   if (!changed) {
+    if (ui.modal.type === 'world') drawWorldSession();
     if (!focus) return;
     const keep = root.querySelector('[data-autofocus]') || root.querySelector('input, button');
     keep?.focus();
@@ -2037,6 +2293,7 @@ const renderModal = ({ focus = true } = {}) => {
     if (image?.complete && image.naturalWidth) updateAvatarEditor();
     else image?.addEventListener('load', updateAvatarEditor, { once: true });
   }
+  if (ui.modal.type === 'world') drawWorldSession();
 
   if (!focus && activeIsInside) {
     let target = activeRole
@@ -2262,7 +2519,7 @@ document.querySelector('#app').innerHTML = `
       </div>
 
       <nav class="topbar__nav" aria-label="Основная навигация">
-        <button class="play-button" type="button">
+        <button class="play-button" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
           ${icon('play', 'icon--play')}
           <span>Играть</span>
         </button>
@@ -2943,6 +3200,11 @@ document.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 document.addEventListener('change', (event) => {
+  if (event.target.dataset?.worldSetting) {
+    refreshWorldPreview();
+    return;
+  }
+
   const key = event.target.dataset?.setting;
   if (!key) return;
 
@@ -3003,6 +3265,40 @@ const pickAndPreviewAvatar = async () => {
 };
 
 const actions = {
+  'open-world': () => {
+    if (!ui.world) ui.world = createWorldSession();
+    openModal('world');
+  },
+
+  'world-generate': () => {
+    const root = overlayRoot();
+    const seed = root?.querySelector('[data-world-setting="seed"]')?.value.trim() || worldSeed();
+    const config = {
+      seed,
+      continents: Number(root?.querySelector('[data-world-setting="continents"]')?.value ?? ui.world.config.continents),
+      voxelSize: Number(root?.querySelector('[data-world-setting="voxelSize"]')?.value ?? ui.world.config.voxelSize),
+      earthMultiples: Number(root?.querySelector('[data-world-setting="earthMultiples"]')?.value ?? ui.world.config.earthMultiples),
+    };
+    const model = createWorld(config);
+    ui.world = {
+      screen: 'explore',
+      config: { seed: model.seed, continents: model.continents, voxelSize: model.voxelSize, earthMultiples: model.earthMultiples },
+      preview: null,
+      model,
+      position: model.findSpawn(),
+    };
+    renderModal({ focus: false });
+    playSound('success');
+    toast(`Сгенерировано: ${worldContinentLabel(model.continents)}. Исследуйте карту и воксельные чанки.`);
+  },
+
+  'world-new': () => {
+    ui.world = createWorldSession({ ...ui.world.config, seed: worldSeed() });
+    renderModal();
+  },
+
+  'world-move': (el) => moveWorldPlayer(Number(el.dataset.dx) || 0, Number(el.dataset.dz) || 0),
+
   'open-auth': () => {
     ui.authTab = 'login';
     openModal('auth');
@@ -3445,11 +3741,25 @@ const actions = {
 
 const ACTIONS_WITH_OWN_SOUND = new Set([
   'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
-  'open-direct', 'open-hub', 'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
+  'open-direct', 'open-hub', 'open-world', 'world-generate', 'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
   'admin-back', 'admin-lock', 'auth-tab',
 ]);
 
 document.addEventListener('click', (event) => {
+  const mapCanvas = event.target.closest?.('canvas[data-role="world-map"]');
+  if (mapCanvas && ui.modal?.type === 'world' && ui.world?.model) {
+    const bounds = mapCanvas.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0) {
+      ui.world.position = {
+        x: Math.max(0, Math.min(ui.world.model.widthCells - 1, Math.floor(((event.clientX - bounds.left) / bounds.width) * ui.world.model.widthCells))),
+        z: Math.max(0, Math.min(ui.world.model.depthCells - 1, Math.floor(((event.clientY - bounds.top) / bounds.height) * ui.world.model.depthCells))),
+      };
+      mapCanvas.focus({ preventScroll: true });
+      drawWorldSession();
+    }
+    return;
+  }
+
   const button = event.target.closest('button:not([disabled])');
   const actionElement = event.target.closest('[data-action]');
   const actionName = actionElement?.dataset.action;
@@ -3475,6 +3785,21 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (ui.modal?.type === 'world' && ui.world?.screen === 'explore') {
+    const typing = event.target.matches?.('input, textarea, select, [contenteditable="true"]');
+    if (!typing) {
+      const moves = {
+        ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+        KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0],
+      };
+      const movement = moves[event.key] ?? moves[event.code];
+      if (movement) {
+        event.preventDefault();
+        moveWorldPlayer(movement[0], movement[1]);
+        return;
+      }
+    }
+  }
   if (!ui.modal) return;
   if (ui.modal.type === 'avatar-preview' && event.target.matches?.('[data-role="avatar-frame"]')) {
     const step = event.shiftKey ? 5 : 1;

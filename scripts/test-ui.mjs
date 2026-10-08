@@ -1,6 +1,6 @@
 /* Смоук-проверка интерфейса: настоящий `mir.html` открывается в jsdom,
-   и по нему кликают, как человек, — меню, окно «Общий хаб», подключение
-   по адресу, регистрация, профиль, отключение.
+   и по нему кликают, как человек, — генератор мира, окна меню и настройки,
+   общий хаб, подключение по адресу, регистрацию, профиль и отключение.
 
    Зачем: собранный файл — это то, что получает игрок. Проверки логики
    (`test:hub`, `test:p2p`) не видят разметку, а опечатка в обработчике
@@ -35,6 +35,13 @@ const fetchStub = (w) => (input, init) =>
     : globalThis.fetch(input, init);
 
 const html = readFileSync(fromRoot('mir.html'), 'utf8');
+const testCanvasContext = () => ({
+  createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+  createLinearGradient: () => ({ addColorStop() {} }),
+  clearRect() {}, fillRect() {}, drawImage() {}, putImageData() {},
+  save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
+  stroke() {}, strokeRect() {}, arc() {}, fill() {}, fillText() {},
+});
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
   url: 'http://127.0.0.1:9999/',   // «страница» не хаб: его на этом порту нет
@@ -42,6 +49,9 @@ const dom = new JSDOM(html, {
   /* fetch нужен уже на старте: приложение сразу проверяет новую сборку. */
   beforeParse(w) {
     w.fetch = fetchStub(w);
+    w.HTMLCanvasElement.prototype.getContext = function () {
+      return this.__testCanvasContext ??= testCanvasContext();
+    };
   },
 });
 const { window } = dom;
@@ -123,6 +133,26 @@ await wait(2200); // даём завершиться стартовой пров
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
+
+/* Кнопка «Играть»: настройки мира, генерация, воксельный чанк и шаг движения. */
+click('.play-button');
+await wait(60);
+ok('кнопка «Играть» открывает генератор', $('.dialog--world') && $('.dialog__title')?.textContent === 'Создание мира');
+ok('генератор предлагает seed, число континентов и масштаб блока', !!$('[data-world-setting="seed"]') && !!$('[data-world-setting="continents"]') && !!$('[data-world-setting="voxelSize"]'));
+ok('минимальная площадь мира больше площади Земли', /2,00×/.test($('[data-world-stat="ratio"]')?.textContent || ''));
+$('[data-world-setting="continents"]').value = '5';
+$('[data-world-setting="continents"]').dispatchEvent(new window.Event('change', { bubbles: true }));
+ok('предпросмотр обновляет выбранное число материков', /5 материков/.test($('.world-preview .world-tag')?.textContent || ''));
+click('[data-action="world-generate"]');
+await wait(60);
+ok('после генерации видны карта и локальный voxel-чанк', !!$('[data-role="world-map"]') && !!$('[data-role="world-viewport"]'));
+const worldPositionBefore = $('[data-role="world-position"]')?.textContent;
+click('[data-action="world-move"][data-dx="1"][data-dz="0"]');
+ok('стрелка перемещает игрока на один блок', worldPositionBefore !== $('[data-role="world-position"]')?.textContent);
+ok('отрисовка Canvas прошла без ошибок', errors.length === 0, errors.join(' | '));
+click('[data-action="world-new"]');
+ok('можно вернуться к настройкам нового мира', $('.dialog__title')?.textContent === 'Создание мира');
+click('[data-action="close-modal"]');
 
 /* Обновления: сервер отдаёт сборку 99.0.0, а в странице 0.8.0 — приложение
    обязано сказать об этом строкой под шапкой. Само оно ничего не
