@@ -5102,6 +5102,281 @@ button.admin-row:hover {
   color: var(--world-accent);
 }
 
+/* ---------- слоты карт и режимы мастера/игрока ---------- */
+
+.world-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: var(--sp-4) var(--sp-8);
+  color: var(--world-accent);
+  border: 1px solid rgba(216, 193, 132, 0.32);
+  background: rgba(216, 193, 132, 0.08);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.world-mode-chip--player {
+  color: var(--warn);
+  border-color: rgba(217, 192, 138, 0.32);
+  background: rgba(217, 192, 138, 0.08);
+}
+
+.world-shell--slots {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(1080px, 100%);
+  margin: 0 auto;
+}
+
+.world-slots {
+  gap: var(--sp-20);
+  padding: var(--sp-24);
+}
+
+.world-slots__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-16);
+}
+
+.world-slots__head > div {
+  min-width: 0;
+}
+
+.world-slots__head h2,
+.world-config h2 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.world-slots__lead {
+  max-width: 620px;
+  margin-top: var(--sp-8);
+  color: var(--world-muted);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+.world-slot-tabs {
+  display: flex;
+  flex: none;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--world-line);
+  background: rgba(2, 7, 8, 0.5);
+}
+
+.world-slot-tab {
+  min-height: var(--control-h-sm);
+  padding: var(--sp-8) var(--sp-16);
+  color: var(--text-dim);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 140ms var(--ease), border-color 140ms var(--ease), background-color 140ms var(--ease);
+}
+
+.world-slot-tab:hover,
+.world-slot-tab:focus-visible {
+  color: var(--text);
+}
+
+.world-slot-tab.is-active {
+  color: var(--world-accent);
+  border-color: rgba(216, 193, 132, 0.4);
+  background: rgba(216, 193, 132, 0.08);
+}
+
+.world-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-14);
+}
+
+.world-slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-10);
+  min-width: 0;
+  padding: var(--sp-10);
+  border: 1px solid var(--world-line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.world-slot-card--empty {
+  border-style: dashed;
+  border-color: rgba(201, 221, 208, 0.22);
+  background: rgba(255, 255, 255, 0.008);
+}
+
+.world-slot-card__ghost {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 1;
+  border: 1px solid rgba(201, 221, 208, 0.1);
+  background:
+    linear-gradient(rgba(174, 205, 183, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 205, 183, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.world-slot-card__ghost span {
+  color: rgba(201, 221, 208, 0.24);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.world-slot-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  border: 1px solid rgba(201, 221, 208, 0.14);
+  background: #102a34;
+}
+
+.world-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.world-slot-body__title {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-slot-body__hint {
+  color: var(--world-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.world-slot-body__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.world-slot-body__meta code {
+  overflow: hidden;
+  color: var(--world-accent);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-slot-actions {
+  display: flex;
+  gap: var(--sp-8);
+  margin-top: auto;
+}
+
+.world-slot-actions .mini-button:first-child {
+  flex: 1 1 auto;
+}
+
+.world-slot-actions .mini-button:last-child {
+  flex: none;
+}
+
+.world-mode-panel {
+  gap: var(--sp-12);
+}
+
+.world-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.world-mode-list__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  color: var(--text-soft);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.world-mode-list__item .icon {
+  margin-top: var(--sp-2);
+  color: var(--accent);
+}
+
+.world-mode-list__item--x {
+  color: var(--text-faint);
+}
+
+.world-mode-list__item--x .icon {
+  color: var(--text-faint);
+}
+
+.world-slot-import-button {
+  width: 100%;
+}
+
+.world-status__dot--player {
+  background: var(--warn);
+}
+
+@media (max-width: 1100px) {
+  .world-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .world-slots__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .world-slot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .world-slots {
+    gap: var(--sp-14);
+    padding: var(--sp-12);
+  }
+
+  .world-slot-tabs {
+    width: 100%;
+  }
+
+  .world-slot-tab {
+    flex: 1;
+    text-align: center;
+  }
+
+  .world-mode-chip {
+    display: none;
+  }
+}
+
 @media (max-width: 1280px) {
   .world-topbar {
     grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) minmax(220px, 1fr);
