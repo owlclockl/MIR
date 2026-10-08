@@ -23,15 +23,16 @@ import { BUILD_INFO_FILE } from './vite-mir.mjs';
 const ROOT_FILES = ['dist', 'mir.html'];
 
 /* Бюджеты веса — сигнал о случайно попавших ресурсах, не запрет на продуктовые
-   функции. Процедурный мир добавил детерминированный генератор чанков и
-   воксельный обзор без внешнего 3D-движка; процедурный атлас и камера RTS
-   используют ту же лёгкую Canvas-отрисовку. Звуки web-версии по-прежнему
-   отдельными файлами, не в JS. */
+   функции. Мир теперь целиком на Azgaar: собственного генератора и редактора
+   в приложении нет, поэтому скрипт и стили MIR держатся около прежнего уровня.
+   Редактор Azgaar весит сам по себе: его CSS — 256 КБ (бюджет 280 КБ), а
+   однофайловая сборка вшивает весь редактор — около 27 МиБ, бюджет 30 МиБ.
+   Звуки web-версии по-прежнему отдельными файлами, не в JS. */
 export const BUDGETS = {
   js: 233 * 1024,
   css: 84 * 1024,
-  fmgCss: 260 * 1024,
-  single: 390 * 1024,
+  fmgCss: 280 * 1024,
+  single: 30 * 1024 * 1024,
 };
 
 const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -103,7 +104,7 @@ export function checkWeb() {
   add(
     fmgHtml.includes('<title>The civilization of the sages — редактор карт</title>')
       && /<link rel="icon"[^>]*href="\/icons\/icon-48\.png"[^>]*sizes="48x48"/.test(fmgHtml),
-    'встроенная картографическая мастерская использует бренд и фирменный favicon',
+    'встроенный редактор карт использует бренд и фирменный favicon',
   );
   add(
     Boolean(fmgHtml) && fmgFiles.length > 100 && Boolean(fmgEntry) && existsSync(join('dist', fmgEntry)),
@@ -135,9 +136,14 @@ export function checkWeb() {
   add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
   const appCode = jsFiles.map((name) => readFileSync(join('dist', name), 'utf8')).join('\n');
   add(
-    appCode.includes('world-fmg-open') && appCode.includes('world-fmg-back') && appCode.includes('world-fmg-overlay') && appCode.includes('<iframe') && appCode.includes('/fmg/index.html?seed=') && appCode.includes('Azgaar'),
-    'атлас открывает полноэкранный Azgaar overlay с тем же seed',
-    'кнопки, iframe, same-seed и возврат присутствуют в веб-бандле',
+    appCode.includes('fmg/index.html') && appCode.includes('world-editor-frame') && appCode.includes('mir-world-slots'),
+    'мир открывает Azgaar во встроенном редакторе и хранит слоты',
+    'iframe /fmg/index.html с seed и размером; слоты в mir-world-slots',
+  );
+  add(
+    appCode.includes('#optionsContainer') && appCode.includes('mir-player-restriction'),
+    'игрок открывает Azgaar с скрытыми панелями правки',
+    'ограничение применяется к документу редактора после загрузки',
   );
 
   const jsBytes = jsFiles.reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -316,24 +322,53 @@ export function checkSingle() {
     'автономная версия сохраняет полное имя и фирменную фразу',
   );
 
+  /* Внутри шаблона Azgaar строки вида "/assets/icons/…" — ключи модулей, а не
+     ссылки на файлы: их подменяет сборщик. Поэтому ищем только атрибуты загрузки. */
   const forbidden = [
     ['<script[^>]*type="module"', 'модульный скрипт'],
     ['modulepreload', 'предзагрузка модулей'],
-    ['/assets/', 'ссылки на каталог сборки'],
-    ['/sounds/', 'ссылки на звуки файлами'],
+    ['(?:src|href)="/assets/', 'ссылки на каталог сборки'],
+    ['(?:src|href)="/sounds/', 'ссылки на звуки файлами'],
     [/__MIR_[A-Z_]+__/.source, 'неподставленные метки сборщика'],
   ];
   for (const [pattern, what] of forbidden)
     add(!new RegExp(pattern).test(html), `в mir.html нет: ${what}`);
 
+  const fontHost = (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com');
   const external = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
-  const allowed = external.every(
-    (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com'),
-  );
+  const allowed = external.every(fontHost);
   add(
     allowed,
     'из внешнего в mir.html только шрифты',
     external.filter((url) => !allowed || !/fonts\.g/.test(url)).join(', ') || `${external.length} ссылок`,
+  );
+
+  /* Шаблон Azgaar лежит в JSON-строке, поэтому его атрибуты экранированы
+     (\"…\"). Скрипты и стили из него должны грузиться только из шрифтов:
+     внешний скрипт сломает офлайн-запуск. Ссылки в тексте справки
+     (картинки, встроенные страницы Watabou) открываются только по просьбе
+     игрока и здесь не проверяются. */
+  const templateMatch = html.match(/<script type="application\/json" id="mir-fmg-template">([\s\S]*?)<\/script>/);
+  let template = '';
+  try {
+    template = templateMatch ? JSON.parse(templateMatch[1]) : '';
+  } catch {
+    template = '';
+  }
+  add(template.length > 1_000_000, 'редактор Azgaar вшит в mir.html', template ? kb(template.length) : 'шаблон не найден');
+  /* Внешние скрипты сборщик уже вставляет внутрь; если ссылка на скрипт
+     осталась, это сломанная сборка — поэтому запрещаем любой <script src>. */
+  const templateScriptSrc = [...template.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
+  const templateStyles = [...template.matchAll(/<link[^>]*href="(https?:\/\/[^"]+)"[^>]*>/g)].map((m) => m[1]);
+  const externalCode = [...templateScriptSrc, ...templateStyles];
+  add(
+    templateScriptSrc.length === 0 && templateStyles.every(fontHost),
+    'редактор Azgaar не грузит скриптов по ссылкам и внешних стилей, кроме шрифтов',
+    externalCode.length ? `ссылок: ${externalCode.length}` : 'всё внутри файла',
+  );
+  add(
+    html.includes('Copyright 2017-2024 Max Haniyeu (Azgaar)') && html.includes('MIT License'),
+    'MIT-лицензия Azgaar и атрибуция сохранены в mir.html',
   );
 
   const expected = version();
@@ -351,7 +386,8 @@ export function checkSingle() {
   );
   add(/rel="icon"[^>]*href="data:image\/png;base64,/.test(html), 'значок вкладки встроен');
 
-  add(bytes <= BUDGETS.single, `mir.html в бюджете (${kb(BUDGETS.single)})`, kb(bytes));
+  const mib = (n) => `${(n / 1024 / 1024).toFixed(1)} МиБ`;
+  add(bytes <= BUDGETS.single, `mir.html в бюджете (${mib(BUDGETS.single)})`, mib(bytes));
 
   /* Главная проверка: скрипт из файла — обычный скрипт. Разбираем его как
      классический код: модульный синтаксис (import/export) здесь не пройдёт,

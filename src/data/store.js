@@ -36,6 +36,8 @@ const KEYS = {
      хаба приходят снимком от хаба. */
   hubSettings: 'mir:hub-settings',
   events: 'mir:events',
+  /* Слоты карт (мир): прежний ключ, чтобы слоты предыдущих версий не терялись. */
+  worlds: 'mir-world-slots',
 };
 
 /* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
@@ -1657,4 +1659,82 @@ export const adminWipeLocal = async () => {
   storage.removeItem(KEYS.session);
   localLogEvent('admin:wipe', { by: 'admin', count });
   notify();
+};
+
+/* ---------- слоты карт -------------------------------------------
+   Слот хранит только seed и размер карты. Саму карту редактор Azgaar
+   строит заново при каждом открытии, и по этим двум значениям она
+   получается одинаковой на любом устройстве. Поэтому картинок и
+   результатов правки в слоте нет: правки живут в файлах Azgaar
+   (кнопки сохранения и загрузки в самом редакторе).
+
+   Записи старого формата хранили параметры в поле `config` — читаем
+   их так же, как новые. */
+
+export const WORLD_ROLES = ['master', 'player'];
+export const WORLD_SLOT_COUNT = 6;
+export const WORLD_SEED_MAX = 48;
+
+/* Размеры карты — пиксели SVG Azgaar. Размер входит в карту: тот же seed
+   при другом размере даёт другие границы, поэтому хранится вместе с seed.
+   Пресеты, а не произвольные числа: мастер и игрок, выбравшие один пункт,
+   получают одну и ту же карту. */
+export const WORLD_SIZES = [
+  { id: 'compact', label: 'Компактная', width: 1280, height: 800 },
+  { id: 'standard', label: 'Стандартная', width: 1600, height: 1000 },
+  { id: 'wide', label: 'Широкая', width: 1920, height: 1080 },
+];
+export const WORLD_DEFAULT_SIZE = WORLD_SIZES[1];
+
+/** Параметры мира в допустимом виде: неизвестный размер заменяется стандартным. */
+export const normalizeWorldConfig = (raw) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const seed = String(source.seed ?? '').trim().slice(0, WORLD_SEED_MAX);
+  const size =
+    WORLD_SIZES.find((item) => item.width === Number(source.width) && item.height === Number(source.height)) ??
+    WORLD_DEFAULT_SIZE;
+  return { seed, width: size.width, height: size.height };
+};
+
+const worldSlotEntry = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const config = normalizeWorldConfig(raw.config && typeof raw.config === 'object' ? raw.config : raw);
+  if (!config.seed) return null;
+  return { ...config, savedAt: Number(raw.savedAt) || 0 };
+};
+
+const worldSlotIsValid = (role, index) =>
+  WORLD_ROLES.includes(role) && Number.isInteger(index) && index >= 0 && index < WORLD_SLOT_COUNT;
+
+/* Читает оба набора слотов. Повреждённая запись превращается в пустой слот,
+   а не ломает весь экран «Играть». */
+const readWorldSlots = () => {
+  const raw = readJSON(KEYS.worlds, null);
+  const list = (role) => {
+    const items = raw && typeof raw === 'object' && Array.isArray(raw[role]) ? raw[role] : [];
+    return Array.from({ length: WORLD_SLOT_COUNT }, (_, index) => worldSlotEntry(items[index]));
+  };
+  return { master: list('master'), player: list('player') };
+};
+
+/** Шесть слотов каждой роли: null — свободный слот. Возвращается новый объект. */
+export const loadWorldSlots = () => readWorldSlots();
+
+/** Записывает параметры карты в слот. false — если слот или seed некорректны. */
+export const saveWorldSlot = (role, index, config) => {
+  const normalized = normalizeWorldConfig(config);
+  if (!worldSlotIsValid(role, index) || !normalized.seed) return false;
+  const slots = readWorldSlots();
+  slots[role][index] = { ...normalized, savedAt: Date.now() };
+  writeJSON(KEYS.worlds, { version: 2, ...slots });
+  return true;
+};
+
+/** Очищает слот. false — если слот некорректен. */
+export const clearWorldSlot = (role, index) => {
+  if (!worldSlotIsValid(role, index)) return false;
+  const slots = readWorldSlots();
+  slots[role][index] = null;
+  writeJSON(KEYS.worlds, { version: 2, ...slots });
+  return true;
 };

@@ -81,7 +81,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate' || request.destination === 'document') {
-    /* Основной экран — SPA (`/`), но встроенная мастерская Azgaar — отдельный
+    /* Основной экран — SPA (`/`), но встроенный редактор Azgaar — отдельный
        документ (`/fmg/index.html`). Не кладём её в ключ `/`: иначе обычная
        страница игры при следующем офлайн-запуске превращается в карту. */
     const documentPath =

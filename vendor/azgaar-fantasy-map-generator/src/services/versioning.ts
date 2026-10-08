@@ -18,6 +18,7 @@
 import { dialogState } from "@/components/dialog/state";
 import { Pins } from "@/components/pins";
 import { tip } from "@/components/tooltips";
+import { isEmbedded } from "./embed";
 import { isElectron } from "./platform";
 
 export const VERSION = "1.154.0";
@@ -150,6 +151,9 @@ function announceVersion(): void {
   document.title += ` v${VERSION}`;
   const loadingScreenVersion = document.getElementById("versionText");
   if (loadingScreenVersion) loadingScreenVersion.innerText = `v${VERSION}`;
+
+  // the update window points at web releases and the desktop app; a page embedded in mir.html has neither
+  if (isEmbedded()) return;
 
   const storedVersion = localStorage.getItem("version");
   if (!storedVersion) {
