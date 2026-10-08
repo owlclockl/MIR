@@ -40,7 +40,7 @@ const testCanvasContext = () => ({
   createLinearGradient: () => ({ addColorStop() {} }),
   clearRect() {}, fillRect() {}, drawImage() {}, putImageData() {},
   save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
-  stroke() {}, strokeRect() {}, arc() {}, fill() {}, fillText() {},
+  stroke() {}, strokeRect() {}, strokeText() {}, arc() {}, fill() {}, fillText() {},
 });
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
@@ -138,17 +138,42 @@ ok('ошибок в консоли нет', errors.length === 0, errors.join(' |
 click('.play-button');
 await wait(60);
 ok('кнопка «Играть» открывает генератор', $('.dialog--world') && $('.dialog__title')?.textContent === 'Создание мира');
-ok('генератор предлагает seed, число континентов и масштаб блока', !!$('[data-world-setting="seed"]') && !!$('[data-world-setting="continents"]') && !!$('[data-world-setting="voxelSize"]'));
+ok('генератор предлагает seed, континенты, ландшафт, климат и размер блока', !!$('[data-world-setting="seed"]') && !!$('[data-world-setting="continents"]') && !!$('[data-world-setting="landscape"]') && !!$('[data-world-setting="climate"]') && !!$('[data-world-setting="voxelSize"]'));
 ok('минимальная площадь мира больше площади Земли', /2,00×/.test($('[data-world-stat="ratio"]')?.textContent || ''));
+const seedBeforeRandom = $('[data-world-setting="seed"]').value;
+click('[data-action="world-random-seed"]');
+ok('кнопка выдаёт новый seed и обновляет предпросмотр', seedBeforeRandom !== $('[data-world-setting="seed"]')?.value);
+$('[data-world-setting="climate"]').value = 'arid';
+$('[data-world-setting="climate"]').dispatchEvent(new window.Event('change', { bubbles: true }));
+ok('выбранный климат отображается в атласе', /засушливый/.test($('.world-preview .world-tag')?.textContent || ''));
 $('[data-world-setting="continents"]').value = '5';
 $('[data-world-setting="continents"]').dispatchEvent(new window.Event('change', { bubbles: true }));
 ok('предпросмотр обновляет выбранное число материков', /5 материков/.test($('.world-preview .world-tag')?.textContent || ''));
+click('[data-action="world-layer"][data-layer="height"]');
+ok('слои атласа переключаются без перегенерации seed', $('[data-action="world-layer"][data-layer="height"]')?.getAttribute('aria-pressed') === 'true');
 click('[data-action="world-generate"]');
 await wait(60);
-ok('после генерации видны карта и локальный voxel-чанк', !!$('[data-role="world-map"]') && !!$('[data-role="world-viewport"]'));
+ok('после генерации видны атлас и локальный voxel-чанк', !!$('[data-role="world-map"]') && !!$('[data-role="world-viewport"]') && !!$('[data-role="world-biome"]'));
 const worldPositionBefore = $('[data-role="world-position"]')?.textContent;
 click('[data-action="world-move"][data-dx="1"][data-dz="0"]');
-ok('стрелка перемещает игрока на один блок', worldPositionBefore !== $('[data-role="world-position"]')?.textContent);
+ok('кнопка камеры перемещает обзор по миру', worldPositionBefore !== $('[data-role="world-position"]')?.textContent);
+const viewport = $('[data-role="world-viewport"]');
+viewport.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 600, right: 900, bottom: 600 });
+const pointer = (type, x, y) => {
+  const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  (type === 'pointerdown' || type === 'pointerup' ? viewport : window.document).dispatchEvent(event);
+};
+const positionBeforeDrag = $('[data-role="world-position"]')?.textContent;
+pointer('pointerdown', 300, 300);
+pointer('pointermove', 380, 300);
+pointer('pointerup', 380, 300);
+ok('перетаскивание мышью панорамирует камеру как в RTS', positionBeforeDrag !== $('[data-role="world-position"]')?.textContent);
+const zoomBeforeWheel = $('[data-role="world-zoom"]')?.textContent;
+viewport.dispatchEvent(new window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 }));
+ok('колесо мыши меняет масштаб камеры', zoomBeforeWheel !== $('[data-role="world-zoom"]')?.textContent);
+click('[data-action="world-camera-home"]');
+ok('кнопка «Старт» возвращает камеру к точке появления', $('[data-role="world-zoom"]')?.textContent === '100%');
 ok('отрисовка Canvas прошла без ошибок', errors.length === 0, errors.join(' | '));
 click('[data-action="world-new"]');
 ok('можно вернуться к настройкам нового мира', $('.dialog__title')?.textContent === 'Создание мира');

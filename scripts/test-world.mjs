@@ -3,15 +3,20 @@
 
 import assert from 'node:assert/strict';
 import {
+  BIOME,
+  BIOME_NAMES,
   BLOCK,
   CHUNK_SIZE,
+  CLIMATE_PRESETS,
   EARTH_SURFACE_KM2,
+  LANDSCAPE_PRESETS,
   MAX_CACHED_CHUNKS,
   MAX_CONTINENTS,
   SEA_LEVEL,
   WORLD_HEIGHT,
   createWorld,
 } from '../src/game/world.js';
+import { cameraPanDelta } from '../src/game/render.js';
 
 const check = (label, callback) => {
   callback();
@@ -38,6 +43,41 @@ check('диапазон континентов — от одного до две
   }
   assert.equal(createWorld({ continents: 0 }).continents, 1);
   assert.equal(createWorld({ continents: 999 }).continents, MAX_CONTINENTS);
+});
+
+check('профили ландшафта и климата меняют генерацию, но неизвестные значения безопасны', () => {
+  const temperate = createWorld({ seed: 'climate-test', landscape: 'mainland', climate: 'temperate' });
+  const island = createWorld({ seed: 'climate-test', landscape: 'islands', climate: 'arid' });
+  const frozen = createWorld({ seed: 'climate-test', landscape: 'highlands', climate: 'frozen' });
+  assert.notEqual(temperate.continentCenters[0].rx, island.continentCenters[0].rx);
+  assert.ok(LANDSCAPE_PRESETS[island.landscape]);
+  assert.ok(CLIMATE_PRESETS[frozen.climate]);
+  assert.equal(createWorld({ landscape: 'unknown', climate: 'unknown' }).landscape, 'mainland');
+  assert.equal(createWorld({ landscape: 'unknown', climate: 'unknown' }).climate, 'temperate');
+
+  const sample = temperate.sampleAtNormalized(temperate.continentCenters[0].x, temperate.continentCenters[0].z);
+  const drySample = createWorld({ seed: 'climate-test', climate: 'arid' })
+    .sampleAtNormalized(temperate.continentCenters[0].x, temperate.continentCenters[0].z);
+  const coldSample = frozen.sampleAtNormalized(frozen.continentCenters[0].x, frozen.continentCenters[0].z);
+  assert.ok(sample.land && sample.biome in BIOME_NAMES);
+  assert.ok(drySample.moisture < sample.moisture);
+  assert.ok(coldSample.temperature < sample.temperature);
+  assert.ok(Object.values(BIOME).includes(sample.biome));
+});
+
+check('у каждого материка есть детерминированное имя и река с названным руслом', () => {
+  const first = createWorld({ seed: 'atlas-test', continents: 5 });
+  const second = createWorld({ seed: 'atlas-test', continents: 5 });
+  assert.deepEqual(first.continentCenters, second.continentCenters);
+  assert.deepEqual(first.rivers, second.rivers);
+  assert.equal(first.rivers.length, first.continents);
+  assert.ok(new Set(first.continentCenters.map((center) => center.name)).size === first.continents);
+  for (const river of first.rivers) {
+    assert.ok(river.name.length > 2);
+    assert.equal(river.points.length, 73);
+    assert.ok(river.points.some((point) => point.land));
+    assert.ok(river.points.every((point) => point.x >= 0 && point.x <= 1 && point.z >= 0 && point.z <= 1));
+  }
 });
 
 check('на карте ровно столько связных континентов, сколько выбрано', () => {
@@ -81,6 +121,17 @@ check('карта и рельеф повторяются по seed', () => {
   assert.deepEqual(a, b);
   const spawn = first.findSpawn();
   assert.deepEqual(first.getColumn(spawn.x, spawn.z), second.getColumn(spawn.x, spawn.z));
+});
+
+check('панорамирование изометрической камеры учитывает проекцию и масштаб', () => {
+  const still = cameraPanDelta(900, 600, 0, 0, 1);
+  const horizontal = cameraPanDelta(900, 600, 52, 0, 1);
+  const vertical = cameraPanDelta(900, 600, 0, 30, 1);
+  const zoomed = cameraPanDelta(900, 600, 52, 0, 2);
+  assert.deepEqual(still, { x: 0, z: 0 });
+  assert.ok(horizontal.x < 0 && horizontal.z > 0, 'горизонтальный drag переводится в диагональ X/Z');
+  assert.ok(vertical.x < 0 && vertical.z < 0, 'вертикальный drag сдвигает камеру по обеим осям');
+  assert.ok(Math.abs(zoomed.x) < Math.abs(horizontal.x), 'при приближении тот же drag проходит меньше клеток');
 });
 
 check('чанк хранит блоки воксельной сетки 16×16×96 и создаётся лениво', () => {
