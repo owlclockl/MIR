@@ -3,7 +3,9 @@
 //
 // Что внутри APK:
 //   AndroidManifest.xml — бинарный AXML (minSdk 21, targetSdk 34);
-//   classes.dex         — одна активность: полноэкранный WebView;
+//   classes.dex         — активность с полноэкранным WebView и её
+//                         WebChromeClient (без него WebView не открывает
+//                         выбор файла — аватарку не добавить);
 //   resources.arsc      — таблица ресурсов с иконкой запуска;
 //   assets/mir.html     — сама игра одним файлом.
 //
@@ -123,15 +125,25 @@ function crc32(buf) {
 /* ============================================================
    1. classes.dex
    ------------------------------------------------------------
-   Генерируем ровно один класс. Он не просто открывает WebView, но и
-   рассказывает о себе в системный журнал (logcat, тег MIR), а любую
-   ошибку запуска показывает прямо на экране телефона — иначе Android
-   покажет «Приложение остановлено» и настоящая причина останется
-   только в logcat, до которого без компьютера не добраться.
+   Генерируем два класса. Первый — активность: полноэкранный WebView,
+   который рассказывает о себе в системный журнал (logcat, тег MIR), а
+   любую ошибку запуска показывает прямо на экране телефона — иначе
+   Android покажет «Приложение остановлено», а настоящая причина
+   останется только в logcat, до которого без компьютера не добраться.
+
+   Второй класс — WebChromeClient. Он нужен не для красоты: без него
+   WebView молча игнорирует <input type="file">, то есть в APK не
+   работала загрузка аватарки (кнопка «Добавить аватарку» не открывала
+   ничего). Android намеренно не даёт WebView системный выбор файла сам
+   по себе — приложение обязано реализовать onShowFileChooser.
 
      package com.mir.game;
+
      public class MainActivity extends android.app.Activity {
+       static ValueCallback<Uri[]> fileCallback;   // ждёт результата выбора файла
+
        public MainActivity() { super(); }
+
        protected void onCreate(Bundle b) {
          Log.i("MIR", "onCreate: старт, версия и код сборки");
          try {
@@ -142,6 +154,7 @@ function crc32(buf) {
            s.setDomStorageEnabled(true);
            s.setAllowFileAccess(true);
            w.setWebViewClient(new WebViewClient());
+           w.setWebChromeClient(new MirChromeClient(this));   // выбор файла
            setContentView(w);
            w.loadUrl("file:///android_asset/mir.html");
            Log.i("MIR", "onCreate: WebView создан, загружаю mir.html");
@@ -154,25 +167,86 @@ function crc32(buf) {
            setContentView(tv);
          }
        }
+
+       protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+         ValueCallback<Uri[]> cb = fileCallback;
+         fileCallback = null;
+         if (cb != null) {
+           try {
+             cb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+           } catch (Throwable t) {
+             Log.e("MIR", Log.getStackTraceString(t));
+           }
+         }
+         Log.i("MIR", "onActivityResult: выбор файла вернул код " + resultCode);
+       }
      }
+
+     class MirChromeClient extends android.webkit.WebChromeClient {
+       private final Activity activity;
+
+       MirChromeClient(Activity activity) {
+         super();
+         this.activity = activity;
+       }
+
+       public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback,
+                                        WebChromeClient.FileChooserParams params) {
+         if (MainActivity.fileCallback != null) MainActivity.fileCallback.onReceiveValue(null);
+         MainActivity.fileCallback = callback;
+         try {
+           Log.i("MIR", "onShowFileChooser: открываю системный выбор файла");
+           Intent intent = params.createIntent();          // ACTION_GET_CONTENT + accept
+           activity.startActivityForResult(intent, 1);     // разрешение не нужно
+         } catch (Throwable t) {
+           Log.e("MIR", Log.getStackTraceString(t));
+           if (MainActivity.fileCallback != null) MainActivity.fileCallback.onReceiveValue(null);
+           MainActivity.fileCallback = null;
+           return false;
+         }
+         return true;
+       }
+     }
+
+   Почему ACTION_GET_CONTENT, а не ACTION_PICK или прямой доступ к хранилищу:
+   Storage Access Framework не требует ни разрешений, ни <queries> в
+   манифесте и работает одинаково на Android 5…15, в том числе с
+   «Фото», «Файлы», облачными дисками и камерой.
    ============================================================ */
 
 function buildDex() {
   const CLASS = 'Lcom/mir/game/MainActivity;';
+  const CHROME_CLASS = 'Lcom/mir/game/MirChromeClient;';
   const SUPER = 'Landroid/app/Activity;';
   const WEBVIEW = 'Landroid/webkit/WebView;';
   const SETTINGS = 'Landroid/webkit/WebSettings;';
   const CLIENT = 'Landroid/webkit/WebViewClient;';
+  const CHROME_SUPER = 'Landroid/webkit/WebChromeClient;';
+  const CHOOSER = 'Landroid/webkit/WebChromeClient$FileChooserParams;';
+  const CALLBACK = 'Landroid/webkit/ValueCallback;';
+  const INTENT = 'Landroid/content/Intent;';
+  const URIS = '[Landroid/net/Uri;';
+  const OBJECT = 'Ljava/lang/Object;';
   const LOG = 'Landroid/util/Log;';
   const TEXTVIEW = 'Landroid/widget/TextView;';
   const THROWABLE = 'Ljava/lang/Throwable;';
   const STRING = 'Ljava/lang/String;';
   const CHARSEQ = 'Ljava/lang/CharSequence;';
   const SOURCE_FILE = 'MainActivity.java';
+  const CHROME_SOURCE_FILE = 'MirChromeClient.java';
   const START_URL = 'file:///android_asset/mir.html';
   const BOOT_MSG = `onCreate: start, MIR ${VERSION_NAME} (${VERSION_CODE})`;
   const READY_MSG = 'onCreate: WebView created, loading assets/mir.html';
+  const PICKER_MSG = 'onShowFileChooser: открываю системный выбор файла';
+  const RESULT_MSG = 'onActivityResult: выбор файла вернул код ';
   const CRASH_PREFIX = 'MIR не запустился. Покажите этот экран разработчику:\n\n';
+  /* Код запроса startActivityForResult. Значение произвольное, но своё:
+     по нему в логах видно, что вернулся именно выбор файла. */
+  const FILE_REQUEST = 1;
+  /* Сколько классов попадёт в classes.dex: активность и её
+     WebChromeClient. Нужен до раскладки файла — от него зависит, где
+     начнётся секция данных. */
+  const CLASS_COUNT = 2;
 
   const ref = (cls, name, params, ret) => ({ cls, name, params, ret });
 
@@ -180,34 +254,64 @@ function buildDex() {
     superInit: ref(SUPER, '<init>', [], 'V'),
     superOnCreate: ref(SUPER, 'onCreate', ['Landroid/os/Bundle;'], 'V'),
     setContentView: ref(SUPER, 'setContentView', ['Landroid/view/View;'], 'V'),
+    startForResult: ref(SUPER, 'startActivityForResult', [INTENT, 'I'], 'V'),
     wvInit: ref(WEBVIEW, '<init>', ['Landroid/content/Context;'], 'V'),
     wvGetSettings: ref(WEBVIEW, 'getSettings', [], SETTINGS),
     wvSetClient: ref(WEBVIEW, 'setWebViewClient', [CLIENT], 'V'),
+    wvSetChromeClient: ref(WEBVIEW, 'setWebChromeClient', [CHROME_SUPER], 'V'),
     wvLoadUrl: ref(WEBVIEW, 'loadUrl', [STRING], 'V'),
     setJs: ref(SETTINGS, 'setJavaScriptEnabled', ['Z'], 'V'),
     setDom: ref(SETTINGS, 'setDomStorageEnabled', ['Z'], 'V'),
     setFiles: ref(SETTINGS, 'setAllowFileAccess', ['Z'], 'V'),
     clientInit: ref(CLIENT, '<init>', [], 'V'),
+    chromeSuperInit: ref(CHROME_SUPER, '<init>', [], 'V'),
+    chooserIntent: ref(CHOOSER, 'createIntent', [], INTENT),
+    chooserParse: ref(CHOOSER, 'parseResult', ['I', INTENT], URIS),
+    receiveValue: ref(CALLBACK, 'onReceiveValue', [OBJECT], 'V'),
     logI: ref(LOG, 'i', [STRING, STRING], 'I'),
     logE: ref(LOG, 'e', [STRING, STRING], 'I'),
     logTrace: ref(LOG, 'getStackTraceString', [THROWABLE], STRING),
     strConcat: ref(STRING, 'concat', [STRING], STRING),
+    strValueOfInt: ref(STRING, 'valueOf', ['I'], STRING),
     tvInit: ref(TEXTVIEW, '<init>', ['Landroid/content/Context;'], 'V'),
     tvSetText: ref(TEXTVIEW, 'setText', [CHARSEQ], 'V'),
     tvSelectable: ref(TEXTVIEW, 'setTextIsSelectable', ['Z'], 'V'),
     ownInit: ref(CLASS, '<init>', [], 'V'),
     ownOnCreate: ref(CLASS, 'onCreate', ['Landroid/os/Bundle;'], 'V'),
+    ownOnActivityResult: ref(CLASS, 'onActivityResult', ['I', 'I', INTENT], 'V'),
+    chromeInit: ref(CHROME_CLASS, '<init>', [SUPER], 'V'),
+    chromeOnShowFileChooser: ref(
+      CHROME_CLASS,
+      'onShowFileChooser',
+      [WEBVIEW, CALLBACK, CHOOSER],
+      'Z',
+    ),
   };
   const methodRefs = Object.values(M);
 
+  /* --- пул полей -------------------------------------------------- */
+  /* activity — чтобы клиент мог открыть выбор файла «для результата»;
+     fileCallback — обещание WebView, которому надо отдать выбранный Uri.
+     Оба поля публичные: их читает и активность, и клиент. */
+  const F = {
+    activity: { cls: CHROME_CLASS, name: 'activity', type: SUPER, access: 0x0001 },
+    callback: { cls: CLASS, name: 'fileCallback', type: CALLBACK, access: 0x0009 },
+  };
+  const fieldRefs = Object.values(F);
+
   /* --- пул типов ------------------------------------------------ */
-  const typeSet = new Set([CLASS, SUPER, 'Ljava/lang/Object;']);
+  const typeSet = new Set([CLASS, CHROME_CLASS, SUPER, OBJECT]);
   for (const m of methodRefs) {
     typeSet.add(m.cls);
     typeSet.add(m.ret);
     for (const p of m.params) typeSet.add(p);
   }
-  for (const t of [WEBVIEW, CLIENT, TEXTVIEW, THROWABLE, STRING, CHARSEQ, LOG]) typeSet.add(t);
+  for (const f of fieldRefs) {
+    typeSet.add(f.cls);
+    typeSet.add(f.type);
+  }
+  for (const t of [WEBVIEW, CLIENT, CHROME_SUPER, CHOOSER, CALLBACK, INTENT, URIS, TEXTVIEW, THROWABLE, STRING, CHARSEQ, LOG])
+    typeSet.add(t);
   const types = [...typeSet].sort();
   const typeIdx = new Map(types.map((t, i) => [t, i]));
 
@@ -215,11 +319,23 @@ function buildDex() {
   const shortyChar = (t) => (t.startsWith('L') || t.startsWith('[') ? 'L' : t);
   const shortyOf = (m) => shortyChar(m.ret) + m.params.map(shortyChar).join('');
 
-  const stringSet = new Set([...types, SOURCE_FILE, START_URL, LOG_TAG, BOOT_MSG, READY_MSG, CRASH_PREFIX]);
+  const stringSet = new Set([
+    ...types,
+    SOURCE_FILE,
+    CHROME_SOURCE_FILE,
+    START_URL,
+    LOG_TAG,
+    BOOT_MSG,
+    READY_MSG,
+    PICKER_MSG,
+    RESULT_MSG,
+    CRASH_PREFIX,
+  ]);
   for (const m of methodRefs) {
     stringSet.add(m.name);
     stringSet.add(shortyOf(m));
   }
+  for (const f of fieldRefs) stringSet.add(f.name);
   const strings = [...stringSet].sort();
   const strIdx = new Map(strings.map((s, i) => [s, i]));
 
@@ -241,6 +357,16 @@ function buildDex() {
   });
   const protoIdx = new Map(protos.map((p, i) => [`${p.ret}|${p.params.join(',')}`, i]));
 
+  /* --- поля: сортировка по классу и имени, как требует ART ------- */
+  const fields = [...fieldRefs].sort(
+    (a, b) =>
+      typeIdx.get(a.cls) - typeIdx.get(b.cls) ||
+      strIdx.get(a.name) - strIdx.get(b.name) ||
+      typeIdx.get(a.type) - typeIdx.get(b.type),
+  );
+  const fieldIdx = new Map(fields.map((f, i) => [`${f.cls}|${f.name}`, i]));
+  const fi = (f) => fieldIdx.get(`${f.cls}|${f.name}`);
+
   /* --- методы ----------------------------------------------------- */
   const methods = methodRefs
     .map((m) => ({
@@ -259,15 +385,23 @@ function buildDex() {
   const OP = {
     constString: 0x1a,
     const4: 0x12,
+    const16: 0x13,
     newInstance: 0x22,
     moveResultObject: 0x0c,
     moveException: 0x0d,
+    ifEqz: 0x38,
+    igetObject: 0x54,
+    iputObject: 0x5b,
+    sgetObject: 0x62,
+    sputObject: 0x69,
     goto: 0x28,
     returnVoid: 0x0e,
+    returnValue: 0x0f,
     invokeVirtual: 0x6e,
     invokeSuper: 0x6f,
     invokeDirect: 0x70,
     invokeStatic: 0x71,
+    invokeInterface: 0x72,
   };
 
   const invoke = (op, method, regs) => {
@@ -280,10 +414,69 @@ function buildDex() {
     ];
   };
 
-  // MainActivity(): registers=1 (p0 = v0), super()
+  /* Однословные инструкции возвращают число, двусловные — пару слов:
+     в массивах байт-кода и те и другие пишутся через spread, иначе
+     вложенный массив молча превратится в ноль при записи в буфер. */
+  /* const/4 — B|A|op, короткая константа -8…7 (null и true/false включительно). */
+  const const4 = (reg, value) => (value << 12) | (reg << 8) | OP.const4;
+  /* 21c/21s — AA|op BBBB: регистр плюс индекс пула или константа на 16 бит.
+     Младший байт первого слова — всегда опкод, старший — регистр. */
+  const reg16 = (op, reg, payload) => [(reg << 8) | op, payload];
+  /* 21t — условный переход: BBBB в 16-битных словах от адреса самого перехода. */
+  const branch = (op, reg, delta) => {
+    if (delta < -32768 || delta > 32767) throw new Error('build-apk: переход не помещается в 21t');
+    return [(reg << 8) | op, delta & 0xffff];
+  };
+  /* 21c — статическое поле: AA|op field@BBBB. */
+  const sfield = (op, reg, field) => [(reg << 8) | op, fi(field)];
+  /* 22c — поле экземпляра: A|B|op field@CCCC, A — значение, B — объект. */
+  const ifield = (op, valueReg, objReg, field) => [
+    (objReg << 12) | (valueReg << 8) | op,
+    fi(field),
+  ];
+  /* 11x — return vAA / return-void / move-exception vAA. */
+  const reg8 = (op, reg = 0) => (reg << 8) | op;
+
+  /** try_item + список обработчиков: один обработчик на Throwable. */
+  const catchThrowable = (start, length, handlerAddr) => {
+    const item = Buffer.alloc(8);
+    item.writeUInt32LE(start, 0);
+    item.writeUInt16LE(length, 4);
+    item.writeUInt16LE(1, 6); // смещение обработчика внутри списка (после uleb размера)
+    const list = Buffer.concat([
+      uleb128(1), // размер списка
+      Buffer.concat([sleb128(1), uleb128(typeIdx.get(THROWABLE)), uleb128(handlerAddr)]),
+    ]);
+    return { item, list };
+  };
+
+  function codeItem(name, registers, ins, outs, units, tries = null) {
+    if (outs > registers)
+      throw new Error(`build-apk: ${name} — исходящих регистров (${outs}) больше, чем всего (${registers})`);
+    units.forEach((unit, i) => {
+      if (!Number.isInteger(unit) || unit < 0 || unit > 0xffff)
+        throw new Error(
+          `build-apk: ${name}, слово №${i} — не 16-битное число (${JSON.stringify(unit)}): забыт spread у помощника?`,
+        );
+    });
+    const head = Buffer.alloc(16 + units.length * 2);
+    head.writeUInt16LE(registers, 0);
+    head.writeUInt16LE(ins, 2);
+    head.writeUInt16LE(outs, 4);
+    head.writeUInt16LE(tries ? 1 : 0, 6);
+    head.writeUInt32LE(0, 8); // debug_info_off
+    head.writeUInt32LE(units.length, 12);
+    units.forEach((unit, i) => head.writeUInt16LE(unit & 0xffff, 16 + i * 2));
+    if (!tries) return head;
+    /* try_item-ы должны начинаться с чётного смещения внутри code_item. */
+    const padding = units.length % 2 ? Buffer.alloc(2) : Buffer.alloc(0);
+    return Buffer.concat([head, padding, tries.item, tries.list]);
+  }
+
+  /* ---- MainActivity() : registers=1 (p0 = v0), super() ---- */
   const initCode = [...invoke(OP.invokeDirect, M.superInit, [0]), OP.returnVoid];
 
-  // onCreate(Bundle): registers=7, ins=2 → p0 = v5 (this), p1 = v6 (bundle)
+  /* ---- onCreate(Bundle): registers=7, ins=2 → p0 = v5 (this), p1 = v6 (bundle) ---- */
   const THIS = 5;
   const BUNDLE = 6;
 
@@ -291,45 +484,50 @@ function buildDex() {
      Если в журнале телефона нет этой строки — Android не дошёл даже до
      запуска активности (не установилось, не распознался манифест). */
   const prologue = [
-    (0 << 8) | OP.constString, strIdx.get(LOG_TAG),            // const-string v0, "MIR"
-    (1 << 8) | OP.constString, strIdx.get(BOOT_MSG),           // const-string v1, "onCreate: start…"
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),             // const-string v0, "MIR"
+    ...reg16(OP.constString, 1, strIdx.get(BOOT_MSG)),            // const-string v1, "onCreate: start…"
     ...invoke(OP.invokeStatic, M.logI, [0, 1]),                // Log.i(v0, v1)
   ];
 
   const guarded = [
     ...invoke(OP.invokeSuper, M.superOnCreate, [THIS, BUNDLE]),
-    (0 << 8) | OP.newInstance, typeIdx.get(WEBVIEW),            // new-instance v0, WebView
+    ...reg16(OP.newInstance, 0, typeIdx.get(WEBVIEW)),             // new-instance v0, WebView
     ...invoke(OP.invokeDirect, M.wvInit, [0, THIS]),            // new WebView(this)
     ...invoke(OP.invokeVirtual, M.wvGetSettings, [0]),          // w.getSettings()
-    (1 << 8) | OP.moveResultObject,                             // move-result-object v1
-    (1 << 12) | (2 << 8) | OP.const4,                           // const/4 v2, 1
+    reg8(OP.moveResultObject, 1),                              // move-result-object v1
+    const4(2, 1),                                            // const/4 v2, 1
     ...invoke(OP.invokeVirtual, M.setJs, [1, 2]),
     ...invoke(OP.invokeVirtual, M.setDom, [1, 2]),
     ...invoke(OP.invokeVirtual, M.setFiles, [1, 2]),
-    (3 << 8) | OP.newInstance, typeIdx.get(CLIENT),             // new-instance v3, WebViewClient
+    ...reg16(OP.newInstance, 3, typeIdx.get(CLIENT)),              // new-instance v3, WebViewClient
     ...invoke(OP.invokeDirect, M.clientInit, [3]),
     ...invoke(OP.invokeVirtual, M.wvSetClient, [0, 3]),
+    /* Без WebChromeClient WebView игнорирует <input type="file">: кнопка
+       «Добавить аватарку» в APK не открывала ничего. */
+    ...reg16(OP.newInstance, 3, typeIdx.get(CHROME_CLASS)),        // new-instance v3, MirChromeClient
+    ...invoke(OP.invokeDirect, M.chromeInit, [3, THIS]),        // new MirChromeClient(this)
+    ...invoke(OP.invokeVirtual, M.wvSetChromeClient, [0, 3]),
     ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 0]),
-    (4 << 8) | OP.constString, strIdx.get(START_URL),           // const-string v4, url
+    ...reg16(OP.constString, 4, strIdx.get(START_URL)),            // const-string v4, url
     ...invoke(OP.invokeVirtual, M.wvLoadUrl, [0, 4]),
-    (0 << 8) | OP.constString, strIdx.get(LOG_TAG),             // const-string v0, "MIR"
-    (1 << 8) | OP.constString, strIdx.get(READY_MSG),           // const-string v1, "…created"
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),              // const-string v0, "MIR"
+    ...reg16(OP.constString, 1, strIdx.get(READY_MSG)),            // const-string v1, "…created"
     ...invoke(OP.invokeStatic, M.logI, [0, 1]),                 // Log.i(v0, v1)
   ];
 
   /* Обработчик: стек ошибки уходит и в logcat, и на экран телефона. */
   const handler = [
-    (0 << 8) | OP.moveException,                                // move-exception v0
+    reg8(OP.moveException, 0),                                  // move-exception v0
     ...invoke(OP.invokeStatic, M.logTrace, [0]),                // Log.getStackTraceString(v0)
-    (1 << 8) | OP.moveResultObject,                             // move-result-object v1 (текст стека)
-    (2 << 8) | OP.constString, strIdx.get(LOG_TAG),             // const-string v2, "MIR"
+    reg8(OP.moveResultObject, 1),                              // move-result-object v1 (текст стека)
+    ...reg16(OP.constString, 2, strIdx.get(LOG_TAG)),              // const-string v2, "MIR"
     ...invoke(OP.invokeStatic, M.logE, [2, 1]),                 // Log.e("MIR", стек)
-    (2 << 8) | OP.constString, strIdx.get(CRASH_PREFIX),        // const-string v2, пояснение
+    ...reg16(OP.constString, 2, strIdx.get(CRASH_PREFIX)),         // const-string v2, пояснение
     ...invoke(OP.invokeVirtual, M.strConcat, [2, 1]),           // пояснение + стек
-    (1 << 8) | OP.moveResultObject,                             // move-result-object v1
-    (3 << 8) | OP.newInstance, typeIdx.get(TEXTVIEW),           // new-instance v3, TextView
+    reg8(OP.moveResultObject, 1),                              // move-result-object v1
+    ...reg16(OP.newInstance, 3, typeIdx.get(TEXTVIEW)),            // new-instance v3, TextView
     ...invoke(OP.invokeDirect, M.tvInit, [3, THIS]),            // new TextView(this)
-    (1 << 12) | (4 << 8) | OP.const4,                           // const/4 v4, 1
+    const4(4, 1),                                            // const/4 v4, 1
     ...invoke(OP.invokeVirtual, M.tvSelectable, [3, 4]),        // текст можно выделить и скопировать
     ...invoke(OP.invokeVirtual, M.tvSetText, [3, 1]),           // tv.setText(пояснение + стек)
     ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 3]),   // показать вместо игры
@@ -347,49 +545,267 @@ function buildDex() {
   const onCreateCode = [
     ...prologue,
     ...guarded,
-    (gotoDelta << 8) | OP.goto,
+    reg8(OP.goto, gotoDelta),
     ...handler,
     OP.returnVoid,
   ];
+  const onCreateTry = catchThrowable(tryStart, tryLength, handlerAddr);
 
-  /* try_item + encoded_catch_handler_list: один обработчик на Throwable. */
-  const catchList = Buffer.concat([
-    uleb128(1), // размер списка
-    Buffer.concat([sleb128(1), uleb128(typeIdx.get(THROWABLE)), uleb128(handlerAddr)]),
-  ]);
-  const tryItem = Buffer.alloc(8);
-  tryItem.writeUInt32LE(tryStart, 0);
-  tryItem.writeUInt16LE(tryLength, 4);
-  tryItem.writeUInt16LE(1, 6); // смещение обработчика внутри списка (после uleb размера)
+  /* ---- onActivityResult(int, int, Intent): registers=7, ins=4
+          p0 = v3 (this), p1 = v4 (requestCode), p2 = v5 (resultCode), p3 = v6 (data)
+       Здесь выбор файла заканчивается: Uri отдаётся обещанию WebView.
+       Поле чистим до вызова — иначе повторный onShowFileChooser отдаст
+       результат старому обещанию. ---- */
+  const AR_THIS = 3;
+  const AR_RESULT = 5;
+  const AR_DATA = 6;
 
-  function codeItem(registers, ins, outs, units, tries = null) {
-    const head = Buffer.alloc(16 + units.length * 2);
-    head.writeUInt16LE(registers, 0);
-    head.writeUInt16LE(ins, 2);
-    head.writeUInt16LE(outs, 4);
-    head.writeUInt16LE(tries ? 1 : 0, 6);
-    head.writeUInt32LE(0, 8); // debug_info_off
-    head.writeUInt32LE(units.length, 12);
-    units.forEach((unit, i) => head.writeUInt16LE(unit & 0xffff, 16 + i * 2));
-    if (!tries) return head;
-    /* try_item-ы должны начинаться с чётного смещения внутри code_item. */
-    const padding = units.length % 2 ? Buffer.alloc(2) : Buffer.alloc(0);
-    return Buffer.concat([head, padding, tries.item, tries.list]);
+  const arDeliver = [
+    ...invoke(OP.invokeStatic, M.chooserParse, [AR_RESULT, AR_DATA]),  // parseResult(code, data) → Uri[]
+    reg8(OP.moveResultObject, 1),                                     // v1 = Uri[] (null, если отмена)
+    ...invoke(OP.invokeInterface, M.receiveValue, [0, 1]),             // callback.onReceiveValue(uris)
+  ];
+  const arDeliverHandler = [
+    reg8(OP.moveException, 0),
+    ...invoke(OP.invokeStatic, M.logTrace, [0]),
+    reg8(OP.moveResultObject, 1),
+    ...reg16(OP.constString, 2, strIdx.get(LOG_TAG)),
+    ...invoke(OP.invokeStatic, M.logE, [2, 1]),
+  ];
+  const arHead = [
+    ...sfield(OP.sgetObject, 0, F.callback),   // v0 = fileCallback
+    const4(1, 0),
+    ...sfield(OP.sputObject, 1, F.callback),   // fileCallback = null
+  ];
+  const arTail = [
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),
+    ...invoke(OP.invokeStatic, M.strValueOfInt, [AR_RESULT]),
+    reg8(OP.moveResultObject, 1),
+    ...reg16(OP.constString, 2, strIdx.get(RESULT_MSG)),
+    ...invoke(OP.invokeVirtual, M.strConcat, [2, 1]),
+    reg8(OP.moveResultObject, 1),
+    ...invoke(OP.invokeStatic, M.logI, [0, 1]),
+    OP.returnVoid,
+  ];
+  const activityResultCode = [
+    ...arHead,
+    /* Обещания нет — не открывали выбор файла: сразу к журналу. */
+    ...branch(OP.ifEqz, 0, arDeliver.length + arDeliverHandler.length + 2),
+    ...arDeliver,
+    ...arDeliverHandler,
+    ...arTail,
+  ];
+  const activityResultTry = catchThrowable(
+    arHead.length + 2,
+    arDeliver.length,
+    arHead.length + 2 + arDeliver.length,
+  );
+
+  /* ---- MirChromeClient(Activity): registers=3, ins=2 → p0 = v1, p1 = v2 ---- */
+  const chromeInitCode = [
+    ...invoke(OP.invokeDirect, M.chromeSuperInit, [1]),          // super()
+    ...ifield(OP.iputObject, 2, 1, F.activity),                  // this.activity = активность
+    OP.returnVoid,
+  ];
+
+  /* ---- onShowFileChooser(WebView, ValueCallback, FileChooserParams) → boolean
+          registers=7, ins=4: p0 = v3 (this), p1 = v4 (webView),
+          p2 = v5 (callback), p3 = v6 (params)
+       Смысл: WebView просит файл. Запоминаем его обещание и открываем
+       системный выбор; результат придёт в onActivityResult. Вернуть
+       false можно только если открыть выбор не удалось — тогда обещанию
+       отдаём null, иначе страница навсегда останется ждать. ---- */
+  const SC_THIS = 3;
+  const SC_CALLBACK = 5;
+  const SC_PARAMS = 6;
+
+  const scStale = [
+    const4(1, 0),
+    ...invoke(OP.invokeInterface, M.receiveValue, [0, 1]),       // старое обещание: отмена
+  ];
+  const scTryBody = [
+    ...sfield(OP.sputObject, SC_CALLBACK, F.callback),           // fileCallback = callback
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),
+    ...reg16(OP.constString, 1, strIdx.get(PICKER_MSG)),
+    ...invoke(OP.invokeStatic, M.logI, [0, 1]),
+    ...invoke(OP.invokeVirtual, M.chooserIntent, [SC_PARAMS]),   // params.createIntent()
+    reg8(OP.moveResultObject, 0),                               // v0 = Intent (ACTION_GET_CONTENT)
+    ...reg16(OP.const16, 1, FILE_REQUEST),                       // v1 = код запроса
+    ...ifield(OP.igetObject, 2, SC_THIS, F.activity),            // v2 = activity
+    ...invoke(OP.invokeVirtual, M.startForResult, [2, 0, 1]),    // activity.startActivityForResult(...)
+    const4(0, 1),
+    reg8(OP.returnValue, 0),                                     // return true
+  ];
+  const scHandler = [
+    reg8(OP.moveException, 0),
+    ...invoke(OP.invokeStatic, M.logTrace, [0]),
+    reg8(OP.moveResultObject, 1),
+    ...reg16(OP.constString, 2, strIdx.get(LOG_TAG)),
+    ...invoke(OP.invokeStatic, M.logE, [2, 1]),
+    ...sfield(OP.sgetObject, 1, F.callback),
+    const4(2, 0),
+    ...invoke(OP.invokeInterface, M.receiveValue, [1, 2]),       // отмена, чтобы страница не ждала
+    ...sfield(OP.sputObject, 2, F.callback),
+    const4(0, 0),
+    reg8(OP.returnValue, 0),                                     // return false
+  ];
+  const scHead = [
+    ...sfield(OP.sgetObject, 0, F.callback),                     // v0 = fileCallback
+    ...branch(OP.ifEqz, 0, scStale.length + 2),                  // пусто — нечего отменять
+    ...scStale,
+  ];
+  const chromeShowCode = [...scHead, ...scTryBody, ...scHandler];
+  const chromeShowTry = catchThrowable(
+    scHead.length,
+    scTryBody.length,
+    scHead.length + scTryBody.length,
+  );
+
+  /* --- code_item-ы: в памяти идут подряд, map_list указывает на первый. */
+  const codeList = [
+    { name: 'MainActivity.<init>', units: initCode.length, buf: codeItem('MainActivity.<init>', 1, 1, 1, initCode), tries: null },
+    {
+      name: 'MainActivity.onCreate',
+      units: onCreateCode.length,
+      buf: codeItem('MainActivity.onCreate', 7, 2, 2, onCreateCode, onCreateTry),
+      tries: onCreateTry,
+    },
+    {
+      name: 'MainActivity.onActivityResult',
+      units: activityResultCode.length,
+      buf: codeItem('MainActivity.onActivityResult', 7, 4, 3, activityResultCode, activityResultTry),
+      tries: activityResultTry,
+    },
+    { name: 'MirChromeClient.<init>', units: chromeInitCode.length, buf: codeItem('MirChromeClient.<init>', 3, 2, 1, chromeInitCode), tries: null },
+    {
+      name: 'MirChromeClient.onShowFileChooser',
+      units: chromeShowCode.length,
+      buf: codeItem('MirChromeClient.onShowFileChooser', 7, 4, 3, chromeShowCode, chromeShowTry),
+      tries: chromeShowTry,
+    },
+  ];
+  /* Верификатор ART идёт по map_list и пересчитывает длину каждого
+     code_item; лишнее выравнивание между ними сбивает этот обход. */
+  let codeOffset = 0;
+  for (const item of codeList) {
+    if (item.buf.length % 2)
+      throw new Error(`build-apk: code_item ${item.name} нечётной длины (${item.buf.length})`);
+    item.off = codeOffset; // относительно начала секции code_item
+    codeOffset += item.buf.length;
+  }
+  const codeBuf = Buffer.concat(codeList.map((item) => item.buf));
+
+  /* --- class_data_item: поля и методы класса ----------------------- */
+  /* Индексы в class_data идут нарастающими дельтами, поэтому списки
+     обязаны быть отсортированы по индексу в общем пуле. */
+  const sortedByIndex = (list, indexOf, label) => {
+    const sorted = [...list].sort((a, b) => indexOf(a) - indexOf(b));
+    sorted.forEach((item, i) => {
+      if (i && indexOf(sorted[i]) <= indexOf(sorted[i - 1]))
+        throw new Error(`build-apk: ${label} — повторяющийся индекс в class_data`);
+    });
+    return sorted;
+  };
+
+  function classData({ staticFields, instanceFields, directMethods, virtualMethods }) {
+    /* Формат class_data_item: сначала четыре размера, потом сами
+       разделы — именно в таком порядке их читает ART. */
+    const fieldSection = (list) => {
+      const out = [];
+      let prev = 0;
+      for (const field of sortedByIndex(list, fi, 'поля')) {
+        const index = fi(field);
+        out.push(uleb128(index - prev), uleb128(field.access));
+        prev = index;
+      }
+      return out;
+    };
+    const methodSection = (list) => {
+      const out = [];
+      let prev = 0;
+      for (const entry of sortedByIndex(list, (e) => mi(e.method), 'методы')) {
+        const index = mi(entry.method);
+        out.push(uleb128(index - prev), uleb128(entry.access), uleb128(entry.codeOff));
+        prev = index;
+      }
+      return out;
+    };
+    return Buffer.concat([
+      uleb128(staticFields.length),
+      uleb128(instanceFields.length),
+      uleb128(directMethods.length),
+      uleb128(virtualMethods.length),
+      ...fieldSection(staticFields),
+      ...fieldSection(instanceFields),
+      ...methodSection(directMethods),
+      ...methodSection(virtualMethods),
+    ]);
   }
 
-  const codeInit = codeItem(1, 1, 1, initCode);
-  const codeOnCreate = codeItem(7, 2, 2, onCreateCode, { item: tryItem, list: catchList });
+  /* Список class_def. Родитель обязан идти раньше наследника, если он
+     тоже объявлен в этом файле; MirChromeClient наследует системный
+     WebChromeClient, поэтому порядок здесь свободный — но фиксированный.
+     Смещения кода становятся известны только в раскладке файла, поэтому
+     список собирается функцией. */
+  const describeClassData = (codeOff) => [
+    {
+      type: CLASS,
+      access: 0x0001, // ACC_PUBLIC
+      superclass: SUPER,
+      sourceFile: SOURCE_FILE,
+      data: classData({
+        staticFields: [F.callback],
+        instanceFields: [],
+        directMethods: [
+          // ACC_PUBLIC | ACC_CONSTRUCTOR
+          { method: M.ownInit, access: 0x10001, codeOff: codeOff['MainActivity.<init>'] },
+        ],
+        virtualMethods: [
+          { method: M.ownOnCreate, access: 0x0004, codeOff: codeOff['MainActivity.onCreate'] }, // ACC_PROTECTED
+          {
+            method: M.ownOnActivityResult,
+            access: 0x0004,
+            codeOff: codeOff['MainActivity.onActivityResult'],
+          },
+        ],
+      }),
+    },
+    {
+      type: CHROME_CLASS,
+      access: 0x0001,
+      superclass: CHROME_SUPER,
+      sourceFile: CHROME_SOURCE_FILE,
+      data: classData({
+        staticFields: [],
+        instanceFields: [F.activity],
+        directMethods: [
+          { method: M.chromeInit, access: 0x10001, codeOff: codeOff['MirChromeClient.<init>'] },
+        ],
+        /* onShowFileChooser в WebChromeClient публичный: переопределение
+           с более строгим доступом верификатор ART отвергает. */
+        virtualMethods: [
+          {
+            method: M.chromeOnShowFileChooser,
+            access: 0x0001,
+            codeOff: codeOff['MirChromeClient.onShowFileChooser'],
+          },
+        ],
+      }),
+    },
+  ];
 
-  /* Сведения для журнала сборки: по ним видно, что именно попало в DEX. */
+  /* --- сведения для журнала сборки ------------------------------- */
   const report = {
     types,
     strings,
+    fields: fields.map((f) => `${f.cls}->${f.name}:${f.type} (0x${f.access.toString(16)})`),
     methods: methods.map((m) => `${m.cls}->${m.name}(${m.params.join('')})${m.ret}`),
-    onCreateUnits: onCreateCode.length,
-    tryStart,
-    tryLength,
-    handlerAddr,
-    doneAddr,
+    code: codeList.map((item) => {
+      const t = item.tries
+        ? `try ${item.tries.item.readUInt32LE(0)}+${item.tries.item.readUInt16LE(4)}, обработчик ${item.tries.item.readUInt16LE(6)}`
+        : 'без try';
+      return `${item.name}: ${item.units} слов, ${t}`;
+    }),
   };
 
   /* --- список типов для прототипов с параметрами ------------------- */
@@ -431,38 +847,48 @@ function buildDex() {
   const stringIdsOff = headerSize;
   const typeIdsOff = stringIdsOff + strings.length * 4;
   const protoIdsOff = typeIdsOff + types.length * 4;
-  const methodIdsOff = protoIdsOff + protos.length * 12;
+  const fieldIdsOff = protoIdsOff + protos.length * 12;
+  const methodIdsOff = fieldIdsOff + fields.length * 8;
   const classDefsOff = methodIdsOff + methods.length * 8;
-  const dataOff = classDefsOff + 32;
+  const dataOff = classDefsOff + CLASS_COUNT * 32;
 
   let cursor = dataOff;
   const typeListsOff = cursor;
   cursor += typeListsBuf.length;
 
+  /* code_item-ы идут подряд, без выравнивания между собой: верификатор
+     ART обходит map_list и пересчитывает длину каждого из них сам, а
+     лишние байты между item-ами сбивают этот обход. */
   cursor += pad4(cursor);
-  const codeInitOff = cursor;
-  cursor += codeInit.length;
-  cursor += pad4(cursor);
-  const codeOnCreateOff = cursor;
-  cursor += codeOnCreate.length;
+  const codeStartOff = cursor;
+  let codeCursor = codeStartOff;
+  const codeRef = {};
+  for (const item of codeList) {
+    if (item.buf.length % 2)
+      throw new Error(`build-apk: code_item ${item.name} нечётной длины (${item.buf.length})`);
+    codeRef[item.name] = codeCursor;
+    codeCursor += item.buf.length;
+  }
+  cursor = codeCursor;
+
+  /* Смещения кода известны — можно собирать class_data и class_defs. */
+  const classDefs = describeClassData(codeRef);
+  if (classDefs.length !== CLASS_COUNT)
+    throw new Error(`build-apk: классов ${classDefs.length}, а в раскладке заложено ${CLASS_COUNT}`);
+  report.classes = classDefs.map((c) => `${c.type} extends ${c.superclass}`);
+  const classDataBufs = classDefs.map((c) => c.data);
+  const classDataBuf = Buffer.concat(classDataBufs);
 
   const stringDataStart = cursor;
   cursor += stringDataBuf.length;
 
-  const classDataOff = cursor;
-  const classDataBuf = Buffer.concat([
-    uleb128(0), // static_fields_size
-    uleb128(0), // instance_fields_size
-    uleb128(1), // direct_methods_size
-    uleb128(1), // virtual_methods_size
-    uleb128(mi(M.ownInit)),
-    uleb128(0x10001), // ACC_PUBLIC | ACC_CONSTRUCTOR
-    uleb128(codeInitOff),
-    uleb128(mi(M.ownOnCreate)),
-    uleb128(0x0004), // ACC_PROTECTED
-    uleb128(codeOnCreateOff),
-  ]);
-  cursor += classDataBuf.length;
+  const classDataStartOff = cursor;
+  let classDataCursor = classDataStartOff;
+  classDefs.forEach((c, i) => {
+    c.dataOff = classDataCursor;
+    classDataCursor += classDataBufs[i].length;
+  });
+  cursor = classDataCursor;
 
   cursor += pad4(cursor);
   const mapOff = cursor;
@@ -472,12 +898,13 @@ function buildDex() {
     { type: 0x0001, size: strings.length, off: stringIdsOff },
     { type: 0x0002, size: types.length, off: typeIdsOff },
     { type: 0x0003, size: protos.length, off: protoIdsOff },
+    { type: 0x0004, size: fields.length, off: fieldIdsOff },
     { type: 0x0005, size: methods.length, off: methodIdsOff },
-    { type: 0x0006, size: 1, off: classDefsOff },
+    { type: 0x0006, size: classDefs.length, off: classDefsOff },
     { type: 0x1001, size: typeListCount, off: typeListsOff },
-    { type: 0x2001, size: 2, off: codeInitOff },
+    { type: 0x2001, size: codeList.length, off: codeStartOff },
     { type: 0x2002, size: strings.length, off: stringDataStart },
-    { type: 0x2000, size: 1, off: classDataOff },
+    { type: 0x2000, size: classDefs.length, off: classDataStartOff },
     { type: 0x1000, size: 1, off: mapOff },
   ].filter((item) => item.size > 0);
   mapItems.sort((a, b) => a.off - b.off);
@@ -503,28 +930,35 @@ function buildDex() {
     dex.writeUInt32LE(typeIdx.get(p.ret), protoIdsOff + i * 12 + 4);
     dex.writeUInt32LE(p.params.length ? typeListsOff + protoParamOff[i] : 0, protoIdsOff + i * 12 + 8);
   });
+  fields.forEach((f, i) => {
+    dex.writeUInt16LE(typeIdx.get(f.cls), fieldIdsOff + i * 8);
+    dex.writeUInt16LE(typeIdx.get(f.type), fieldIdsOff + i * 8 + 2);
+    dex.writeUInt32LE(strIdx.get(f.name), fieldIdsOff + i * 8 + 4);
+  });
   methods.forEach((m, i) => {
     dex.writeUInt16LE(m.classIdx, methodIdsOff + i * 8);
     dex.writeUInt16LE(m.protoIdx, methodIdsOff + i * 8 + 2);
     dex.writeUInt32LE(m.nameIdx, methodIdsOff + i * 8 + 4);
   });
 
-  /* --- class_def_item ------------------------------------------------ */
-  dex.writeUInt32LE(typeIdx.get(CLASS), classDefsOff);
-  dex.writeUInt32LE(0x0001, classDefsOff + 4); // ACC_PUBLIC
-  dex.writeUInt32LE(typeIdx.get(SUPER), classDefsOff + 8);
-  dex.writeUInt32LE(0, classDefsOff + 12); // interfaces_off
-  dex.writeUInt32LE(strIdx.get(SOURCE_FILE), classDefsOff + 16);
-  dex.writeUInt32LE(0, classDefsOff + 20); // annotations_off
-  dex.writeUInt32LE(classDataOff, classDefsOff + 24);
-  dex.writeUInt32LE(0, classDefsOff + 28); // static_values_off
+  /* --- class_def_item-ы ---------------------------------------------- */
+  classDefs.forEach((c, i) => {
+    const off = classDefsOff + i * 32;
+    dex.writeUInt32LE(typeIdx.get(c.type), off);
+    dex.writeUInt32LE(c.access, off + 4);
+    dex.writeUInt32LE(typeIdx.get(c.superclass), off + 8);
+    dex.writeUInt32LE(0, off + 12); // interfaces_off
+    dex.writeUInt32LE(strIdx.get(c.sourceFile), off + 16);
+    dex.writeUInt32LE(0, off + 20); // annotations_off
+    dex.writeUInt32LE(c.dataOff, off + 24);
+    dex.writeUInt32LE(0, off + 28); // static_values_off: поля стартуют с null
+  });
 
   /* --- секция данных -------------------------------------------------- */
   typeListsBuf.copy(dex, typeListsOff);
-  codeInit.copy(dex, codeInitOff);
-  codeOnCreate.copy(dex, codeOnCreateOff);
+  codeBuf.copy(dex, codeStartOff);
   stringDataBuf.copy(dex, stringDataStart);
-  classDataBuf.copy(dex, classDataOff);
+  classDataBuf.copy(dex, classDataStartOff);
   mapBuf.copy(dex, mapOff);
 
   /* --- заголовок ------------------------------------------------------- */
@@ -541,11 +975,11 @@ function buildDex() {
   dex.writeUInt32LE(typeIdsOff, 68);
   dex.writeUInt32LE(protos.length, 72);
   dex.writeUInt32LE(protoIdsOff, 76);
-  dex.writeUInt32LE(0, 80); // field_ids_size
-  dex.writeUInt32LE(0, 84); // field_ids_off (0, если размер 0)
+  dex.writeUInt32LE(fields.length, 80);
+  dex.writeUInt32LE(fieldIdsOff, 84);
   dex.writeUInt32LE(methods.length, 88);
   dex.writeUInt32LE(methodIdsOff, 92);
-  dex.writeUInt32LE(1, 96);
+  dex.writeUInt32LE(classDefs.length, 96);
   dex.writeUInt32LE(classDefsOff, 100);
   dex.writeUInt32LE(fileSize - dataOff, 104);
   dex.writeUInt32LE(dataOff, 108);
@@ -558,18 +992,19 @@ function buildDex() {
     stringIdsOff,
     typeIdsOff,
     protoIdsOff,
+    fieldIdsOff,
     methodIdsOff,
     classDefsOff,
     dataOff,
     typeListsOff,
-    codeInitOff,
-    codeOnCreateOff,
+    codeStartOff,
     stringDataStart,
-    classDataOff,
+    classDataStartOff,
     mapOff,
     fileSize,
   };
   report.mapItems = mapItems;
+  report.codeRefs = codeRef;
 
   return { dex, report };
 }
@@ -1519,17 +1954,18 @@ try {
   log.section('2. Байт-код classes.dex');
   const { dex, report } = buildDex();
   log.detail('Размер DEX', human(dex.length));
+  log.detail('Классов', report.classes.length);
   log.detail('Типов', report.types.length);
   log.detail('Строк', report.strings.length);
+  log.detail('Полей', report.fields.length);
   log.detail('Методов', report.methods.length);
+  log.raw(`Классы: ${report.classes.join(', ')}`);
   log.raw(`Типы: ${report.types.join(', ')}`);
+  log.raw(`Поля:\n  ${report.fields.join('\n  ')}`);
   log.raw(`Методы:\n  ${report.methods.join('\n  ')}`);
   log.raw(`Строки: ${report.strings.map((s) => JSON.stringify(s)).join(', ')}`);
   log.raw(`Раскладка файла: ${JSON.stringify(report.layout, null, 2)}`);
-  log.raw(
-    `onCreate: ${report.onCreateUnits} 16-битных слов, try с ${report.tryStart} по ${report.tryStart + report.tryLength}, ` +
-      `обработчик на ${report.handlerAddr}, выход на ${report.doneAddr}`,
-  );
+  log.raw(`Байт-код:\n  ${report.code.join('\n  ')}`);
   log.blob('classes.dex', dex);
 
   const dexProblems = verifyDex(dex);

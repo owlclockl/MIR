@@ -13,16 +13,36 @@ export const pickAvatarFile = () =>
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png, image/jpeg, image/webp, image/gif';
+    /* Поле обязательно должно быть в документе: часть WebView (в том
+       числе та, что внутри MIR.apk) игнорирует клик по <input type="file">,
+       который ни к чему не прикреплён, и выбор файла просто не открывается. */
+    input.setAttribute('aria-hidden', 'true');
+    input.tabIndex = -1;
+    input.style.cssText =
+      'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none';
     let settled = false;
+    let waiter = null;
     const done = (value) => {
       if (settled) return;
       settled = true;
-      resolve(value);
+      if (waiter) clearInterval(waiter);
+      input.remove();
+      resolve(value ?? null);
     };
-    input.addEventListener('change', () => done(input.files?.[0] || null));
-    window.addEventListener('focus', () => setTimeout(() => done(input.files?.[0] || null), 350), {
-      once: true,
-    });
+    /* После выбора Android сначала возвращает фокус окну и лишь потом
+       заполняет input.files, поэтому «отмену» признаём не сразу, а
+       подождав: иначе на телефоне диалог закрывался бы впустую. */
+    const waitThenDone = () => {
+      let waited = 0;
+      waiter = setInterval(() => {
+        waited += 100;
+        const file = input.files?.[0];
+        if (file || waited >= 1500) done(file);
+      }, 100);
+    };
+    input.addEventListener('change', () => done(input.files?.[0]));
+    window.addEventListener('focus', waitThenDone, { once: true });
+    document.body.appendChild(input);
     input.click();
   });
 

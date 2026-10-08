@@ -419,6 +419,10 @@ npm run dev
 - Телефон спросит разрешение «установка из неизвестных источников» —
   это нормально для файла, который пришёл не из магазина.
 - Внутри — WebView с игрой из `mir.html`, интернет не нужен.
+- **Аватарка добавляется прямо с телефона.** WebView не умеет открывать
+  выбор файла сам — это делает приложение, и оно делает: системный выбор
+  («Файлы», «Фото», облачные диски, камера) открывается по кнопке
+  «Добавить аватарку», разрешения на хранилище не спрашивает.
 - **Если что-то идёт не так, это видно, а не угадывается:**
   - каждая сборка пишет протокол в `logs/apk-build.log` (размеры, смещения,
     хеши, все проверки и то, как их провал выглядит на телефоне);
@@ -450,6 +454,7 @@ npm run logs        # показать журнал событий сервер�
 npm run test:hub -- https://адрес   # полный разбор живого хаба по его адресу
 npm run test:worker # адаптер хостинга (Cloudflare) без сети: хранение и перезапуск
 npm run test:ui     # собранный mir.html в jsdom: окна, кнопки, подключение к хабу
+npm run test:avatar # выбор аватарки в jsdom: поле выбора файла, выбор, отмена
 npm run host:logs   # живой журнал хостинга: каждый запрос к игре и хабу
 ```
 
@@ -496,6 +501,7 @@ npm run sounds       # скачать звуки интерфейса из би�
 npm run test:hub      -- http://127.0.0.1:4173   # хаб: аккаунты, друзья, панель админа
 npm run test:worker                              # адаптер хостинга без сети (хранение, перезапуск)
 npm run test:ui       -- http://127.0.0.1:4173   # окна меню в собранном mir.html
+npm run test:avatar                              # выбор аватарки (нужен jsdom)
 npm run test:p2p                                 # прямая связь между игроками
 npm run test:perf                                # отзывчивость меню (нужен jsdom)
 npm run test:build                               # артефакты сборки: ссылки, версия, вес
@@ -615,7 +621,7 @@ MIR/
 ├─ scripts/              сборка: build-web / build-single / build-exe / build-apk /
 │                        build-all, icons.mjs, doctor.mjs, apk-doctor.mjs,
 │                        test-build.mjs, test-spacing.mjs, test-p2p.mjs, test-hub.mjs,
-│                        test-ui.mjs, test-perf.mjs,
+│                        test-ui.mjs, test-perf.mjs, test-avatar.mjs,
 │                        lib/ (build.mjs, vite-mir.mjs — плагины сборки,
 │                        verify-build.mjs — проверки артефактов,
 │                        log.mjs, apk-read.mjs, apk-audit.mjs, …), win/MirSetup.cs

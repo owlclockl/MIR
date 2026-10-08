@@ -290,6 +290,49 @@ export function auditApk(buf, log, { prefix = '' } = {}) {
           fail: 'при падении пользователь увидит только «Приложение остановлено» без причины',
         });
       }
+
+      /* Выбор файла в WebView: без WebChromeClient с onShowFileChooser
+         Android молча игнорирует <input type="file"> — кнопка «Добавить
+         аватарку» в APK не открывает ничего и ничего не говорит. */
+      const code = (method) => method?.code?.lines?.join('\n') ?? '';
+      const chrome = dex.classes.find((c) => c.superclass === 'Landroid/webkit/WebChromeClient;');
+      log.check(Boolean(chrome), 'есть класс-наследник WebChromeClient', {
+        fail: 'WebView не откроет системный выбор файла: загрузка аватарки в APK не работает',
+      });
+      const onShowFileChooser = chrome?.methods.find((m) => m.name === 'onShowFileChooser');
+      log.check(Boolean(onShowFileChooser), 'в нём реализован onShowFileChooser(WebView, ValueCallback, FileChooserParams)', {
+        fail: 'клик по «Добавить аватарку» не доходит до Android — выбора файла не будет',
+      });
+      log.check(
+        Boolean(onShowFileChooser) && onShowFileChooser.access === 0x0001,
+        'onShowFileChooser публичный (как в WebChromeClient)',
+        { fail: 'ART отвергает переопределение с более строгим доступом: приложение не запустится' },
+      );
+      log.check(
+        code(onShowFileChooser).includes('startActivityForResult'),
+        'onShowFileChooser открывает системный выбор файла (startActivityForResult)',
+        { fail: 'обещание WebView останется без ответа — страница будет ждать файл вечно' },
+      );
+      log.check(
+        code(onCreate).includes('setWebChromeClient'),
+        'onCreate ставит этот клиент в WebView (setWebChromeClient)',
+        { fail: 'клиент есть, но WebView о нём не знает: выбор файла по-прежнему не откроется' },
+      );
+      const onResult = main.methods.find((m) => m.name === 'onActivityResult');
+      log.check(Boolean(onResult), 'у активности есть onActivityResult(int, int, Intent)', {
+        fail: 'выбранный файл некому передать обратно в WebView',
+      });
+      log.check(
+        code(onResult).includes('onReceiveValue'),
+        'onActivityResult отдаёт результат обещанию WebView (onReceiveValue)',
+        { fail: 'файл выбран, но страница его не получает — аватарка не появляется' },
+      );
+      log.check(
+        code(onResult).includes('parseResult'),
+        'результат разбирается штатно (FileChooserParams.parseResult)',
+        { fail: 'Uri из результата выбора не превратится в файл для WebView',
+        },
+      );
     }
 
     /* Ссылка на сам файл игры: если её нет в архиве — чёрный экран. */
