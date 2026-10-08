@@ -130,7 +130,7 @@ MIR/
 │  ├─ lib/web-diagnostics.mjs  экранный журнал ошибок внутри APK
 │  ├─ lib/net-check.mjs  проверка DNS/SRV перед публичной ссылкой
 │  └─ win/MirSetup.cs    исходник Windows-установщика
-├─ public/               манифест и иконки (копируются в dist/ как есть)
+├─ public/               манифест, иконки и Cloudflare _headers (копируются в dist/)
 ├─ docs/preview.svg      статичный макет экрана (артефакт)
 └─ *.bat                 входные точки для Windows без командной строки
 ```

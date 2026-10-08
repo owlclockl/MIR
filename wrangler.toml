@@ -15,6 +15,22 @@ main = "hosting/cloudflare/worker.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
 
+# Сохраняем только явные логи ошибок и редкую долю трассировок: хаб
+# использует длинный опрос. Строки запросов скрываем — старые клиенты
+# могут передавать сессионный токен в query string.
+[observability]
+enabled = true
+redact_query_string = true
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = false
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 0.01
+
 # Сама игра: статические файлы из dist/. Запросы к /api/* идут мимо
 # них, в код воркера, — иначе хаб перехватывала бы страница игры.
 [assets]

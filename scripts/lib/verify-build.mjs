@@ -109,6 +109,16 @@ export function checkWeb() {
     `${webSoundAssets.length} файлов; base64 в JS: ${inlineAudio ? 'да' : 'нет'}`,
   );
 
+  const assetFiles = files.filter((name) => name.startsWith('assets/'));
+  const unhashedAssets = assetFiles.filter((name) => !/^assets\/[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$/.test(name));
+  const headersFile = existsSync('dist/_headers') ? readFileSync('dist/_headers', 'utf8') : '';
+  const immutableCacheRule = /(?:^|\n)\/assets\/\*\s*\n\s*Cache-Control:\s*public,\s*max-age=31536000,\s*immutable(?:\s|$)/m.test(headersFile);
+  add(
+    immutableCacheRule && assetFiles.length > 0 && unhashedAssets.length === 0,
+    'все хешированные ассеты получают годовой immutable-кеш',
+    `${assetFiles.length} файлов; нехешированные: ${unhashedAssets.join(', ') || 'нет'}`,
+  );
+
   const cssBytes = files
     .filter((name) => name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -143,6 +153,11 @@ export function checkWeb() {
       new Set(precache).size === precache.length,
       'в списке оболочки нет повторов',
       `${precache.length - new Set(precache).size} лишних`,
+    );
+    add(
+      !precache.includes('/_headers') && !precache.includes('/_redirects'),
+      'метаданные Workers Assets не попали в офлайн-кэш',
+      '/_headers и /_redirects исключены',
     );
 
     /* Новости о версии из кэша не отдаются: иначе приложение сравнивало бы

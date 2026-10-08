@@ -31,6 +31,7 @@
    =========================================================== */
 
 const MAX_AVATAR_CHARS = 300 * 1024;
+export const MAX_REQUEST_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
 
 /* Журнал панели админа: последние события хаба — кто зарегистрировался,
@@ -123,7 +124,7 @@ export function httpError(status, message) {
 export const corsHeaders = () => ({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Mir-Admin',
   'Access-Control-Max-Age': '86400',
 });
 
