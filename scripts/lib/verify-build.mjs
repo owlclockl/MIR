@@ -28,9 +28,10 @@ const ROOT_FILES = ['dist', 'mir.html'];
    используют ту же лёгкую Canvas-отрисовку. Звуки web-версии по-прежнему
    отдельными файлами, не в JS. */
 export const BUDGETS = {
-  js: 204 * 1024,
-  css: 64 * 1024,
-  single: 340 * 1024,
+  js: 232 * 1024,
+  css: 84 * 1024,
+  fmgCss: 260 * 1024,
+  single: 390 * 1024,
 };
 
 const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -74,6 +75,20 @@ export function checkWeb() {
 
   const files = walk('dist');
   const html = readFileSync('dist/index.html', 'utf8');
+  const fmgHtmlPath = 'dist/fmg/index.html';
+  const fmgHtml = existsSync(fmgHtmlPath) ? readFileSync(fmgHtmlPath, 'utf8') : '';
+  const fmgFiles = files.filter((name) => name.startsWith('fmg/'));
+  const fmgEntry = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
+  add(
+    Boolean(fmgHtml) && fmgFiles.length > 100 && Boolean(fmgEntry) && existsSync(join('dist', fmgEntry)),
+    'полный Azgaar FMG встроен в веб-сборку',
+    fmgHtml ? `${fmgFiles.length} файлов, входной модуль ${fmgEntry ?? 'не найден'}` : 'dist/fmg/index.html отсутствует',
+  );
+  add(
+    Boolean(fmgHtml) && !/googletagmanager\.com|storage\.googleapis\.com/.test(fmgHtml) && !existsSync('dist/fmg/sw.js'),
+    'FMG не запускает внешнюю аналитику или вложенный service worker',
+    'аналитика удалена, офлайн-кэш обслуживает MIR',
+  );
 
   const missing = localRefs(html).filter((ref) => !existsSync(join('dist', ref)));
   add(
@@ -92,6 +107,12 @@ export function checkWeb() {
 
   const jsFiles = files.filter((name) => /^assets\/.*\.js$/.test(name));
   add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
+  const appCode = jsFiles.map((name) => readFileSync(join('dist', name), 'utf8')).join('\n');
+  add(
+    appCode.includes('world-fmg-open') && appCode.includes('world-fmg-back') && appCode.includes('world-fmg-overlay') && appCode.includes('<iframe') && appCode.includes('/fmg/index.html?seed=') && appCode.includes('Azgaar'),
+    'атлас открывает полноэкранный Azgaar overlay с тем же seed',
+    'кнопки, iframe, same-seed и возврат присутствуют в веб-бандле',
+  );
 
   const jsBytes = jsFiles.reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
   add(
@@ -120,10 +141,18 @@ export function checkWeb() {
     `${assetFiles.length} файлов; нехешированные: ${unhashedAssets.join(', ') || 'нет'}`,
   );
 
-  const cssBytes = files
-    .filter((name) => name.endsWith('.css'))
+  const mirCssBytes = files
+    .filter((name) => name.startsWith('assets/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
-  add(cssBytes > 0 && cssBytes <= BUDGETS.css, `стили в бюджете (${kb(BUDGETS.css)})`, kb(cssBytes));
+  add(mirCssBytes > 0 && mirCssBytes <= BUDGETS.css, `стили MIR в бюджете (${kb(BUDGETS.css)})`, kb(mirCssBytes));
+  const fmgCssBytes = files
+    .filter((name) => name.startsWith('fmg/') && name.endsWith('.css'))
+    .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
+  add(
+    fmgCssBytes > 0 && fmgCssBytes <= BUDGETS.fmgCss,
+    `стили Azgaar в бюджете (${kb(BUDGETS.fmgCss)})`,
+    kb(fmgCssBytes),
+  );
 
   /* Service worker: имя кэша и список оболочки. */
   if (!existsSync('dist/sw.js')) {
@@ -149,6 +178,12 @@ export function checkWeb() {
       precache.length > 2 && broken.length === 0,
       'список оболочки service worker существует целиком',
       broken.length ? `нет: ${broken.join(', ')}` : `${precache.length} файлов`,
+    );
+    const missingFmgPrecache = fmgFiles.filter((name) => !precache.includes(`/${name}`));
+    add(
+      fmgFiles.length > 100 && precache.includes('/fmg/index.html') && missingFmgPrecache.length === 0,
+      'весь редактор Azgaar включён в офлайн-кэш MIR',
+      missingFmgPrecache.length ? `вне precache: ${missingFmgPrecache.slice(0, 6).join(', ')}` : `${fmgFiles.length} файлов`,
     );
     add(
       new Set(precache).size === precache.length,

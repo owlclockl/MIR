@@ -1,11 +1,13 @@
 {
   "name": "mir-game-menu",
   "private": true,
-  "version": "0.9.3",
+  "version": "0.9.5",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "node scripts/build-web.mjs",
+    "fmg:install": "npm ci --ignore-scripts --prefix vendor/azgaar-fantasy-map-generator",
+    "fmg:build": "node scripts/build-fmg.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "single": "node scripts/build-single.mjs",
     "build:exe": "node scripts/build-exe.mjs",

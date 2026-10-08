@@ -1,0 +1,161 @@
+/* MIR cartography palette layered over Azgaar's original map/editor styles.
+   The generated map remains user-stylable; these rules only recolor the UI. */
+:root {
+  color-scheme: dark;
+  --mir-ink: #080d0e;
+  --mir-panel: #0d1515;
+  --mir-panel-raised: #14201e;
+  --mir-line: rgba(201, 221, 208, 0.16);
+  --mir-text: #e6ece8;
+  --mir-muted: #9eaea6;
+  --mir-gold: #d8c184;
+}
+
+html,
+body {
+  color-scheme: dark;
+  color: var(--mir-text);
+  background: var(--mir-ink);
+}
+
+body {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+#map {
+  background-color: #080d0e;
+}
+
+#options,
+#optionsContainer,
+#collapsible,
+#dialogs,
+.ui-dialog.ui-widget-content,
+.ui-dialog .ui-dialog-content,
+.ui-widget-content:not(#map) {
+  color: var(--mir-text);
+  background-color: var(--mir-panel);
+  border-color: var(--mir-line);
+}
+
+#options,
+#optionsContainer,
+.ui-dialog.ui-widget-content {
+  border-radius: 3px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48);
+}
+
+#options p,
+#optionsContent span,
+#optionsContent td,
+#optionsContent label,
+#optionsContent small,
+.ui-dialog,
+.ui-dialog label,
+.ui-dialog td,
+.ui-dialog th {
+  color: var(--mir-text);
+}
+
+#options .tip,
+.ui-dialog .tip,
+#optionsContent .tip {
+  color: var(--mir-muted);
+}
+
+#options input:not([type="color"]),
+#options select,
+#options textarea,
+.ui-dialog input:not([type="color"]),
+.ui-dialog select,
+.ui-dialog textarea {
+  color: var(--mir-text);
+  background-color: #091111;
+  border: 1px solid var(--mir-line);
+  accent-color: var(--mir-gold);
+}
+
+#options input[type="range"],
+.ui-dialog input[type="range"] {
+  accent-color: var(--mir-gold);
+}
+
+#options button,
+.tabcontent button,
+.ui-dialog .ui-button,
+button.options {
+  color: var(--mir-text);
+  background-color: var(--mir-panel-raised);
+  border-color: var(--mir-line);
+  border-radius: 2px;
+}
+
+#options button:hover,
+.tabcontent button:hover,
+.ui-dialog .ui-button:hover,
+button.options:hover,
+button.options.active {
+  color: #fff8e7;
+  background-color: #20352e;
+  border-color: rgba(216, 193, 132, 0.42);
+}
+
+#options button:focus-visible,
+.tabcontent button:focus-visible,
+.ui-dialog button:focus-visible,
+#options input:focus-visible,
+#options select:focus-visible {
+  outline: 2px solid var(--mir-gold);
+  outline-offset: 2px;
+}
+
+.ui-widget-header,
+.ui-dialog .ui-dialog-titlebar,
+div.tab {
+  color: var(--mir-text);
+  background: #111c1a;
+  border-color: var(--mir-line);
+}
+
+.ui-dialog .ui-dialog-titlebar-close {
+  color: var(--mir-text);
+  background: transparent;
+  border-color: transparent;
+}
+
+#options .tab,
+#optionsContent table,
+.ui-dialog table {
+  border-color: var(--mir-line);
+}
+
+#optionsContent table td,
+.ui-dialog table td,
+.ui-dialog table th {
+  border-color: rgba(201, 221, 208, 0.12);
+}
+
+.tabcontent li {
+  color: var(--mir-text);
+  background-color: var(--mir-panel-raised);
+  border-radius: 2px;
+}
+
+.tabcontent li.buttonoff {
+  color: #a2afa9;
+  background-color: #101918;
+}
+
+#tooltip,
+.ui-tooltip {
+  color: var(--mir-text);
+  background: #111c1a;
+  border: 1px solid var(--mir-line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+}
+
+#optionsTrigger {
+  color: var(--mir-gold);
+  background: #0d1515;
+  border-color: var(--mir-line);
+}

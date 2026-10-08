@@ -81,20 +81,30 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate' || request.destination === 'document') {
+    /* Основной экран — SPA (`/`), но встроенная мастерская Azgaar — отдельный
+       документ (`/fmg/index.html`). Не кладём её в ключ `/`: иначе обычная
+       страница игры при следующем офлайн-запуске превращается в карту. */
+    const documentPath =
+      url.pathname === '/fmg' || url.pathname === '/fmg/'
+        ? '/fmg/index.html'
+        : url.pathname.startsWith('/fmg/') ? url.pathname : '/';
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .then((response) => {
-          if (response.ok) caches.open(CACHE).then((cache) => cache.put('/', response.clone())).catch(() => {});
+          if (response.ok)
+            caches.open(CACHE).then((cache) => cache.put(documentPath, response.clone())).catch(() => {});
           return response;
         })
-        .catch(async () => (await caches.match('/')) || Response.error()),
+        .catch(async () => (await caches.match(documentPath)) || Response.error()),
     );
     return;
   }
 
   event.respondWith(
     (async () => {
-      const cached = await caches.match(request);
+      /* Azgaar annotates fixed-path assets with ?v=...; the offline precache
+         stores their canonical path without that query. */
+      const cached = await caches.match(request, { ignoreSearch: url.pathname.startsWith('/fmg/') });
       const fresh = fetch(request)
         .then((response) => {
           if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone())).catch(() => {});
