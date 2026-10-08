@@ -2022,20 +2022,19 @@ const createWorldSession = (config = null) => {
     voxelSize: 1.25,
     earthMultiples: 2,
   };
-  const preview = createWorld(settings);
   return {
     open: false,
     screen: 'setup',
     returnScreen: null,
     config: {
-      seed: preview.seed,
-      continents: preview.continents,
-      landscape: preview.landscape,
-      climate: preview.climate,
-      voxelSize: preview.voxelSize,
-      earthMultiples: preview.earthMultiples,
+      seed: settings.seed || worldSeed(),
+      continents: settings.continents ?? 4,
+      landscape: settings.landscape ?? 'mainland',
+      climate: settings.climate ?? 'temperate',
+      voxelSize: settings.voxelSize ?? 1.25,
+      earthMultiples: settings.earthMultiples ?? 2,
     },
-    preview,
+    preview: null,
     model: null,
     spawn: null,
     camera: null,
@@ -2044,109 +2043,26 @@ const createWorldSession = (config = null) => {
 };
 
 const worldSetupHtml = (session) => {
-  const world = session.preview;
   const config = session.config;
-  const continentOptions = Array.from({ length: MAX_CONTINENTS }, (_, index) => index + 1)
-    .map((count) => `<option value="${count}"${count === config.continents ? ' selected' : ''}>${worldContinentLabel(count)}</option>`)
-    .join('');
-  const landscapeOptions = Object.entries(LANDSCAPE_PRESETS)
-    .map(([value, preset]) => `<option value="${value}"${value === config.landscape ? ' selected' : ''}>${preset.label}</option>`)
-    .join('');
-  const climateOptions = Object.entries(CLIMATE_PRESETS)
-    .map(([value, preset]) => `<option value="${value}"${value === config.climate ? ' selected' : ''}>${preset.label}</option>`)
-    .join('');
-  const voxelOptions = [1, 1.25, 1.5]
-    .map((size) => `<option value="${size}"${size === config.voxelSize ? ' selected' : ''}>${String(size).replace('.', ',')} м</option>`)
-    .join('');
-  const areaOptions = [2, 4, 8]
-    .map((factor) => `<option value="${factor}"${factor === config.earthMultiples ? ' selected' : ''}>${factor}× Земли · ${worldInteger(EARTH_SURFACE_KM2 * factor)} км²</option>`)
-    .join('');
-
   return `
-    <div class="world-shell world-shell--setup">
+    <div class="world-shell world-shell--setup world-shell--azgaar">
       <section class="world-card world-config">
-        <div class="world-card__eyebrow">Параметры генерации</div>
+        <div class="world-card__eyebrow">Генератор карт Azgaar</div>
+        <h2>Создайте свой мир</h2>
+        <p class="world-fmg-description">Полный Fantasy Map Generator создаст карту, государства, рельеф и остальные детали мира. MIR передаст генератору seed.</p>
         <label class="field world-field">
-          <span class="field__label">Seed мира</span>
+          <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
             <input class="input input--code" type="text" maxlength="48" autocomplete="off" spellcheck="false"
                    data-role="world-seed" data-world-setting="seed" value="${escapeHtml(config.seed)}" />
             <button class="icon-button icon-button--sm" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('refresh', 'icon--xs')}</button>
           </span>
-          <span class="world-field__hint">Один и тот же seed создаёт одинаковую карту и чанки.</span>
+          <span class="world-field__hint">Укажите seed или сгенерируйте случайный. Настройки и правила карты задаются в Azgaar.</span>
         </label>
-        <label class="field world-field">
-          <span class="field__label">Число континентов</span>
-          <select class="input" data-role="world-continents" data-world-setting="continents">${continentOptions}</select>
-        </label>
-        <label class="field world-field">
-          <span class="field__label">Форма ландшафта</span>
-          <select class="input" data-role="world-landscape" data-world-setting="landscape">${landscapeOptions}</select>
-        </label>
-        <label class="field world-field">
-          <span class="field__label">Климат</span>
-          <select class="input" data-role="world-climate" data-world-setting="climate">${climateOptions}</select>
-        </label>
-        <label class="field world-field">
-          <span class="field__label">Размер одного вокселя</span>
-          <select class="input" data-role="world-voxel-size" data-world-setting="voxelSize">${voxelOptions}</select>
-          <span class="world-field__hint" data-role="world-voxel-hint">Один блок — куб ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} м.</span>
-        </label>
-        <label class="field world-field">
-          <span class="field__label">Площадь мира</span>
-          <select class="input" data-role="world-area" data-world-setting="earthMultiples">${areaOptions}</select>
-          <span class="world-field__hint">Минимум — вдвое больше площади поверхности Земли.</span>
-        </label>
-        <div class="world-callout">
-          ${icon('globe', 'icon--xs')}
-          <p>Мир собирается по seed: материки, биомы, горы и реки готовы сразу, а воксели создаются только рядом с камерой.</p>
-        </div>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
-          <span>Создать мир</span>${icon('play', 'icon--xs')}
+          <span>Открыть генератор Azgaar</span>${icon('play', 'icon--xs')}
         </button>
       </section>
-
-      <section class="world-card world-preview">
-        <header class="world-card__heading">
-          <div><p class="world-card__eyebrow">Атлас генерации</p><h3>Новая цивилизация</h3></div>
-          <span class="world-tag">${LANDSCAPE_PRESETS[config.landscape].label} · ${CLIMATE_PRESETS[config.climate].label.toLowerCase()} · ${worldContinentLabel(config.continents).replace('континент', 'материк')}</span>
-        </header>
-        ${worldLayerControlsHtml(session.layer)}
-        <canvas class="world-map-canvas" data-role="world-preview-map" width="960" height="480" aria-label="Предварительный атлас сгенерированного мира"></canvas>
-        ${worldMapLegendHtml(session.layer)}
-        <div class="world-map-facts" data-role="world-map-facts">${worldMapFactsHtml(world)}</div>
-        ${worldStatsHtml(world)}
-        <p class="world-footnote">Площадь учитывает размер вокселя. Миллионы миллиардов блоков не хранятся в памяти — ландшафт и чанки воспроизводятся из seed.</p>
-      </section>
-    </div>`;
-};
-
-const worldStateDetailsHtml = (world, stateId) => {
-  const state = world.states.find((item) => item.id === stateId);
-  if (!state)
-    return `<div class="world-state-empty"><span class="world-state-empty__mark">⌖</span><strong>Выберите территорию</strong><span>Кликните по суше на карте, чтобы открыть сводку государства.</span></div>`;
-  const settlements = world.settlements.filter((item) => item.stateId === state.id);
-  const cities = settlements.filter((item) => item.kind !== 'столица').length;
-  const population = state.population >= 1_000_000
-    ? `${(state.population / 1_000_000).toFixed(1).replace('.', ',')} млн.`
-    : `${worldInteger(Math.round(state.population / 1000))} тыс.`;
-  return `
-    <div class="world-state-head">
-      <i class="world-state-color" style="--state-color:${state.color}"></i>
-      <div><span class="world-card__eyebrow">${escapeHtml(state.culture)}</span><h4>${escapeHtml(state.name)}</h4></div>
-      <span class="world-state-order">${String(state.order).padStart(2, '0')}</span>
-    </div>
-    <div class="world-state-metrics">
-      <div><span>Население</span><strong>${population}</strong></div>
-      <div><span>Поселения</span><strong>${settlements.length}</strong></div>
-      <div><span>Крупные города</span><strong>${cities}</strong></div>
-    </div>
-    <div class="world-state-resource-block"><span class="world-card__eyebrow">Стратегические ресурсы</span>
-      <div class="world-resource-list">${state.resources.map((resource) => `<span>${escapeHtml(resource)}</span>`).join('')}</div>
-    </div>
-    <div class="world-state-settlements"><span class="world-card__eyebrow">Узлы территории</span>
-      ${settlements.slice(0, 4).map((settlement) => `
-        <div class="world-settlement-row"><i class="${settlement.kind === 'столица' ? 'is-capital' : ''}"></i><span>${escapeHtml(settlement.name)}</span><small>${escapeHtml(settlement.kind)}</small></div>`).join('')}
     </div>`;
 };
 
@@ -2371,29 +2287,10 @@ const worldModalHtml = () => {
 
 const refreshWorldPreview = () => {
   if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'setup') return;
-  const root = worldRoot();
-  const field = (name) => root?.querySelector(`[data-world-setting="${name}"]`);
-  const seedField = field('seed');
-  const seed = seedField?.value.trim() || worldSeed();
-  if (seedField && !seedField.value.trim()) seedField.value = seed;
-  const config = {
-    seed,
-    continents: Number(field('continents')?.value ?? ui.world.config.continents),
-    landscape: field('landscape')?.value ?? ui.world.config.landscape,
-    climate: field('climate')?.value ?? ui.world.config.climate,
-    voxelSize: Number(field('voxelSize')?.value ?? ui.world.config.voxelSize),
-    earthMultiples: Number(field('earthMultiples')?.value ?? ui.world.config.earthMultiples),
-  };
-  ui.world.config = config;
-  ui.world.preview = createWorld(config);
-  updateWorldStats(root, ui.world.preview);
-  const tag = root?.querySelector('.world-preview .world-tag');
-  if (tag) tag.textContent = `${LANDSCAPE_PRESETS[config.landscape].label} · ${CLIMATE_PRESETS[config.climate].label.toLowerCase()} · ${worldContinentLabel(config.continents).replace('континент', 'материк')}`;
-  const facts = root?.querySelector('[data-role="world-map-facts"]');
-  if (facts) facts.innerHTML = worldMapFactsHtml(ui.world.preview);
-  const hint = root?.querySelector('.world-field__hint[data-role="world-voxel-hint"]');
-  if (hint) hint.textContent = `Один блок — куб ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} × ${String(config.voxelSize).replace('.', ',')} м.`;
-  drawWorldMap(root?.querySelector('[data-role="world-preview-map"]'), ui.world.preview, null, ui.world.layer);
+  const field = worldRoot()?.querySelector('[data-world-setting="seed"]');
+  const seed = field?.value.trim() || worldSeed();
+  if (field && !field.value.trim()) field.value = seed;
+  ui.world.config.seed = seed;
 };
 
 const updateWorldReadouts = () => {
@@ -2421,10 +2318,7 @@ const updateWorldReadouts = () => {
 const drawWorldSession = () => {
   if ((ui.modal?.type !== 'world' && !ui.world?.open) || !ui.world) return;
   const root = worldRoot();
-  if (ui.world.screen === 'setup') {
-    drawWorldMap(root?.querySelector('[data-role="world-preview-map"]'), ui.world.preview, null, ui.world.layer);
-    return;
-  }
+  if (ui.world.screen === 'setup') return;
   drawWorldMap(root?.querySelector('[data-role="world-focus-map"]'), ui.world.model, ui.world.camera, ui.world.layer);
   drawWorldMap(root?.querySelector('[data-role="world-map"]'), ui.world.model, ui.world.camera, ui.world.layer, true);
   drawVoxelView(root?.querySelector('[data-role="world-viewport"]'), ui.world.model, ui.world.camera);
@@ -3742,39 +3636,9 @@ const actions = {
   'world-generate': () => {
     const root = worldRoot();
     const seed = root?.querySelector('[data-world-setting="seed"]')?.value.trim() || worldSeed();
-    const config = {
-      seed,
-      continents: Number(root?.querySelector('[data-world-setting="continents"]')?.value ?? ui.world.config.continents),
-      landscape: root?.querySelector('[data-world-setting="landscape"]')?.value ?? ui.world.config.landscape,
-      climate: root?.querySelector('[data-world-setting="climate"]')?.value ?? ui.world.config.climate,
-      voxelSize: Number(root?.querySelector('[data-world-setting="voxelSize"]')?.value ?? ui.world.config.voxelSize),
-      earthMultiples: Number(root?.querySelector('[data-world-setting="earthMultiples"]')?.value ?? ui.world.config.earthMultiples),
-    };
-    const model = createWorld(config);
-    const spawn = model.findSpawn();
-    const state = model.stateAtNormalized((spawn.x + 0.5) / model.widthCells, (spawn.z + 0.5) / model.depthCells);
-    ui.world = {
-      open: true,
-      screen: 'explore',
-      config: {
-        seed: model.seed,
-        continents: model.continents,
-        landscape: model.landscape,
-        climate: model.climate,
-        voxelSize: model.voxelSize,
-        earthMultiples: model.earthMultiples,
-      },
-      preview: null,
-      model,
-      spawn,
-      camera: { x: spawn.x, z: spawn.z, zoom: 1, mapZoom: 2.1 },
-      selectedStateId: state?.id ?? model.states[0]?.id ?? null,
-      layer: ui.world.layer ?? 'biomes',
-    };
-    renderWorldPage({ focus: false });
-    if (ui.modal?.type === 'world') renderModal({ focus: false });
-    playSound('success');
-    toast(`Мир готов: ${model.continentCenters.length} материка, ${model.states.length} государств, ${model.settlements.length} поселений. Seed сохранён в параметрах.`);
+    ui.world.config.seed = seed;
+    refreshWorldPreview();
+    actions['world-fmg-open']();
   },
 
   'world-new': () => {
