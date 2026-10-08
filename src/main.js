@@ -20,7 +20,7 @@ import {
   MAX_CONTINENTS,
   createWorld,
 } from './game/world.js';
-import { cameraPanDelta, drawVoxelView, drawWorldMap } from './game/render.js';
+import { cameraPanDelta, drawVoxelView, drawWorldMap, worldMapPointAt } from './game/render.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -30,6 +30,11 @@ const TITLE_FULL = `${TITLE.lead} ${TITLE.tail}`;
    обновить вместе. Запасное значение нужно лишь для чтения модуля без
    сборки (например, из тестов). */
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
+/* Полный Azgaar доступен в веб/PWA-сборке, где рядом раздаётся его каталог
+   public/fmg. Однофайловый mir.html остаётся самодостаточным и не обещает
+   открыть отсутствующую папку. */
+const HAS_AZGAAR_EDITOR =
+  typeof __MIR_AZGAAR_AVAILABLE__ === 'boolean' && __MIR_AZGAAR_AVAILABLE__;
 
 /* Аватар: загруженная картинка или инициалы на цвете из имени.
 
@@ -121,10 +126,13 @@ const ui = {
   hubDraft: '',
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
-  world: null, // настройки генерации или текущая сессия voxel-world
+  world: null, // настройки генерации или текущая сессия мира
 };
 
 let worldCameraDrag = null;
+let worldMapDragSuppressed = false;
+let worldPageHistoryEntry = false;
+let renderedWorldPageHtml = '';
 let backendReady = store.isBackendInitialized?.() ?? false;
 
 /* Разметка, которая сейчас лежит в слое окон. Сравниваем строки между
@@ -134,6 +142,8 @@ let backendReady = store.isBackendInitialized?.() ?? false;
 let renderedModalHtml = '';
 
 const overlayRoot = () => document.querySelector('#overlay-root');
+const worldPageRoot = () => document.querySelector('#world-page-root');
+const worldRoot = () => ui.world?.open ? worldPageRoot() : overlayRoot();
 
 const openModal = (type, data = null) => {
   ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -1919,14 +1929,15 @@ const worldScientific = (value) => {
   const [mantissa, exponent] = Number(value).toExponential(1).split('e');
   return `${mantissa.replace('.', ',')} × 10${worldSuperscript(Number(exponent))}`;
 };
-const worldContinentWord = (count) => {
+const russianCountWord = (count, one, few, many) => {
   const mod100 = count % 100;
-  if (mod100 >= 11 && mod100 <= 14) return 'континентов';
+  if (mod100 >= 11 && mod100 <= 14) return many;
   const mod10 = count % 10;
-  if (mod10 === 1) return 'континент';
-  if (mod10 >= 2 && mod10 <= 4) return 'континента';
-  return 'континентов';
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 };
+const worldContinentWord = (count) => russianCountWord(count, 'континент', 'континента', 'континентов');
 const worldContinentLabel = (count) => `${count} ${worldContinentWord(count)}`;
 const worldRiverWord = (count) => {
   const mod100 = count % 100;
@@ -1940,11 +1951,17 @@ const WORLD_MAP_LAYERS = [
   ['biomes', 'Биомы'],
   ['relief', 'Рельеф'],
   ['height', 'Высоты'],
+  ['politics', 'Государства'],
+  ['cultures', 'Культуры'],
+  ['tectonics', 'Тектоника'],
 ];
 const WORLD_MAP_LEGENDS = {
-  biomes: [['ocean', 'океан'], ['forest', 'лес'], ['land', 'равнины'], ['sand', 'сухие земли'], ['snow', 'горы'], ['river', 'реки']],
+  biomes: [['ocean', 'океан'], ['forest', 'леса'], ['land', 'равнины'], ['sand', 'сухие земли'], ['snow', 'горы'], ['river', 'реки']],
   relief: [['ocean', 'океан'], ['land', 'суша'], ['sand', 'низины'], ['snow', 'высоты'], ['river', 'реки']],
   height: [['ocean', 'низины'], ['land', 'равнины'], ['sand', 'возвышенности'], ['snow', 'вершины'], ['river', 'реки']],
+  politics: [['land', 'государства'], ['snow', 'столицы'], ['river', 'границы и реки']],
+  cultures: [['forest', 'культурные ареалы'], ['river', 'границы культур']],
+  tectonics: [['ocean', 'океаническая кора'], ['land', 'устойчивые плиты'], ['sand', 'активные границы']],
 };
 const worldLayerControlsHtml = (active) => `
   <div class="world-layer-switch" role="group" aria-label="Слой карты">
@@ -1956,7 +1973,9 @@ const worldMapLegendHtml = (layer) => `
   </div>`;
 const worldMapFactsHtml = (world) => `
   <span class="world-map-fact">${world.continentCenters.length} ${worldContinentWord(world.continentCenters.length)}</span>
-  <span class="world-map-fact">${world.rivers.length} ${worldRiverWord(world.rivers.length)}</span>`;
+  <span class="world-map-fact">${world.states.length} ${russianCountWord(world.states.length, 'государство', 'государства', 'государств')}</span>
+  <span class="world-map-fact">${world.rivers.length} ${worldRiverWord(world.rivers.length)}</span>
+  <span class="world-map-fact">${world.settlements.length} ${russianCountWord(world.settlements.length, 'поселение', 'поселения', 'поселений')}</span>`;
 const worldSeed = () => {
   const value = new Uint32Array(1);
   if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(value);
@@ -1969,7 +1988,9 @@ const worldStatsHtml = (world) => `
     <div class="world-stat"><span>Площадь</span><strong data-world-stat="area">${worldInteger(world.areaKm2)} км²</strong></div>
     <div class="world-stat"><span>К Земле</span><strong data-world-stat="ratio">${world.earthRatio.toFixed(2).replace('.', ',')}×</strong></div>
     <div class="world-stat"><span>Сторона карты</span><strong data-world-stat="side">${worldInteger(world.widthMeters / 1000)} км</strong></div>
-    <div class="world-stat"><span>Континенты</span><strong data-world-stat="continents">${world.continents} / ${MAX_CONTINENTS}</strong></div>
+    <div class="world-stat"><span>Материки</span><strong data-world-stat="continents">${world.continents} / ${MAX_CONTINENTS}</strong></div>
+    <div class="world-stat"><span>Государства</span><strong data-world-stat="states">${world.states.length}</strong></div>
+    <div class="world-stat"><span>Поселения</span><strong data-world-stat="settlements">${world.settlements.length}</strong></div>
     <div class="world-stat"><span>Поверхностные блоки</span><strong data-world-stat="voxels">≈ ${worldScientific(world.surfaceVoxelCount)}</strong></div>
     <div class="world-stat"><span>Всего чанков</span><strong data-world-stat="chunks">≈ ${worldScientific(world.chunkCount)}</strong></div>
   </div>`;
@@ -1981,6 +2002,8 @@ const updateWorldStats = (root, world) => {
     ratio: `${world.earthRatio.toFixed(2).replace('.', ',')}×`,
     side: `${worldInteger(world.widthMeters / 1000)} км`,
     continents: `${world.continents} / ${MAX_CONTINENTS}`,
+    states: String(world.states.length),
+    settlements: String(world.settlements.length),
     voxels: `≈ ${worldScientific(world.surfaceVoxelCount)}`,
     chunks: `≈ ${worldScientific(world.chunkCount)}`,
   };
@@ -2001,7 +2024,9 @@ const createWorldSession = (config = null) => {
   };
   const preview = createWorld(settings);
   return {
+    open: false,
     screen: 'setup',
+    returnScreen: null,
     config: {
       seed: preview.seed,
       continents: preview.continents,
@@ -2096,52 +2121,105 @@ const worldSetupHtml = (session) => {
     </div>`;
 };
 
+const worldStateDetailsHtml = (world, stateId) => {
+  const state = world.states.find((item) => item.id === stateId);
+  if (!state)
+    return `<div class="world-state-empty"><span class="world-state-empty__mark">⌖</span><strong>Выберите территорию</strong><span>Кликните по суше на карте, чтобы открыть сводку государства.</span></div>`;
+  const settlements = world.settlements.filter((item) => item.stateId === state.id);
+  const cities = settlements.filter((item) => item.kind !== 'столица').length;
+  const population = state.population >= 1_000_000
+    ? `${(state.population / 1_000_000).toFixed(1).replace('.', ',')} млн.`
+    : `${worldInteger(Math.round(state.population / 1000))} тыс.`;
+  return `
+    <div class="world-state-head">
+      <i class="world-state-color" style="--state-color:${state.color}"></i>
+      <div><span class="world-card__eyebrow">${escapeHtml(state.culture)}</span><h4>${escapeHtml(state.name)}</h4></div>
+      <span class="world-state-order">${String(state.order).padStart(2, '0')}</span>
+    </div>
+    <div class="world-state-metrics">
+      <div><span>Население</span><strong>${population}</strong></div>
+      <div><span>Поселения</span><strong>${settlements.length}</strong></div>
+      <div><span>Крупные города</span><strong>${cities}</strong></div>
+    </div>
+    <div class="world-state-resource-block"><span class="world-card__eyebrow">Стратегические ресурсы</span>
+      <div class="world-resource-list">${state.resources.map((resource) => `<span>${escapeHtml(resource)}</span>`).join('')}</div>
+    </div>
+    <div class="world-state-settlements"><span class="world-card__eyebrow">Узлы территории</span>
+      ${settlements.slice(0, 4).map((settlement) => `
+        <div class="world-settlement-row"><i class="${settlement.kind === 'столица' ? 'is-capital' : ''}"></i><span>${escapeHtml(settlement.name)}</span><small>${escapeHtml(settlement.kind)}</small></div>`).join('')}
+    </div>`;
+};
+
 const worldExploreHtml = (session) => {
   const world = session.model;
   return `
     <div class="world-shell world-shell--explore">
-      <section class="world-card world-map-panel">
-        <header class="world-card__heading">
-          <div><p class="world-card__eyebrow">Глобальный атлас</p><h3>Континенты и океаны</h3></div>
-          <span class="world-tag">Seed · ${escapeHtml(world.seed)}</span>
+      <section class="world-card world-map-panel world-map-panel--focus">
+        <header class="world-map-toolbar">
+          <div class="world-map-toolbar__title"><p class="world-card__eyebrow">Оперативный атлас</p><h3>Поверхность мира</h3></div>
+          <div class="world-camera-tools world-camera-tools--map" role="group" aria-label="Масштаб стратегической карты">
+            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="-1" aria-label="Отдалить стратегическую карту">−</button>
+            <span data-role="world-map-zoom">${Math.round((session.camera?.mapZoom ?? 2) * 100)}%</span>
+            <button class="world-camera-button" type="button" data-action="world-map-zoom" data-step="1" aria-label="Приблизить стратегическую карту">+</button>
+            <button class="mini-button world-camera-home" type="button" data-action="world-camera-home">К центру</button>
+          </div>
         </header>
         ${worldLayerControlsHtml(session.layer)}
-        <canvas class="world-map-canvas world-map-canvas--interactive" data-role="world-map" width="960" height="480" tabindex="0" aria-label="Карта мира. Нажмите на карту, чтобы переместить камеру."></canvas>
+        <div class="world-map-viewport" data-role="world-map-frame">
+          <canvas class="world-map-canvas world-map-canvas--focus" data-role="world-focus-map" width="1440" height="900" tabindex="0" aria-label="Стратегическая карта. Перетаскивайте мышью, колесо меняет масштаб, WASD двигает камеру."></canvas>
+          <div class="world-map-hud world-map-hud--top" aria-hidden="true"><span class="world-map-hud__live"><i></i>СИСТЕМА КАРТЫ · АКТИВНА</span><span>${escapeHtml(world.seed)}</span></div>
+          <div class="world-map-hud world-map-hud--bottom" aria-hidden="true"><span>СЕВЕР ↑</span><span>DRAG ПАНОРАМИРОВАНИЕ · WHEEL МАСШТАБ</span></div>
+          <div class="world-map-crosshair" aria-hidden="true"><i></i><b></b></div>
+        </div>
         <div class="world-map-legendline">
           ${worldMapLegendHtml(session.layer)}
           <div class="world-map-facts" data-role="world-map-facts">${worldMapFactsHtml(world)}</div>
         </div>
-        <p class="world-map-hint">Нажмите на карту, чтобы перейти в сектор. Маркер показывает текущий обзор камеры.</p>
-        ${worldStatsHtml(world)}
         <div class="world-map-actions">
-          <span class="world-status"><i class="world-status__dot"></i>Мир готов к исследованию</span>
-          <button class="mini-button" type="button" data-action="world-new">Новый мир</button>
+          <span class="world-status"><i class="world-status__dot"></i>Мир сгенерирован · чанки подгружаются по запросу</span>
+          <button class="mini-button" type="button" data-action="world-edit-config">Настройки мира</button>
         </div>
       </section>
 
-      <div class="world-side-column">
+      <aside class="world-side-column world-side-column--studio">
+        <section class="world-card world-minimap-panel">
+          <header class="world-card__heading world-card__heading--compact">
+            <div><p class="world-card__eyebrow">Полная проекция</p><h3>Навигация</h3></div>
+            <span class="world-tag">${world.continentCenters.length} МАТЕРИКА</span>
+          </header>
+          <canvas class="world-map-canvas world-map-canvas--overview" data-role="world-map" width="720" height="360" tabindex="0" aria-label="Мини-карта всего мира. Щелкните, чтобы переместить камеру."></canvas>
+          <p class="world-map-hint">Щёлкните по мини-карте, чтобы перейти в выбранный сектор.</p>
+        </section>
+
         <section class="world-card world-terrain-panel">
           <header class="world-card__heading world-card__heading--compact">
-            <div><p class="world-card__eyebrow">Обзор местности</p><h3>Воксельная камера</h3></div>
-            <div class="world-camera-tools" role="group" aria-label="Масштаб и позиция камеры">
-              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="-1" aria-label="Отдалить камеру">−</button>
+            <div><p class="world-card__eyebrow">Обзор местности</p><h3>Воксельная сцена</h3></div>
+            <div class="world-camera-tools" role="group" aria-label="Масштаб воксельной камеры">
+              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="-1" aria-label="Отдалить вид местности">−</button>
               <span data-role="world-zoom">100%</span>
-              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="1" aria-label="Приблизить камеру">+</button>
-              <button class="mini-button world-camera-home" type="button" data-action="world-camera-home">Старт</button>
+              <button class="world-camera-button" type="button" data-action="world-zoom" data-step="1" aria-label="Приблизить вид местности">+</button>
+              <button class="world-camera-button" type="button" data-action="world-camera-home" aria-label="К точке старта">⌖</button>
             </div>
           </header>
-          <canvas class="world-voxel-canvas" data-role="world-viewport" width="900" height="600" aria-label="Изометрический вид мира. Перетаскивайте мышью для движения камеры, используйте колесо для масштаба."></canvas>
-          <p class="world-camera-hint">Перетаскивайте ЛКМ / ПКМ · колесо — масштаб · WASD — камера</p>
+          <canvas class="world-voxel-canvas" data-role="world-viewport" width="900" height="560" aria-label="Изометрическая воксельная сцена. Перетаскивайте мышью для панорамирования камеры."></canvas>
           <div class="world-readouts">
-            <div><span>Координаты обзора</span><strong data-role="world-position">—</strong></div>
+            <div><span>Координаты</span><strong data-role="world-position">—</strong></div>
             <div><span>Биом</span><strong data-role="world-biome">—</strong></div>
-            <div><span>Загружено чанков</span><strong data-role="world-loaded">—</strong></div>
+            <div><span>Чанки</span><strong data-role="world-loaded">—</strong></div>
           </div>
+        </section>
+
+        <section class="world-card world-state-panel">
+          <header class="world-card__heading world-card__heading--compact">
+            <div><p class="world-card__eyebrow">Разведданные</p><h3>Выбранная территория</h3></div>
+            <button class="mini-button" type="button" data-action="world-clear-selection">Сбросить</button>
+          </header>
+          <div class="world-state-details" data-role="world-state-details">${worldStateDetailsHtml(world, session.selectedStateId)}</div>
         </section>
 
         <section class="world-card world-controls-panel">
           <div class="world-control-copy"><p class="world-card__eyebrow">Камера RTS</p><span>WASD / стрелки · Shift — быстрее</span></div>
-          <div class="world-controls" role="group" aria-label="Управление камерой по карте">
+          <div class="world-controls" role="group" aria-label="Быстрое перемещение камеры">
             <span aria-hidden="true"></span>
             <button class="world-control" type="button" data-action="world-move" data-dx="0" data-dz="-1" aria-label="Переместить камеру на север">↑</button>
             <span aria-hidden="true"></span>
@@ -2153,9 +2231,132 @@ const worldExploreHtml = (session) => {
             <span aria-hidden="true"></span>
           </div>
         </section>
-      </div>
+      </aside>
     </div>`;
 };
+
+const worldFmgOverlayHtml = (session, seed) => {
+  const frameUrl = `/fmg/index.html?seed=${encodeURIComponent(seed)}`;
+  return `
+    <section class="world-fmg-overlay" data-role="world-fmg-overlay" role="dialog" aria-modal="true" aria-label="Картографическая мастерская Azgaar" hidden>
+      <div class="world-fmg-shell">
+        <header class="world-fmg-heading">
+          <div>
+            <p class="world-card__eyebrow">РАСШИРЕННАЯ КАРТОГРАФИЯ · AZGAAR FMG</p>
+            <h3>Мастерская карт</h3>
+            <p class="world-fmg-description">Полный редактор Fantasy Map Generator открыт внутри MIR. Карта остаётся открытой, когда вы возвращаетесь в атлас.</p>
+          </div>
+          <div class="world-fmg-seed"><span>SEED MIR · ПЕРЕДАН</span><code data-role="world-fmg-seed">${escapeHtml(seed)}</code></div>
+          <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас MIR">${icon('chevron', 'world-back-icon')}<span>Атлас MIR</span></button>
+        </header>
+        <iframe class="world-fmg-frame" data-role="world-fmg-frame"
+          src="${escapeHtml(frameUrl)}" title="Azgaar Fantasy Map Generator — мастерская карт MIR"
+          referrerpolicy="no-referrer" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+        <p class="world-fmg-attribution">Основано на Azgaar’s Fantasy Map Generator · MIT License · Max Haniyeu и contributors</p>
+      </div>
+    </section>`;
+};
+
+const worldPageHtml = () => {
+  if (!ui.world) return '';
+  const exploring = ui.world.screen === 'explore' && ui.world.model;
+  const title = exploring ? 'Стратегический атлас' : 'Создание цивилизации';
+  const sessionTitle = exploring ? 'МИР АКТИВЕН' : 'МАСТЕР ГЕНЕРАЦИИ';
+  const sessionInfo = exploring ? `SEED · ${escapeHtml(ui.world.model.seed)}` : 'ГЕОГРАФИЧЕСКИЙ ПРОТОКОЛ MIR';
+  return `
+    <div class="world-app" role="application" aria-label="Редактор мира MIR">
+      <header class="world-topbar">
+        <div class="world-topbar__identity">
+          <button class="world-back-button" type="button" data-action="world-exit" aria-label="Вернуться в главное меню" title="В меню">${icon('chevron', 'world-back-icon')}</button>
+          <span class="world-brand-mark">${icon('sigil')}</span>
+          <div class="world-brand-copy"><span>THE CIVILIZATION OF THE SAGES</span><strong>${title}</strong></div>
+        </div>
+        <div class="world-topbar__session">
+          <span class="world-topbar__live"><i></i>${sessionTitle}</span>
+          <span class="world-topbar__seed">${sessionInfo}</span>
+        </div>
+        <div class="world-topbar__actions">
+          ${exploring ? `
+            <button class="world-topbar-button" type="button" data-action="world-new">${icon('refresh', 'icon--xs')}<span>Новый мир</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-save">${icon('save', 'icon--xs')}<span>Сохранить</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-export">${icon('download', 'icon--xs')}<span>Экспорт</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-export-image">${icon('camera', 'icon--xs')}<span>Снимок</span></button>` : `
+            <button class="world-topbar-button" type="button" data-action="world-load">${icon('download', 'icon--xs')}<span>Загрузить seed</span></button>
+            <button class="world-topbar-button" type="button" data-action="world-random-seed">${icon('refresh', 'icon--xs')}<span>Новый seed</span></button>`}
+${HAS_AZGAAR_EDITOR ? `          <button class="world-topbar-button world-fmg-open" type="button" data-action="world-fmg-open" aria-label="Открыть полный редактор карт Azgaar" title="Открыть полный редактор карт Azgaar">${icon('globe', 'icon--xs')}<span>Azgaar FMG</span></button>` : ''}
+          <button class="world-exit-button" type="button" data-action="world-exit">В главное меню</button>
+        </div>
+      </header>
+      <main class="world-page-body" data-role="world-page-body">
+        ${exploring ? worldExploreHtml(ui.world) : worldSetupHtml(ui.world)}
+      </main>
+      <input class="world-file-input" type="file" accept="application/json,.json" data-role="world-file" tabindex="-1" aria-hidden="true" />
+    </div>`;
+};
+
+const renderWorldPage = ({ focus = false } = {}) => {
+  const root = worldPageRoot();
+  if (!root || !ui.world?.open) return;
+  const html = worldPageHtml();
+  const currentApp = root.querySelector('.world-app');
+  const overlay = root.querySelector('[data-role="world-fmg-overlay"]');
+  const overlayVisible = Boolean(overlay && !overlay.hidden);
+  if (renderedWorldPageHtml !== html || !currentApp) {
+    if (currentApp) currentApp.outerHTML = html;
+    else root.innerHTML = html;
+    renderedWorldPageHtml = html;
+    if (focus) root.querySelector('[data-role="world-seed"]')?.focus();
+  }
+  const worldApp = root.querySelector('.world-app');
+  if (overlay && worldApp) {
+    worldApp.after(overlay);
+    worldApp.toggleAttribute('inert', overlayVisible);
+  }
+  drawWorldSession();
+};
+
+const openWorldPage = ({ history = true } = {}) => {
+  if (!ui.world) ui.world = createWorldSession();
+  if (ui.modal) closeModal();
+  ui.world.open = true;
+  if (history && window.location.hash !== '#play') {
+    window.history.pushState({ mirWorldPage: true }, '', `${window.location.pathname}${window.location.search}#play`);
+    worldPageHistoryEntry = true;
+  } else {
+    worldPageHistoryEntry = false;
+  }
+  document.body.classList.add('world-page-open');
+  const root = worldPageRoot();
+  if (root) root.hidden = false;
+  renderWorldPage({ focus: true });
+  playSound('open');
+};
+
+const closeWorldPage = ({ history = true } = {}) => {
+  if (!ui.world?.open) return;
+  ui.world.open = false;
+  document.body.classList.remove('world-page-open');
+  worldCameraDrag = null;
+  worldMapDragSuppressed = false;
+  const root = worldPageRoot();
+  if (root) {
+    root.hidden = true;
+    root.innerHTML = '';
+  }
+  renderedWorldPageHtml = '';
+  if (history && window.location.hash === '#play') {
+    if (worldPageHistoryEntry) window.history.back();
+    else window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
+  }
+  worldPageHistoryEntry = false;
+  playSound('close');
+};
+
+window.addEventListener('popstate', () => {
+  const isWorldRoute = window.location.hash.toLowerCase() === '#play';
+  if (isWorldRoute && !ui.world?.open) openWorldPage({ history: false });
+  else if (!isWorldRoute && ui.world?.open) closeWorldPage({ history: false });
+});
 
 const worldModalHtml = () => {
   if (!ui.world) return '';
@@ -2169,8 +2370,8 @@ const worldModalHtml = () => {
 };
 
 const refreshWorldPreview = () => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'setup') return;
-  const root = overlayRoot();
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'setup') return;
+  const root = worldRoot();
   const field = (name) => root?.querySelector(`[data-world-setting="${name}"]`);
   const seedField = field('seed');
   const seed = seedField?.value.trim() || worldSeed();
@@ -2196,8 +2397,8 @@ const refreshWorldPreview = () => {
 };
 
 const updateWorldReadouts = () => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore' || !ui.world.model) return;
-  const root = overlayRoot();
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore' || !ui.world.model) return;
+  const root = worldRoot();
   const { model, camera } = ui.world;
   const column = model.getColumn(camera.x, camera.z);
   const chunkX = Math.floor(camera.x / model.chunkSize);
@@ -2206,7 +2407,9 @@ const updateWorldReadouts = () => {
   const biomeNode = root?.querySelector('[data-role="world-biome"]');
   const loadedNode = root?.querySelector('[data-role="world-loaded"]');
   const zoomNode = root?.querySelector('[data-role="world-zoom"]');
+  const mapZoomNode = root?.querySelector('[data-role="world-map-zoom"]');
   if (positionNode) positionNode.textContent = `X ${worldInteger(Math.floor(camera.x))} · Z ${worldInteger(Math.floor(camera.z))}`;
+  if (mapZoomNode) mapZoomNode.textContent = `${Math.round((camera.mapZoom ?? 1) * 100)}%`;
   if (biomeNode && column) {
     const biome = BIOME_NAMES[column.biome] ?? BLOCK_NAMES[column.topMaterial] ?? 'воксель';
     biomeNode.textContent = column.water ? `${biome} · дно: ${BLOCK_NAMES[column.surfaceMaterial]}` : `${biome} · чанк ${chunkX}, ${chunkZ}`;
@@ -2216,19 +2419,20 @@ const updateWorldReadouts = () => {
 };
 
 const drawWorldSession = () => {
-  if (ui.modal?.type !== 'world' || !ui.world) return;
-  const root = overlayRoot();
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || !ui.world) return;
+  const root = worldRoot();
   if (ui.world.screen === 'setup') {
     drawWorldMap(root?.querySelector('[data-role="world-preview-map"]'), ui.world.preview, null, ui.world.layer);
     return;
   }
-  drawWorldMap(root?.querySelector('[data-role="world-map"]'), ui.world.model, ui.world.camera, ui.world.layer);
+  drawWorldMap(root?.querySelector('[data-role="world-focus-map"]'), ui.world.model, ui.world.camera, ui.world.layer);
+  drawWorldMap(root?.querySelector('[data-role="world-map"]'), ui.world.model, ui.world.camera, ui.world.layer, true);
   drawVoxelView(root?.querySelector('[data-role="world-viewport"]'), ui.world.model, ui.world.camera);
   updateWorldReadouts();
 };
 
 const moveWorldCamera = (dx, dz) => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore' || !ui.world.model) return;
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore' || !ui.world.model) return;
   const { model, camera } = ui.world;
   camera.x = Math.max(0, Math.min(model.widthCells - 1, camera.x + dx));
   camera.z = Math.max(0, Math.min(model.depthCells - 1, camera.z + dz));
@@ -2236,17 +2440,35 @@ const moveWorldCamera = (dx, dz) => {
 };
 
 const changeWorldZoom = (direction) => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore') return;
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore') return;
   ui.world.camera.zoom = clamp(ui.world.camera.zoom * (direction > 0 ? 1.2 : 1 / 1.2), 0.6, 2.5);
   ui.world.camera.zoom = Math.round(ui.world.camera.zoom * 100) / 100;
   drawWorldSession();
 };
 
+const changeWorldMapZoom = (direction, canvas = null, clientX = null, clientY = null) => {
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore') return;
+  const camera = ui.world.camera;
+  const world = ui.world.model;
+  const before = worldMapPointAt(canvas, world, camera, clientX, clientY);
+  const bounds = canvas?.getBoundingClientRect?.();
+  const screenU = bounds?.width ? (clientX - bounds.left) / bounds.width : 0.5;
+  const screenV = bounds?.height ? (clientY - bounds.top) / bounds.height : 0.5;
+  const nextZoom = clamp((camera.mapZoom ?? 2) * (direction > 0 ? 1.22 : 1 / 1.22), 1, 5);
+  if (before) {
+    camera.x = before.x - (screenU - 0.5) * world.widthCells / nextZoom;
+    camera.z = before.z - (screenV - 0.5) * world.depthCells / nextZoom;
+  }
+  camera.mapZoom = Math.round(nextZoom * 100) / 100;
+  moveWorldCamera(0, 0);
+};
+
 const resetWorldCamera = () => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore' || !ui.world.spawn) return;
+  if ((ui.modal?.type !== 'world' && !ui.world?.open) || ui.world?.screen !== 'explore' || !ui.world.spawn) return;
   ui.world.camera.x = ui.world.spawn.x;
   ui.world.camera.z = ui.world.spawn.z;
   ui.world.camera.zoom = 1;
+  ui.world.camera.mapZoom = 2.1;
   drawWorldSession();
 };
 
@@ -3294,14 +3516,17 @@ document.addEventListener('pointerup', endAvatarDrag);
 document.addEventListener('pointercancel', endAvatarDrag);
 
 document.addEventListener('pointerdown', (event) => {
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore') return;
-  const canvas = event.target.closest?.('[data-role="world-viewport"]');
+  const pageOpen = ui.world?.open || ui.modal?.type === 'world';
+  if (!pageOpen || ui.world?.screen !== 'explore') return;
+  const canvas = event.target.closest?.('[data-role="world-viewport"], [data-role="world-focus-map"]');
   if (!canvas || ![0, 1, 2].includes(event.button)) return;
   worldCameraDrag = {
     pointerId: event.pointerId ?? 0,
     canvas,
+    kind: canvas.dataset.role === 'world-focus-map' ? 'map' : 'terrain',
     lastX: event.clientX,
     lastY: event.clientY,
+    moved: false,
   };
   canvas.classList.add('is-dragging');
   try {
@@ -3313,7 +3538,8 @@ document.addEventListener('pointerdown', (event) => {
 document.addEventListener('pointermove', (event) => {
   const drag = worldCameraDrag;
   if (!drag || (event.pointerId ?? 0) !== drag.pointerId) return;
-  if (ui.modal?.type !== 'world' || ui.world?.screen !== 'explore') {
+  const pageOpen = ui.world?.open || ui.modal?.type === 'world';
+  if (!pageOpen || ui.world?.screen !== 'explore') {
     worldCameraDrag = null;
     drag.canvas.classList.remove('is-dragging');
     return;
@@ -3324,27 +3550,48 @@ document.addEventListener('pointermove', (event) => {
   const deltaY = (event.clientY - drag.lastY) * drag.canvas.height / bounds.height;
   drag.lastX = event.clientX;
   drag.lastY = event.clientY;
+  if (Math.abs(deltaX) + Math.abs(deltaY) > 2) drag.moved = true;
   if (deltaX || deltaY) {
-    const pan = cameraPanDelta(drag.canvas.width, drag.canvas.height, deltaX, deltaY, ui.world.camera.zoom);
-    moveWorldCamera(pan.x, pan.z);
+    if (drag.kind === 'map') {
+      const zoom = ui.world.camera.mapZoom ?? 1;
+      moveWorldCamera(
+        -deltaX * ui.world.model.widthCells / (drag.canvas.width * zoom),
+        -deltaY * ui.world.model.depthCells / (drag.canvas.height * zoom),
+      );
+    } else {
+      const pan = cameraPanDelta(drag.canvas.width, drag.canvas.height, deltaX, deltaY, ui.world.camera.zoom);
+      moveWorldCamera(pan.x, pan.z);
+    }
   }
   event.preventDefault();
 });
 
 const endWorldCameraDrag = (event) => {
   if (!worldCameraDrag || (event.pointerId ?? 0) !== worldCameraDrag.pointerId) return;
-  worldCameraDrag.canvas.classList.remove('is-dragging');
+  const drag = worldCameraDrag;
+  drag.canvas.classList.remove('is-dragging');
   worldCameraDrag = null;
+  if (drag.moved && drag.kind === 'map') {
+    worldMapDragSuppressed = true;
+    window.setTimeout(() => { worldMapDragSuppressed = false; }, 280);
+  }
 };
 document.addEventListener('pointerup', endWorldCameraDrag);
 document.addEventListener('pointercancel', endWorldCameraDrag);
 document.addEventListener('contextmenu', (event) => {
-  if (event.target.closest?.('[data-role="world-viewport"]')) event.preventDefault();
+  if (event.target.closest?.('[data-role="world-viewport"], [data-role="world-focus-map"]')) event.preventDefault();
 });
 
 document.addEventListener('wheel', (event) => {
   const worldCanvas = event.target.closest?.('[data-role="world-viewport"]');
-  if (worldCanvas && ui.modal?.type === 'world' && ui.world?.screen === 'explore') {
+  const focusMap = event.target.closest?.('[data-role="world-focus-map"]');
+  const worldActive = ui.world?.open || ui.modal?.type === 'world';
+  if (focusMap && worldActive && ui.world?.screen === 'explore') {
+    event.preventDefault();
+    changeWorldMapZoom(event.deltaY < 0 ? 1 : -1, focusMap, event.clientX, event.clientY);
+    return;
+  }
+  if (worldCanvas && worldActive && ui.world?.screen === 'explore') {
     event.preventDefault();
     ui.world.camera.zoom = clamp(ui.world.camera.zoom * Math.exp(-event.deltaY * 0.0015), 0.6, 2.5);
     ui.world.camera.zoom = Math.round(ui.world.camera.zoom * 100) / 100;
@@ -3358,6 +3605,22 @@ document.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 document.addEventListener('change', (event) => {
+  if (event.target.dataset?.role === 'world-file') {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    file.text().then((text) => {
+      const imported = JSON.parse(text);
+      const config = imported?.config ?? imported;
+      const layer = ui.world?.layer ?? 'biomes';
+      ui.world = createWorldSession(config);
+      ui.world.open = true;
+      ui.world.layer = layer;
+      renderWorldPage({ focus: false });
+      toast(`Параметры мира загружены: ${ui.world.config.seed}.`);
+    }).catch(() => toast('Файл мира повреждён или имеет неверный формат.', 'error'));
+    event.target.value = '';
+    return;
+  }
   if (event.target.dataset?.worldSetting) {
     refreshWorldPreview();
     return;
@@ -3423,13 +3686,40 @@ const pickAndPreviewAvatar = async () => {
 };
 
 const actions = {
-  'open-world': () => {
-    if (!ui.world) ui.world = createWorldSession();
-    openModal('world');
+  'open-world': () => openWorldPage(),
+
+  'world-exit': () => closeWorldPage(),
+
+  'world-fmg-open': () => {
+    if (!HAS_AZGAAR_EDITOR || !ui.world?.open) return;
+    const root = worldPageRoot();
+    const worldApp = root?.querySelector('.world-app');
+    let overlay = root?.querySelector('[data-role="world-fmg-overlay"]');
+    if (!root || !worldApp) return;
+    if (!overlay) {
+      ui.world.fmgSeed = ui.world.model?.seed ?? ui.world.config.seed;
+      const holder = document.createElement('div');
+      holder.innerHTML = worldFmgOverlayHtml(ui.world, ui.world.fmgSeed);
+      overlay = holder.firstElementChild;
+      if (!overlay) return;
+      root.append(overlay);
+    }
+    overlay.hidden = false;
+    worldApp.setAttribute('inert', '');
+    overlay.querySelector('[data-action="world-fmg-back"]')?.focus({ preventScroll: true });
+  },
+
+  'world-fmg-back': () => {
+    const root = worldPageRoot();
+    const overlay = root?.querySelector('[data-role="world-fmg-overlay"]');
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    root.querySelector('.world-app')?.removeAttribute('inert');
+    root.querySelector('[data-action="world-fmg-open"]')?.focus({ preventScroll: true });
   },
 
   'world-random-seed': () => {
-    const field = overlayRoot()?.querySelector('[data-world-setting="seed"]');
+    const field = worldRoot()?.querySelector('[data-world-setting="seed"]');
     if (!field || ui.world?.screen !== 'setup') return;
     field.value = worldSeed();
     refreshWorldPreview();
@@ -3439,18 +3729,18 @@ const actions = {
     const layer = el.dataset.layer;
     if (!WORLD_MAP_LAYERS.some(([value]) => value === layer) || !ui.world) return;
     ui.world.layer = layer;
-    for (const button of overlayRoot()?.querySelectorAll('[data-action="world-layer"]') ?? []) {
+    for (const button of worldRoot()?.querySelectorAll('[data-action="world-layer"]') ?? []) {
       const active = button.dataset.layer === layer;
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', String(active));
     }
-    const legend = overlayRoot()?.querySelector('[data-role="world-legend"]');
+    const legend = worldRoot()?.querySelector('[data-role="world-legend"]');
     if (legend) legend.outerHTML = worldMapLegendHtml(layer);
     drawWorldSession();
   },
 
   'world-generate': () => {
-    const root = overlayRoot();
+    const root = worldRoot();
     const seed = root?.querySelector('[data-world-setting="seed"]')?.value.trim() || worldSeed();
     const config = {
       seed,
@@ -3462,7 +3752,9 @@ const actions = {
     };
     const model = createWorld(config);
     const spawn = model.findSpawn();
+    const state = model.stateAtNormalized((spawn.x + 0.5) / model.widthCells, (spawn.z + 0.5) / model.depthCells);
     ui.world = {
+      open: true,
       screen: 'explore',
       config: {
         seed: model.seed,
@@ -3475,21 +3767,107 @@ const actions = {
       preview: null,
       model,
       spawn,
-      camera: { x: spawn.x, z: spawn.z, zoom: 1 },
+      camera: { x: spawn.x, z: spawn.z, zoom: 1, mapZoom: 2.1 },
+      selectedStateId: state?.id ?? model.states[0]?.id ?? null,
       layer: ui.world.layer ?? 'biomes',
     };
-    renderModal({ focus: false });
+    renderWorldPage({ focus: false });
+    if (ui.modal?.type === 'world') renderModal({ focus: false });
     playSound('success');
-    toast(`Создан мир: ${worldContinentLabel(model.continents)} · ${CLIMATE_PRESETS[model.climate].label.toLowerCase()}. Карта и чанки воспроизводятся из seed.`);
+    toast(`Мир готов: ${model.continentCenters.length} материка, ${model.states.length} государств, ${model.settlements.length} поселений. Seed сохранён в параметрах.`);
   },
 
   'world-new': () => {
+    const layer = ui.world?.layer ?? 'biomes';
     ui.world = createWorldSession({ ...ui.world.config, seed: worldSeed() });
-    renderModal();
+    ui.world.open = true;
+    ui.world.layer = layer;
+    renderWorldPage({ focus: false });
+  },
+
+  'world-edit-config': () => {
+    const layer = ui.world?.layer ?? 'biomes';
+    ui.world = createWorldSession({ ...ui.world.config });
+    ui.world.open = true;
+    ui.world.layer = layer;
+    renderWorldPage({ focus: false });
+  },
+
+  'world-map-zoom': (el, event) => {
+    const canvas = worldRoot()?.querySelector('[data-role="world-focus-map"]');
+    const onMap = event.target.closest?.('[data-role="world-focus-map"]');
+    changeWorldMapZoom(Number(el.dataset.step) || 0, onMap ? canvas : null, onMap ? event.clientX : null, onMap ? event.clientY : null);
+  },
+
+  'world-clear-selection': () => {
+    if (!ui.world) return;
+    ui.world.selectedStateId = null;
+    const node = worldRoot()?.querySelector('[data-role="world-state-details"]');
+    if (node) node.innerHTML = worldStateDetailsHtml(ui.world.model, null);
+  },
+
+  'world-save': () => {
+    try {
+      const payload = { version: 1, savedAt: Date.now(), config: ui.world.config };
+      localStorage.setItem('mir-world-last-save', JSON.stringify(payload));
+      toast('Мир сохранён на этом устройстве.');
+    } catch {
+      toast('Не удалось сохранить мир в браузере. Используйте «Экспорт».', 'error');
+    }
+  },
+
+  'world-load': () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mir-world-last-save') || 'null');
+      if (saved?.config) {
+        const layer = ui.world?.layer ?? 'biomes';
+        ui.world = createWorldSession(saved.config);
+        ui.world.open = true;
+        ui.world.layer = layer;
+        renderWorldPage({ focus: false });
+        toast(`Сохранённый seed загружен: ${ui.world.config.seed}.`);
+        return;
+      }
+    } catch { /* повреждённый локальный слот не блокирует импорт файла */ }
+    worldRoot()?.querySelector('[data-role="world-file"]')?.click();
+  },
+
+  'world-export': () => {
+    try {
+      const payload = JSON.stringify({
+        format: 'MIR world seed',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        config: ui.world.config,
+      }, null, 2);
+      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${ui.world.config.seed.replace(/[^a-z0-9-]/gi, '_')}.mir-world.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      toast('Seed и параметры мира экспортированы.');
+    } catch {
+      toast('Экспорт недоступен в этом браузере.', 'error');
+    }
+  },
+
+  'world-export-image': () => {
+    const canvas = worldRoot()?.querySelector('[data-role="world-focus-map"]');
+    try {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `${ui.world.config.seed.replace(/[^a-z0-9-]/gi, '_')}-atlas.png`;
+      link.click();
+      toast('Снимок атласа сохранён.');
+    } catch {
+      toast('Не удалось сделать снимок карты.', 'error');
+    }
   },
 
   'world-move': (el) => {
-    const step = Math.max(3, Math.round(8 / (ui.world?.camera?.zoom ?? 1)));
+    const worldWidth = ui.world?.model?.widthCells ?? 24;
+    const step = Math.max(3, Math.round(worldWidth / (38 * (ui.world?.camera?.mapZoom ?? 1))));
     moveWorldCamera((Number(el.dataset.dx) || 0) * step, (Number(el.dataset.dz) || 0) * step);
   },
 
@@ -3943,12 +4321,19 @@ const ACTIONS_WITH_OWN_SOUND = new Set([
 ]);
 
 document.addEventListener('click', (event) => {
-  const mapCanvas = event.target.closest?.('canvas[data-role="world-map"]');
-  if (mapCanvas && ui.modal?.type === 'world' && ui.world?.model) {
-    const bounds = mapCanvas.getBoundingClientRect();
-    if (bounds.width > 0 && bounds.height > 0) {
-      ui.world.camera.x = Math.max(0, Math.min(ui.world.model.widthCells - 1, Math.floor(((event.clientX - bounds.left) / bounds.width) * ui.world.model.widthCells)));
-      ui.world.camera.z = Math.max(0, Math.min(ui.world.model.depthCells - 1, Math.floor(((event.clientY - bounds.top) / bounds.height) * ui.world.model.depthCells)));
+  const mapCanvas = event.target.closest?.('canvas[data-role="world-map"], canvas[data-role="world-focus-map"]');
+  const worldActive = ui.world?.open || ui.modal?.type === 'world';
+  if (mapCanvas && worldActive && ui.world?.model) {
+    if (worldMapDragSuppressed) return;
+    const overview = mapCanvas.dataset.role === 'world-map';
+    const point = worldMapPointAt(mapCanvas, ui.world.model, ui.world.camera, event.clientX, event.clientY, overview);
+    if (point) {
+      ui.world.camera.x = point.x;
+      ui.world.camera.z = point.z;
+      const state = ui.world.model.stateAtNormalized(point.u, point.v);
+      ui.world.selectedStateId = state?.id ?? null;
+      const details = worldRoot()?.querySelector('[data-role="world-state-details"]');
+      if (details) details.innerHTML = worldStateDetailsHtml(ui.world.model, ui.world.selectedStateId);
       mapCanvas.focus({ preventScroll: true });
       drawWorldSession();
     }
@@ -3980,7 +4365,23 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (ui.modal?.type === 'world' && ui.world?.screen === 'explore') {
+  if (ui.world?.open) {
+    const fmgOverlay = worldPageRoot()?.querySelector('[data-role="world-fmg-overlay"]');
+    if (fmgOverlay && !fmgOverlay.hidden) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        actions['world-fmg-back']();
+      }
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeWorldPage();
+      return;
+    }
+  }
+  const worldActive = ui.world?.open || ui.modal?.type === 'world';
+  if (worldActive && ui.world?.screen === 'explore') {
     const typing = event.target.matches?.('input, textarea, select, [contenteditable="true"]');
     if (!typing) {
       const moves = {
@@ -3990,7 +4391,7 @@ document.addEventListener('keydown', (event) => {
       const movement = moves[event.key] ?? moves[event.code];
       if (movement) {
         event.preventDefault();
-        const step = event.shiftKey ? 24 : Math.max(2, Math.round(8 / ui.world.camera.zoom));
+        const step = Math.max(3, Math.round(ui.world.model.widthCells / (120 * (ui.world.camera.mapZoom ?? 1)))) * (event.shiftKey ? 4 : 1);
         moveWorldCamera(movement[0] * step, movement[1] * step);
         return;
       }
@@ -4076,6 +4477,7 @@ update.start();
 restoreNotifications();
 
 render();
+if (window.location.hash.toLowerCase() === '#play') openWorldPage({ history: false });
 /* На старте сперва проверяем хаб; только после этого открываем аккаунты.
    Если сеть недоступна, store включает локальный офлайн-резерв. */
 const initializeConnection = async () => {

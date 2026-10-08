@@ -24,8 +24,13 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
 
   return {
-    /* Версия доступна коду как __APP_VERSION__ (см. src/main.js). */
-    define: { __APP_VERSION__: JSON.stringify(version) },
+    /* Версия доступна коду как __APP_VERSION__. Полный редактор Azgaar
+       подключается только в web/PWA: однофайловый mir.html не зависит от
+       каталога public/fmg и остаётся пригоден для file://. */
+    define: {
+      __APP_VERSION__: JSON.stringify(version),
+      __MIR_AZGAAR_AVAILABLE__: JSON.stringify(!single),
+    },
 
     /* В однофайловой сборке каталога рядом нет: иконки и манифест там не
        нужны (по file:// они бесполезны), а значок вкладки плагин встраивает

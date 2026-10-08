@@ -131,6 +131,24 @@ const mulberry32 = (seed) => {
 
 const NAME_HEADS = ['Ар', 'Бел', 'Валь', 'Грей', 'Дор', 'Эль', 'Фар', 'Ил', 'Кел', 'Лор', 'Мир', 'Нор', 'Ор', 'Сел', 'Тир', 'Эс'];
 const NAME_TAILS = ['валь', 'вин', 'дар', 'дор', 'рин', 'лис', 'мир', 'таль', 'нар', 'эль', 'ион', 'ар', 'ора', 'ен'];
+const REALM_FORMS = ['Содружество', 'Конклав', 'Лига', 'Протекторат', 'Дом'];
+const CULTURE_NAMES = ['Северный рубеж', 'Степная дуга', 'Прибрежный союз', 'Высокогорные', 'Лесные кланы', 'Старый тракт'];
+const RESOURCE_NAMES = ['феррит', 'кварц', 'биомасса', 'редкие сплавы', 'пресная вода', 'энергетические кристаллы'];
+const SETTLEMENT_KINDS = ['город', 'аванпост', 'архив'];
+
+const hslToHex = (hue, saturation = 42, lightness = 49) => {
+  const h = ((hue % 360) + 360) % 360 / 360;
+  const s = clamp(saturation / 100, 0, 1);
+  const l = clamp(lightness / 100, 0, 1);
+  const channel = (offset) => {
+    const k = (offset + h * 12) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const value = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(value * 255).toString(16).padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
+};
+
 const makeName = (random, used) => {
   for (let attempt = 0; attempt < 32; attempt += 1) {
     const name = `${NAME_HEADS[Math.floor(random() * NAME_HEADS.length)]}${NAME_TAILS[Math.floor(random() * NAME_TAILS.length)]}`;
@@ -190,6 +208,176 @@ const buildContinentCenters = (seed, count, landscape) => {
   return Object.freeze(centers);
 };
 
+/* Небольшая детерминированная плиточная модель добавляет к шуму
+   направленные хребты и зоны расхождения. Это не симулятор тектоники,
+   а недорогой генеративный слой: один seed всегда даёт тот же каркас. */
+const buildTectonicPlates = (seed) => {
+  const random = mulberry32(seed ^ 0x51ed270b);
+  return Object.freeze(Array.from({ length: 9 }, (_, index) => {
+    const angle = random() * Math.PI * 2;
+    const speed = 0.18 + random() * 0.36;
+    return Object.freeze({
+      id: index + 1,
+      x: 0.04 + random() * 0.92,
+      z: 0.04 + random() * 0.92,
+      vx: Math.cos(angle) * speed,
+      vz: Math.sin(angle) * speed,
+    });
+  }));
+};
+
+const tectonicActivityAt = (plates, x, z) => {
+  let first = null;
+  let second = null;
+  for (const plate of plates) {
+    const dx = x - plate.x;
+    const dz = z - plate.z;
+    const distance = dx * dx + dz * dz;
+    if (!first || distance < first.distance) {
+      second = first;
+      first = { plate, dx, dz, distance };
+    } else if (!second || distance < second.distance) {
+      second = { plate, dx, dz, distance };
+    }
+  }
+  if (!first || !second) return 0;
+  const gap = Math.sqrt(second.distance) - Math.sqrt(first.distance);
+  const boundary = clamp(1 - gap / 0.075, 0, 1);
+  if (!boundary) return 0;
+  const nx = second.plate.x - first.plate.x;
+  const nz = second.plate.z - first.plate.z;
+  const magnitude = Math.hypot(nx, nz) || 1;
+  const normalX = nx / magnitude;
+  const normalZ = nz / magnitude;
+  const relativeVelocity = (second.plate.vx - first.plate.vx) * normalX +
+    (second.plate.vz - first.plate.vz) * normalZ;
+  const convergence = clamp(0.38 - relativeVelocity, 0, 1);
+  return boundary * (0.16 + convergence * 0.84);
+};
+
+/* Политическая карта и поселения — игровые данные, а не декоративные
+   случайные точки. Каждая страна получает столицу, культуру и снабжение;
+   клик по карте может разрешить координаты обратно в государство. */
+const buildPolities = (seed, centers, sampleAtNormalized) => {
+  const random = mulberry32(seed ^ 0x2c1b3c6d);
+  const usedStates = new Set();
+  const usedSettlements = new Set();
+  const states = [];
+  const settlements = [];
+
+  for (const center of centers) {
+    const stateCount = 2 + Math.floor(random() * 3);
+    const placements = [];
+    for (let index = 0; index < stateCount; index += 1) {
+      let x = center.x;
+      let z = center.z;
+      for (let attempt = 0; attempt < 18; attempt += 1) {
+        const angle = random() * Math.PI * 2;
+        const radius = Math.sqrt(random()) * 0.54;
+        x = clamp(center.x + Math.cos(angle) * center.rx * radius, 0.015, 0.985);
+        z = clamp(center.z + Math.sin(angle) * center.rz * radius, 0.015, 0.985);
+        if (sampleAtNormalized(x, z).land) break;
+      }
+      if (!sampleAtNormalized(x, z).land) {
+        x = center.x;
+        z = center.z;
+      }
+      placements.push({ x, z });
+    }
+
+    placements.forEach((placement, index) => {
+      const id = states.length + 1;
+      const name = makeName(random, usedStates);
+      const resourcePool = [...RESOURCE_NAMES];
+      const resources = [];
+      const resourceCount = 2 + Math.floor(random() * 2);
+      for (let resourceIndex = 0; resourceIndex < resourceCount; resourceIndex += 1)
+        resources.push(resourcePool.splice(Math.floor(random() * resourcePool.length), 1)[0]);
+      const state = Object.freeze({
+        id,
+        continentId: center.id,
+        name: `${name} ${REALM_FORMS[Math.floor(random() * REALM_FORMS.length)]}`,
+        shortName: name,
+        culture: CULTURE_NAMES[Math.floor(random() * CULTURE_NAMES.length)],
+        color: hslToHex((seed % 360 + id * 137.508) % 360, 42, 47 + (id % 3) * 3),
+        center: Object.freeze({ x: placement.x, z: placement.z }),
+        population: 650_000 + Math.floor(random() * 24_350_000),
+        resources: Object.freeze(resources),
+        capitalId: `capital-${id}`,
+        order: index + 1,
+      });
+      states.push(state);
+      settlements.push(Object.freeze({
+        id: state.capitalId,
+        stateId: id,
+        name: makeName(random, usedSettlements),
+        kind: 'столица',
+        x: placement.x,
+        z: placement.z,
+        population: 70_000 + Math.floor(random() * 1_800_000),
+      }));
+    });
+  }
+
+  const statesByContinent = new Map();
+  for (const state of states) {
+    if (!statesByContinent.has(state.continentId)) statesByContinent.set(state.continentId, []);
+    statesByContinent.get(state.continentId).push(state);
+  }
+
+  const stateAtNormalized = (u, v, terrain = null) => {
+    const sample = terrain ?? sampleAtNormalized(u, v);
+    if (!sample?.land) return null;
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const state of statesByContinent.get(sample.continent) ?? []) {
+      const dx = (u - state.center.x) * Math.cos((v - 0.5) * Math.PI * 0.82);
+      const dz = v - state.center.z;
+      const distance = dx * dx + dz * dz;
+      if (distance < nearestDistance) {
+        nearest = state;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  };
+
+  for (const state of states) {
+    const center = centers[state.continentId - 1];
+    const desiredCities = 1 + Math.floor(random() * 3);
+    for (let index = 0; index < desiredCities; index += 1) {
+      let point = null;
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        const angle = random() * Math.PI * 2;
+        const radius = 0.1 + random() * 0.35;
+        const x = clamp(state.center.x + Math.cos(angle) * center.rx * radius, 0.015, 0.985);
+        const z = clamp(state.center.z + Math.sin(angle) * center.rz * radius, 0.015, 0.985);
+        const terrain = sampleAtNormalized(x, z);
+        if (terrain.land && stateAtNormalized(x, z, terrain)?.id === state.id) {
+          point = { x, z };
+          break;
+        }
+      }
+      if (!point) continue;
+      settlements.push(Object.freeze({
+        id: `settlement-${state.id}-${index + 1}`,
+        stateId: state.id,
+        name: makeName(random, usedSettlements),
+        kind: SETTLEMENT_KINDS[Math.floor(random() * SETTLEMENT_KINDS.length)],
+        x: point.x,
+        z: point.z,
+        population: 8_000 + Math.floor(random() * 320_000),
+      }));
+    }
+  }
+
+  return {
+    states: Object.freeze(states),
+    settlements: Object.freeze(settlements),
+    stateAtNormalized,
+  };
+};
+
 const buildRivers = (seed, centers, sampleAtNormalized) => {
   const random = mulberry32(seed ^ 0x7f4a7c15);
   const names = new Set();
@@ -245,6 +433,7 @@ export const createWorld = (options = {}) => {
   const areaKm2 = (widthMeters * widthMeters) / 1_000_000;
   const chunksPerSide = Math.ceil(cellsPerSide / CHUNK_SIZE);
   const centers = buildContinentCenters(seedHash, config.continents, config.landscape);
+  const tectonicPlates = buildTectonicPlates(seedHash);
   const landscape = LANDSCAPE_PRESETS[config.landscape];
   const climate = CLIMATE_PRESETS[config.climate];
   const chunks = new Map();
@@ -284,13 +473,16 @@ export const createWorld = (options = {}) => {
     if (continentId) {
       const largeRelief = fractalNoise(seedHash ^ 0x68bc21eb, nx * 14, nz * 14, 4);
       const smallRelief = fractalNoise(seedHash ^ 0x02e5be93, nx * 86, nz * 86, 3);
+      const tectonics = tectonicActivityAt(tectonicPlates, nx, nz);
+      const uplift = tectonics * 16 * landscape.relief;
       const height = Math.round(clamp(
-        37 + continentalDepth * 34 + (largeRelief - 0.5) * 17 * landscape.relief + (smallRelief - 0.5) * 5 * landscape.relief,
+        37 + continentalDepth * 34 + (largeRelief - 0.5) * 17 * landscape.relief + (smallRelief - 0.5) * 5 * landscape.relief + uplift,
         SEA_LEVEL + 1,
         WORLD_HEIGHT - 8,
       ));
       const humidityField = fractalNoise(seedHash ^ 0x165667b1, nx * 12, nz * 12, 4);
-      const moisture = clamp(0.18 + humidityField * 0.82 + climate.moisture, 0, 1);
+      const rainShadow = tectonics * 0.1;
+      const moisture = clamp(0.18 + humidityField * 0.82 + climate.moisture - rainShadow, 0, 1);
       const latitude = Math.abs(nz - 0.5) * 2;
       const altitudeCooling = Math.max(0, height - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL) * 0.32;
       const temperature = clamp(1 - latitude * 0.62 - altitudeCooling + climate.temperature, 0, 1);
@@ -327,6 +519,7 @@ export const createWorld = (options = {}) => {
         biome,
         temperature,
         moisture,
+        tectonics,
       };
     }
 
@@ -345,10 +538,12 @@ export const createWorld = (options = {}) => {
       biome: waterDepth > 14 ? BIOME.DEEP_OCEAN : BIOME.COASTAL_WATER,
       temperature: 0,
       moisture: 0,
+      tectonics: 0,
     };
   };
 
   const rivers = buildRivers(seedHash, centers, sampleNormalized);
+  const { states, settlements, stateAtNormalized } = buildPolities(seedHash, centers, sampleNormalized);
 
   const sampleColumn = (x, z) => {
     const worldX = Math.floor(Number(x));
@@ -495,7 +690,11 @@ export const createWorld = (options = {}) => {
     worldHeight: WORLD_HEIGHT,
     seaLevel: SEA_LEVEL,
     continentCenters: centers,
+    tectonicPlates,
     rivers,
+    states,
+    settlements,
+    stateAtNormalized,
     sampleAtNormalized: sampleNormalized,
     sampleColumn,
     getChunk,

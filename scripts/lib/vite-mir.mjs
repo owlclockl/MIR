@@ -228,7 +228,16 @@ export function mirServiceWorker({ version }) {
     generateBundle(_options, bundle) {
       if (bundle['sw.js']) return; // уже собран (несколько сборок в одном процессе)
 
-      const buildId = bundleFingerprint(bundle);
+      const publicPaths = publicFiles();
+      /* Фиксированные public-файлы тоже входят в отпечаток. Это особенно
+         важно для встроенного Azgaar: его статический редактор живёт под
+         /fmg/, а изменения в нём обязаны менять ключ офлайн-кэша, даже если
+         основной JS-бандл MIR остался прежним. */
+      const publicFingerprint = publicPaths
+        .map((name) => `${name}\n${createHash('sha256').update(readFileSync(join('public', name))).digest('hex')}`)
+        .join('\n');
+      const serviceWorkerFingerprint = createHash('sha256').update(readFileSync('src/sw.js')).digest('hex');
+      const buildId = shortHash(`${bundleFingerprint(bundle)}\n${publicFingerprint}\n${serviceWorkerFingerprint}`);
       const cacheName = `mir-app-${version}-${buildId}`;
 
       /* Список оболочки: документ, манифест, собранные файлы и содержимое
@@ -250,7 +259,7 @@ export function mirServiceWorker({ version }) {
         ...new Set([
           '/',
           '/manifest.webmanifest',
-          ...publicFiles().filter((name) => !staticMetadata.has(name)).map((name) => `/${name}`),
+          ...publicPaths.filter((name) => !staticMetadata.has(name)).map((name) => `/${name}`),
           ...files,
         ]),
       ];

@@ -70,21 +70,36 @@ const getMapData = (world) => {
   const biomes = new Uint8Array(length);
   const depths = new Uint8Array(length);
   const land = new Uint8Array(length);
+  const stateIds = new Uint8Array(length);
+  const tectonics = new Uint8Array(length);
+  const stateColors = ['#52645a', ...(world.states ?? []).map((state) => state.color)];
+  const cultureColors = ['#52645a'];
+  const cultureIds = new Map();
+  for (const state of world.states ?? []) {
+    if (!cultureIds.has(state.culture)) {
+      cultureIds.set(state.culture, cultureColors.length);
+      cultureColors.push(state.color);
+    }
+  }
+  const cultureByState = ['#52645a', ...(world.states ?? []).map((state) => cultureColors[cultureIds.get(state.culture)])];
 
   for (let py = 0; py < MAP_RASTER_HEIGHT; py += 1) {
     const v = (py + 0.5) / MAP_RASTER_HEIGHT;
     for (let px = 0; px < MAP_RASTER_WIDTH; px += 1) {
       const u = (px + 0.5) / MAP_RASTER_WIDTH;
       const sample = world.sampleAtNormalized(u, v);
+      const state = world.stateAtNormalized?.(u, v, sample);
       const index = py * MAP_RASTER_WIDTH + px;
       heights[index] = sample.height;
       biomes[index] = sample.biome;
       depths[index] = sample.waterDepth;
       land[index] = sample.land ? 1 : 0;
+      stateIds[index] = state?.id ?? 0;
+      tectonics[index] = Math.round((sample.tectonics ?? 0) * 255);
     }
   }
 
-  return { heights, biomes, depths, land };
+  return { heights, biomes, depths, land, stateIds, tectonics, stateColors, cultureByState };
 };
 
 const heightColor = (height) => {
@@ -100,6 +115,14 @@ const heightColor = (height) => {
 
 const baseColor = (index, layer, data) => {
   if (layer === 'height') return heightColor(data.heights[index]);
+  if (layer === 'politics' && data.stateIds[index])
+    return rgb(data.stateColors[data.stateIds[index]] ?? '#52645a');
+  if (layer === 'cultures' && data.stateIds[index])
+    return rgb(data.cultureByState[data.stateIds[index]] ?? '#52645a');
+  if (layer === 'tectonics' && data.land[index]) {
+    const activity = data.tectonics[index] / 255;
+    return [Math.round(45 + activity * 190), Math.round(75 + activity * 58), Math.round(80 + activity * 26)];
+  }
   if (layer === 'biomes') return rgb(BIOME_COLORS[data.biomes[index]] ?? '#52645a');
   if (!data.land[index]) {
     const depth = Math.min(1, data.depths[index] / 34);
@@ -187,6 +210,71 @@ const drawRivers = (context, world, width, height) => {
   context.restore();
 };
 
+const drawStateBorders = (context, data, width, height, cultureMode = false) => {
+  const scaleX = width / MAP_RASTER_WIDTH;
+  const scaleY = height / MAP_RASTER_HEIGHT;
+  context.save();
+  context.beginPath();
+  context.strokeStyle = 'rgba(235, 237, 215, 0.74)';
+  context.lineWidth = Math.max(0.9, width / 900);
+  for (let py = 0; py < MAP_RASTER_HEIGHT; py += 1) {
+    for (let px = 0; px < MAP_RASTER_WIDTH; px += 1) {
+      const index = py * MAP_RASTER_WIDTH + px;
+      const stateId = data.stateIds[index];
+      if (!stateId) continue;
+      const current = cultureMode ? data.cultureByState[stateId] : stateId;
+      if (px + 1 < MAP_RASTER_WIDTH) {
+        const east = index + 1;
+        const eastState = data.stateIds[east];
+        if (eastState && current !== (cultureMode ? data.cultureByState[eastState] : eastState)) {
+          context.moveTo((px + 1) * scaleX, py * scaleY);
+          context.lineTo((px + 1) * scaleX, (py + 1) * scaleY);
+        }
+      }
+      if (py + 1 < MAP_RASTER_HEIGHT) {
+        const south = index + MAP_RASTER_WIDTH;
+        const southState = data.stateIds[south];
+        if (southState && current !== (cultureMode ? data.cultureByState[southState] : southState)) {
+          context.moveTo(px * scaleX, (py + 1) * scaleY);
+          context.lineTo((px + 1) * scaleX, (py + 1) * scaleY);
+        }
+      }
+    }
+  }
+  context.stroke();
+  context.restore();
+};
+
+const drawSettlements = (context, world, width, height, zoom = 1) => {
+  if (!world.settlements?.length) return;
+  context.save();
+  context.textAlign = 'left';
+  context.textBaseline = 'middle';
+  for (const settlement of world.settlements) {
+    const x = settlement.x * width;
+    const y = settlement.z * height;
+    const capital = settlement.kind === 'столица';
+    const radius = capital ? Math.max(2.5, width / 300) : Math.max(1.3, width / 520);
+    context.fillStyle = capital ? '#f3db9b' : 'rgba(235, 237, 215, 0.9)';
+    context.strokeStyle = 'rgba(11, 18, 19, 0.95)';
+    context.lineWidth = Math.max(1, width / 560);
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    if (zoom >= (capital ? 1.45 : 3.1)) {
+      const fontSize = clamp(width / 115, 9, 14);
+      context.font = `${capital ? '700' : '500'} ${fontSize}px Manrope, Inter, system-ui, sans-serif`;
+      context.lineWidth = Math.max(2, width / 380);
+      context.strokeStyle = 'rgba(5, 10, 11, 0.88)';
+      context.strokeText(settlement.name, x + radius + 4, y - radius - 1);
+      context.fillStyle = capital ? '#f3db9b' : 'rgba(232, 237, 222, 0.84)';
+      context.fillText(settlement.name, x + radius + 4, y - radius - 1);
+    }
+  }
+  context.restore();
+};
+
 const drawContinentLabels = (context, world, width, height) => {
   if (!world.continentCenters?.length) return;
   context.save();
@@ -211,25 +299,36 @@ const drawContinentLabels = (context, world, width, height) => {
   context.restore();
 };
 
-/** Рисует процедурный атлас мира: рельеф, климат, реки и названия материков. */
-export const drawWorldMap = (canvas, world, camera = null, layer = 'biomes') => {
+/** Рисует глобальный атлас или увеличенный участок, центрированный на RTS-камере. */
+export const drawWorldMap = (canvas, world, camera = null, layer = 'biomes', overview = false) => {
   const context = getContext(canvas);
   if (!context || !world) return;
   const width = canvas.width;
   const height = canvas.height;
-  const mapLayer = ['biomes', 'height', 'relief'].includes(layer) ? layer : 'biomes';
+  const mapLayer = ['biomes', 'height', 'relief', 'politics', 'cultures', 'tectonics'].includes(layer) ? layer : 'biomes';
   const raster = getMapRaster(canvas, world, mapLayer);
+  const zoom = overview ? 1 : clamp(Number(camera?.mapZoom) || 1, 1, 5);
+  const focusU = zoom > 1 && camera ? clamp((camera.x + 0.5) / world.widthCells, 0, 1) : 0.5;
+  const focusV = zoom > 1 && camera ? clamp((camera.z + 0.5) / world.depthCells, 0, 1) : 0.5;
+  const focusX = focusU * width;
+  const focusY = focusV * height;
+  const stateData = worldMapCache.get(world)?.data;
 
   context.clearRect(0, 0, width, height);
   context.fillStyle = '#102a34';
   context.fillRect(0, 0, width, height);
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.scale(zoom, zoom);
+  context.translate(-focusX, -focusY);
   if (raster) {
     context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
     context.drawImage(raster, 0, 0, width, height);
   }
 
   context.save();
-  context.strokeStyle = 'rgba(218, 232, 221, 0.1)';
+  context.strokeStyle = 'rgba(218, 232, 221, 0.12)';
   context.lineWidth = 1;
   for (let index = 1; index < 5; index += 1) {
     const x = Math.round((width * index) / 5) + 0.5;
@@ -243,31 +342,58 @@ export const drawWorldMap = (canvas, world, camera = null, layer = 'biomes') => 
     context.lineTo(width, y);
     context.stroke();
   }
-  context.strokeStyle = 'rgba(218, 232, 221, 0.34)';
-  context.strokeRect(0.5, 0.5, width - 1, height - 1);
   context.restore();
 
   drawRivers(context, world, width, height);
   drawContinentLabels(context, world, width, height);
+  if ((mapLayer === 'politics' || mapLayer === 'cultures') && stateData)
+    drawStateBorders(context, stateData, width, height, mapLayer === 'cultures');
+  if (mapLayer !== 'tectonics') drawSettlements(context, world, width, height, zoom);
 
   if (camera && Number.isFinite(camera.x) && Number.isFinite(camera.z)) {
     const x = ((camera.x + 0.5) / world.widthCells) * width;
     const y = ((camera.z + 0.5) / world.depthCells) * height;
     context.save();
     context.shadowColor = 'rgba(238, 220, 156, 0.9)';
-    context.shadowBlur = 18;
+    context.shadowBlur = 18 / zoom;
     context.fillStyle = '#f4d984';
     context.beginPath();
-    context.arc(x, y, Math.max(5, width / 120), 0, Math.PI * 2);
+    context.arc(x, y, Math.max(5, width / 120) / zoom, 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
     context.strokeStyle = '#111b1c';
-    context.lineWidth = 2;
+    context.lineWidth = 2 / zoom;
     context.beginPath();
-    context.arc(x, y, Math.max(8, width / 85), 0, Math.PI * 2);
+    context.arc(x, y, Math.max(8, width / 85) / zoom, 0, Math.PI * 2);
     context.stroke();
     context.restore();
   }
+  context.restore();
+
+  context.save();
+  context.strokeStyle = 'rgba(218, 232, 221, 0.34)';
+  context.lineWidth = 1;
+  context.strokeRect(0.5, 0.5, width - 1, height - 1);
+  context.restore();
+};
+
+/** Преобразует точку интерфейса обратно в координаты мира с учётом зума. */
+export const worldMapPointAt = (canvas, world, camera, clientX, clientY, overview = false) => {
+  const bounds = canvas?.getBoundingClientRect?.();
+  if (!bounds?.width || !bounds?.height || !world) return null;
+  const zoom = overview ? 1 : clamp(Number(camera?.mapZoom) || 1, 1, 5);
+  const focusU = zoom > 1 && camera ? (camera.x + 0.5) / world.widthCells : 0.5;
+  const focusV = zoom > 1 && camera ? (camera.z + 0.5) / world.depthCells : 0.5;
+  const screenU = (clientX - bounds.left) / bounds.width;
+  const screenV = (clientY - bounds.top) / bounds.height;
+  const u = clamp(focusU + (screenU - 0.5) / zoom, 0, 1);
+  const v = clamp(focusV + (screenV - 0.5) / zoom, 0, 1);
+  return {
+    x: Math.max(0, Math.min(world.widthCells - 1, Math.floor(u * world.widthCells))),
+    z: Math.max(0, Math.min(world.depthCells - 1, Math.floor(v * world.depthCells))),
+    u,
+    v,
+  };
 };
 
 const polygon = (context, points, fill, stroke = null) => {

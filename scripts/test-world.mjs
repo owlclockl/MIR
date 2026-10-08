@@ -16,7 +16,7 @@ import {
   WORLD_HEIGHT,
   createWorld,
 } from '../src/game/world.js';
-import { cameraPanDelta } from '../src/game/render.js';
+import { cameraPanDelta, worldMapPointAt } from '../src/game/render.js';
 
 const check = (label, callback) => {
   callback();
@@ -121,6 +121,41 @@ check('карта и рельеф повторяются по seed', () => {
   assert.deepEqual(a, b);
   const spawn = first.findSpawn();
   assert.deepEqual(first.getColumn(spawn.x, spawn.z), second.getColumn(spawn.x, spawn.z));
+});
+
+check('государства, культуры, ресурсы и поселения детерминированы seed мира', () => {
+  const first = createWorld({ seed: 'civilization-test', continents: 4 });
+  const second = createWorld({ seed: 'civilization-test', continents: 4 });
+  assert.deepEqual(first.states, second.states);
+  assert.deepEqual(first.settlements, second.settlements);
+  assert.ok(first.states.length >= first.continents * 2);
+  assert.ok(first.settlements.length >= first.states.length, 'у каждого государства есть столица');
+  for (const state of first.states) {
+    assert.ok(state.name.length > 4);
+    assert.ok(state.resources.length >= 2);
+    assert.ok(state.color.startsWith('#'));
+    assert.equal(first.stateAtNormalized(state.center.x, state.center.z)?.id, state.id);
+    assert.ok(first.settlements.some((item) => item.id === state.capitalId && item.kind === 'столица'));
+  }
+  const tectonicSamples = Array.from({ length: 70 }, (_, index) => {
+    const u = (index + 0.5) / 70;
+    return Array.from({ length: 36 }, (_, row) => first.sampleAtNormalized(u, (row + 0.5) / 36).tectonics);
+  }).flat();
+  assert.ok(tectonicSamples.some((activity) => activity > 0.4), 'процедурные границы плит формируют активные зоны');
+  assert.ok(tectonicSamples.every((activity) => activity >= 0 && activity <= 1));
+});
+
+check('стратегическая карта переводит экранные координаты в seed-координаты с учётом зума', () => {
+  const world = createWorld({ seed: 'map-camera-test' });
+  const canvas = { getBoundingClientRect: () => ({ left: 20, top: 30, width: 1000, height: 500 }) };
+  const camera = { x: 400, z: 220, mapZoom: 2 };
+  const center = worldMapPointAt(canvas, world, camera, 520, 280);
+  assert.equal(center.x, 400);
+  assert.equal(center.z, 220);
+  const overviewCorner = worldMapPointAt(canvas, world, camera, 20, 30, true);
+  assert.equal(overviewCorner.x, 0);
+  assert.equal(overviewCorner.z, 0);
+  assert.ok(worldMapPointAt(canvas, world, camera, 1020, 530, true).x === world.widthCells - 1);
 });
 
 check('панорамирование изометрической камеры учитывает проекцию и масштаб', () => {
