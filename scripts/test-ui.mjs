@@ -155,6 +155,19 @@ ok(
   'уведомления телефона доступны только с service worker',
   !!$('[data-setting="notify"]') && $('[data-setting="notify"]').disabled === true,
 );
+ok(
+  'настройки описывают звуковые эффекты игрового меню',
+  /Звуки игрового меню/i.test($('.settings-list')?.textContent || '') && /окна, переключатели/i.test($('.settings-list')?.textContent || ''),
+);
+const soundSwitch = $('[data-setting="sound"]');
+soundSwitch.checked = false;
+soundSwitch.dispatchEvent(new window.Event('change', { bubbles: true }));
+await wait(30);
+ok('выключение звуков отключает ползунок громкости', $('[data-setting="sound"]')?.checked === false && $('[data-setting="volume"]')?.disabled === true);
+$('[data-setting="sound"]').checked = true;
+$('[data-setting="sound"]').dispatchEvent(new window.Event('change', { bubbles: true }));
+await wait(30);
+ok('звуки игрового меню снова включаются переключателем', $('[data-setting="sound"]')?.checked === true && $('[data-setting="volume"]')?.disabled === false);
 click('[data-action="close-modal"]');
 click('[data-action="open-hub"]');
 await wait(50);
@@ -243,10 +256,14 @@ await wait(100);
 /* Скрытая панель админа: вход по знаку игры и заводскому ключу.
    Проверяем в локальном режиме — там панель работает без хаба. */
 const brandMark = $('[data-action="admin-tap"]');
-ok('знак игры — потайная кнопка панели', !!brandMark);
-for (let i = 0; i < 5; i += 1) click('[data-action="admin-tap"]');
+ok('знак игры — доступная с клавиатуры потайная кнопка', !!brandMark && brandMark.getAttribute('aria-label') === 'Знак игры');
+for (let i = 0; i < 6; i += 1) click('[data-action="admin-tap"]');
+await wait(40);
+ok('неполная комбинация не показывает вход', !$('form[data-form="admin-login"]'));
+click('[data-action="admin-tap"]');
 await wait(100);
-ok('пять щелчков по знаку открывают вход в панель', !!$('form[data-form="admin-login"]'), $('.dialog__title')?.textContent);
+ok('семь касаний за короткую серию открывают скрытый вход', !!$('form[data-form="admin-login"]'), $('.dialog__title')?.textContent);
+ok('вход показан отдельными анимированными вратами', !!$('.dialog--admin-gate .admin-gate__emblem') && !!$('.admin-gate__keyline'));
 
 $('[data-role="admin-key"]').value = 'не-тот-ключ';
 $('form[data-form="admin-login"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));

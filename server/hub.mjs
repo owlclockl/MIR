@@ -20,9 +20,8 @@ import {
   createHubCore,
   httpError,
   HUB_DEFAULT_ADMIN_KEY,
+  MAX_REQUEST_BYTES,
 } from './hub-core.mjs';
-
-const MAX_BODY_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 
 const clientIp = (req) =>
   String(req.headers['cf-connecting-ip'] || '')
@@ -103,7 +102,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
       const chunks = [];
       req.on('data', (chunk) => {
         size += chunk.length;
-        if (size > MAX_BODY_BYTES) {
+        if (size > MAX_REQUEST_BYTES) {
           reject(httpError(413, 'Слишком большой запрос.'));
           req.destroy();
           return;

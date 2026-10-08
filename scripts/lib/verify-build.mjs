@@ -23,18 +23,18 @@ import { BUILD_INFO_FILE } from './vite-mir.mjs';
 const ROOT_FILES = ['dist', 'mir.html'];
 
 /* Бюджеты веса — сигнал о случайно попавших ресурсах, не запрет на продуктовые
-   функции. Админ-консоль получила аналитические SVG-графики и адаптивный
-   интерфейс без библиотек; лимиты адаптированы под эту реализацию, чтобы
-   не раздувать загрузку сторонней chart-зависимостью. */
+   функции. Админ-консоль получила аналитику на SVG без библиотек, а скрытая
+   форма входа — отдельный адаптивный визуальный слой. Лимит CSS поднят на 2 KiB
+   для этой разметки; звуки в web остаются отдельными файлами, не в JS. */
 export const BUDGETS = {
   js: 168 * 1024,
-  css: 52 * 1024,
+  css: 54 * 1024,
   single: 288 * 1024,
 };
 
 const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
 
-/* Звуки интерфейса: файлы из src/assets/sounds/ (mp3 из библиотеки UI SFX,
+/* Звуки игрового меню: файлы из src/assets/sounds/ (mp3 из библиотеки UI SFX,
    см. scripts/sounds.mjs). Список читается с диска, а не прошивается числом:
    набор звуков меняется командой `npm run sounds`, и проверка обязана
    подхватить новый состав сама. */
@@ -99,6 +99,26 @@ export function checkWeb() {
     kb(jsBytes),
   );
 
+  const webSoundAssets = files.filter((name) => name.startsWith('assets/') && name.endsWith('.mp3'));
+  const inlineAudio = jsFiles.some((name) =>
+    readFileSync(join('dist', name), 'utf8').includes('data:audio/mpeg;base64'),
+  );
+  add(
+    SOUND_FILES.length > 0 && webSoundAssets.length >= SOUND_FILES.length && !inlineAudio,
+    'звуки веб-версии — отдельные хешированные ресурсы',
+    `${webSoundAssets.length} файлов; base64 в JS: ${inlineAudio ? 'да' : 'нет'}`,
+  );
+
+  const assetFiles = files.filter((name) => name.startsWith('assets/'));
+  const unhashedAssets = assetFiles.filter((name) => !/^assets\/[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$/.test(name));
+  const headersFile = existsSync('dist/_headers') ? readFileSync('dist/_headers', 'utf8') : '';
+  const immutableCacheRule = /(?:^|\n)\/assets\/\*\s*\n\s*Cache-Control:\s*public,\s*max-age=31536000,\s*immutable(?:\s|$)/m.test(headersFile);
+  add(
+    immutableCacheRule && assetFiles.length > 0 && unhashedAssets.length === 0,
+    'все хешированные ассеты получают годовой immutable-кеш',
+    `${assetFiles.length} файлов; нехешированные: ${unhashedAssets.join(', ') || 'нет'}`,
+  );
+
   const cssBytes = files
     .filter((name) => name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -133,6 +153,11 @@ export function checkWeb() {
       new Set(precache).size === precache.length,
       'в списке оболочки нет повторов',
       `${precache.length - new Set(precache).size} лишних`,
+    );
+    add(
+      !precache.includes('/_headers') && !precache.includes('/_redirects'),
+      'метаданные Workers Assets не попали в офлайн-кэш',
+      '/_headers и /_redirects исключены',
     );
 
     /* Новости о версии из кэша не отдаются: иначе приложение сравнивало бы

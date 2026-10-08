@@ -1,15 +1,13 @@
-/* Короткие CC0-звуки интерфейса: восемь откликов из библиотеки UI SFX
-   (npm-пакет `uisfx`, набор «Glass» — яркие, хрустальные, «как на топовых
-   сайтах»).
-   Происхождение, лицензия и способ заменить весь комплект другой командой —
-   в src/assets/sounds/LICENSE.txt.
+/* Короткие CC0-звуки игрового меню из UI SFX (набор «Arcade»).
+   Состав: щелчки, успех/ошибка, уведомления, открытие/закрытие окон,
+   выбор/назад, переключатели, подключение, регулировка громкости и
+   отдельный сигнал для скрытого входа администратора.
 
-   Файлы лежат рядом с кодом и проходят через сборщик, а не через public/:
-   так у веб-версии получается хешированное имя с вечным кешем, а в
-   однофайловом mir.html звук становится data URL сам собой (сборщик
-   встраивает ресурсы) — без ручной склейки строк.
-   Audio создаётся лениво после первого действия пользователя: мобильные
-   браузеры блокируют воспроизведение до касания. */
+   Происхождение, лицензия и команда смены набора — в
+   src/assets/sounds/LICENSE.txt. Файлы проходят через Vite: веб-версия
+   получает хешированные URL, а однофайловый mir.html встраивает звук как
+   data URL. Audio создаётся лениво после первого действия пользователя:
+   мобильные браузеры не разрешают воспроизведение до касания. */
 import click from '../assets/sounds/click.mp3';
 import success from '../assets/sounds/success.mp3';
 import message from '../assets/sounds/message.mp3';
@@ -18,6 +16,11 @@ import open from '../assets/sounds/open.mp3';
 import close from '../assets/sounds/close.mp3';
 import toggleOn from '../assets/sounds/toggle-on.mp3';
 import toggleOff from '../assets/sounds/toggle-off.mp3';
+import select from '../assets/sounds/select.mp3';
+import back from '../assets/sounds/back.mp3';
+import unlock from '../assets/sounds/unlock.mp3';
+import connect from '../assets/sounds/connect.mp3';
+import volumeChange from '../assets/sounds/volume-change.mp3';
 
 const FILES = {
   click,
@@ -28,6 +31,11 @@ const FILES = {
   close,
   'toggle-on': toggleOn,
   'toggle-off': toggleOff,
+  select,
+  back,
+  unlock,
+  connect,
+  'volume-change': volumeChange,
 };
 const pool = new Map();
 let settingsGetter = () => ({ sound: true, volume: 0.55 });

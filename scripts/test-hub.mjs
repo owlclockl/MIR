@@ -101,8 +101,22 @@ expect(
   ping.headers.get('access-control-allow-origin') || 'заголовка нет',
 );
 
-const preflight = await call('OPTIONS', '/api/register');
-expect('префлайт OPTIONS', preflight.status === 204 || preflight.status === 200, `${preflight.status}`);
+const preflight = await fetch(`${BASE}/api/admin/state`, {
+  method: 'OPTIONS',
+  headers: {
+    Origin: 'https://mir-ui.example',
+    'Access-Control-Request-Method': 'POST',
+    'Access-Control-Request-Headers': 'content-type,x-mir-admin',
+  },
+});
+const allowedHeaders = (preflight.headers.get('access-control-allow-headers') || '')
+  .split(',')
+  .map((header) => header.trim().toLowerCase());
+expect(
+  'префлайт разрешает JSON и заголовок ключа админа',
+  preflight.status === 204 && allowedHeaders.includes('content-type') && allowedHeaders.includes('x-mir-admin'),
+  `${preflight.status}; разрешено: ${allowedHeaders.join(', ') || 'ничего'}`,
+);
 
 /* ---------- 2. аккаунты ---------- */
 

@@ -22,13 +22,16 @@
    Развёртывание: `npm run host` (см. README, раздел про хостинг).
    =========================================================== */
 
-import { corsHeaders, createHubCore } from '../../server/hub-core.mjs';
+import { corsHeaders, createHubCore, MAX_REQUEST_BYTES } from '../../server/hub-core.mjs';
 
 /* Как часто записывать «был в сети» (сердцебиения приходят каждые
    30 секунд от каждого устройства, а бесплатный тариф считает
    записи). Пропущенная отметка присутствия ничего не ломает:
    следующая придёт через полминуты. */
 const PRESENCE_WRITE_MS = 15_000;
+
+/* Общий лимит запроса — 512 КиБ: аватарки до 300 КиБ в base64 помещаются
+   с запасом, а содержимое не буферизуется без границы. */
 
 const json = (status, payload) =>
   new Response(payload === null ? null : JSON.stringify(payload), {
@@ -40,6 +43,52 @@ const json = (status, payload) =>
       ...corsHeaders(),
     },
   });
+
+const readRequestText = async (request) => {
+  const contentLength = request.headers.get('Content-Length');
+  const declaredOversized = Boolean(contentLength && Number(contentLength) > MAX_REQUEST_BYTES);
+  if (!request.body)
+    return declaredOversized ? { status: 413, error: 'Слишком большой запрос.' } : { text: '' };
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  let oversized = declaredOversized;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_REQUEST_BYTES) oversized = true;
+      /* Дренируем без сохранения остатка, чтобы не держать неограниченный
+         объём в памяти и не оставить входящий поток непрочитанным. */
+      if (!oversized) chunks.push(value);
+    }
+  } catch {
+    return { status: 400, error: 'Тело запроса — не JSON.' };
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (oversized) return { status: 413, error: 'Слишком большой запрос.' };
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { text: new TextDecoder().decode(bytes) };
+};
+
+const readJsonBody = async (request) => {
+  const result = await readRequestText(request);
+  if (result.error) return result;
+  try {
+    return { body: result.text ? JSON.parse(result.text) : {} };
+  } catch {
+    return { status: 400, error: 'Тело запроса — не JSON.' };
+  }
+};
 
 export class MirHub {
   constructor(state, env) {
@@ -95,6 +144,7 @@ export class MirHub {
   /** Записываем только то, что изменилось: экономим квоту записей. */
   async flush() {
     const puts = {};
+    const snapshotsAfterWrite = new Map();
     const alive = new Set();
     for (const user of this.db.users) {
       const key = `u:${user.id}`;
@@ -102,30 +152,30 @@ export class MirHub {
       const text = JSON.stringify(user);
       if (this.snapshot.get(key) !== text) {
         puts[key] = user;
-        this.snapshot.set(key, text);
+        snapshotsAfterWrite.set(key, text);
       }
     }
     const requests = JSON.stringify(this.db.requests);
     if (this.snapshot.get('reqs') !== requests) {
       puts.reqs = this.db.requests;
-      this.snapshot.set('reqs', requests);
+      snapshotsAfterWrite.set('reqs', requests);
     }
     /* Ключ панели админа, сменённый через панель, живёт в данных хаба. */
     const adminKey = JSON.stringify(this.db.adminKey ?? '');
     if (this.snapshot.get('adminKey') !== adminKey) {
       puts.adminKey = this.db.adminKey ?? '';
-      this.snapshot.set('adminKey', adminKey);
+      snapshotsAfterWrite.set('adminKey', adminKey);
     }
     /* Настройки панели (открыта ли регистрация) и журнал событий. */
     const settings = JSON.stringify(this.db.settings ?? {});
     if (this.snapshot.get('settings') !== settings) {
       puts.settings = this.db.settings ?? {};
-      this.snapshot.set('settings', settings);
+      snapshotsAfterWrite.set('settings', settings);
     }
     const events = JSON.stringify(this.db.events ?? []);
     if (this.snapshot.get('events') !== events) {
       puts.events = this.db.events ?? [];
-      this.snapshot.set('events', events);
+      snapshotsAfterWrite.set('events', events);
     }
     const gone = [...this.snapshot.keys()].filter((key) => key.startsWith('u:') && !alive.has(key));
     /* Больше 128 ключей за раз хранилище не принимает. */
@@ -134,6 +184,9 @@ export class MirHub {
       const slice = {};
       for (const key of keys.slice(i, i + 100)) slice[key] = puts[key];
       await this.state.storage.put(slice);
+      /* Кеш считаем свежим только после подтверждённой записи: при сбое
+         следующий запрос должен повторить попытку, а не пропустить данные. */
+      for (const key of Object.keys(slice)) this.snapshot.set(key, snapshotsAfterWrite.get(key));
     }
     if (gone.length) {
       await this.state.storage.delete(gone);
@@ -155,12 +208,9 @@ export class MirHub {
     if (request.method === 'OPTIONS') return json(204, null);
     let body = {};
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      try {
-        const text = await request.text();
-        body = text ? JSON.parse(text) : {};
-      } catch {
-        return json(400, { error: 'Тело запроса — не JSON.' });
-      }
+      const parsed = await readJsonBody(request);
+      if (parsed.error) return json(parsed.status, { error: parsed.error });
+      body = parsed.body;
     }
     const result = await this.core.handle({
       method: request.method,
@@ -189,12 +239,47 @@ export class MirHub {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/')) {
+    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+
+    try {
+      let requestForHub = request;
+      if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS') {
+        const contentLength = request.headers.get('Content-Length');
+        if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES)
+          return json(413, { error: 'Слишком большой запрос.' });
+
+        /* Сначала полностью читаем поток на входном Worker и отклоняем
+           превышение, не пересылая тело в Durable Object. */
+        const boundedBody = await readRequestText(request);
+        if (boundedBody.error) return json(boundedBody.status, { error: boundedBody.error });
+        const headers = new Headers(request.headers);
+        headers.delete('Content-Length');
+        headers.delete('Host');
+        headers.delete('Transfer-Encoding');
+        requestForHub = new Request(request.url, {
+          method: request.method,
+          headers,
+          body: boundedBody.text,
+          signal: request.signal,
+        });
+      }
+
       /* Хаб один на весь мир: все игроки должны видеть одни и те же
          аккаунты, поэтому имя объекта фиксированное. */
       const id = env.HUB.idFromName('mir');
-      return env.HUB.get(id).fetch(request);
+      return await env.HUB.get(id).fetch(requestForHub);
+    } catch (error) {
+      /* Не записываем query string или заголовки: в них могут быть сессии
+         и ключ панели. Для диагноза хватает метода, пути и типа ошибки. */
+      console.error(
+        JSON.stringify({
+          event: 'mir_hub_request_failed',
+          method: request.method,
+          path: url.pathname,
+          error: error instanceof Error ? error.name : 'UnknownError',
+        }),
+      );
+      return json(503, { error: 'Хаб временно недоступен.' });
     }
-    return env.ASSETS.fetch(request);
   },
 };

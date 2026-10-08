@@ -243,7 +243,17 @@ export function mirServiceWorker({ version }) {
       const files = Object.keys(bundle)
         .filter((name) => name !== 'index.html' && name !== BUILD_INFO_FILE && !name.endsWith('.map'))
         .map((name) => `/${name}`);
-      const precache = [...new Set(['/', '/manifest.webmanifest', ...publicFiles().map((name) => `/${name}`), ...files])];
+      /* Cloudflare Workers Static Assets metadata controls response headers;
+         it is not a public asset and must not enter the offline precache. */
+      const staticMetadata = new Set(['_headers', '_redirects']);
+      const precache = [
+        ...new Set([
+          '/',
+          '/manifest.webmanifest',
+          ...publicFiles().filter((name) => !staticMetadata.has(name)).map((name) => `/${name}`),
+          ...files,
+        ]),
+      ];
 
       const template = readFileSync('src/sw.js', 'utf8');
       const source = template

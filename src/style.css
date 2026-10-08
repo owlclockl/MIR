@@ -341,17 +341,60 @@ a {
 }
 
 .brand__mark {
+  position: relative;
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
   flex: none;
+  padding: 0;
   color: #0b0b0d;
+  border: 0;
   background: #e9e9ec;
-  /* Знак — потайная кнопка входа в панель админа. Курсор и подсветка
-     остаются обычными, чтобы вход не выдавал себя. */
+  appearance: none;
+  /* Знак остаётся обычной частью логотипа: прогресс комбинации виден
+     только во время нажатий, без hover-эффекта или подписи о панели. */
   cursor: default;
   user-select: none;
+  transition: box-shadow 180ms var(--ease);
+}
+
+.brand__mark::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--sp-4));
+  border: 1px solid var(--accent);
+  opacity: 0;
+  transform: scale(0.82);
+  transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+  pointer-events: none;
+}
+
+.brand__mark--charging {
+  box-shadow: 0 0 var(--sigil-glow, 0px) var(--accent-glow);
+}
+
+.brand__mark--charging::before {
+  opacity: var(--sigil-progress, 0.12);
+  transform: scale(1);
+}
+
+.brand__mark--unlocked {
+  animation: brand-sigil-unlock 720ms var(--ease);
+}
+
+@keyframes brand-sigil-unlock {
+  35% {
+    color: var(--accent);
+    box-shadow: 0 0 24px var(--accent-glow);
+    transform: scale(1.12) rotate(45deg);
+  }
+
+  100% {
+    color: #0b0b0d;
+    box-shadow: 0 0 0 transparent;
+    transform: none;
+  }
 }
 
 .brand__mark .icon {
@@ -2618,6 +2661,304 @@ button.admin-row:hover {
 
   .setting-row {
     align-items: flex-start;
+  }
+}
+
+/* ---------- Скрытые врата панели администратора ------------------ */
+
+.dialog--admin-gate {
+  position: relative;
+  width: min(460px, 100%);
+  overflow: hidden;
+  border-color: rgba(194, 217, 201, 0.26);
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(194, 217, 201, 0.085), transparent 42%),
+    linear-gradient(155deg, rgba(17, 20, 19, 0.99), rgba(8, 8, 10, 0.99) 68%);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.74), 0 0 50px rgba(141, 178, 153, 0.08);
+}
+
+.dialog--admin-gate .dialog__head {
+  background: transparent;
+  border-bottom-color: rgba(194, 217, 201, 0.1);
+}
+
+.dialog--admin-gate .dialog__title {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.dialog--admin-gate .dialog__body {
+  position: relative;
+  gap: var(--sp-20);
+  overflow-y: auto;
+  padding: var(--sp-24);
+}
+
+.admin-gate__emblem {
+  position: relative;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  animation: admin-gate-arrive 420ms var(--ease) both;
+}
+
+.admin-gate__ring {
+  position: absolute;
+  display: block;
+  border: 1px solid rgba(194, 217, 201, 0.22);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.admin-gate__ring--outer {
+  inset: 0;
+  border-style: dashed;
+  animation: admin-gate-orbit 32s linear infinite;
+}
+
+.admin-gate__ring--inner {
+  inset: var(--sp-10);
+  border-color: rgba(194, 217, 201, 0.12);
+  transform: rotate(45deg);
+}
+
+.admin-gate__seal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  background: rgba(194, 217, 201, 0.07);
+  box-shadow: inset 0 0 24px rgba(194, 217, 201, 0.08), 0 0 28px rgba(141, 178, 153, 0.08);
+}
+
+.admin-gate__seal > .icon:first-child {
+  width: 34px;
+  height: 34px;
+  opacity: 0.68;
+}
+
+.admin-gate__sigil {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  background: #111412;
+}
+
+.admin-gate__serial {
+  position: absolute;
+  bottom: 0;
+  padding: var(--sp-4) var(--sp-8);
+  color: var(--accent);
+  border: 1px solid rgba(194, 217, 201, 0.2);
+  background: var(--bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+
+.admin-gate__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-8);
+  text-align: center;
+}
+
+.admin-gate__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  width: 100%;
+  padding-bottom: var(--sp-10);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-gate__status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--warn);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.admin-gate__status-label .dot {
+  width: 6px;
+  height: 6px;
+  background: var(--warn-glow);
+  box-shadow: 0 0 8px var(--warn-glow);
+}
+
+.admin-gate__status-code {
+  color: var(--text-faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.admin-gate__intro .eyebrow {
+  margin-top: var(--sp-4);
+  color: var(--accent);
+  letter-spacing: 0.24em;
+}
+
+.admin-gate__intro h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 5vw, 25px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.admin-gate__intro > p:last-child {
+  max-width: 320px;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+.admin-gate__form {
+  gap: var(--sp-12);
+}
+
+.admin-gate__keyline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  min-height: var(--control-h);
+  padding-inline: var(--sp-12);
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  transition: border-color 150ms var(--ease), background-color 150ms var(--ease);
+}
+
+.admin-gate__keyline:focus-within {
+  border-color: var(--accent-line);
+  background: rgba(194, 217, 201, 0.045);
+  box-shadow: 0 0 0 1px rgba(194, 217, 201, 0.08);
+}
+
+.admin-gate__key-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.admin-gate__keyline .input {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(var(--control-h) - 2px);
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+}
+
+.admin-gate__keyline .input:focus {
+  border: 0;
+  background: transparent;
+}
+
+.admin-gate__submit {
+  justify-content: flex-start;
+  margin-top: var(--sp-4);
+}
+
+.admin-gate__arrow {
+  margin-left: auto;
+  font-size: var(--fs-base);
+  letter-spacing: 0;
+  transition: transform 160ms var(--ease);
+}
+
+.admin-gate__submit:hover .admin-gate__arrow {
+  transform: translate(2px, -2px);
+}
+
+.admin-gate__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-10);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--line);
+}
+
+.admin-gate__node {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.admin-gate__node-label {
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.admin-gate__hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.55;
+}
+
+.admin-gate__hint code {
+  color: var(--warn);
+  border-bottom: 1px solid rgba(217, 192, 138, 0.25);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+}
+
+@keyframes admin-gate-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes admin-gate-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--sp-6)) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .dialog--admin-gate .dialog__body {
+    gap: var(--sp-14);
+    padding: var(--sp-16);
+  }
+
+  .admin-gate__emblem {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-gate__emblem,
+  .admin-gate__ring--outer,
+  .brand__mark--unlocked {
+    animation: none;
   }
 }
 
