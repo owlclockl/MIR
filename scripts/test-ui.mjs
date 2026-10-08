@@ -260,9 +260,22 @@ ok('заводской ключ пускает в панель', !!$('[data-acti
 
 /* Обзор: сводные числа и настройки — первое, что видит владелец. */
 ok('панель открывается на обзоре со сводкой', !!$('.admin-tiles'), $('.admin-tile__key')?.textContent?.trim());
+ok('админка собрана в отдельное адаптивное рабочее пространство', !!$('.admin-layout .admin-rail') && !!$('.admin-toolbar') && !!$('.admin-content'));
+ok('обзор содержит графики регистраций и активности', $$('.admin-chart svg[role="img"]').length === 2);
 ok('на обзоре видна настройка регистрации', !!$('[data-action="admin-registration"]'));
-const panelTabs = $$('.tabs--panel [data-action="admin-tab"]');
+const panelTabs = $$('.admin-nav [data-action="admin-tab"]');
 ok('в панели пять вкладок', panelTabs.length === 5, panelTabs.map((el) => el.dataset.tab).join(', '));
+click('[data-action="admin-range"][data-value="7"]');
+await wait(100);
+ok('период графиков переключается без потери панели', $('[data-action="admin-range"][data-value="7"]')?.getAttribute('aria-pressed') === 'true' && $('.admin-chart__svg')?.querySelector('desc')?.textContent.includes('7 календарных дней'));
+click('[data-action="admin-range"][data-value="14"]');
+click('.admin-tile[data-action="admin-go"][data-tab="players"][data-filter="today"]');
+await wait(100);
+ok('показатель новых аккаунтов открывает фильтр за 24 часа', $('[data-action="admin-filter"][data-value="today"]')?.getAttribute('aria-pressed') === 'true');
+click('[data-action="admin-tab"][data-tab="overview"]');
+click('.admin-tile[data-action="admin-go"][data-tab="players"][data-filter="online"]');
+await wait(100);
+ok('карточка показателя открывает отфильтрованный список игроков', $('[data-action="admin-filter"][data-value="online"]')?.getAttribute('aria-pressed') === 'true');
 
 /* Игроки: поиск, фильтры и карточка с блокировкой. */
 click('[data-action="admin-tab"][data-tab="players"]');
@@ -299,6 +312,13 @@ await wait(200);
 const journal = $('.admin-list')?.textContent || '';
 ok('журнал показывает события', /Регистрация/.test(journal), journal.replace(/\s+/g, ' ').trim().slice(0, 90));
 ok('в журнале видно, кого блокировали', /блокировка/i.test(journal));
+const eventSearch = $('[data-role="admin-event-search"]');
+eventSearch.value = localName;
+eventSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+await wait(100);
+ok('журнал ищет по имени игрока', ($('.admin-list')?.textContent || '').includes(localName));
+$('[data-role="admin-event-search"]').value = '';
+$('[data-role="admin-event-search"]').dispatchEvent(new window.Event('input', { bubbles: true }));
 click('[data-action="admin-event-filter"][data-value="admin"]');
 await wait(150);
 ok('фильтр журнала оставляет только панель', !/Регистрация/.test($('.admin-list')?.textContent || '') && /блокировка/i.test($('.admin-list')?.textContent || ''));

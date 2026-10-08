@@ -68,12 +68,16 @@ const ADMIN_TAP_WINDOW = 3000; // за это время
 const adminState = () => ({
   tab: 'overview', // overview | players | requests | events | system
   query: '',
-  filter: 'all', // all | online | offline | banned
+  requestQuery: '',
+  eventQuery: '',
+  range: '14', // сколько дней показать в аналитике
+  filter: 'all', // all | online | offline | banned | today | active
   sort: 'name', // name | seen | created
   limit: 60, // сколько строк списка показано
   eventFilter: 'all', // all | players | admin
   data: null, // снимок от store.adminSnapshot()
   openId: null, // открытая карточка игрока
+  lastUpdatedAt: 0,
   banReason: '', // черновик формы блокировки
   banHours: '0',
   keyDraft: '',
@@ -948,9 +952,14 @@ const eventLabel = (kind) => EVENT_LABELS[kind] ?? kind;
 const eventIsAdmin = (kind) => String(kind).startsWith('admin:');
 const untilText = (ts) => (ts ? `до ${formatDate(ts)} ${TIME_FORMAT.format(new Date(ts))}` : 'навсегда');
 
-const adminTabHtml = (id, label) =>
-  `<button class="tab${ui.admin.tab === id ? ' tab--active' : ''}" type="button" role="tab"
-           aria-selected="${ui.admin.tab === id}" data-action="admin-tab" data-tab="${id}">${label}</button>`;
+const adminTabHtml = (id, label, glyph, count = null) =>
+  `<button class="admin-nav__item${ui.admin.tab === id ? ' admin-nav__item--active' : ''}" type="button" role="tab"
+           id="admin-tab-${id}" aria-controls="admin-panel" aria-selected="${ui.admin.tab === id}"
+           data-action="admin-tab" data-tab="${id}">
+     ${icon(glyph, 'admin-nav__icon')}
+     <span class="admin-nav__label">${escapeHtml(label)}</span>
+     ${count === null ? '' : `<span class="admin-nav__count" translate="no">${escapeHtml(String(count))}</span>`}
+   </button>`;
 
 const adminChipHtml = (action, value, label, active) =>
   `<button class="chip${active ? ' chip--active' : ''}" type="button" data-action="${action}"
@@ -1216,6 +1225,8 @@ const requestCounts = (requests) => {
 const ADMIN_FILTERS = [
   ['all', 'Все'],
   ['online', 'В сети'],
+  ['active', 'Активны 24ч'],
+  ['today', 'Новые 24ч'],
   ['offline', 'Офлайн'],
   ['banned', 'Заблокированы'],
 ];
@@ -1227,7 +1238,10 @@ const ADMIN_SORTS = [
 ];
 
 const adminMatchFilter = (user, filter) => {
+  const day = 24 * 60 * 60 * 1000;
   if (filter === 'online') return user.presence !== 'offline';
+  if (filter === 'active') return Date.now() - (user.seenAt ?? 0) < day;
+  if (filter === 'today') return Date.now() - (user.createdAt ?? 0) < day;
   if (filter === 'offline') return user.presence === 'offline';
   if (filter === 'banned') return !!user.ban;
   return true;
@@ -1302,32 +1316,47 @@ const adminRequestsHtml = () => {
   const requests = data?.requests ?? [];
   const users = data?.users ?? [];
   const nameOf = (id) => users.find((user) => user.id === id)?.name ?? id;
-  if (!requests.length) return '<p class="hint">Заявок нет.</p>';
+  const query = ui.admin.requestQuery.trim().toLocaleLowerCase('ru');
+  const found = [...requests]
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+    .filter((request) => {
+      if (!query) return true;
+      return [nameOf(request.from), nameOf(request.to), request.from, request.to]
+        .some((value) => String(value).toLocaleLowerCase('ru').includes(query));
+    });
   return `
-    <p class="hint">Входящие и исходящие заявки в друзья: можно отклонить, не дожидаясь ответа игрока. Имена открывают карточку.</p>
+    <div class="admin-page-intro">
+      <p class="hint">Заявки в друзья можно найти по имени или ID и удалить, если они зависли. Нажмите на имя, чтобы открыть аккаунт.</p>
+      <span class="admin-result-count">${found.length} из ${requests.length}</span>
+    </div>
+    <label class="field admin-search-field">
+      <span class="field__label">Поиск по участникам заявки</span>
+      <input class="input" type="search" placeholder="Имя или ID игрока…" autocomplete="off" spellcheck="false"
+             value="${escapeHtml(ui.admin.requestQuery)}" data-role="admin-request-search" />
+    </label>
     <div class="admin-list">
-      ${requests
-        .map(
-          (request) => `
+      ${
+        found.length
+          ? found.map((request) => `
         <div class="admin-row admin-row--static">
           <span class="admin-row__text">
             <span class="admin-row__name">
-              <button class="admin-link" type="button" data-action="admin-open" data-id="${request.from}"
+              <button class="admin-link" type="button" data-action="admin-open" data-id="${escapeHtml(request.from)}"
                       translate="no">${escapeHtml(nameOf(request.from))}</button>
               <span class="admin-arrow" aria-hidden="true">→</span>
-              <button class="admin-link" type="button" data-action="admin-open" data-id="${request.to}"
+              <button class="admin-link" type="button" data-action="admin-open" data-id="${escapeHtml(request.to)}"
                       translate="no">${escapeHtml(nameOf(request.to))}</button>
             </span>
             <small class="admin-row__meta">${escapeHtml(seenText(request.at))}</small>
           </span>
           <button class="icon-button icon-button--sm icon-button--danger" type="button"
-                  data-action="admin-drop-request" data-id="${request.id}"
+                  data-action="admin-drop-request" data-id="${escapeHtml(request.id)}"
                   aria-label="Удалить заявку" title="Удалить заявку">
             ${icon('trash')}
           </button>
-        </div>`,
-        )
-        .join('')}
+        </div>`).join('')
+          : `<div class="admin-empty"><strong>${requests.length ? 'Ничего не найдено' : 'Заявок пока нет'}</strong><span>${requests.length ? 'Измените поисковый запрос.' : 'Новые запросы появятся здесь автоматически.'}</span></div>`
+      }
     </div>`;
 };
 
@@ -1354,18 +1383,29 @@ const adminEventRowHtml = (event) => `
 const adminEventsHtml = () => {
   const all = ui.admin.data?.events ?? [];
   const filter = ui.admin.eventFilter;
-  const events = all.filter(
-    (event) => filter === 'all' || (filter === 'admin' ? eventIsAdmin(event.kind) : !eventIsAdmin(event.kind)),
-  );
+  const query = ui.admin.eventQuery.trim().toLocaleLowerCase('ru');
+  const events = all.filter((event) => {
+    const kindMatches = filter === 'all' || (filter === 'admin' ? eventIsAdmin(event.kind) : !eventIsAdmin(event.kind));
+    const text = `${eventLabel(event.kind)} ${event.kind} ${adminEventDetail(event)}`.toLocaleLowerCase('ru');
+    return kindMatches && (!query || text.includes(query));
+  });
   return `
-    <p class="hint">Короткая память хаба: регистрации, входы, дружба и действия панели. Записей: ${all.length}, свежие сверху.</p>
+    <div class="admin-page-intro">
+      <p class="hint">Журнал хранит последние события хаба и панели. В снимке показаны свежие записи сверху.</p>
+      <span class="admin-result-count">${events.length} из ${all.length}</span>
+    </div>
     <div class="admin-chips" role="group" aria-label="Фильтр журнала">
       ${adminChipHtml('admin-event-filter', 'all', 'Всё', filter === 'all')}
       ${adminChipHtml('admin-event-filter', 'players', 'Игроки', filter === 'players')}
       ${adminChipHtml('admin-event-filter', 'admin', 'Панель', filter === 'admin')}
     </div>
+    <label class="field admin-search-field">
+      <span class="field__label">Поиск по событию, имени или тексту</span>
+      <input class="input" type="search" placeholder="Например, регистрация или ник игрока…" autocomplete="off" spellcheck="false"
+             value="${escapeHtml(ui.admin.eventQuery)}" data-role="admin-event-search" />
+    </label>
     <div class="admin-list">
-      ${events.length ? events.map(adminEventRowHtml).join('') : '<p class="hint">Здесь пока пусто.</p>'}
+      ${events.length ? events.map(adminEventRowHtml).join('') : `<div class="admin-empty"><strong>${all.length ? 'События не найдены' : 'Журнал пуст'}</strong><span>${all.length ? 'Измените фильтр или поисковый запрос.' : 'События появятся здесь после первых действий.'}</span></div>`}
     </div>
     ${
       all.length
@@ -1376,67 +1416,280 @@ const adminEventsHtml = () => {
     }`;
 };
 
+const ADMIN_RANGES = [
+  ['7', '7 дней'],
+  ['14', '14 дней'],
+  ['30', '30 дней'],
+];
+
+const adminDateKey = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const adminTimeline = (records, range, mode = 'users') => {
+  const count = Number(range) || 14;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayLabel = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+  const fullLabel = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+  const days = Array.from({ length: count }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (count - index - 1));
+    return {
+      date,
+      key: adminDateKey(date),
+      label: dayLabel.format(date),
+      fullLabel: fullLabel.format(date),
+      registrations: 0,
+      logins: 0,
+      other: 0,
+      total: 0,
+    };
+  });
+  const byDate = new Map(days.map((day) => [day.key, day]));
+  for (const record of records ?? []) {
+    const timestamp = Number(mode === 'users' ? record.createdAt : record.at);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) continue;
+    const date = new Date(timestamp);
+    const bucket = byDate.get(adminDateKey(date));
+    if (!bucket) continue;
+    if (mode === 'users') {
+      bucket.total += 1;
+      continue;
+    }
+    if (record.kind === 'register') bucket.registrations += 1;
+    else if (record.kind === 'login') bucket.logins += 1;
+    else bucket.other += 1;
+    bucket.total += 1;
+  }
+  return days;
+};
+
+const adminLineChartHtml = (series) => {
+  const width = 720;
+  const height = 232;
+  const left = 42;
+  const right = 12;
+  const top = 16;
+  const bottom = 36;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const maxValue = Math.max(0, ...series.map((point) => point.total));
+  const scaleMax = Math.max(1, maxValue);
+  const x = (index) => left + (series.length <= 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
+  const y = (value) => top + plotHeight - (value / scaleMax) * plotHeight;
+  const points = series.map((point, index) => ({ ...point, x: x(index), y: y(point.total) }));
+  const linePath = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+  const areaPath = points.length
+    ? `${linePath} L ${points.at(-1).x.toFixed(1)} ${(top + plotHeight).toFixed(1)} L ${points[0].x.toFixed(1)} ${(top + plotHeight).toFixed(1)} Z`
+    : '';
+  const ticks = [...new Set([scaleMax, Math.ceil(scaleMax / 2), 0])];
+  const guides = ticks.map((tick) => `
+    <g class="admin-chart__axis">
+      <line x1="${left}" x2="${width - right}" y1="${y(tick).toFixed(1)}" y2="${y(tick).toFixed(1)}" />
+      <text x="${left - 10}" y="${(y(tick) + 3).toFixed(1)}" text-anchor="end">${tick}</text>
+    </g>`).join('');
+  const labelIndices = [...new Set([0, Math.floor((series.length - 1) / 2), series.length - 1])];
+  const dateLabels = labelIndices.map((index) => {
+    const point = points[index];
+    return `<text class="admin-chart__date" x="${point.x.toFixed(1)}" y="${height - 8}" text-anchor="${index === 0 ? 'start' : index === series.length - 1 ? 'end' : 'middle'}">${escapeHtml(point.label)}</text>`;
+  }).join('');
+  const markers = points.map((point) => `
+    <circle class="admin-chart__marker" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3.5">
+      <title>${escapeHtml(point.fullLabel)}: ${point.total} новых аккаунтов</title>
+    </circle>`).join('');
+  const total = series.reduce((sum, point) => sum + point.total, 0);
+  return `
+    <svg class="admin-chart__svg" viewBox="0 0 ${width} ${height}" role="img"
+         aria-labelledby="admin-growth-title admin-growth-desc" focusable="false">
+      <title id="admin-growth-title">Новые аккаунты по дням — ${total} за выбранный период</title>
+      <desc id="admin-growth-desc">Линейный график ежедневных регистраций за последние ${series.length} календарных дней.</desc>
+      <defs>
+        <linearGradient id="admin-growth-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="var(--accent)" stop-opacity=".25" />
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      ${guides}
+      <path class="admin-chart__area" d="${areaPath}" fill="url(#admin-growth-fill)" />
+      <path class="admin-chart__line" d="${linePath}" />
+      ${markers}
+      ${dateLabels}
+    </svg>`;
+};
+
+const adminEventsChartHtml = (series) => {
+  const width = 720;
+  const height = 232;
+  const left = 42;
+  const right = 12;
+  const top = 16;
+  const bottom = 36;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const maxValue = Math.max(0, ...series.map((point) => point.total));
+  const scaleMax = Math.max(1, maxValue);
+  const y = (value) => top + plotHeight - (value / scaleMax) * plotHeight;
+  const step = plotWidth / Math.max(series.length, 1);
+  const barWidth = Math.max(4, Math.min(15, step * 0.54));
+  const ticks = [...new Set([scaleMax, Math.ceil(scaleMax / 2), 0])];
+  const guides = ticks.map((tick) => `
+    <g class="admin-chart__axis">
+      <line x1="${left}" x2="${width - right}" y1="${y(tick).toFixed(1)}" y2="${y(tick).toFixed(1)}" />
+      <text x="${left - 10}" y="${(y(tick) + 3).toFixed(1)}" text-anchor="end">${tick}</text>
+    </g>`).join('');
+  const bars = series.map((point, index) => {
+    const barX = left + step * index + (step - barWidth) / 2;
+    let cursor = top + plotHeight;
+    const segments = [
+      { value: point.other, className: 'admin-chart__bar--other' },
+      { value: point.logins, className: 'admin-chart__bar--login' },
+      { value: point.registrations, className: 'admin-chart__bar--register' },
+    ].map((segment) => {
+      if (!segment.value) return '';
+      const barHeight = Math.max(1, (segment.value / scaleMax) * plotHeight);
+      cursor -= barHeight;
+      return `<rect class="admin-chart__bar ${segment.className}" x="${barX.toFixed(1)}" y="${cursor.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" />`;
+    }).join('');
+    return `<g><title>${escapeHtml(point.fullLabel)}: ${point.registrations} регистраций, ${point.logins} входов, ${point.other} прочих событий</title>${segments}</g>`;
+  }).join('');
+  const labelIndices = [...new Set([0, Math.floor((series.length - 1) / 2), series.length - 1])];
+  const dateLabels = labelIndices.map((index) => {
+    const point = series[index];
+    const labelX = left + step * index + step / 2;
+    return `<text class="admin-chart__date" x="${labelX.toFixed(1)}" y="${height - 8}" text-anchor="${index === 0 ? 'start' : index === series.length - 1 ? 'end' : 'middle'}">${escapeHtml(point.label)}</text>`;
+  }).join('');
+  const total = series.reduce((sum, point) => sum + point.total, 0);
+  return `
+    <svg class="admin-chart__svg" viewBox="0 0 ${width} ${height}" role="img"
+         aria-labelledby="admin-events-title admin-events-desc" focusable="false">
+      <title id="admin-events-title">События журнала — ${total} за выбранный период</title>
+      <desc id="admin-events-desc">Столбцы разделены на регистрации, входы и прочие события за последние ${series.length} календарных дней.</desc>
+      ${guides}
+      ${bars}
+      ${dateLabels}
+    </svg>`;
+};
+
+const adminStatusMixHtml = (users) => {
+  const banned = users.filter((user) => !!user.ban).length;
+  const online = users.filter((user) => !user.ban && user.presence !== 'offline').length;
+  const offline = Math.max(0, users.length - banned - online);
+  const total = users.length;
+  const percent = (value) => total ? (value / total) * 100 : 0;
+  return `
+    <div class="admin-mixbar" role="img" aria-label="Состояние аккаунтов: ${online} в сети, ${offline} офлайн, ${banned} заблокировано">
+      <span class="admin-mixbar__online" style="width:${percent(online).toFixed(2)}%"></span>
+      <span class="admin-mixbar__offline" style="width:${percent(offline).toFixed(2)}%"></span>
+      <span class="admin-mixbar__banned" style="width:${percent(banned).toFixed(2)}%"></span>
+    </div>
+    <div class="admin-mixlegend">
+      <span><i class="admin-mixlegend__dot admin-mixlegend__dot--online"></i>В сети <strong>${online}</strong></span>
+      <span><i class="admin-mixlegend__dot admin-mixlegend__dot--offline"></i>Офлайн <strong>${offline}</strong></span>
+      <span><i class="admin-mixlegend__dot admin-mixlegend__dot--banned"></i>Блокировки <strong>${banned}</strong></span>
+    </div>`;
+};
+
 const adminOverviewHtml = () => {
   const data = ui.admin.data;
   const stats = data?.stats ?? {};
-  const events = (data?.events ?? []).slice(0, 6);
-  const tile = (key, value, tone = '') => `
-    <div class="admin-tile${tone ? ` admin-tile--${tone}` : ''}">
-      <span class="admin-tile__value" translate="no">${escapeHtml(String(value))}</span>
-      <span class="admin-tile__key">${key}</span>
-    </div>`;
+  const users = data?.users ?? [];
+  const events = data?.events ?? [];
+  const range = ADMIN_RANGES.some(([value]) => value === ui.admin.range) ? ui.admin.range : '14';
+  const registrations = adminTimeline(users, range, 'users');
+  const eventTimeline = adminTimeline(events, range, 'events');
+  const registrationTotal = registrations.reduce((sum, day) => sum + day.total, 0);
+  const loggedEvents = eventTimeline.reduce((sum, day) => sum + day.total, 0);
   const banned = stats.banned ?? 0;
+  const registrationOpen = data?.settings?.registrationOpen !== false;
+  const tile = (key, value, note, tab, filter = 'all', sort = 'name', tone = '') => `
+    <button class="admin-tile${tone ? ` admin-tile--${tone}` : ''}" type="button"
+            data-action="admin-go" data-tab="${tab}" data-filter="${filter}" data-sort="${sort}"
+            aria-label="${escapeHtml(`${key}: ${value}. Перейти в раздел ${tab === 'requests' ? 'заявок' : 'игроков'}`)}">
+      <span class="admin-tile__value" translate="no">${escapeHtml(String(value))}</span>
+      <span class="admin-tile__key">${escapeHtml(key)}</span>
+      <span class="admin-tile__note">${escapeHtml(note)}</span>
+      <span class="admin-tile__arrow" aria-hidden="true">↗</span>
+    </button>`;
+  const recent = events.slice(0, 5);
   return `
     ${adminKeyWarningHtml()}
-    <div class="admin-tiles">
-      ${tile('аккаунтов', stats.users ?? 0)}
-      ${tile('в сети', stats.online ?? 0)}
-      ${tile('новых за сутки', stats.today ?? 0)}
-      ${tile('были за сутки', stats.activeDay ?? 0)}
-      ${tile('заблокировано', banned, banned ? 'danger' : '')}
-      ${tile('заявок', stats.requests ?? 0)}
-    </div>
+    <section class="admin-metrics" aria-label="Ключевые показатели">
+      <div class="admin-section-heading">
+        <div><p class="eyebrow">Сводка</p><h4>Состояние сообщества</h4></div>
+        <span class="admin-section-heading__caption">Нажмите на карточку, чтобы открыть список</span>
+      </div>
+      <div class="admin-tiles">
+        ${tile('Аккаунты', stats.users ?? 0, 'всего в базе', 'players')}
+        ${tile('В сети', stats.online ?? 0, 'активны прямо сейчас', 'players', 'online', 'seen')}
+        ${tile('Новые за 24 часа', stats.today ?? 0, 'регистрации', 'players', 'today', 'created')}
+        ${tile('Активны за 24 часа', stats.activeDay ?? 0, 'заходили на платформу', 'players', 'active', 'seen')}
+        ${tile('Заявки', stats.requests ?? 0, 'ожидают внимания', 'requests')}
+        ${tile('Заблокировано', banned, 'аккаунтов', 'players', 'banned', 'name', banned ? 'danger' : '')}
+      </div>
+    </section>
 
-    <div class="dialog__actions dialog__actions--spread">
-      <button class="mini-button" type="button" data-action="admin-refresh">
-        ${icon('refresh', 'icon--xs')} Обновить
-      </button>
-      <button class="mini-button" type="button" data-action="admin-export">
-        ${icon('download', 'icon--xs')} Скачать данные
-      </button>
-      <button class="mini-button" type="button" data-action="admin-lock">
-        ${icon('logOut', 'icon--xs')} Заблокировать панель
-      </button>
-    </div>
+    <section class="admin-analytics" aria-label="Аналитика">
+      <div class="admin-section-heading admin-section-heading--wrap">
+        <div><p class="eyebrow">Аналитика</p><h4>Динамика и активность</h4></div>
+        <div class="admin-chips admin-range" role="group" aria-label="Период графиков">
+          ${ADMIN_RANGES.map(([value, label]) => adminChipHtml('admin-range', value, label, range === value)).join('')}
+        </div>
+      </div>
+      <div class="admin-chart-grid">
+        <article class="admin-card admin-chart">
+          <div class="admin-chart__heading">
+            <div><h5>Регистрации</h5><p>Новые аккаунты по дням</p></div>
+            <strong class="admin-chart__total" translate="no">${registrationTotal}</strong>
+          </div>
+          ${adminLineChartHtml(registrations)}
+          <p class="admin-chart__foot">За ${range} календарных дней · данные рассчитаны по времени создания аккаунтов</p>
+        </article>
+        <article class="admin-card admin-chart">
+          <div class="admin-chart__heading">
+            <div><h5>Активность</h5><p>События из сохранённого журнала</p></div>
+            <strong class="admin-chart__total" translate="no">${loggedEvents}</strong>
+          </div>
+          ${adminEventsChartHtml(eventTimeline)}
+          <div class="admin-chart__legend" role="group" aria-label="Обозначения графика">
+            <span><i class="admin-chart__legend-dot admin-chart__legend-dot--register"></i>Регистрации</span>
+            <span><i class="admin-chart__legend-dot admin-chart__legend-dot--login"></i>Входы</span>
+            <span><i class="admin-chart__legend-dot admin-chart__legend-dot--other"></i>Другие</span>
+          </div>
+          <p class="admin-chart__foot">Журнал хранит до 300 событий; на графике — доступные записи снимка.</p>
+        </article>
+      </div>
+    </section>
 
-    <div class="divider" role="separator"></div>
+    <div class="admin-overview-grid">
+      <section class="admin-card admin-operations">
+        <div class="admin-card__heading"><div><p class="eyebrow">Управление</p><h4>Регистрация</h4></div>${icon('settings', 'admin-card__icon')}</div>
+        <div class="admin-status-line">
+          <span class="dot ${registrationOpen ? '' : 'dot--warn'}" aria-hidden="true"></span>
+          <span>Новые аккаунты</span>
+          <strong class="${registrationOpen ? 'admin-status-open' : 'admin-status-closed'}">${registrationOpen ? 'Открыты' : 'Закрыты'}</strong>
+        </div>
+        <p class="hint">${registrationOpen ? 'Игроки могут создавать аккаунты.' : 'Новые игроки не смогут зарегистрироваться, пока доступ закрыт.'}</p>
+        <div class="admin-card__actions">
+          <button class="mini-button ${registrationOpen ? 'mini-button--danger' : 'mini-button--accent'}" type="button" data-action="admin-registration" data-open="${registrationOpen ? '0' : '1'}">
+            ${registrationOpen ? 'Закрыть регистрацию' : 'Открыть регистрацию'}
+          </button>
+          <button class="mini-button" type="button" data-action="admin-tab" data-tab="system">Ключ и диагностика</button>
+        </div>
+      </section>
 
-    <p class="eyebrow">Последние события</p>
-    ${
-      events.length
-        ? `<div class="admin-list admin-list--flat">${events.map(adminEventRowHtml).join('')}</div>`
-        : '<p class="hint">Пока ничего не происходило.</p>'
-    }
-    ${
-      (data?.events ?? []).length > events.length
-        ? `<button class="mini-button" type="button" data-action="admin-tab" data-tab="events">
-             ${icon('message', 'icon--xs')} Весь журнал
-           </button>`
-        : ''
-    }
+      <section class="admin-card admin-account-mix">
+        <div class="admin-card__heading"><div><p class="eyebrow">Присутствие</p><h4>Статус аккаунтов</h4></div>${icon('users', 'admin-card__icon')}</div>
+        ${adminStatusMixHtml(users)}
+        <button class="admin-link admin-card__link" type="button" data-action="admin-tab" data-tab="players">Открыть список игроков ${icon('chevron', 'icon--xs')}</button>
+      </section>
 
-    <div class="divider" role="separator"></div>
-
-    <p class="eyebrow">Настройки</p>
-    ${statRow('Регистрация новых аккаунтов', ui.admin.data?.settings?.registrationOpen === false ? 'закрыта' : 'открыта')}
-    <div class="dialog__actions">
-      <button class="mini-button" type="button" data-action="admin-registration"
-              data-open="${ui.admin.data?.settings?.registrationOpen === false ? '1' : '0'}">
-        ${ui.admin.data?.settings?.registrationOpen === false ? 'Открыть регистрацию' : 'Закрыть регистрацию'}
-      </button>
-      <button class="mini-button" type="button" data-action="admin-tab" data-tab="system">
-        Ключ и диагностика
-      </button>
+      <section class="admin-card admin-recent">
+        <div class="admin-card__heading"><div><p class="eyebrow">Лента событий</p><h4>Последние действия</h4></div><span class="admin-result-count">${events.length}</span></div>
+        ${recent.length
+          ? `<div class="admin-list admin-list--flat">${recent.map(adminEventRowHtml).join('')}</div>`
+          : '<div class="admin-empty"><strong>Пока тихо</strong><span>Новые регистрации и действия появятся здесь.</span></div>'}
+        <button class="admin-link admin-card__link" type="button" data-action="admin-tab" data-tab="events">Открыть журнал ${icon('chevron', 'icon--xs')}</button>
+      </section>
     </div>`;
 };
 
@@ -1467,18 +1720,6 @@ const adminSystemHtml = () => {
       ${statRow('Обновление', updateDiagnostics())}
       ${statRow('Прямая связь', p2p.supported() ? 'WebRTC доступен' : 'WebRTC недоступен')}
       ${statRow('Версия', VERSION)}
-    </div>
-
-    <div class="dialog__actions dialog__actions--spread">
-      <button class="mini-button" type="button" data-action="admin-refresh">
-        ${icon('refresh', 'icon--xs')} Обновить
-      </button>
-      <button class="mini-button" type="button" data-action="admin-export">
-        ${icon('download', 'icon--xs')} Скачать данные
-      </button>
-      <button class="mini-button" type="button" data-action="admin-lock">
-        ${icon('logOut', 'icon--xs')} Заблокировать панель
-      </button>
     </div>
 
     <div class="divider" role="separator"></div>
@@ -1525,38 +1766,101 @@ const adminSystemHtml = () => {
     </div>`;
 };
 
+const adminUpdatedText = () => {
+  if (!ui.admin.lastUpdatedAt) return 'Данные ещё не обновлялись';
+  const date = new Date(ui.admin.lastUpdatedAt);
+  const time = TIME_FORMAT.format(date);
+  return date.toDateString() === new Date().toDateString()
+    ? `Обновлено в ${time}`
+    : `Обновлено ${formatDate(ui.admin.lastUpdatedAt)} · ${time}`;
+};
+
 const adminModalHtml = () => {
   const data = ui.admin.data;
   if (!data) return dialogShell({ label: 'Панель админа', title: 'Панель админа', size: 'wide', body: adminLoginHtml() });
   const user = ui.admin.openId ? data.users.find((item) => item.id === ui.admin.openId) : null;
-  const body = user
+  const section = user
     ? adminCardHtml(user)
-    : `
-      <div class="tabs tabs--panel" role="tablist" aria-label="Разделы панели">
-        ${adminTabHtml('overview', 'Обзор')}
-        ${adminTabHtml('players', `Игроки · ${data.users.length}`)}
-        ${adminTabHtml('requests', `Заявки · ${data.requests.length}`)}
-        ${adminTabHtml('events', `Журнал · ${data.events?.length ?? 0}`)}
-        ${adminTabHtml('system', 'Система')}
-      </div>
-      ${
-        ui.admin.tab === 'players'
-          ? adminPlayersHtml()
-          : ui.admin.tab === 'requests'
-            ? adminRequestsHtml()
-            : ui.admin.tab === 'events'
-              ? adminEventsHtml()
-              : ui.admin.tab === 'system'
-                ? adminSystemHtml()
-                : adminOverviewHtml()
-      }`;
+    : ui.admin.tab === 'players'
+      ? adminPlayersHtml()
+      : ui.admin.tab === 'requests'
+        ? adminRequestsHtml()
+        : ui.admin.tab === 'events'
+          ? adminEventsHtml()
+          : ui.admin.tab === 'system'
+            ? adminSystemHtml()
+            : adminOverviewHtml();
+  const host = data.mode === 'hub'
+    ? data.host || (typeof location !== 'undefined' ? location.origin : 'Общий хаб')
+    : 'Данные только этого браузера';
+  const sectionTitle = user
+    ? user.name
+    : ({ overview: 'Обзор', players: 'Игроки', requests: 'Заявки', events: 'Журнал событий', system: 'Система' }[ui.admin.tab] ?? 'Обзор');
+  const sectionDescription = user
+    ? 'Аккаунт игрока · действия администратора'
+    : ui.admin.tab === 'overview'
+      ? 'Общая картина, аналитика и быстрые действия'
+      : ui.admin.tab === 'players'
+        ? 'Поиск и управление аккаунтами'
+        : ui.admin.tab === 'requests'
+          ? 'Очередь заявок в друзья'
+          : ui.admin.tab === 'events'
+            ? 'История активности и действий панели'
+            : 'Безопасность, настройки и диагностика';
+  const modeLabel = data.mode === 'hub' ? 'ОБЩИЙ ХАБ' : 'ЛОКАЛЬНЫЙ РЕЖИМ';
   return dialogShell({
     label: 'Панель админа',
     title: user ? 'Карточка игрока' : 'Панель админа',
-    size: 'wide',
-    body: `<div class="dialog__body">${
-      ui.admin.busy ? '<p class="hint">Обновляем данные…</p>' : ''
-    }${body}</div>`,
+    size: 'admin',
+    body: `
+      <div class="dialog__body admin-layout">
+        <aside class="admin-rail" aria-label="Навигация администратора">
+          <div class="admin-rail__brand">
+            <span class="admin-rail__symbol">${icon('shield')}</span>
+            <span><strong>MIR CONTROL</strong><small>ПАНЕЛЬ УПРАВЛЕНИЯ</small></span>
+          </div>
+          <div class="admin-rail__mode"><span class="dot" aria-hidden="true"></span><span>${modeLabel}</span></div>
+          <p class="eyebrow">РАБОЧАЯ ОБЛАСТЬ</p>
+          <nav class="admin-nav" role="tablist" aria-orientation="vertical" aria-label="Разделы панели">
+            ${adminTabHtml('overview', 'Обзор', 'sigil')}
+            ${adminTabHtml('players', 'Игроки', 'users', data.users.length)}
+            ${adminTabHtml('requests', 'Заявки', 'userPlus', data.requests.length)}
+            ${adminTabHtml('events', 'Журнал', 'message', data.events?.length ?? 0)}
+            ${adminTabHtml('system', 'Система', 'settings')}
+          </nav>
+          <div class="admin-rail__footer">
+            <span class="admin-rail__version">MIR · v${escapeHtml(VERSION)}</span>
+            <span class="admin-rail__host" title="${escapeHtml(host)}">${escapeHtml(host)}</span>
+          </div>
+        </aside>
+
+        <main class="admin-content" id="admin-panel" role="tabpanel" aria-labelledby="admin-tab-${ui.admin.tab}" tabindex="0">
+          <header class="admin-toolbar">
+            <div class="admin-toolbar__heading">
+              <div class="admin-toolbar__context">
+                <span class="admin-mode"><i class="dot" aria-hidden="true"></i>${modeLabel}</span>
+                <span class="admin-refresh-state" aria-live="polite" aria-atomic="true">${ui.admin.busy ? 'Синхронизация…' : escapeHtml(adminUpdatedText())}</span>
+              </div>
+              <h3>${escapeHtml(sectionTitle)}</h3>
+              <p>${escapeHtml(sectionDescription)}</p>
+            </div>
+            <div class="admin-toolbar__actions" role="group" aria-label="Действия панели">
+              <button class="mini-button" type="button" data-action="admin-refresh" ${ui.admin.busy ? 'disabled' : ''}>
+                ${icon('refresh', 'icon--xs')}<span>Обновить</span>
+              </button>
+              <button class="mini-button" type="button" data-action="admin-export">
+                ${icon('download', 'icon--xs')}<span>Экспорт JSON</span>
+              </button>
+              <button class="mini-button mini-button--danger" type="button" data-action="admin-lock">
+                ${icon('logOut', 'icon--xs')}<span>Заблокировать</span>
+              </button>
+            </div>
+          </header>
+          ${ui.admin.error ? `<p class="admin-alert" role="alert">${icon('shield', 'icon--xs')}${escapeHtml(ui.admin.error)}${data ? ' · показан последний успешный снимок.' : ''}</p>` : ''}
+          ${ui.admin.busy && data ? '<p class="admin-progress" role="status">Получаем актуальный снимок данных…</p>' : ''}
+          <div class="admin-content__body">${section}</div>
+        </main>
+      </div>`,
   });
 };
 
@@ -1666,7 +1970,9 @@ const renderModal = ({ focus = true } = {}) => {
   const activeRole = activeIsInside ? active.dataset?.role : '';
   const activeSetting = activeIsInside ? active.dataset?.setting : '';
   const activeAction = activeIsInside ? active.dataset?.action : '';
-  const activeId = activeIsInside ? active.dataset?.id : '';
+  const activeId = activeIsInside ? active.dataset?.id : undefined;
+  const activeTab = activeIsInside ? active.dataset?.tab : undefined;
+  const activeValue = activeIsInside ? active.dataset?.value : undefined;
   const selection = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
     ? { start: active.selectionStart, end: active.selectionEnd }
     : null;
@@ -1706,7 +2012,11 @@ const renderModal = ({ focus = true } = {}) => {
         ? root.querySelector(`[data-setting="${activeSetting}"]`)
         : activeAction
           ? [...root.querySelectorAll('[data-action]')].find(
-              (item) => item.dataset.action === activeAction && item.dataset.id === activeId,
+              (item) =>
+                item.dataset.action === activeAction &&
+                item.dataset.id === activeId &&
+                item.dataset.tab === activeTab &&
+                item.dataset.value === activeValue,
             )
           : null;
     if (target && !target.disabled) {
@@ -2222,16 +2532,18 @@ const withBusy = async (form, fn) => {
 /* ---------- панель админа: загрузка и действия --------------- */
 
 const refreshAdmin = async () => {
+  if (ui.admin.busy) return;
   ui.admin.busy = true;
-  renderModal({ focus: false });
+  if (ui.modal?.type === 'admin') renderModal({ focus: false });
   try {
     ui.admin.data = await store.adminSnapshot();
+    ui.admin.lastUpdatedAt = Date.now();
     ui.admin.error = '';
   } catch (error) {
     ui.admin.error = error instanceof Error ? error.message : 'Хаб не ответил.';
   } finally {
     ui.admin.busy = false;
-    renderModal({ focus: false });
+    if (ui.modal?.type === 'admin') renderModal({ focus: false });
   }
 };
 
@@ -2485,6 +2797,14 @@ document.addEventListener('input', (event) => {
     ui.admin.query = event.target.value;
     renderModal({ focus: false });
   }
+  if (role === 'admin-request-search') {
+    ui.admin.requestQuery = event.target.value;
+    renderModal({ focus: false });
+  }
+  if (role === 'admin-event-search') {
+    ui.admin.eventQuery = event.target.value;
+    renderModal({ focus: false });
+  }
   if (role === 'admin-name') ui.admin.nameDraft = event.target.value;
   if (role === 'admin-ban-reason') ui.admin.banReason = event.target.value;
   if (role === 'admin-ban-hours') ui.admin.banHours = event.target.value;
@@ -2734,6 +3054,20 @@ const actions = {
   'admin-tab': (el) => {
     ui.admin.tab = el.dataset.tab;
     ui.admin.openId = null;
+    renderModal({ focus: false });
+  },
+
+  'admin-go': (el) => {
+    const tab = el.dataset.tab;
+    if (!['overview', 'players', 'requests', 'events', 'system'].includes(tab)) return;
+    ui.admin.tab = tab;
+    ui.admin.openId = null;
+    if (tab === 'players') {
+      ui.admin.filter = ['online', 'active', 'today', 'offline', 'banned'].includes(el.dataset.filter) ? el.dataset.filter : 'all';
+      ui.admin.sort = ['name', 'seen', 'created'].includes(el.dataset.sort) ? el.dataset.sort : 'name';
+      ui.admin.query = '';
+      ui.admin.limit = 60;
+    }
     renderModal();
   },
 
@@ -2768,6 +3102,12 @@ const actions = {
     renderModal({ focus: false });
   },
 
+  'admin-range': (el) => {
+    if (!['7', '14', '30'].includes(el.dataset.value)) return;
+    ui.admin.range = el.dataset.value;
+    renderModal({ focus: false });
+  },
+
   'admin-more': () => {
     ui.admin.limit += 60;
     renderModal({ focus: false });
@@ -2784,7 +3124,7 @@ const actions = {
   'admin-lock': () => {
     store.adminLogout();
     ui.admin = adminState();
-    renderModal({ focus: false });
+    renderModal();
     toast('Панель заблокирована — ключ спросят заново.');
   },
 
@@ -3102,6 +3442,16 @@ setInterval(() => store.heartbeat(), 30_000);
 /* Раз в полминуты обновляем присутствие, но сравниваем разметку: если данные
    не изменились, ни панели, ни открытые формы не пересоздаются. */
 setInterval(renderAfterStoreChange, 30_000);
+/* Открытая админ-панель сама обновляет серверный снимок, но только пока
+   вкладка видима и ключ ещё активен: мониторинг не расходует запросы в фоне. */
+setInterval(() => {
+  if (
+    document.visibilityState === 'visible' &&
+    ui.modal?.type === 'admin' &&
+    store.adminKey() &&
+    !ui.admin.busy
+  ) refreshAdmin();
+}, 30_000);
 /* В hub-режиме опрашиваем общий сервер: друзья и заявки с других
    устройств появляются сами. Чаще, когда вкладка видима. */
 setInterval(() => {
