@@ -150,8 +150,8 @@ const fmgStyleResponse = await fetch(`${HUB}/fmg/styles/night.json`);
 const fmgWorkerResponse = await fetch(`${HUB}/fmg/sw.js`);
 const mirWorkerResponse = await fetch(`${HUB}/sw.js`);
 const mirWorker = mirWorkerResponse.ok ? await mirWorkerResponse.text() : '';
-ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>MIR — [^<]*(?:Azgaar|Azgaar|карт)[^<]*<\/title>/i.test(fmgHtml));
-ok('веб-редактор получает MIR-тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
+ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>The civilization of the sages — редактор карт<\/title>/i.test(fmgHtml));
+ok('веб-редактор получает фирменную тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
 ok(
   'Azgaar переведён на единый Lucide SVG-пак, включая кнопки боевых меню',
   fmgTheme.includes('Lucide 1.53.0') && fmgTheme.includes('.icon-button-melee::before')
@@ -160,7 +160,7 @@ ok(
     && fmgLicenseResponse.ok && /ISC License/.test(await fmgLicenseResponse.text()),
   `классов Font Awesome: ${legacyIconClasses.size}, не переведены: ${unmappedFmgIcons.join(', ') || 'нет'}`,
 );
-ok('FMG не регистрирует вложенный worker, общий worker MIR обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
+ok('FMG не регистрирует вложенный worker, корневой worker обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
 
 /* Веб-бандл открываем отдельно от mir.html: проверяем, что полноэкранный
    iframe действительно остаётся тем же документом при возврате в атлас. */
@@ -466,7 +466,7 @@ await wait(100);
 /* Скрытая панель админа: вход по знаку игры и заводскому ключу.
    Проверяем в локальном режиме — там панель работает без хаба. */
 const brandMark = $('[data-action="admin-tap"]');
-ok('знак игры — доступная с клавиатуры потайная кнопка', !!brandMark && brandMark.getAttribute('aria-label') === 'Знак игры');
+ok('знак игры — доступная с клавиатуры потайная кнопка', !!brandMark && brandMark.getAttribute('aria-label') === 'Печать The civilization of the sages');
 for (let i = 0; i < 6; i += 1) click('[data-action="admin-tap"]');
 await wait(40);
 ok('неполная комбинация не показывает вход', !$('form[data-form="admin-login"]'));

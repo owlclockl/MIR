@@ -1,6 +1,6 @@
-// Генерирует иконки приложения (PWA) без единой зависимости:
-// рисует фирменный знак (кольцо, точка, риски) попиксельно с 4×
-// суперсэмплингом и кодирует PNG через встроенный node:zlib.
+// Генерирует фирменные иконки The civilization of the sages без зависимостей:
+// рисует печать (кольцо, точка, стороны света) с 4× суперсэмплингом,
+// кодирует PNG и собирает multi-size ICO через встроенный node:zlib.
 //
 // Запуск: npm run icons
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -62,7 +62,7 @@ const paint = (rgba, size, x, y, cover, color) => {
 };
 
 /**
- * Знак «мудрецов»: кольцо, точка в центре, четыре риски по осям.
+ * Печать The civilization of the sages: кольцо, точка и четыре стороны света.
  * scale = доля размера, которую занимает рисунок (для maskable меньше).
  */
 const renderSigil = (size, { scale, bg, fg }) => {
@@ -124,21 +124,52 @@ const renderSigil = (size, { scale, bg, fg }) => {
 
 mkdirSync(fromRoot('public', 'icons'), { recursive: true });
 
+const BRAND_BG = '#080d0e';
+const BRAND_MARK = '#c2d9c9';
+const renderBrandIcon = (size, scale = 1) => encodePng(
+  size,
+  renderSigil(size, { scale, bg: BRAND_BG, fg: BRAND_MARK }),
+);
 const targets = [
-  ['icon-192.png', 192, {}],
-  ['icon-512.png', 512, {}],
+  ['icon-16.png', 16, 1],
+  ['icon-32.png', 32, 1],
+  ['icon-48.png', 48, 1],
+  ['icon-192.png', 192, 1],
+  ['icon-512.png', 512, 1],
   // maskable: рисунок в безопасной зоне (80%), фон до краёв
-  ['icon-maskable-512.png', 512, { scale: 0.8 }],
-  ['apple-touch-icon.png', 180, {}],
+  ['icon-maskable-512.png', 512, 0.8],
+  ['apple-touch-icon.png', 180, 1],
 ];
 
-for (const [name, size, opts] of targets) {
-  const rgba = renderSigil(size, {
-    scale: opts.scale ?? 1,
-    bg: '#0b0b0d',
-    fg: '#ededf0',
-  });
-  writeFileSync(fromRoot('public', 'icons', name), encodePng(size, rgba));
+for (const [name, size, scale] of targets) {
+  writeFileSync(fromRoot('public', 'icons', name), renderBrandIcon(size, scale));
   console.log(`icons/${name} — ${size}×${size}`);
 }
-console.log('Готово. Иконки лежат в public/icons/.');
+
+/* Windows использует ICO как отдельный формат. PNG-кадры дают чёткие
+   размеры без второго рисунка знака или растянутой 512px-копии. */
+const icoSizes = [16, 32, 48, 64, 128, 256];
+const icoImages = icoSizes.map((size) => ({ size, data: renderBrandIcon(size) }));
+const icoHeader = Buffer.alloc(6 + icoImages.length * 16);
+icoHeader.writeUInt16LE(0, 0);
+icoHeader.writeUInt16LE(1, 2);
+icoHeader.writeUInt16LE(icoImages.length, 4);
+let icoOffset = icoHeader.length;
+for (const [index, image] of icoImages.entries()) {
+  const at = 6 + index * 16;
+  icoHeader.writeUInt8(image.size === 256 ? 0 : image.size, at);
+  icoHeader.writeUInt8(image.size === 256 ? 0 : image.size, at + 1);
+  icoHeader.writeUInt8(0, at + 2);
+  icoHeader.writeUInt8(0, at + 3);
+  icoHeader.writeUInt16LE(1, at + 4);
+  icoHeader.writeUInt16LE(32, at + 6);
+  icoHeader.writeUInt32LE(image.data.length, at + 8);
+  icoHeader.writeUInt32LE(icoOffset, at + 12);
+  icoOffset += image.data.length;
+}
+writeFileSync(
+  fromRoot('public', 'icons', 'app.ico'),
+  Buffer.concat([icoHeader, ...icoImages.map((image) => image.data)]),
+);
+console.log(`icons/app.ico — ${icoImages.map(({ size }) => size).join(', ')} px`);
+console.log('Готово. Фирменные иконки лежат в public/icons/.');

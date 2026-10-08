@@ -28,7 +28,7 @@ const ROOT_FILES = ['dist', 'mir.html'];
    используют ту же лёгкую Canvas-отрисовку. Звуки web-версии по-прежнему
    отдельными файлами, не в JS. */
 export const BUDGETS = {
-  js: 232 * 1024,
+  js: 233 * 1024,
   css: 84 * 1024,
   fmgCss: 260 * 1024,
   single: 390 * 1024,
@@ -79,6 +79,32 @@ export function checkWeb() {
   const fmgHtml = existsSync(fmgHtmlPath) ? readFileSync(fmgHtmlPath, 'utf8') : '';
   const fmgFiles = files.filter((name) => name.startsWith('fmg/'));
   const fmgEntry = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
+  const manifestPath = join('dist', 'manifest.webmanifest');
+  let manifest = null;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    manifest = null;
+  }
+  const browserBrand =
+    html.includes('<title>The civilization of the sages — Главное меню</title>')
+    && html.includes('<meta name="application-name" content="The civilization of the sages"')
+    && html.includes('<meta property="og:title" content="The civilization of the sages"')
+    && html.includes('<meta name="apple-mobile-web-app-title" content="Sages"')
+    && ['16', '32', '48'].every((size) => html.includes(`sizes="${size}x${size}" href="/icons/icon-${size}.png"`));
+  add(browserBrand, 'браузерные заголовки и значки используют фирменное имя', 'полное имя, Sages для ОС, favicon 16/32/48');
+  add(
+    manifest?.name === 'The civilization of the sages'
+      && manifest?.short_name === 'Sages'
+      && manifest?.theme_color === '#080d0e',
+    'манифест PWA содержит полное имя и короткий системный ярлык',
+    `name: ${manifest?.name ?? '—'}, short_name: ${manifest?.short_name ?? '—'}`,
+  );
+  add(
+    fmgHtml.includes('<title>The civilization of the sages — редактор карт</title>')
+      && /<link rel="icon"[^>]*href="\/icons\/icon-48\.png"[^>]*sizes="48x48"/.test(fmgHtml),
+    'встроенная картографическая мастерская использует бренд и фирменный favicon',
+  );
   add(
     Boolean(fmgHtml) && fmgFiles.length > 100 && Boolean(fmgEntry) && existsSync(join('dist', fmgEntry)),
     'полный Azgaar FMG встроен в веб-сборку',
@@ -87,7 +113,7 @@ export function checkWeb() {
   add(
     Boolean(fmgHtml) && !/googletagmanager\.com|storage\.googleapis\.com/.test(fmgHtml) && !existsSync('dist/fmg/sw.js'),
     'FMG не запускает внешнюю аналитику или вложенный service worker',
-    'аналитика удалена, офлайн-кэш обслуживает MIR',
+    'аналитика удалена, офлайн-кэш обслуживает приложение',
   );
 
   const missing = localRefs(html).filter((ref) => !existsSync(join('dist', ref)));
@@ -144,7 +170,7 @@ export function checkWeb() {
   const mirCssBytes = files
     .filter((name) => name.startsWith('assets/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
-  add(mirCssBytes > 0 && mirCssBytes <= BUDGETS.css, `стили MIR в бюджете (${kb(BUDGETS.css)})`, kb(mirCssBytes));
+  add(mirCssBytes > 0 && mirCssBytes <= BUDGETS.css, `стили приложения в бюджете (${kb(BUDGETS.css)})`, kb(mirCssBytes));
   const fmgCssBytes = files
     .filter((name) => name.startsWith('fmg/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -182,7 +208,7 @@ export function checkWeb() {
     const missingFmgPrecache = fmgFiles.filter((name) => !precache.includes(`/${name}`));
     add(
       fmgFiles.length > 100 && precache.includes('/fmg/index.html') && missingFmgPrecache.length === 0,
-      'весь редактор Azgaar включён в офлайн-кэш MIR',
+      'весь редактор Azgaar включён в офлайн-кэш приложения',
       missingFmgPrecache.length ? `вне precache: ${missingFmgPrecache.slice(0, 6).join(', ')}` : `${fmgFiles.length} файлов`,
     );
     add(
@@ -284,6 +310,11 @@ export function checkSingle() {
   const html = readFileSync('mir.html', 'utf8');
   const bytes = Buffer.byteLength(html);
   add(true, 'mir.html собран', kb(bytes));
+  add(
+    html.includes('<title>The civilization of the sages — Главное меню</title>')
+      && html.includes('Мудрость создаёт миры.'),
+    'автономная версия сохраняет полное имя и фирменную фразу',
+  );
 
   const forbidden = [
     ['<script[^>]*type="module"', 'модульный скрипт'],

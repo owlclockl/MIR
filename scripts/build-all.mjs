@@ -24,21 +24,21 @@ const steps = [
   },
   {
     id: 'single',
-    title: 'один файл mir.html',
+    title: 'автономная версия The civilization of the sages',
     script: 'build-single.mjs',
     artifacts: ['mir.html'],
     hint: 'двойной клик, флешка, вложение в мессенджере и .apk',
   },
   {
     id: 'exe',
-    title: 'Windows — установщик .exe',
+    title: 'Windows — The civilization of the sages',
     script: 'build-exe.mjs',
     artifacts: ['MIR-Setup.exe'],
     hint: 'нужен csc.exe из .NET Framework (есть на Windows 10/11)',
   },
   {
     id: 'apk',
-    title: 'Android — приложение .apk',
+    title: 'Android — приложение Sages',
     script: 'build-apk.mjs',
     artifacts: ['MIR.apk'],
     hint: 'собирается без Android SDK: свой упаковщик подписи',
@@ -65,7 +65,7 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2));
 
 if (args.help) {
-  console.log(`Сборка всех форматов MIR.
+  console.log(`Сборка всех форматов The civilization of the sages.
 
   node scripts/build-all.mjs [--only=СПИСОК]
 
@@ -93,7 +93,7 @@ const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest(
 /* ---------- сборка ------------------------------------------------- */
 
 console.log('============================================================');
-console.log('  MIR — The civilization of the sages');
+console.log('  The civilization of the sages');
 console.log(`  Сборка: ${selected.map((step) => step.id).join(', ')}`);
 console.log('============================================================');
 
@@ -143,9 +143,9 @@ if (!failedSteps.length && !brokenChecks.length) {
   }
   console.log('');
   console.log('  Что отправить друзьям:');
-  console.log('    • Windows:  MIR-Setup.exe');
-  console.log('    • Android:  MIR.apk');
-  console.log('    • Браузер:  mir.html  (двойной клик) или папка dist/ (хостинг)');
+  console.log('    • Windows:  The civilization of the sages (MIR-Setup.exe)');
+  console.log('    • Android:  Sages (MIR.apk)');
+  console.log('    • Браузер:  The civilization of the sages (mir.html или dist/)');
 } else {
   console.log('  ИТОГ СБОРКИ — есть проблемы');
   for (const step of done) console.log(`    ${step.ok ? '✓' : '✗'}  ${step.title} — ${step.ok ? step.seconds + ' с' : 'не собралось'}`);

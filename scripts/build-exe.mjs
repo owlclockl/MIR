@@ -25,7 +25,7 @@ const CS_SOURCE = join('scripts', 'win', 'MirSetup.cs');
 const PACKAGE_VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version ?? '0.0.0';
 const ASSEMBLY_VERSION = `${PACKAGE_VERSION}.0`;
 
-console.log('--- Сборка MIR для Windows (.exe) ---');
+console.log('--- The civilization of the sages — сборка Windows-приложения (.exe) ---');
 
 /* ---------- 1. свежая сборка сайта -------------------------------- */
 
@@ -75,37 +75,11 @@ writeFileSync(sitePackPath, sitePack);
 
 /* ---------- 3. иконка приложения ----------------------------------- */
 
-function makeIco(entries) {
-  const header = Buffer.alloc(6 + entries.length * 16);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2); // тип 1 — иконка
-  header.writeUInt16LE(entries.length, 4);
-
-  let offset = header.length;
-  entries.forEach((entry, i) => {
-    const at = 6 + i * 16;
-    header.writeUInt8(entry.size >= 256 ? 0 : entry.size, at);
-    header.writeUInt8(entry.size >= 256 ? 0 : entry.size, at + 1);
-    header.writeUInt8(0, at + 2); // палитра
-    header.writeUInt8(0, at + 3);
-    header.writeUInt16LE(1, at + 4); // плоскости
-    header.writeUInt16LE(32, at + 6); // бит на пиксель
-    header.writeUInt32LE(entry.data.length, at + 8);
-    header.writeUInt32LE(offset, at + 12);
-    offset += entry.data.length;
-  });
-
-  return Buffer.concat([header, ...entries.map((e) => e.data)]);
-}
-
-const iconEntries = [];
-if (existsSync('public/icons/icon-192.png'))
-  iconEntries.push({ size: 192, data: readFileSync('public/icons/icon-192.png') });
-if (existsSync('public/icons/icon-512.png'))
-  iconEntries.push({ size: 256, data: readFileSync('public/icons/icon-512.png') });
-
+/* Переиспользуем полный multi-resolution ICO, собранный icons.mjs. Так
+   Windows получает отдельные чёткие размеры, а не растянутый PNG кадр. */
 const icoPath = join(OUT_DIR, 'app.ico');
-if (iconEntries.length) writeFileSync(icoPath, makeIco(iconEntries));
+if (existsSync('public/icons/app.ico'))
+  writeFileSync(icoPath, readFileSync('public/icons/app.ico'));
 
 /* ---------- 4. компилятор C# ---------------------------------------- */
 
@@ -143,7 +117,11 @@ if (!compiler) {
 /* csc.exe определяет кодировку исходника по BOM: без него русские строки
    превратятся в кракозябры. Поэтому компилируем копию с BOM. */
 const sourceWithBom = join(OUT_DIR, 'MirSetup.cs');
-writeFileSync(sourceWithBom, '\uFEFF' + readFileSync(CS_SOURCE, 'utf8'), 'utf8');
+const csharpSource = readFileSync(CS_SOURCE, 'utf8')
+  .replaceAll('__APP_ASSEMBLY_VERSION__', ASSEMBLY_VERSION)
+  .replaceAll('__APP_VERSION__', PACKAGE_VERSION);
+if (csharpSource.includes('__APP_')) throw new Error('build-exe: не все метаданные установщика подставлены.');
+writeFileSync(sourceWithBom, '\uFEFF' + csharpSource, 'utf8');
 
 /* Манифест: asInvoker — чтобы Windows не считала файл с «Setup» в имени
    установщиком и не просила права администратора (мы ставим игру в папку
@@ -154,7 +132,7 @@ writeFileSync(
   `<?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="${ASSEMBLY_VERSION}" name="MIR.Setup" type="win32" />
-  <description>MIR — The civilization of the sages</description>
+  <description>The civilization of the sages</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -229,7 +207,7 @@ if (problems.length) {
 writeFileSync('MIR-Setup.exe', exe);
 
 console.log('');
-console.log('✓ Windows-установщик собран:');
+console.log('✓ Установщик The civilization of the sages собран:');
 console.log('    MIR-Setup.exe  (копия: dist-app/MIR-Setup.exe)');
 console.log(`    Размер: ${(exe.length / 1024).toFixed(1)} КБ, внутри ${siteFiles.length} файлов игры`);
 console.log('    Проверено: настоящий PE-файл, ресурсы на месте.');

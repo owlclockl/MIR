@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 >nul
-title MIR — игра в интернете (бесплатный хостинг)
+title The civilization of the sages — игра в интернете (бесплатный хостинг)
 cd /d "%~dp0"
 
 :start_menu
 cls
 echo ============================================================
-echo   MIR — The civilization of the sages
+echo   The civilization of the sages
 echo   Игра в интернете: постоянная ссылка на бесплатном хостинге
 echo ============================================================
 echo.

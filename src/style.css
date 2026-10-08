@@ -10,9 +10,9 @@
   --font-display: 'Manrope', var(--font-ui);
 
   /* Поверхности */
-  --bg: #08080a;
-  --panel: rgba(13, 13, 15, 0.9);
-  --bar: rgba(8, 8, 10, 0.72);
+  --bg: #080d0e;
+  --panel: rgba(13, 20, 21, 0.9);
+  --bar: rgba(8, 13, 14, 0.72);
   --fill: rgba(255, 255, 255, 0.035);
   --fill-hover: rgba(255, 255, 255, 0.075);
   --fill-active: rgba(255, 255, 255, 0.11);
@@ -348,9 +348,9 @@ a {
   height: 34px;
   flex: none;
   padding: 0;
-  color: #0b0b0d;
+  color: var(--bg);
   border: 0;
-  background: #e9e9ec;
+  background: var(--accent);
   appearance: none;
   /* Знак остаётся обычной частью логотипа: прогресс комбинации виден
      только во время нажатий, без hover-эффекта или подписи о панели. */
@@ -391,7 +391,7 @@ a {
   }
 
   100% {
-    color: #0b0b0d;
+    color: var(--bg);
     box-shadow: 0 0 0 transparent;
     transform: none;
   }
@@ -615,7 +615,7 @@ a {
   min-height: 0;
   padding: clamp(var(--sp-24), 6vh, 72px) var(--pad-x);
   overflow: hidden;
-  background: radial-gradient(circle at 50% 50%, #242428 0, #151517 30%, #0a0a0b 68%);
+  background: radial-gradient(circle at 50% 50%, #18221e 0, #101714 30%, #080d0e 68%);
 }
 
 .atmosphere {
@@ -1230,7 +1230,7 @@ a {
    =========================================================== */
 
 :root {
-  --panel-solid: #101013;
+  --panel-solid: #0d1415;
   --avatar-checker: rgba(255, 255, 255, 0.035);
   --avatar-grid: rgba(255, 255, 255, 0.34);
   --avatar-outline: rgba(255, 255, 255, 0.42);
@@ -1285,9 +1285,9 @@ a {
   width: 100%;
   min-height: var(--control-h);
   padding: var(--sp-12) var(--sp-16);
-  color: #0b0b0d;
+  color: var(--bg);
   border: 1px solid transparent;
-  background: #e9e9ec;
+  background: var(--accent);
   font-size: var(--fs-small);
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -3741,8 +3741,8 @@ button.admin-row:hover {
 }
 
 /* ===========================================================
-   MIR World Studio — атлас, слоты и инструменты карты
-   Тёмная лесная палитра, янтарный акцент, тонкие линии, чёткая сетка.
+   The civilization of the sages — атлас, слоты и мастерская карт
+   Тёмная лесная палитра, шалфейный знак и янтарный акцент картографии.
    =========================================================== */
 :root {
   --world-bg: #080d0e;

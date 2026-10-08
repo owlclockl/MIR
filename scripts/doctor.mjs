@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * MIR Diagnostic Doctor — инструмент самодиагностики сети, туннелей и логов.
+ * The civilization of the sages — инструмент самодиагностики сети, туннелей и логов.
  * Запуск: npm run doctor (или scripts/doctor.mjs, ЛОГИ-И-ДИАГНОСТИКА.bat) (или через ЛОГИ-И-ДИАГНОСТИКА.bat / npm run doctor)
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ import './lib/root.mjs';
 import { checkDns, explainDns, CLOUDFLARE_SRV } from './lib/net-check.mjs';
 
 console.log('============================================================');
-console.log('   MIR — Диагностика системы, сети и туннелей (Doctor)    ');
+console.log('   The civilization of the sages — диагностика (Doctor)   ');
 console.log('============================================================\n');
 
 const reportLines = [];

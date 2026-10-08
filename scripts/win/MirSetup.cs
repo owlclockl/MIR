@@ -33,29 +33,30 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 
 // Свойства файла в проводнике Windows: без них exe выглядит «пустым».
-[assembly: AssemblyTitle("MIR — The civilization of the sages")]
-[assembly: AssemblyDescription("Офлайн-игра и общий хаб для друзей")]
-[assembly: AssemblyProduct("MIR")]
-[assembly: AssemblyCompany("MIR")]
-[assembly: AssemblyCopyright("MIR")]
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyTitle("The civilization of the sages")]
+[assembly: AssemblyDescription("Картографическая игра для создания и исследования миров")]
+[assembly: AssemblyProduct("The civilization of the sages")]
+[assembly: AssemblyCompany("The civilization of the sages")]
+[assembly: AssemblyCopyright("© 2026 The civilization of the sages")]
+[assembly: AssemblyVersion("__APP_ASSEMBLY_VERSION__")]
+[assembly: AssemblyFileVersion("__APP_ASSEMBLY_VERSION__")]
 
 namespace Mir
 {
     internal static class Branding
     {
-        public const string AppName = "MIR";
-        public const string FullName = "MIR — The civilization of the sages";
-        public const string Version = "0.3.0";
+        public const string LegacyName = "MIR";
+        public const string FullName = "The civilization of the sages";
+        public const string Version = "__APP_VERSION__";
         public const int BasePort = 47821;
         public const int PortAttempts = 12;
 
-        public static readonly Color Background = Color.FromArgb(8, 8, 10);
+        public static readonly Color Background = Color.FromArgb(8, 13, 14);
         public static readonly Color Foreground = Color.FromArgb(237, 237, 240);
         public static readonly Color Muted = Color.FromArgb(139, 139, 148);
-        public static readonly Color Line = Color.FromArgb(39, 39, 42);
-        public static readonly Color Panel = Color.FromArgb(20, 20, 24);
+        public static readonly Color Line = Color.FromArgb(30, 40, 36);
+        public static readonly Color Panel = Color.FromArgb(13, 20, 21);
+        public static readonly Color Accent = Color.FromArgb(194, 217, 201);
     }
 
     /// <summary>Встроенные в exe файлы сайта и иконка.</summary>
@@ -402,8 +403,10 @@ namespace Mir
             get
             {
                 return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    @"Programs\MIR");
+                    Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "Programs"),
+                    Branding.LegacyName);
             }
         }
 
@@ -413,7 +416,7 @@ namespace Mir
             {
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    @"MIR");
+                    Branding.LegacyName);
             }
         }
 
@@ -452,7 +455,7 @@ namespace Mir
             Directory.CreateDirectory(dir);
             Directory.CreateDirectory(Paths.DataDir);
 
-            string exe = Path.Combine(dir, "MIR.exe");
+            string exe = Path.Combine(dir, Branding.LegacyName + ".exe");
             if (!string.Equals(Paths.SelfPath, exe, StringComparison.OrdinalIgnoreCase))
                 File.Copy(Paths.SelfPath, exe, true);
 
@@ -461,12 +464,14 @@ namespace Mir
             if (iconBytes.Length > 0) File.WriteAllBytes(icon, iconBytes);
             else icon = exe;
 
-            string desktop = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "MIR.lnk");
+            string desktopFolder = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            TryDelete(Path.Combine(desktopFolder, Branding.LegacyName + ".lnk"));
+            string desktop = Path.Combine(desktopFolder, Branding.FullName + ".lnk");
             CreateShortcut(desktop, exe, "--play", dir, icon);
 
-            string startMenu = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Programs), "MIR.lnk");
+            string programsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            TryDelete(Path.Combine(programsFolder, Branding.LegacyName + ".lnk"));
+            string startMenu = Path.Combine(programsFolder, Branding.FullName + ".lnk");
             CreateShortcut(startMenu, exe, "--play", dir, icon);
 
             RegisterUninstall(dir, exe, icon);
@@ -476,8 +481,14 @@ namespace Mir
         public static void Uninstall()
         {
             string dir = Paths.InstallDir;
-            TryDelete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "MIR.lnk"));
-            TryDelete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "MIR.lnk"));
+            TryDelete(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Branding.FullName + ".lnk"));
+            TryDelete(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Programs), Branding.FullName + ".lnk"));
+            TryDelete(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Branding.LegacyName + ".lnk"));
+            TryDelete(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Programs), Branding.LegacyName + ".lnk"));
 
             try
             {
@@ -523,7 +534,7 @@ namespace Mir
                     key.SetValue("DisplayName", Branding.FullName);
                     key.SetValue("DisplayVersion", Branding.Version);
                     key.SetValue("DisplayIcon", icon);
-                    key.SetValue("Publisher", "MIR");
+                    key.SetValue("Publisher", Branding.FullName);
                     key.SetValue("InstallLocation", dir);
                     key.SetValue("UninstallString", "\"" + exe + "\" --uninstall");
                     key.SetValue("NoModify", 1, RegistryValueKind.DWord);
@@ -584,7 +595,7 @@ namespace Mir
             button.UseVisualStyleBackColor = false;
             if (primary)
             {
-                button.BackColor = Branding.Foreground;
+                button.BackColor = Branding.Accent;
                 button.ForeColor = Branding.Background;
                 button.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
                 button.FlatAppearance.BorderSize = 0;
@@ -592,7 +603,7 @@ namespace Mir
             else
             {
                 button.BackColor = Branding.Panel;
-                button.ForeColor = Color.FromArgb(161, 161, 170);
+                button.ForeColor = Branding.Muted;
                 button.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
                 button.FlatAppearance.BorderColor = Branding.Line;
             }
@@ -639,7 +650,7 @@ namespace Mir
             Ui.ApplyIcon(this);
 
             Controls.Add(Ui.Text("THE CIVILIZATION", 32, 28, 440, 30, Branding.Foreground, 16f, FontStyle.Bold));
-            Controls.Add(Ui.Text("OF THE SAGES", 32, 56, 440, 30, Branding.Foreground, 16f, FontStyle.Bold));
+            Controls.Add(Ui.Text("OF THE SAGES", 32, 56, 440, 30, Branding.Accent, 16f, FontStyle.Bold));
             Controls.Add(Ui.Text("Установка игры на компьютер", 34, 96, 440, 22, Branding.Muted, 10f, FontStyle.Regular));
 
             Button install = Ui.Action("УСТАНОВИТЬ НА КОМПЬЮТЕР", 32, 134, 456, 46, true);
@@ -648,14 +659,14 @@ namespace Mir
 
             Controls.Add(Ui.Text(
                 "Ярлык на рабочем столе и в меню «Пуск». Игра запускается в отдельном\nокне без адресной строки и работает без интернета.",
-                34, 186, 456, 38, Color.FromArgb(113, 113, 122), 8.5f, FontStyle.Regular));
+                34, 186, 456, 38, Branding.Muted, 8.5f, FontStyle.Regular));
 
             Button portable = Ui.Action("Просто поиграть, без установки", 32, 232, 456, 38, false);
             portable.Click += OnPortable;
             Controls.Add(portable);
 
-            status = Ui.Text("Версия " + Branding.Version + " • офлайн-игра и общий хаб для друзей",
-                34, 288, 456, 34, Color.FromArgb(82, 82, 91), 8.5f, FontStyle.Regular);
+            status = Ui.Text("Версия " + Branding.Version + " • картографическая игра, работает офлайн",
+                34, 288, 456, 34, Branding.Muted, 8.5f, FontStyle.Regular);
             Controls.Add(status);
         }
 
@@ -675,7 +686,7 @@ namespace Mir
                 Process.Start(info);
 
                 MessageBox.Show(
-                    "MIR установлен.\n\nЯрлык появился на рабочем столе и в меню «Пуск».\nИгра уже запускается — приятной игры!",
+                    "The civilization of the sages установлена.\n\nЯрлык появился на рабочем столе и в меню «Пуск».\nИгра уже запускается — приятной игры!",
                     "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 Close();
             }
@@ -719,7 +730,7 @@ namespace Mir
             Controls.Add(Ui.Text("Игра запущена в браузере", 28, 26, 400, 26, Branding.Foreground, 13f, FontStyle.Bold));
             Controls.Add(Ui.Text("Адрес: " + url, 30, 60, 400, 22, Branding.Muted, 9.5f, FontStyle.Regular));
             Controls.Add(Ui.Text("Не закрывайте это окно, пока играете.", 30, 84, 400, 22,
-                Color.FromArgb(113, 113, 122), 9f, FontStyle.Regular));
+                Branding.Muted, 9f, FontStyle.Regular));
 
             Button again = Ui.Action("Открыть ещё раз", 28, 120, 200, 40, false);
             again.Click += delegate { Browser.Open(url, Path.Combine(Paths.DataDir, "Profile")); };
@@ -750,8 +761,8 @@ namespace Mir
             if (mode == "--uninstall")
             {
                 DialogResult answer = MessageBox.Show(
-                    "Удалить MIR с этого компьютера?\n\nСохранённые аккаунты в профиле игры тоже останутся на диске —\nудалите папку MIR в %LOCALAPPDATA%, если они больше не нужны.",
-                    "Удаление MIR", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    "Удалить The civilization of the sages с этого компьютера?\n\nСохранённые аккаунты останутся в папке MIR внутри %LOCALAPPDATA% —\nэто прежний технический каталог; удалите его отдельно, если данные больше не нужны.",
+                    "Удаление The civilization of the sages", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (answer == DialogResult.Yes) Setup.Uninstall();
                 return;
             }

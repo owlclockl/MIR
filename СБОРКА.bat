@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title MIR — сборка установщиков
+title The civilization of the sages — сборка установщиков
 cd /d "%~dp0"
 
 echo ============================================================
-echo   MIR — The civilization of the sages
+echo   The civilization of the sages
 echo   Сборка игры и установщиков
 echo ============================================================
 echo.

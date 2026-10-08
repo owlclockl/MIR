@@ -19,4 +19,4 @@ const html = await buildSingleHtml();
 const kb = (statSync('mir.html').size / 1024).toFixed(0);
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
-console.log(`mir.html готов — ${kb} КБ за ${seconds} с. Откройте двойным кликом в браузере.`);
+console.log(`The civilization of the sages — автономный файл mir.html готов: ${kb} КБ за ${seconds} с. Откройте двойным кликом в браузере.`);

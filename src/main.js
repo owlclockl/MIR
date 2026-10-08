@@ -196,7 +196,7 @@ const authNoteHtml = () => {
   if (!backendReady)
     return `<p class="form-note">Подключаемся к общему хабу… Вход станет доступен после проверки.</p>`;
   if (!store.storagePersists())
-    return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте игру через MIR-Setup.exe или по ссылке хаба.</p>`;
+    return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте The civilization of the sages по ссылке или используйте Windows-файл MIR-Setup.exe.</p>`;
   return `<p class="form-note">${
     store.isHub()
       ? `Аккаунт хранится на общем хабе ${escapeHtml(store.hubHost())}.`
@@ -1006,7 +1006,7 @@ const adminLoginHtml = () => {
         <span class="admin-gate__ring admin-gate__ring--outer"></span>
         <span class="admin-gate__ring admin-gate__ring--inner"></span>
         <span class="admin-gate__seal">${icon('shield')}${icon('sigil', 'admin-gate__sigil')}</span>
-        <span class="admin-gate__serial">MIR · 07</span>
+        <span class="admin-gate__serial">SAGES · 07</span>
       </div>
 
       <div class="admin-gate__intro">
@@ -1873,7 +1873,7 @@ const adminModalHtml = () => {
         <aside class="admin-rail" aria-label="Навигация администратора">
           <div class="admin-rail__brand">
             <span class="admin-rail__symbol">${icon('shield')}</span>
-            <span><strong>MIR CONTROL</strong><small>ПАНЕЛЬ УПРАВЛЕНИЯ</small></span>
+            <span><strong>THE CIVILIZATION</strong><small>OF THE SAGES</small></span>
           </div>
           <div class="admin-rail__mode"><span class="dot" aria-hidden="true"></span><span>${modeLabel}</span></div>
           <p class="eyebrow">РАБОЧАЯ ОБЛАСТЬ</p>
@@ -1885,7 +1885,7 @@ const adminModalHtml = () => {
             ${adminTabHtml('system', 'Система', 'settings')}
           </nav>
           <div class="admin-rail__footer">
-            <span class="admin-rail__version">MIR · v${escapeHtml(VERSION)}</span>
+            <span class="admin-rail__version">SAGES · v${escapeHtml(VERSION)}</span>
             <span class="admin-rail__host" title="${escapeHtml(host)}">${escapeHtml(host)}</span>
           </div>
         </aside>
@@ -1980,7 +1980,7 @@ const worldSeed = () => {
   const value = new Uint32Array(1);
   if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(value);
   else value[0] = (Date.now() ^ Math.floor(Math.random() * 0xffff_ffff)) >>> 0;
-  return `MIR-${value[0].toString(16).toUpperCase().padStart(8, '0')}`;
+  return `SAGES-${value[0].toString(16).toUpperCase().padStart(8, '0')}`;
 };
 
 const worldStateDetailsHtml = (world, selectedStateId) => {
@@ -2396,7 +2396,7 @@ const worldFmgOverlayHtml = (session, seed) => {
       <div class="world-fmg-shell">
         <header class="world-fmg-heading">
           <div class="world-fmg-seed"><span>SEED</span><code data-role="world-fmg-seed">${escapeHtml(seed)}</code></div>
-          <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас MIR">${icon('chevronLeft', 'icon--xs')}<span>Атлас MIR</span></button>
+          <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас мира">${icon('chevronLeft', 'icon--xs')}<span>Атлас мира</span></button>
         </header>
         <iframe class="world-fmg-frame" data-role="world-fmg-frame"
           src="${escapeHtml(frameUrl)}" title="Редактор карт"
@@ -2445,7 +2445,7 @@ const worldPageHtml = () => {
     ? `\n          <button class="world-topbar-button world-fmg-open" type="button" data-action="world-fmg-open" aria-label="Открыть полный редактор карт Azgaar" title="Открыть полный редактор карт Azgaar">${icon('map', 'icon--xs')}<span>Редактор карт</span></button>`
     : '';
   return `
-    <div class="world-app" role="application" aria-label="Редактор мира MIR">
+    <div class="world-app" role="application" aria-label="The civilization of the sages — редактор мира">
       <header class="world-topbar">
         <div class="world-topbar__identity">
           <button class="world-back-button" type="button" data-action="world-exit" aria-label="Вернуться в главное меню" title="В меню">${icon('chevronLeft', 'icon--sm')}</button>
@@ -3081,7 +3081,7 @@ document.querySelector('#app').innerHTML = `
           ${icon('settings')}
         </button>
         <p class="brand" translate="no">
-          <button class="brand__mark" type="button" data-action="admin-tap" aria-label="Знак игры">${icon('sigil')}</button>
+          <button class="brand__mark" type="button" data-action="admin-tap" aria-label="Печать The civilization of the sages">${icon('sigil')}</button>
           <span class="brand__name" lang="en">
             <span class="brand__line">${TITLE.lead}</span>
             <span class="brand__line brand__line--muted">${TITLE.tail}</span>
@@ -3110,12 +3110,12 @@ document.querySelector('#app').innerHTML = `
       </div>
 
       <section class="hero" aria-labelledby="hero-title">
-        <p class="eyebrow">Тактический протокол</p>
+        <p class="eyebrow">Цивилизация мудрецов</p>
         <h1 class="hero__title" id="hero-title" lang="en" translate="no">
           <span class="hero__line">${TITLE.lead}</span>
           <span class="hero__line hero__line--tail">${TITLE.tail}</span>
         </h1>
-        <p class="hero__caption"><span>Тишина — тоже оружие.</span></p>
+        <p class="hero__caption"><span>Мудрость создаёт миры.</span></p>
       </section>
     </main>
 
@@ -3453,7 +3453,7 @@ const adminExport = () => {
   const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `mir-admin-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `sages-admin-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -4197,7 +4197,7 @@ const actions = {
       const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${session.config.seed.replace(/[^a-z0-9-]/gi, '_')}.mir-world.json`;
+      link.download = `${session.config.seed.replace(/[^a-z0-9-]/gi, '_')}.sages-world.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
       toast('Seed и параметры мира экспортированы.');

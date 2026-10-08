@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 >nul
-title MIR — сервер для друзей
+title The civilization of the sages — сервер для друзей
 cd /d "%~dp0"
 
 :start_menu
 cls
 echo ============================================================
-echo   MIR — The civilization of the sages
+echo   The civilization of the sages
 echo   Запуск игры и сервера для друзей
 echo ============================================================
 echo.

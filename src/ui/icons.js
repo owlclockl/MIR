@@ -1,6 +1,6 @@
 /* Встроенные SVG Lucide 1.53.0 (ISC; пути, унаследованные от Feather,
-   также сохраняют уведомление MIT в LUCIDE-LICENSE.txt). Знак MIR — фирменная
-   эмблема; остальные иконки интерфейса имеют контур 24×24 и единый штрих. */
+   также сохраняют уведомление MIT в LUCIDE-LICENSE.txt). `sigil` — печать
+   The civilization of the sages; остальные UI-иконки имеют контур 24×24. */
 export const ICONS = {
   sigil:
     '<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>',
