@@ -185,29 +185,238 @@ div.tab {
   }
 }
 
-/* ── Экранные размеры: заставка и подсказки ───────────────────────────────────
-   upstream задал шрифт заголовка в 7em — на телефоне он не влезает совсем. */
-#loading > #loading-typography {
-  width: min(86vw, 620px);
-  font-size: clamp(9px, 2.2vw, 13px);
+/* ── Заставка карты: пока Azgaar строит мир ──────────────────────────────────
+   Заставку видит игрок, поэтому она оформлена как игра: лесная ночь, шалфей,
+   старинное золото, фирменная печать. Чужие элементы убраны — синий фон-океан
+   Azgaar с его бумажной текстурой и номер версии редактора; атрибуция Azgaar
+   живёт в подвале окна карты самой игры. Размеры — в пикселях: upstream
+   задавал их в em от 10px body, и на телефоне заголовок не влезал совсем. */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding: 24px;
+  overflow: hidden;
+  pointer-events: none;
   color: var(--mir-text);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  background-color: var(--mir-ink);
+  background-image:
+    radial-gradient(120% 78% at 50% 0%, rgba(194, 217, 201, 0.09), transparent 60%),
+    radial-gradient(90% 60% at 50% 112%, rgba(216, 193, 132, 0.08), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(194, 217, 201, 0.05) 0 1px, transparent 1px 76px),
+    repeating-linear-gradient(90deg, rgba(194, 217, 201, 0.05) 0 1px, transparent 1px 76px);
 }
 
-#title {
-  font-size: clamp(1.9em, 7vw, 5.4em);
-  line-height: 1.05;
-  letter-spacing: 0.01em;
+/* upstream фиксирует каждого ребёнка по центру экрана: возвращаем их в поток,
+   иначе печать и подписи лежат друг на друге. */
+#loading > * {
+  position: static;
+  inset: auto;
+  top: auto;
+  left: auto;
+  transform: none;
 }
 
-#titleName {
-  font-size: clamp(1.1em, 3.4vw, 2.4em);
+/* Фон-океан Azgaar с его текстурой бумаги. Правило нужно и на тот случай,
+   если заставка попадёт в сборку с прежней разметкой. */
+#loading > svg:not(#loading-logo) {
+  display: none;
+}
+
+#loading-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Кольцо вокруг печати: идёт медленно, как картушка компаса. */
+#loading-mark::before {
+  content: "";
+  position: absolute;
+  inset: -22px;
+  border: 1px dashed rgba(194, 217, 201, 0.26);
+  border-radius: 50%;
+  animation: mir-loader-ring 28s linear infinite;
+}
+
+#loading-mark::after {
+  content: "";
+  position: absolute;
+  inset: -56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(194, 217, 201, 0.14), transparent 66%);
+}
+
+#loading #loading-logo {
+  width: 78px;
+  height: 78px;
+  stroke: #c2d9c9;
+  animation: mir-loader-breath 3.6s ease-in-out infinite alternate;
+}
+
+#loading #loading-logo circle {
+  fill: none;
+  stroke: #c2d9c9;
+}
+
+#loading #loading-logo circle:nth-of-type(2) {
+  fill: #c2d9c9;
+  stroke: none;
+}
+
+#loading #loading-typography {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(88vw, 460px);
+  max-width: none;
+  font-size: 12px;
+  color: var(--mir-text);
+  text-align: center;
+  text-shadow: none;
+  opacity: 1;
+}
+
+/* Название — Manrope и разрядка, две строки, как в шапке игры. */
+#loading #titleName,
+#loading #title {
+  display: block;
+  margin: 0;
+  font-family: Manrope, Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+#loading #titleName {
+  color: #e6ece8;
+}
+
+#loading #title {
+  color: #c2d9c9;
+}
+
+/* Ключевая фраза игры — тихим камнем, без разрядки. */
+#loading #title::after {
+  content: "Мудрость создаёт миры.";
+  display: block;
+  margin-top: 10px;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-indent: 0;
+  text-transform: none;
+  color: var(--mir-muted);
+}
+
+#loading #loading-text {
+  margin: 0;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  text-transform: uppercase;
+  color: #c2d9c9;
+}
+
+#loading #loading-text > span {
+  padding-left: 2px;
+  font-size: 12px;
+  line-height: 1;
   color: var(--mir-gold);
 }
 
-#versionText {
-  font-size: clamp(0.9em, 2vw, 1.6em);
-  color: var(--mir-muted);
+/* Полоса хода: генератор не отдаёт проценты, поэтому полоса просто идёт. */
+#loading #loading-typography::after {
+  content: "";
+  display: block;
+  width: min(60%, 190px);
+  height: 2px;
+  background-color: rgba(194, 217, 201, 0.16);
+  background-image: linear-gradient(90deg, transparent, rgba(216, 193, 132, 0.85), transparent);
+  background-repeat: no-repeat;
+  background-size: 44% 100%;
+  animation: mir-loader-track 2s ease-in-out infinite;
+}
+
+/* Номер версии редактора — чужой служебный текст. */
+#loading #versionText {
+  display: none;
+}
+
+@keyframes mir-loader-ring {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mir-loader-breath {
+  from {
+    transform: scale(0.97);
+    opacity: 0.82;
+  }
+
+  to {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+}
+
+@keyframes mir-loader-track {
+  from {
+    background-position: -46% 0;
+  }
+
+  to {
+    background-position: 146% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #loading-mark::before,
+  #loading #loading-logo,
+  #loading #loading-typography::after {
+    animation: none;
+  }
+}
+
+/* ── Файл карты, перетащённый в окно ─────────────────────────────────────────
+   Тот же экран загрузки в роли зоны переноса: тёмная подложка, шалфейная
+   рамка и золотые точки вместо «Uploading…» на чужом фоне. */
+#mapOverlay {
+  z-index: 90;
+  color: var(--mir-text);
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-shadow: none;
+  background: rgba(8, 13, 14, 0.82);
+}
+
+#mapOverlay::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border: 1px dashed rgba(194, 217, 201, 0.3);
+  border-radius: 2px;
+}
+
+#mapOverlay > span {
+  color: var(--mir-gold);
 }
 
 /* ── Телефон: панель управления становится нижней шторкой ──────────────────── */
