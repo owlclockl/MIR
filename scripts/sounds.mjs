@@ -1,20 +1,18 @@
-/* Звуки интерфейса: взять восемь откликов из библиотеки UI SFX.
+/* Звуки игрового меню: взять тринадцать коротких откликов из UI SFX.
 
    Запуск:
 
-     npm run sounds            набор «Glass» (по умолчанию)
-     npm run sounds -- zen     другой набор, здесь — «Zen»
+     npm run sounds            набор «Arcade» (по умолчанию)
+     npm run sounds -- glass   другой набор, здесь — «Glass»
 
-   Зачем отдельный скрипт. Звуки не рисуются в коде, а берутся готовыми из
-   библиотеки: 936 коротких файлов, 78 смысловых откликов (press, success,
-   notification, error, open, toggle-on и так далее) в 12 наборах на любой
-   характер интерфейса. Перебирать их руками в архиве утомительно, а без
-   скрипта через месяц уже не вспомнить, откуда именно взялся click.mp3 и
-   какой версии он был.
+   Библиотека содержит 936 коротких файлов: 78 смысловых откликов (press,
+   success, notification, error, open, select, back, unlock и так далее) в 12
+   наборах. Для MIR выбраны звуки, которые покрывают щелчки, окна, навигацию,
+   переключатели, подключение и скрытый вход администратора.
 
    Скрипт не зависит ни от чего, кроме Node: сам скачивает tgz-архив пакета
    с registry.npmjs.org, сам его разжимает (tar разбирается вручную — в
-   системе не должно быть ни tar, ни архиватора) и раскладывает восемь
+   системе не должно быть ни tar, ни архиватора) и раскладывает тринадцать
    файлов в src/assets/sounds/.
 
    Лицензия звуков — CC0 1.0 (общественное достояние): можно менять и
@@ -30,14 +28,13 @@ import { fromRoot } from './lib/root.mjs';
 const PACKAGE = 'uisfx';
 const VERSION = '0.4.0';
 
-/* Наборы библиотеки. Первый в списке — наш по умолчанию: тёмное меню с
-   волосяными линиями любит «топовый» звук — звонкий и короткий, без
-   долгого хвоста, поэтому «хрустальный» Glass. */
+/* Наборы библиотеки. Первый — наш по умолчанию: Arcade добавляет меню
+   узнаваемый игровой отклик, не превращая фон в навязчивую музыку. */
 const PACKS = [
+  'arcade',
   'glass',
   'minimal',
   'soft',
-  'arcade',
   'mechanical',
   'organic',
   'dreamy',
@@ -59,6 +56,11 @@ const CUES = [
   ['close', 'close'],
   ['toggle-on', 'toggle-on'],
   ['toggle-off', 'toggle-off'],
+  ['select', 'select'],
+  ['back', 'back'],
+  ['unlock', 'unlock'],
+  ['connect', 'connect'],
+  ['volume-change', 'volume-change'],
 ];
 
 const OUT_DIR = fromRoot('src', 'assets', 'sounds');
@@ -104,7 +106,7 @@ if (!PACKS.includes(pack)) {
 }
 
 const url = `https://registry.npmjs.org/${PACKAGE}/-/${PACKAGE}-${VERSION}.tgz`;
-console.log(`Звуки интерфейса: ${PACKAGE} ${VERSION}, набор «${pack}»`);
+console.log(`Звуки игрового меню: ${PACKAGE} ${VERSION}, набор «${pack}»`);
 console.log(`  скачиваю ${url}`);
 
 let files;

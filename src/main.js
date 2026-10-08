@@ -59,11 +59,11 @@ const PRESENCE = {
 
 /* ---------- скрытая панель админа ----------------------------
    Служебный раздел: аккаунты, пароли, дружба, диагностика. В меню
-   его не видно — вход через знак игры, сочетание клавиш или адрес
-   с `#admin`, а дальше спрашивается ключ администратора. */
+   его не видно — вход через семь быстрых касаний знака, сочетание
+   клавиш или адрес с `#admin`, а дальше спрашивается ключ. */
 
-const ADMIN_TAPS = 5; // щелчков по знаку
-const ADMIN_TAP_WINDOW = 3000; // за это время
+const ADMIN_TAPS = 7; // быстрых касаний по знаку — секретная комбинация
+const ADMIN_TAP_WINDOW = 2800; // миллисекунд на комбинацию
 
 const adminState = () => ({
   tab: 'overview', // overview | players | requests | events | system
@@ -126,10 +126,13 @@ const overlayRoot = () => document.querySelector('#overlay-root');
 const openModal = (type, data = null) => {
   ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   ui.modal = { type, data };
+  playSound('open');
   renderModal();
 };
 
 const closeModal = () => {
+  if (!ui.modal) return;
+  playSound('close');
   ui.modal = null;
   ui.confirm = null;
   releaseAvatarPreview(ui.pendingAvatar);
@@ -498,7 +501,7 @@ const settingsModalHtml = () => {
     body: `
       <div class="dialog__body settings-list">
         <label class="setting-row">
-          <span><strong>Звуки интерфейса</strong><small>Кнопки, успешные действия и ошибки</small></span>
+          <span><strong>Звуки игрового меню</strong><small>Кнопки, окна, переключатели и игровые события</small></span>
           <input class="switch" type="checkbox" data-setting="sound" ${settings.sound ? 'checked' : ''} />
         </label>
         <label class="setting-row setting-row--column">
@@ -973,26 +976,56 @@ const statRow = (key, value) => `
 
 const adminLoginHtml = () => {
   const hub = store.isHub();
+  const node = hub ? `Хаб · ${escapeHtml(store.hubHost())}` : 'Локальное хранилище · это устройство';
   return `
-    <p class="hint">Служебный раздел: аккаунты, пароли, дружба, журнал и состояние хаба. Вход — по ключу администратора.</p>
-    <form class="form" data-form="admin-login" novalidate>
-      <label class="field">
-        <span class="field__label">Ключ администратора</span>
-        <input class="input" name="key" type="password" autocomplete="off" spellcheck="false"
-               value="${escapeHtml(ui.admin.keyDraft)}" data-role="admin-key" data-autofocus required />
-      </label>
-      <p class="form-error" data-role="form-error" hidden></p>
-      <button class="solid-button" type="submit" data-role="submit">${icon('shield', 'icon--xs')}<span>Войти в панель</span></button>
-    </form>
-    ${ui.admin.error ? `<p class="form-note form-note--warn">${escapeHtml(ui.admin.error)}</p>` : ''}
-    <div class="divider" role="separator"></div>
-    <p class="hint">${
-      hub
-        ? `На хабе ключ по умолчанию — <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> (он в открытом исходнике). Владелец мог задать свой: переменная <strong>MIR_ADMIN_KEY</strong> при запуске на ПК или секрет воркера на хостинге — либо сменить ключ после входа, во вкладке «Система».`
-        : `Ключ по умолчанию — <code translate="no">${escapeHtml(
-            store.DEFAULT_ADMIN_KEY,
-          )}</code>. Он подходит только для аккаунтов этого браузера; смените его во вкладке «Система».`
-    }</p>`;
+    <div class="dialog__body admin-gate">
+      <div class="admin-gate__emblem" aria-hidden="true">
+        <span class="admin-gate__ring admin-gate__ring--outer"></span>
+        <span class="admin-gate__ring admin-gate__ring--inner"></span>
+        <span class="admin-gate__seal">${icon('shield')}${icon('sigil', 'admin-gate__sigil')}</span>
+        <span class="admin-gate__serial">MIR · 07</span>
+      </div>
+
+      <div class="admin-gate__intro">
+        <div class="admin-gate__status">
+          <span class="admin-gate__status-label"><i class="dot" aria-hidden="true"></i>ДОСТУП ЗАКРЫТ</span>
+          <span class="admin-gate__status-code">OWNER / 07</span>
+        </div>
+        <p class="eyebrow">СЛУЖЕБНЫЙ УЗЕЛ</p>
+        <h3>Панель владельца</h3>
+        <p>Управление игроками, журналом событий и состоянием хаба.</p>
+      </div>
+
+      <form class="form admin-gate__form" data-form="admin-login" novalidate>
+        <label class="field">
+          <span class="field__label">Ключ администратора</span>
+          <span class="admin-gate__keyline">
+            ${icon('key', 'admin-gate__key-icon')}
+            <input class="input" name="key" type="password" autocomplete="off" spellcheck="false"
+                   placeholder="Введите ключ доступа" value="${escapeHtml(ui.admin.keyDraft)}"
+                   data-role="admin-key" data-autofocus required />
+          </span>
+        </label>
+        <p class="form-error" data-role="form-error" hidden></p>
+        <button class="solid-button admin-gate__submit" type="submit" data-role="submit">
+          ${icon('shield', 'icon--xs')}<span>Открыть панель</span><span class="admin-gate__arrow" aria-hidden="true">↗</span>
+        </button>
+      </form>
+
+      ${ui.admin.error ? `<p class="form-note form-note--warn">${escapeHtml(ui.admin.error)}</p>` : ''}
+
+      <footer class="admin-gate__footer">
+        <div class="admin-gate__node">
+          <span class="admin-gate__node-label">ТОЧКА ПОДКЛЮЧЕНИЯ</span>
+          <span>${node}</span>
+        </div>
+        <p class="admin-gate__hint">${
+          hub
+            ? `Если ключ не меняли, действует заводской <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code>. Можно задать свой через <strong>MIR_ADMIN_KEY</strong> или сменить ключ после входа — во вкладке «Система».`
+            : `Заводской ключ <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> подходит только для аккаунтов этого браузера. Для безопасности смените его во вкладке «Система».`
+        }</p>
+      </footer>
+    </div>`;
 };
 
 /* Предупреждение о заводском ключе — показывается на «Обзоре», чтобы
@@ -1777,7 +1810,7 @@ const adminUpdatedText = () => {
 
 const adminModalHtml = () => {
   const data = ui.admin.data;
-  if (!data) return dialogShell({ label: 'Панель админа', title: 'Панель админа', size: 'wide', body: adminLoginHtml() });
+  if (!data) return dialogShell({ label: 'Служебный доступ к панели администратора', title: 'Доступ ограничен', size: 'admin-gate', body: adminLoginHtml() });
   const user = ui.admin.openId ? data.users.find((item) => item.id === ui.admin.openId) : null;
   const section = user
     ? adminCardHtml(user)
@@ -2220,7 +2253,7 @@ document.querySelector('#app').innerHTML = `
           ${icon('settings')}
         </button>
         <p class="brand" translate="no">
-          <span class="brand__mark" data-action="admin-tap" aria-hidden="true">${icon('sigil')}</span>
+          <button class="brand__mark" type="button" data-action="admin-tap" aria-label="Знак игры">${icon('sigil')}</button>
           <span class="brand__name" lang="en">
             <span class="brand__line">${TITLE.lead}</span>
             <span class="brand__line brand__line--muted">${TITLE.tail}</span>
@@ -2549,8 +2582,10 @@ const refreshAdmin = async () => {
 
 /** Открыть служебный раздел (знак игры, Ctrl+Shift+Alt+A или #admin). */
 const openAdminGate = () => {
+  ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   ui.admin = adminState();
   ui.modal = { type: 'admin' };
+  playSound('unlock');
   renderModal();
   /* Ключ этой вкладки уже вводили — данные можно подтянуть сразу. */
   if (store.adminKey()) refreshAdmin();
@@ -2599,13 +2634,36 @@ const adminExport = () => {
 };
 
 let adminTaps = [];
+let adminTapTimer = 0;
 
-/** Считаем быстрые щелчки по знаку игры: пять подряд открывают панель. */
-const registerAdminTap = () => {
+const clearAdminTapCharge = (mark) => {
+  mark?.classList.remove('brand__mark--charging');
+  mark?.style.removeProperty('--sigil-progress');
+  mark?.style.removeProperty('--sigil-glow');
+};
+
+/** Семь быстрых касаний открывают скрытый вход; незавершённая серия тихо гаснет. */
+const registerAdminTap = (mark) => {
   const now = Date.now();
   adminTaps = [...adminTaps.filter((at) => now - at < ADMIN_TAP_WINDOW), now];
-  if (adminTaps.length < ADMIN_TAPS) return false;
+  const progress = Math.min(1, adminTaps.length / ADMIN_TAPS);
+  mark?.style.setProperty('--sigil-progress', String(progress));
+  mark?.style.setProperty('--sigil-glow', `${Math.round(progress * 14)}px`);
+  mark?.classList.toggle('brand__mark--charging', adminTaps.length > 0);
+  window.clearTimeout(adminTapTimer);
+
+  if (adminTaps.length < ADMIN_TAPS) {
+    adminTapTimer = window.setTimeout(() => {
+      adminTaps = [];
+      clearAdminTapCharge(mark);
+    }, ADMIN_TAP_WINDOW);
+    return false;
+  }
+
   adminTaps = [];
+  clearAdminTapCharge(mark);
+  mark?.classList.add('brand__mark--unlocked');
+  window.setTimeout(() => mark?.classList.remove('brand__mark--unlocked'), 760);
   return true;
 };
 
@@ -2662,6 +2720,7 @@ const formHandlers = {
       setFormError(form, '');
       renderModal({ focus: false });
       syncP2P();
+      playSound('connect');
       toast(
         users > 0
           ? `Хаб подключён: ${store.hubHost()}. Игроков на нём: ${users}. Войдите или создайте аккаунт.`
@@ -2910,9 +2969,12 @@ document.addEventListener('change', (event) => {
   }
 
   const value = event.target.type === 'checkbox' ? event.target.checked : Number(event.target.value);
+  /* Перед выключением даём последний короткий отклик, пока звук ещё включён. */
+  if (key === 'sound' && !value) playSound('toggle-off');
   store.updateSettings({ [key]: value });
   applySettings();
-  if (key === 'sound' && value) playSound('success');
+  if (key === 'sound' && value) playSound('toggle-on');
+  else if (key === 'volume') playSound('volume-change');
   renderModal({ focus: false });
 });
 
@@ -2933,6 +2995,7 @@ const pickAndPreviewAvatar = async () => {
     ui.avatarCrop = { x: 50, y: 50, zoom: 1, rotation: 0 };
     ui.avatarDrag = null;
     ui.modal = { type: 'avatar-preview' };
+    playSound('open');
     renderModal();
   } catch (error) {
     toast(error instanceof Error ? error.message : 'Не удалось обработать картинку.', 'error');
@@ -2946,6 +3009,7 @@ const actions = {
   },
 
   'auth-tab': (el) => {
+    playSound('select');
     ui.authTab = el.dataset.tab;
     renderModal();
   },
@@ -3047,17 +3111,19 @@ const actions = {
 
   /* --- панель админа --- */
 
-  'admin-tap': () => {
-    if (registerAdminTap()) openAdminGate();
+  'admin-tap': (el) => {
+    if (registerAdminTap(el)) openAdminGate();
   },
 
   'admin-tab': (el) => {
+    playSound('select');
     ui.admin.tab = el.dataset.tab;
     ui.admin.openId = null;
     renderModal({ focus: false });
   },
 
   'admin-go': (el) => {
+    playSound('select');
     const tab = el.dataset.tab;
     if (!['overview', 'players', 'requests', 'events', 'system'].includes(tab)) return;
     ui.admin.tab = tab;
@@ -3080,6 +3146,7 @@ const actions = {
   },
 
   'admin-back': () => {
+    playSound('back');
     ui.admin.openId = null;
     ui.admin.banReason = '';
     renderModal();
@@ -3122,6 +3189,7 @@ const actions = {
   'admin-export': () => adminExport(),
 
   'admin-lock': () => {
+    playSound('back');
     store.adminLogout();
     ui.admin = adminState();
     renderModal();
@@ -3254,10 +3322,7 @@ const actions = {
     toast('Локальные аккаунты очищены.');
   },
 
-  'close-modal': () => {
-    closeModal();
-    playSound('close');
-  },
+  'close-modal': () => closeModal(),
 
   'overlay-down': (el, event) => {
     if (event.target === el) closeModal();
@@ -3378,8 +3443,17 @@ const actions = {
   },
 };
 
+const ACTIONS_WITH_OWN_SOUND = new Set([
+  'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
+  'open-direct', 'open-hub', 'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
+  'admin-back', 'admin-lock', 'auth-tab',
+]);
+
 document.addEventListener('click', (event) => {
-  if (event.target.closest('button:not([disabled])')) playSound('click');
+  const button = event.target.closest('button:not([disabled])');
+  const actionElement = event.target.closest('[data-action]');
+  const actionName = actionElement?.dataset.action;
+  if (button && !ACTIONS_WITH_OWN_SOUND.has(actionName)) playSound('click');
   if (event.target.closest('[data-action="overlay-down"]')) {
     const overlay = event.target.closest('[data-action="overlay-down"]');
     if (event.target === overlay) actions['overlay-down'](overlay, event);
@@ -3498,8 +3572,8 @@ const initializeConnection = async () => {
   if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
   syncP2P();
   /* Ссылка с `#admin` (или `?admin=1`) открывает панель сразу: так в неё
-     удобно заходить на телефоне, где нет ни клавиатуры, ни пяти щелчков
-     по знаку. Ключ всё равно спросят. */
+     удобно заходить на телефоне, где нет клавиатуры для сочетания клавиш.
+     Ключ всё равно спросят. */
   if (adminFromUrl()) openAdminGate();
 };
 initializeConnection();

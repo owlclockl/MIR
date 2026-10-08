@@ -44,8 +44,10 @@ export default defineConfig(({ mode }) => {
          их не удалить потом ни на хостинге, ни в установщике .exe. */
       emptyOutDir: true,
       cssCodeSplit: !single,
-      /* В mir.html ресурсы должны лежать внутри, иначе file:// их не найдёт. */
-      assetsInlineLimit: single ? () => true : 4096,
+      /* В mir.html ресурсы должны лежать внутри, иначе file:// их не найдёт.
+         Веб-версия держит даже маленькие звуки отдельными хешированными файлами:
+         data URL аудио раздувает JS и мешает раздельному кешированию. */
+      assetsInlineLimit: single ? () => true : 0,
       modulePreload: single ? false : undefined,
       sourcemap: false,
       reportCompressedSize: false,

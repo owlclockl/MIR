@@ -378,7 +378,7 @@ function onReady(port) {
        При заводском ключе подсказываем, как сменить — в панели или
        переменной окружения. */
     console.log('');
-    console.log(`  Панель админа: знак игры слева вверху — 5 быстрых щелчков`);
+    console.log(`  Панель админа: знак игры слева вверху — 7 быстрых касаний за 2,8 с`);
     console.log(`  (или Ctrl+Shift+Alt+A). Ключ: ${hub.adminKey}`);
     if (hub.adminKeyIsDefault && args.public)
       console.log(
