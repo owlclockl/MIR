@@ -1,4 +1,3 @@
-import { showInfo } from "@/components/app-info";
 import { refreshEditors } from "@/components/dialog/dialog-helpers";
 import type { LayerId } from "@/components/layers";
 import { Layers } from "@/components/layers";
@@ -505,7 +504,6 @@ export const MAP_COMMANDS: MapCommand[] = [
   { id: "styleTab", name: "Open Style Tab", aliases: "menu panel editor", run: () => openTab("styleTab") },
   { id: "optionsTab", name: "Open Options Tab", aliases: "menu panel settings", run: () => openTab("optionsTab") },
   { id: "toolsTab", name: "Open Tools Tab", aliases: "menu panel", run: () => openTab("toolsTab") },
-  { id: "aboutTab", name: "Open About Tab", aliases: "menu panel info credits", run: () => openTab("aboutTab") },
   {
     id: "exportSvg",
     name: "Export as SVG",
@@ -629,7 +627,6 @@ export const MAP_COMMANDS: MapCommand[] = [
     aliases: "download table areas regions",
     run: () => Controllers.ZonesEditor.exportCsv()
   },
-  { id: "showInfo", name: "Show App Info", aliases: "about version help", run: () => showInfo() },
   { id: "getApp", name: "Get Desktop App", aliases: "install download electron", run: () => Services.AppOffer.open() },
   {
     id: "toggleSaveReminder",

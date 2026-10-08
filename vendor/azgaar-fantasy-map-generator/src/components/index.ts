@@ -1,5 +1,4 @@
 import "./options-model";
-import "./app-info";
 import "./tooltips";
 import "./map-tooltip";
 import "./zoom";

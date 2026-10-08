@@ -1,0 +1,29 @@
+import{H as e,On as t,P as n,U as r,nr as i,nt as a,tt as o}from"./utils-BXzQ0Tym.js";import{R as s,t as c}from"./layers-Bcg3SU5R.js";import{n as l}from"./highlight-izWZujNC.js";import{i as u}from"./emblems-generator-BdUAGZhv.js";import{i as d,t as f}from"./tooltips-P6FAPAdd.js";import{i as p}from"./viewport-C0deAIKO.js";import{t as m}from"./controllers-DoYIZ-kt.js";import{c as h,n as g,r as _}from"./dialog-helpers-CJ5pbzaw.js";var v=`markerRadiusRing`;function y(){let e=t(`#${v}`);return e.empty()?t(`#viewbox`).append(`g`).attr(`id`,v).attr(`pointer-events`,`none`):e}function b(e,t,n,r=`#d4351c`){let a=y();a.selectAll(`*`).remove(),a.append(`circle`).attr(`cx`,i(e,1)).attr(`cy`,i(t,1)).attr(`r`,i(n,1)).attr(`fill`,`none`).attr(`stroke`,r).attr(`stroke-width`,1.4).attr(`stroke-dasharray`,`5 4`).attr(`vector-effect`,`non-scaling-stroke`)}function x(){t(`#${v}`).remove()}var S=null,C=0,w=[];function T(){let e=Math.min(p.width,p.height)/4*options.map.units.distance.scale,t=10**Math.floor(Math.log10(e||1));return Math.max(1,Math.round(e/t)*t)}function E(){return C||=T(),C}function D(e){return e.name||e.type||`Marker`}function O(e){customization||(g(`.stable`),c.show(`markers`),S=e,k(),j(E()),$(`#markersInRadius`).dialog({title:`Маркеры в радиусе`,resizable:!1,width:`fit-content`,close:z,position:{my:`right top`,at:`right-10 top+10`,of:`svg`,collision:`fit`}}))}function k(){document.getElementById(`markersInRadius`)?.remove();let e=`
+    <div id="markersInRadius" class="dialog">
+      <div style="padding:.2em 0 .4em; line-height:1.5">Around: <b>${S?D(S):``}</b></div>
+
+      <div data-tip="Радиус вокруг маркера в единицах расстояния карты — внутри него маркеры показываются в списке">
+        <span class="label" style="display:inline">Radius:</span>
+        <input id="markersRadiusValue" type="number" min="1" step="1" value="${E()}" style="width:6em" />
+        <span>${options.map.units.distance.unit}</span>
+      </div>
+
+      <div class="label" style="margin-top:.4em">В диапазоне: <span id="markersRadiusCount">0</span></div>
+      <div id="markersRadiusList" class="table" style="max-height:15em; overflow-y:auto"></div>
+
+      <div id="markersRadiusBottom" style="margin-top:.4em">
+        <button id="markersRadiusLocate" data-tip="Приблизить к маркеру" class="icon-target"></button>
+        <button id="markersRadiusExport" data-tip="Скачать маркеры в радиусе в текстовый файл (.csv)" class="icon-download"></button>
+      </div>
+    </div>`;n(`dialogs`).insertAdjacentHTML(`beforeend`,e),n(`markersRadiusValue`).addEventListener(`change`,A),n(`markersRadiusList`).addEventListener(`click`,N),n(`markersRadiusLocate`).addEventListener(`click`,R),n(`markersRadiusExport`).addEventListener(`click`,L)}function A(){let e=Math.max(1,Math.round(+this.value)||T());this.value=String(e),C=e,j(e)}function j(e){if(!S)return;let t=e/options.map.units.distance.scale;b(S.x,S.y,t);let n=pack.markers.filter(e=>Math.hypot(e.x-S.x,e.y-S.y)<=t);s(n.map(e=>e.i)),c.draw(`markers`),M(n)}function M(e){w=e.filter(e=>e.i!==S.i),n(`markersRadiusCount`).textContent=String(w.length),n(`markersRadiusList`).innerHTML=w.map(({i:e,type:t,icon:n,iconFill:r,iconStroke:i,pinned:a,lock:o,name:s})=>{let c=s||t;return`
+        <div class="states" data-id="${e}" style="display:flex; align-items:center; gap:.15em">
+          ${`<span style="width:1.3em; display:flex">${u.html(n,{fill:r,stroke:i})}</span>`}
+          <div data-tip="${t}" style="flex:1; min-width:10em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${c}</div>
+          <span class="icon-pencil pointer" data-tip="Изменить маркер"></span>
+          <span class="icon-target pointer" data-tip="Найти на карте"></span>
+          <span class="icon-pin pointer ${a?``:`inactive`}" data-tip="Закрепить маркер"></span>
+          <span class="locks pointer ${o?`icon-lock`:`icon-lock-open inactive`}" data-tip="Заблокировать маркер"></span>
+          <span class="icon-trash-empty pointer" data-tip="Удалить маркер"></span>
+        </div>`}).join(``)}function N(e){let t=e.target,n=t.closest(`.states`);if(!n)return;let r=+n.dataset.id,i=pack.markers.find(e=>e.i===r);if(!i)return;if(t.classList.contains(`icon-pencil`)){zoomTo(i.x,i.y,8,1600),m.MarkersEditor.open(r);return}if(t.classList.contains(`icon-pin`))return void P(i,t);if(t.classList.contains(`locks`))return void F(i,t);if(t.classList.contains(`icon-trash-empty`))return void I(i);zoomTo(i.x,i.y,8,1600);let a=document.getElementById(`marker${r}`);a&&l(a,2)}function P(e,t){Markers.setPinned(e.i,!e.pinned),t.classList.toggle(`inactive`),c.draw(`markers`)}function F(e,t){Markers.setLocked(e.i,!e.lock),t.className=e.lock?`locks pointer icon-lock`:`locks pointer icon-lock-open inactive`}function I(e){_({title:`Удалить маркер`,message:`Вы уверены, что хотите удалить этот маркер? Это действие необратимо`,confirm:`Удалить`,onConfirm:()=>{Markers.remove(e.i),document.getElementById(`marker${e.i}`)?.remove(),h(),j(E())}})}function L(){if(!w.length)return void d(`No markers in range to export`,!1,`error`);let t=e=>`"${e.replaceAll(`"`,`""`)}"`;e(`Id,Type,Icon,Name,Note,State,Culture,X,Y,Latitude,Longitude
+`+w.map(({i:e,type:n,icon:r,x:i,y:s,cell:c,name:l,note:d})=>{let f=t(l),p=t(d||``),m=pack.states[pack.cells.state[c]],h=pack.cultures[pack.cells.culture[c]],g=m?t(m.fullName||m.name):``,_=h?t(h.name):``,v=o(s,options.map.geography.coordinates,options.map.graph.height,2),y=a(i,options.map.geography.coordinates,options.map.graph.width,2);return[e,n,t(u.glyphText(r)??r),f,p,g,_,i,s,v,y].join(`,`)}).join(`
+`),`${r(`Markers in radius`)}.csv`)}function R(){S&&zoomTo(S.x,S.y,8,1600)}function z(){x(),s(null),c.draw(`markers`),w=[],S=null,f(),$(`#markersInRadius`).dialog(`destroy`),document.getElementById(`markersInRadius`)?.remove()}var B={open:O};export{B as MarkersInRadius};

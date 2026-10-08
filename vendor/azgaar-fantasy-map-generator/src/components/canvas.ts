@@ -20,21 +20,29 @@ export function applyGraphSize(): void {
   select("#deftemp").select("mask#water > rect").attr("width", width).attr("height", height);
 }
 
+/** Насколько дальше «весь мир в окне» можно отъехать назад: вчетверо мельче */
+const ZOOM_OUT_DEPTH = 4;
+
 /**
  * The zoom floor is the scale at which the map covers the viewport, derived from the two of them:
- * a map larger than the window zooms out until it fits, a smaller one in until it covers. It is
- * also what the panel shows, so the control never claims a limit the canvas does not enforce.
- * Rounded up, so the rounding itself cannot leave a hairline of canvas at the edge
+ * a map larger than the window zooms out until it fits, a smaller one in until it covers. The whole
+ * world is not the end of it either: back off by ZOOM_OUT_DEPTH more and the map sits in its
+ * margins, which is how big worlds are surveyed from the side. The requested minimum is clamped
+ * between the two, and it is exactly what the panel shows, so the control never claims a limit the
+ * canvas does not enforce. Rounded up, so the rounding itself cannot leave a hairline of canvas.
  */
 export function applyZoomExtent(): void {
   const { width, height } = options.map.graph;
-  const cover = Math.ceil(Math.max(viewport.width / width, viewport.height / height) * 1000) / 1000;
+  const fit = Math.ceil(Math.max(viewport.width / width, viewport.height / height) * 1000) / 1000;
+  const floor = Math.floor((fit / ZOOM_OUT_DEPTH) * 10000) / 10000;
+  const wanted = options.app.zoomExtent.min || fit;
+  const min = Math.min(Math.max(wanted, Math.min(floor, fit)), fit);
 
-  Options.set(o => (o.app.zoomExtent.min = cover));
+  Options.set(o => (o.app.zoomExtent.min = min));
   const input = findEl<HTMLInputElement>("zoomExtentMin");
-  if (input) input.value = String(cover);
+  if (input) input.value = String(min);
 
-  setZoomExtent(cover, options.app.zoomExtent.max);
+  setZoomExtent(min, options.app.zoomExtent.max);
   constrainZoom(); // d3 applies a new extent to gestures only; the current view has to be pulled in
 }
 

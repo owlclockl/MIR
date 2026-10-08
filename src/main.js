@@ -2154,19 +2154,14 @@ const worldExploreHtml = (session) => {
 const worldFmgOverlayHtml = (session, seed) => {
   const frameUrl = `/fmg/index.html?seed=${encodeURIComponent(seed)}`;
   return `
-    <section class="world-fmg-overlay" data-role="world-fmg-overlay" role="dialog" aria-modal="true" aria-label="Картографическая мастерская Azgaar" hidden>
+    <section class="world-fmg-overlay" data-role="world-fmg-overlay" role="dialog" aria-modal="true" aria-label="Редактор карт" hidden>
       <div class="world-fmg-shell">
         <header class="world-fmg-heading">
-          <div>
-            <p class="world-card__eyebrow">РАСШИРЕННАЯ КАРТОГРАФИЯ · AZGAAR FMG</p>
-            <h3>Мастерская карт</h3>
-            <p class="world-fmg-description">Полный редактор Fantasy Map Generator открыт внутри MIR. Карта остаётся открытой, когда вы возвращаетесь в атлас.</p>
-          </div>
-          <div class="world-fmg-seed"><span>SEED MIR · ПЕРЕДАН</span><code data-role="world-fmg-seed">${escapeHtml(seed)}</code></div>
+          <div class="world-fmg-seed"><span>SEED</span><code data-role="world-fmg-seed">${escapeHtml(seed)}</code></div>
           <button class="world-topbar-button world-fmg-back-button" type="button" data-action="world-fmg-back" aria-label="Вернуться в атлас MIR">${icon('chevron', 'world-back-icon')}<span>Атлас MIR</span></button>
         </header>
         <iframe class="world-fmg-frame" data-role="world-fmg-frame"
-          src="${escapeHtml(frameUrl)}" title="Azgaar Fantasy Map Generator — мастерская карт MIR"
+          src="${escapeHtml(frameUrl)}" title="Редактор карт"
           referrerpolicy="no-referrer" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
         <p class="world-fmg-attribution">Основано на Azgaar’s Fantasy Map Generator · MIT License · Max Haniyeu и contributors</p>
       </div>

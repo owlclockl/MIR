@@ -1,0 +1,18 @@
+import{L as e,On as t,P as n,er as r,nr as i}from"./utils-BXzQ0Tym.js";import{C as a,t as o}from"./layers-Bcg3SU5R.js";import{i as s,t as c}from"./tooltips-P6FAPAdd.js";import{t as l}from"./controllers-DoYIZ-kt.js";import{i as u,n as d}from"./dialog-helpers-CJ5pbzaw.js";import{t as f}from"./viewbox-events-3YWWeuSF.js";import{t as p}from"./map-placement-Ba3TDMYG.js";var m=[],h=!1;function g(e){customization||(p(),d(),o.show(`routes`),h=!o.isOn(`cells`),o.show(`cells`),s(`Кликните, чтобы добавить точку маршрута`,!0),t(`#debug`).append(`g`).attr(`id`,`controlCells`),t(`#debug`).append(`g`).attr(`id`,`controlPoints`),t(`#viewbox`).style(`cursor`,`crosshair`).on(`click`,y),m=[],_(),n(`routeCreatorGroupSelect`).innerHTML=t(`#routes`).selectAll(`g`).nodes().map(t=>{let n=e||`roads`;return`<option value="${t.id}" ${t.id===n?`selected`:``}>${t.id}</option>`}).join(``),$(`#routeCreator`).dialog({title:`Создать маршрут`,resizable:!1,position:{my:`left top`,at:`left+10 top+10`,of:`#map`},close:C}))}function _(){u(`routeCreator`),n(`dialogs`).insertAdjacentHTML(`beforeend`,`<div id="routeCreator" class="dialog">
+    <div>Кликните по карте, чтобы добавить/убрать точки маршрута</div>
+    <div id="routeCreatorBody" class="table" style="margin: 0.3em 0"></div>
+    <div id="routeCreatorBottom">
+      <button id="routeCreatorComplete" data-tip="Завершить создание маршрута" class="icon-check"></button>
+      <button id="routeCreatorCancel" data-tip="Отменить создание" class="icon-cancel"></button>
+      <div style="display: inline-block">
+        Group:
+        <select id="routeCreatorGroupSelect"></select>
+        <span id="routeCreatorGroupEdit" data-tip="Изменить группы маршрутов" class="icon-pencil pointer"></span>
+      </div>
+    </div>
+  </div>`),n(`routeCreatorGroupSelect`).addEventListener(`change`,()=>x(m)),n(`routeCreatorGroupEdit`).addEventListener(`click`,()=>void l.RouteGroupsEditor.open()),n(`routeCreatorComplete`).addEventListener(`click`,S),n(`routeCreatorCancel`).addEventListener(`click`,()=>$(`#routeCreator`).dialog(`close`)),n(`routeCreatorBody`).addEventListener(`click`,v)}function v(e){let t=e.target;t.classList.contains(`icon-trash-empty`)&&b(t.parentNode.dataset.point)}function y(t){let[a,o]=e(t,this),s=r(a,0,options.map.graph.width),c=r(o,0,options.map.graph.height),l=Pack.findCell(s,c),u=[i(s,2),i(c,2),l];m.push(u),x(m),n(`routeCreatorBody`).innerHTML+=`<div class="editorLine" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1em;" data-point="${u.join(`-`)}">
+      <span><b>Ячейка</b>: ${l}</span>
+      <span><b>X</b>: ${u[0]}</span>
+      <span><b>Y</b>: ${u[1]}</span>
+      <span data-tip="Удалить точку" class="icon-trash-empty pointer"></span>
+    </div>`}function b(e){m=m.filter(t=>t.join(`-`)!==e),x(m),n(`routeCreatorBody`).querySelector(`[data-point='${e}']`)?.remove()}function x(e){t(`#debug`).select(`#controlCells`).selectAll(`polygon`).data(e).join(`polygon`).attr(`points`,e=>String(Pack.getPolygon(e[2]))).attr(`class`,`current`),t(`#debug`).select(`#controlPoints`).selectAll(`circle`).data(e).join(`circle`).attr(`cx`,e=>e[0]).attr(`cy`,e=>e[1]).attr(`r`,.6);let r=n(`routeCreatorGroupSelect`).value;a({group:r,points:e})}function S(){let e=m;if(e.length<2){s(`Добавьте минимум 2 точки`,!1,`error`);return}let t=n(`routeCreatorGroupSelect`).value,r=Routes.create(e,t);a(null),o.draw(`routes`),l.RouteEditor.open(`route${r}`)}function C(){t(`#debug`).select(`#controlCells`).remove(),t(`#debug`).select(`#controlPoints`).remove(),a(null),f(),c(),h&&o.hide(`cells`),h=!1,u(`routeCreator`)}var w={open:g};export{w as RouteCreator};

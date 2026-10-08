@@ -17,7 +17,6 @@ vi.mock("@/components/options/tabs/layers-tab", () => ({
 }));
 vi.mock("@/components/zoom", () => ({ changeMapZoom: vi.fn(), resetZoom: vi.fn() }));
 vi.mock("@/controllers", () => ({ Controllers: {} }));
-vi.mock("@/components/app-info", () => ({ showInfo: vi.fn() }));
 vi.mock("@/components/layers-presets", () => ({ applyPreset: mocks.applyPreset, savePreset: vi.fn() }));
 vi.mock("@/components/lifecycle", () => ({ regeneratePrompt: vi.fn() }));
 vi.mock("@/components/options/io-panes", () => ({}));

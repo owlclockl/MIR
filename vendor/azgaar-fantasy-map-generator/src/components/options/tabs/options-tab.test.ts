@@ -201,7 +201,7 @@ describe("options tab bindings", () => {
   it("normalizes zoom endpoints together on change", () => {
     control("zoomExtentMax").value = "10";
     edit(control("zoomExtentMin"), "15");
-    expect(options.app.zoomExtent).toEqual({ min: 1, max: 20 });
+    expect(options.app.zoomExtent).toEqual({ min: 0.1, max: 150 });
     control("zoomExtentMin").dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(options.app.zoomExtent).toEqual({ min: 10, max: 15 });

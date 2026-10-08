@@ -288,32 +288,6 @@ function start() {
         }
       },
 
-      // ── About tab ────────────────────────────────────────────────────────────
-      {
-        element: "#aboutTab",
-        onHighlightStarted: () => {
-          ensureEl("aboutTab")?.click();
-        },
-        popover: {
-          title: "About Tab",
-          description:
-            "The About tab has links to documentation, video tutorials, the community Discord, and version information.",
-          side: "bottom"
-        }
-      },
-      {
-        element: "#aboutContent",
-        onHighlightStarted: () => {
-          ensureEl("aboutTab")?.click();
-        },
-        popover: {
-          title: "About & Resources",
-          description:
-            "Find the Quick Start guide, video tutorials, hotkey reference, Discord community, and changelog here. The project is open source and actively maintained.",
-          side: "right"
-        }
-      },
-
       // ── Export / Save / Load ─────────────────────────────────────────────────
       {
         element: "#exportButton",

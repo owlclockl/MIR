@@ -11,8 +11,7 @@ const TAB_CONTENT: Record<string, string> = {
   layersTab: "layersContent",
   styleTab: "styleContent",
   optionsTab: "optionsContent",
-  toolsTab: "toolsContent",
-  aboutTab: "aboutContent"
+  toolsTab: "toolsContent"
 };
 
 export function showOptions(event?: Event): void {
@@ -122,7 +121,7 @@ function initialize(): void {
 
 initialize();
 
-// Legacy seam: the hotkeys and the About tab reach these by name from inline markup
+// Legacy seam: the hotkeys reach these by name from inline markup
 declare global {
   // biome-ignore lint/suspicious/noRedeclare: legacy seam
   var toggleOptions: (event?: Event) => void;

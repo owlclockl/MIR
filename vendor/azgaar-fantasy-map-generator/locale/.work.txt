@@ -1,0 +1,3073 @@
+0001 , currentYOffset: number, stages: Set «production-chains.ts»
+0002 , find a font you like and enter its name to the field below. «dialogs.ts»
+0003 , goodsById: Map «production-chains.ts»
+0004 , inset: Inset): Promise «widgets.ts»
+0005 , just provide the font name. Make sure the browser is reloaded after the installation. The font won't work on machines not having it installed. Good source of fonts are «dialogs.ts»
+0006 , moved: Record «auto-update.ts»
+0007 , onApply: (values: Partial «good-editor.ts»
+0008 , see the «burg-group-editor.ts»
+0009 , stageById: Map «production-chains.ts»
+0010 , temp: ArrayLike «precipitation-generator.ts»
+0011 , uploads are custom-goods- «auto-update.ts»
+0012 : characters that can be duplicated in generated names. For example «namesbase-editor.ts»
+0013 : maximal recommended length of generated names. It should be a number greater than minimal length. «namesbase-editor.ts»
+0014 : minimal recommended length of generated names. It should be a number. «namesbase-editor.ts»
+0015 : name of the base. «namesbase-editor.ts»
+0016 : names data, separated with commas. It should contain at least 3 names to be valid. «namesbase-editor.ts»
+0017 : unused parameter, populate with «namesbase-editor.ts»
+0018 . If you have a font «dialogs.ts»
+0019 . Open «dialogs.ts»
+0020 . Parameters should be separated with the «namesbase-editor.ts»
+0021 . Provide font name and link to the font file hosted online. The best free font hostings are «dialogs.ts»
+0022 . The most common issue is names and other parameters being on two separate lines. «namesbase-editor.ts»
+0023 . This version is compatible with «versioning.ts»
+0024 . To get font file open the link to css provided by these services and manually copy the link to «dialogs.ts»
+0025 . Use the Heightmap Editor for significant changes. «wrap-tool.ts»
+0026 ( schema: z.ZodObject, defaults: Readonly «schemaUtils.ts»
+0027 ( tag: K, attrs: Record «draw-ocean.ts»
+0028 ( tag: K, props: HtmlProps «nodeUtils.ts»
+0029 ( tag: string, id: string, attrs: Record «nodeUtils.ts»
+0030 ( this: ReadableStream «polyfills.ts»
+0031 (".marketDealParty")?.closest «market-deals-overview.ts»
+0032 (".states")?.querySelector «journey-editor.ts»
+0033 ("#controlPoints") .selectAll «river-editor.ts,route-editor.ts»
+0034 ("#emblems") .selectAll «emblems-editor.ts»
+0035 ("#ice") .selectAll «ice-editor.ts»
+0036 ("#lakes") .selectAll «lakes-editor.ts»
+0037 ("#viewbox") .append «draw-marker-radius.ts»
+0038 ("convertOverlay").value = ensureEl «heightmap-editor.ts»
+0039 ("latitude", null), longitude: Pins.valueOr «options-model.ts»
+0040 ("mapSize", null), latitude: Pins.valueOr «options-model.ts»
+0041 ("options3dMeshSky").value, ensureEl «view-3d.ts»
+0042 ("polygon") .data «heightmap-editor.ts»
+0043 ("reliefSize").value = ensureEl «relief-editor.ts»
+0044 ()): Set «validationUtils.ts»
+0045 (array: ArrayLike «probabilityUtils.ts»
+0046 (definition: OptionDefinition «options-tab.ts»
+0047 (ensureEl «relief-editor.ts»
+0048 (entries: ReadonlyMap «arrayUtils.ts»
+0049 (h «heightmap-editor.ts»
+0050 (i «heightmap-editor.ts»
+0051 (key: string): NodeListOf «options-tab.ts»
+0052 (measurer: Measurer, event: MeasurerDragEvent «measurers-editor.ts»
+0053 (node: QuadtreeNode «quadtree.ts»
+0054 (o.app.labels.showAll = ensureEl «labels-group-editor.ts»
+0055 (path: string, init: RequestInit): Promise «api.ts»
+0056 (promise: Promise «registry.ts»
+0057 (tag: K, attrs: Record «preview.ts»
+0058 (target: T, source: Record «objectUtils.ts»
+0059 (value: T): Loader «registry.ts»
+0060 (x: number, y: number, radius: number, tree: Quadtree «quadtree.ts»
+0061 ): AsyncGenerator «polyfills.ts»
+0062 ): Map «arrayUtils.ts»
+0063 ): node is QuadtreeInternalNode «quadtree.ts»
+0064 ): Promise «icons.ts,registry.ts»
+0065 ): Record «production-generator.ts»
+0066 & ArrayLike «pathUtils.ts»
+0067 & Record «markers-generator.ts»
+0068 #controlPoints") .selectAll «labels-editor.ts»
+0069 °C «options-model.ts,world-configurator.ts»
+0070 °F «options-model.ts»
+0071 + Add OR group «goods-distribution-editor.ts»
+0072 + New chat «index.ts»
+0073 +(el.closest «table.ts»
+0074 <u>B</u>iomes «layer-labels.ts»
+0075 <u>C</u>ultures «layer-labels.ts»
+0076 <u>G</u>oods «layer-labels.ts»
+0077 <u>H</u>eightmap «layer-labels.ts»
+0078 <u>I</u>cons «layer-labels.ts»
+0079 <u>L</u>abels «layer-labels.ts»
+0080 <u>M</u>ilitary «layer-labels.ts»
+0081 <u>P</u>rovinces «layer-labels.ts»
+0082 <u>R</u>eligions «layer-labels.ts»
+0083 <u>S</u>tates «layer-labels.ts»
+0084 <u>T</u>emperature «layer-labels.ts»
+0085 <u>W</u>ind Rose «layer-labels.ts»
+0086 <u>Z</u>ones «layer-labels.ts»
+0087 = D3DragEvent «measurers-editor.ts»
+0088 = Extract «widgets.ts»
+0089 = Partial «nodeUtils.ts»
+0090 = QuadtreeInternalNode «quadtree.ts»
+0091 = Record «sorting.ts»
+0092 = ym) «quadtree.ts»
+0093 🔑 Connect your AI key «index.ts»
+0094 0 of 0 «burgs-overview.ts»
+0095 0.5x «view-3d.ts»
+0096 1 map pixel: «units-editor.ts»
+0097 1 MB «index.ts»
+0098 1 population point: «units-editor.ts»
+0099 10 MB, shrunk to 1024 px «index.ts»
+0100 1000 x 1000 px «index.html»
+0101 10K «options-tab.ts»
+0102 18px «coastline-editor.ts»
+0103 2 MB, shrunk to 256 px «index.ts»
+0104 200 kB «index.ts»
+0105 2px «coastline-editor.ts»
+0106 3D mode settings «view-3d.ts»
+0107 3D Preview «view-3d.ts»
+0108 3D scene «customization-tab.ts,layers-tab.ts»
+0109 A ready-made look. Sets every slider, tune from there «coastline-editor.ts»
+0110 A route cannot be split at its end point «route-editor.ts»
+0111 A sample of the relief the pool places, at the map's sizes and spacing «relief-pool-editor.ts»
+0112 A transport type with that name already exists «transport-editor.ts»
+0113 Abbreviation cannot be empty «hierarchy-tree.ts»
+0114 Abbreviation must be 3 characters or less «hierarchy-tree.ts»
+0115 above sea level «burg-editor.ts»
+0116 absolute «compare-prices.ts,goods-editor.ts,markets-overview.ts»
+0117 Acacia «relief-generator.ts»
+0118 Actions «labels-group-editor.ts»
+0119 Activate/deactivate group «burg-group-editor.ts,labels-group-editor.ts»
+0120 Activate/deactivate group. Deactivated group labels are not visible «labels-group-editor.ts»
+0121 Active «burg-group-editor.ts,labels-group-editor.ts,markers-generator.ts»
+0122 add «proposal-card.ts»
+0123 Add «good-editor.ts,proposal-card.ts,tools-tab.ts»
+0124 Add a chart «charts-overview.ts»
+0125 Add a custom biome «biomes-editor.ts»
+0126 Add a new burg. Hold Shift to add multiple «burgs-overview.ts»
+0127 Add a new culture. Hold Shift to add multiple «cultures-editor.ts»
+0128 Add a new good «goods-editor.ts»
+0129 Add a new marker. Hold Shift to add multiple «markers-overview.ts»
+0130 Add a new market. Click on a burg on the map. Hold Shift to add multiple «markets-overview.ts»
+0131 Add a new province. Hold Shift to add multiple «provinces-editor.ts»
+0132 Add a new religion. Hold Shift to add multiple «religions-editor.ts»
+0133 Add a new state. Hold Shift to add multiple «states-editor.ts»
+0134 Add a new transport type «transport-editor.ts»
+0135 Add a recipe «good-editor.ts»
+0136 Add a relief type, drawn in the style's relief set «relief-pool-editor.ts»
+0137 Add a rule, checked last «relief-rules-editor.ts»
+0138 Add a segment to the journey «journey-editor.ts»
+0139 Add additional marker of that type «markers-editor.ts»
+0140 Add any icon… «relief-pool-editor.ts»
+0141 Add at least 2 cells «river-creator.ts»
+0142 Add at least 2 points «route-creator.ts»
+0143 Add Burg «map-commands.ts»
+0144 Add column left «notes-rich-text.ts»
+0145 Add column right «notes-rich-text.ts»
+0146 Add custom font «dialogs.ts»
+0147 Add ingredient «good-editor.ts»
+0148 Add Label «map-commands.ts»
+0149 Add link «index.ts»
+0150 Add Marker «map-commands.ts»
+0151 Add new good «good-editor.ts»
+0152 Add new military unit to the table «military-overview.ts»
+0153 Add new namesbase «namesbase-editor.ts»
+0154 Add new zone layer «zones-editor.ts»
+0155 Add or subtract value from all heights in range «heightmap-editor.ts»
+0156 Add regiment to the battle «battle-screen.ts»
+0157 Add River «map-commands.ts»
+0158 Add Route «map-commands.ts»
+0159 Add route group «route-groups-editor.ts»
+0160 Add row above «notes-rich-text.ts»
+0161 Add row below «notes-rich-text.ts»
+0162 Add your own icon, an emoji or another set's art «relief-pool-editor.ts»
+0163 Adjust cell shapes with a brush «tools-tab.ts»
+0164 after «change.ts»
+0165 After zoom «performance-settings.ts»
+0166 AI Text Generator «ai-generator.ts»
+0167 Air Battle «battle-screen.ts»
+0168 Air Battle: maneuring fight of avia units «battle-screen.ts»
+0169 Align brush: drag to set height of cells in radius to height of the cell at mousepoint «heightmap-editor.ts»
+0170 Alignment «notes-rich-text.ts»
+0171 all «burg-group-editor.ts,military-overview.ts»
+0172 All «market-deals-overview.ts»
+0173 all cells «heightmap-editor.ts»
+0174 All population of religion territory is considered believers of this religion. It means believers number change will directly affect population «religions-editor.ts»
+0175 All routes are locked. Unlock routes to remove them, or use Lock all to unlock first. «routes-overview.ts»
+0176 All units should have unique names «military-overview.ts»
+0177 All-world «options-tab.ts»
+0178 Allies formed a defensive pact and protect each other in case of third party aggression «diplomacy.ts»
+0179 Allow culture centers, expansion and type changes to take an immediate effect «cultures-editor.ts»
+0180 Allow dragging the map beyond the canvas borders «options-tab.ts»
+0181 Allow religion center, extent, and expansionism changes to take an immediate effect «religions-editor.ts»
+0182 Allow states neutral distance, expansion and type changes to take an immediate effect «states-editor.ts»
+0183 Allow system to change state labels when states data is change «states-editor.ts»
+0184 Allow water erosion «customization-tab.ts»
+0185 Ambush: surprise attack «battle-screen.ts»
+0186 Analyze namesbase to get a validity and quality overview «namesbase-editor.ts»
+0187 anchor «draw-burg-icons.ts»
+0188 Anchors «styles-schema.ts»
+0189 Animations «trade-animation-editor.ts»
+0190 Annex provinces: click the annexing province, then the provinces of the same state it absorbs. Hold Shift to keep annexing «provinces-editor.ts»
+0191 Annex states: click the annexing state, then the states it absorbs. Hold Shift to keep annexing «states-editor.ts»
+0192 Annual max precipitation «charts-overview.ts»
+0193 Annual max temperature «charts-overview.ts»
+0194 Annual mean precipitation «charts-overview.ts»
+0195 Annual mean temperature «charts-overview.ts»
+0196 Annual min precipitation «charts-overview.ts»
+0197 Annual min temperature «charts-overview.ts»
+0198 Antique «options-tab.ts»
+0199 Antique big «textures.ts»
+0200 Antique small «textures.ts»
+0201 any «burg-group-editor.ts,relief-rules-editor.ts»
+0202 Any «burg-group-editor.ts,relief-editor.ts»
+0203 API key «index.ts»
+0204 Apply «ai-generator.ts,burg-group-editor.ts,cultures-editor.ts»
+0205 Apply a filter «burgs-overview.ts»
+0206 Apply changes «diplomacy-editor.ts»
+0207 Apply changes and regenerate markers «markers-settings.ts»
+0208 Apply current settings to the map «world-configurator.ts»
+0209 Apply military units settings. <span style='color:#cb5858'>All forces will be recalculated!</span> «military-overview.ts»
+0210 Apply painted changes «paint-editor.ts»
+0211 Apply the changes and keep editing «wrap-tool.ts»
+0212 Apply the pasted emblem «emblems-editor.ts»
+0213 apply to all non-overwritten features «coastline-editor.ts»
+0214 Applying changes reclassifies Burgs, but label groups are not affected. Reconcile label groups in «burg-group-editor.ts»
+0215 Archipelago «heightmap-editor.ts,heightmap-templates.ts»
+0216 are «style-preset.ts»
+0217 Are you sure you want to change the style preset? All unsaved style changes will be lost «style-preset.ts»
+0218 Are you sure you want to declare province independence? <br>It will turn province into a new state «provinces-editor.ts»
+0219 Are you sure you want to generate a new map?<br />All unsaved changes made to the current map will be lost «lifecycle.ts»
+0220 Are you sure you want to merge provinces? This action cannot be reverted. «provinces-editor.ts»
+0221 Are you sure you want to merge states? This action cannot be reverted. «states-editor.ts»
+0222 Are you sure you want to regenerate bonus goods placement? Generation will be based on the current Goods settings and won't affect production or trade «goods-editor.ts»
+0223 Are you sure you want to regenerate production and trade for all goods? Generation will be based on the current Goods settings and bonus goods placement «goods-editor.ts,markets-overview.ts»
+0224 Are you sure you want to regenerate relations of all states? <br>This action cannot be reverted «diplomacy-overview.ts»
+0225 Are you sure you want to remove all non-locked markers? The action cannot be reverted «markers-overview.ts»
+0226 Are you sure you want to remove the burg? <br>This action cannot be reverted «burg-editor.ts,burgs-overview.ts»
+0227 Are you sure you want to remove the culture? <br>This action cannot be reverted «cultures-editor.ts»
+0228 Are you sure you want to remove the entire route group? All routes in this group will be removed.<br>This action can't be reverted «route-groups-editor.ts»
+0229 Are you sure you want to remove the group? <br>This WON'T change the burgs unless the changes are applied «burg-group-editor.ts»
+0230 Are you sure you want to remove the journey? <br>This action cannot be reverted. «journeys-overview.ts»
+0231 Are you sure you want to remove the religion? <br>This action cannot be reverted «religions-editor.ts»
+0232 Are you sure you want to remove the route? <br>This action cannot be reverted «route-editor.ts,routes-overview.ts»
+0233 Are you sure you want to remove the selected note? There is no way to undo this action «notes-editor.ts»
+0234 Are you sure you want to remove the state? <br>This action cannot be reverted «states-editor.ts»
+0235 Are you sure you want to remove the zone? <br>This action cannot be reverted «zones-editor.ts»
+0236 Are you sure you want to remove this marker? The action cannot be reverted «markers-editor.ts,markers-in-radius.ts,markers-overview.ts»
+0237 Are you sure you want to restore default goods? <br>This action cannot be reverted «goods-editor.ts»
+0238 Area «biomes-editor.ts,cultures-editor.ts,features-overview.ts»
+0239 Area unit: «units-editor.ts»
+0240 Armoria cannot show pictures from the icon library: those charges are missing there «emblems-editor.ts»
+0241 Armoria link or COA string «emblems-editor.ts»
+0242 Ask a question… «index.ts»
+0243 Ask this «widgets.ts»
+0244 Assign «labels-editor.ts,labels-overview.ts»
+0245 Assign all selected labels to the selected group «labels-overview.ts»
+0246 Assign cross-type Label Group «labels-editor.ts,labels-overview.ts»
+0247 Assignment order: move group down «burg-group-editor.ts»
+0248 Assignment order: move group up «burg-group-editor.ts»
+0249 Assignment order: move group up or down «labels-group-editor.ts»
+0250 Assistant chat «index.ts»
+0251 at «journey-places.ts»
+0252 At least one group should be defined «burg-group-editor.ts,labels-group-editor.ts»
+0253 Atoll «heightmap-editor.ts,heightmap-templates.ts»
+0254 Attached image «index.ts»
+0255 Attack foreign regiment «regiment-editor.ts»
+0256 Attackers «battle-screen.ts»
+0257 Attackers army destroyed «battle-screen.ts»
+0258 Attackers morale: «battle-screen.ts»
+0259 Attackers strength during this phase. Strength defines dealt damage «battle-screen.ts»
+0260 auto «commonUtils.ts»
+0261 Auto «performance-settings.ts»
+0262 auto-apply changes «cultures-editor.ts,religions-editor.ts,states-editor.ts»
+0263 auto-change labels «states-editor.ts»
+0264 Automatically add river starting from clicked cell. Hold Shift to add multiple «rivers-overview.ts»
+0265 Automatically update world on input changes and button clicks «world-configurator.ts»
+0266 Autonomy «provinces-editor.ts»
+0267 Autosave interval «options-tab.ts»
+0268 Autosave: map cannot be saved in edit mode «autosave.ts»
+0269 Autosave: map is saved «autosave.ts»
+0270 Average area «provinces-editor.ts»
+0271 Average depth: «lakes-editor.ts»
+0272 Average discharge «rivers-overview.ts»
+0273 Average elevation «charts-overview.ts»
+0274 Average forces rate per state «military-overview.ts»
+0275 Average gross product «burgs-overview.ts»
+0276 Average gross sales revenue per market «markets-overview.ts»
+0277 Average length «rivers-overview.ts,routes-overview.ts»
+0278 Average market value per market «markets-overview.ts»
+0279 Average military forces per state «military-overview.ts»
+0280 Average mouth width «rivers-overview.ts»
+0281 Average name length «namesbase-editor.ts»
+0282 Average number of generation variants for each key in the chain «namesbase-editor.ts»
+0283 Average population «burgs-overview.ts,provinces-editor.ts»
+0284 Average price of this good across markets «compare-prices.ts»
+0285 Average purchase spending per market «markets-overview.ts»
+0286 Average speed «journeys-overview.ts»
+0287 Average speed, moving segments only «journeys-overview.ts»
+0288 Average speed, segments with non-zero speed only «journey-editor.ts»
+0289 Average treasury «burgs-overview.ts»
+0290 Average War Alert «military-overview.ts»
+0291 Azgaar Assistant «index.ts,options-tab.ts»
+0292 Azgaar's «index.html»
+0293 Azgaar's Fantasy Map Generator «emblems-editor.ts»
+0294 Azgaar's Fantasy Map Generator output: azgaar.github.io/Fantasy-map-generator «export-json.ts»
+0295 Background «styles-schema.ts»
+0296 Background element padding in pixels «styles-schema.ts»
+0297 Bad answer «index.ts»
+0298 Bake procedural erosion detail into the 3D terrain. Visual only, the map data is not changed «view-3d.ts»
+0299 Balance «options-tab.ts»
+0300 Banner «emblems-editor.ts,options-tab.ts»
+0301 Bar size «styles-schema.ts»
+0302 Barony «provinces-editor.ts»
+0303 Baroque «emblems-editor.ts,options-tab.ts»
+0304 Base name «namesbase-editor.ts»
+0305 Base Price* «good-editor.ts»
+0306 based «military-generator.ts»
+0307 Basin «rivers-overview.ts»
+0308 Battle type. Click to change «battle-screen.ts»
+0309 battleAttackers «battle-screen.ts»
+0310 battleDefenders «battle-screen.ts»
+0311 before «change.ts»
+0312 before editing the heightmap! «heightmap-editor.ts»
+0313 Bevel «style-choices.ts»
+0314 big «river-generator.ts»
+0315 Biome «biomes-editor.ts,charts-overview.ts,fields.ts»
+0316 Biome area «biomes-editor.ts»
+0317 Biome Baseline Production «good-editor.ts»
+0318 Biome habitability percent «biomes-editor.ts»
+0319 Biome habitability percent. Click and set new value to change «biomes-editor.ts»
+0320 Biome name. Click and type to change «biomes-editor.ts»
+0321 Biomes «burg-group-editor.ts,map-entities.ts,military-overview.ts»
+0322 Biomes Editor «biomes-editor.ts»
+0323 Biomes the rule claims «relief-rules-editor.ts»
+0324 black «draw-landmass.ts»
+0325 Blob maximum height, use hyphen to get a random number in range «heightmap-editor.ts»
+0326 Blobs to add, use hyphen to get a random number in range «heightmap-editor.ts»
+0327 block «renderer.ts,view-3d-renderer.ts,view-3d.ts»
+0328 Blockade phase. Prepare or hold the blockade «battle-screen.ts»
+0329 Blur «styles-schema.ts»
+0330 Blur radius in pixels. Set to 0 for a solid line «styles-schema.ts»
+0331 Blurred glow along state borders. It is an SVG blur filter, which is costly on big maps «performance-settings.ts»
+0332 Boarding phase. Melee units go aboard «battle-screen.ts»
+0333 Boeotian «emblems-editor.ts,options-tab.ts»
+0334 bold «renderer.ts»
+0335 Bold «notes-rich-text.ts»
+0336 Bombardment phase. Attack enemy with machinery units «battle-screen.ts»
+0337 Bonus distribution «good-editor.ts»
+0338 boolean ): Promise «draw-trade-animation.ts»
+0339 Browse all elements and their groups «style-tab.ts»
+0340 Brush size: «paint-editor.ts»
+0341 bString ? 1 : aString «sorting.ts»
+0342 Bubble «markers-editor.ts»
+0343 Bulk assignment: select multiple labels and assign them all to one group «labels-overview.ts»
+0344 Bulleted list «notes-rich-text.ts»
+0345 Bundle «elevation-profile.ts»
+0346 burg «draw-burg-icons.ts,emblems-editor.ts»
+0347 Burg «burgs-overview.ts,emblems-editor.ts,fields.ts»
+0348 Burg average daily production «burg-editor.ts»
+0349 Burg average yearly temperature «burg-editor.ts»
+0350 Burg emblem. Click to edit «burg-editor.ts»
+0351 Burg group «burgs-overview.ts»
+0352 Burg Group Configurator «labels-group-editor.ts»
+0353 Burg height above mean sea level «burg-editor.ts»
+0354 Burg map preview: scroll to zoom, drag to pan «burg-editor.ts»
+0355 Burg name «burgs-overview.ts»
+0356 Burg population «burgs-overview.ts»
+0357 Burg population is calculated as «burg-group-editor.ts»
+0358 Burg preview generator «burg-group-editor.ts»
+0359 Burg preview: «burg-editor.ts»
+0360 Burg Production: «cell-info.ts»
+0361 Burg province «burgs-overview.ts»
+0362 Burg state «burgs-overview.ts»
+0363 Burgs «charts-overview.ts,map-entities.ts,markets-overview.ts»
+0364 Burgs bubble chart «burgs-overview.ts»
+0365 Burgs bulk renaming «burgs-overview.ts»
+0366 Burgs count «provinces-editor.ts,states-editor.ts»
+0367 Burgs displayed «burgs-overview.ts»
+0368 burgs except for capitals and market centers? «burgs-overview.ts»
+0369 Burgs number «options-tab.ts,states-editor.ts»
+0370 Burgs Overview «burgs-overview.ts»
+0371 Burgs profit «charts-overview.ts»
+0372 Burgs profit from trade and manufacturing «charts-overview.ts»
+0373 busy icon-cancel «index.ts»
+0374 Butt «style-choices.ts»
+0375 BUY «production-overview.ts»
+0376 Buyer «trade-details.ts»
+0377 Buys «markets-overview.ts»
+0378 bValue ? 1 : aValue «sorting.ts»
+0379 by name «charts-overview.ts»
+0380 by value «charts-overview.ts»
+0381 Cactus «relief-generator.ts»
+0382 Calculated size of image if combined «index.html»
+0383 Calm shores «coastline-editor.ts»
+0384 Calmer lakes «coastline-editor.ts»
+0385 Can't plot a journey: the map needs at least two burgs connected by land or sea «journeys-overview.ts»
+0386 Cancel «burg-group-editor.ts,burgs-overview.ts,cultures-editor.ts»
+0387 Cancel battle: roll back results and close the screen «battle-screen.ts»
+0388 Cancel painted changes «paint-editor.ts»
+0389 Cancel the conversion. Previous heightmap will be restored «heightmap-editor.ts»
+0390 Cancel the creation «river-creator.ts,route-creator.ts»
+0391 Cannot attach regiment to itself. Please click on another regiment «regiment-editor.ts»
+0392 Cannot attack fraternal regiment «regiment-editor.ts»
+0393 Cannot fetch Google font for this value «fonts.ts»
+0394 Cannot load 3d library «view-3d-renderer.ts»
+0395 Cannot load a namesbase. Please check the data format «namesbase-editor.ts»
+0396 Cannot load last saved map «load.ts»
+0397 Cannot load the file, please check the format «burgs-overview.ts»
+0398 Cannot load the file. Please check the data format «notes-editor.ts,style-preset.ts»
+0399 Cannot parse the list, please check the file format «burgs-overview.ts»
+0400 Cannot parse the template, please check the file «heightmap-editor.ts»
+0401 Cannot remove system preset «style-preset.ts»
+0402 Canton «provinces-editor.ts»
+0403 Capital «provinces-editor.ts,states-editor.ts»
+0404 Capital name «states-editor.ts»
+0405 capital, «burgs-overview.ts»
+0406 Captaincy «provinces-editor.ts»
+0407 Casualties «battle-screen.ts»
+0408 CDN Fonts «dialogs.ts»
+0409 Cell «route-creator.ts»
+0410 Cell Details «cell-info.ts»
+0411 Cell info: «customization-tab.ts»
+0412 Cell Production: «cell-info.ts»
+0413 Cells «biomes-editor.ts,charts-overview.ts,cultures-editor.ts»
+0414 Cells assigned to no market «markets-overview.ts»
+0415 Cells at or above a height «goods-distribution-editor.ts»
+0416 Cells at or below a height «goods-distribution-editor.ts»
+0417 Cells by proximity to water «goods-distribution-editor.ts»
+0418 Cells by waterbody type «goods-distribution-editor.ts»
+0419 Cells count «biomes-editor.ts,cultures-editor.ts,states-editor.ts»
+0420 Cells in specific biomes «goods-distribution-editor.ts»
+0421 Cells that have a river flowing «goods-distribution-editor.ts»
+0422 Cells to change: «heightmap-editor.ts»
+0423 Cells where biome habitability is at or above a value «goods-distribution-editor.ts»
+0424 Cells with average temperature at or above a value «goods-distribution-editor.ts»
+0425 Cells with average temperature at or below a value «goods-distribution-editor.ts»
+0426 Chance «good-editor.ts»
+0427 Change «heightmap-editor.ts,style-preset.ts»
+0428 Change believers number «religions-editor.ts»
+0429 Change brush power «heightmap-editor.ts»
+0430 Change brush size. Shortcut: Shift + drag on the map, or + and − «map-brush.ts»
+0431 Change culture population «cultures-editor.ts»
+0432 Change height for all cells «heightmap-editor.ts»
+0433 Change Iceberg size «ice-editor.ts»
+0434 Change land only «paint-editor.ts»
+0435 Change line randomness. Zero makes the line as straight as possible «heightmap-editor.ts»
+0436 Change only land or all cells «heightmap-editor.ts»
+0437 Change population of all cells assigned to the culture «cultures-editor.ts»
+0438 Change population of all cells assigned to the state «states-editor.ts»
+0439 Change province name «provinces-editor.ts»
+0440 Change province population «provinces-editor.ts»
+0441 Change relations: click or drag over states on the map «diplomacy-overview.ts»
+0442 Change state name «states-editor.ts»
+0443 Change state population «states-editor.ts»
+0444 Change style preset «style-preset.ts»
+0445 Change Template «heightmap-editor.ts»
+0446 Change the icon «markers-settings.ts»
+0447 Change zone population «zones-editor.ts»
+0448 character, and this character should not be used within the parameters. Another prohibited character is «namesbase-editor.ts»
+0449 Characters outside of Basic Latin have bad font support «namesbase-editor.ts»
+0450 Charge «emblems-editor.ts»
+0451 Charge size «emblems-editor.ts»
+0452 Charts «tools-tab.ts»
+0453 chat «index.ts»
+0454 chats «index.ts»
+0455 Chats «index.ts»
+0456 Check if unit is <b>separate</b> and can be stacked only with the same units «military-overview.ts»
+0457 Check if unit is separate and can be stacked only with units of the same type «military-overview.ts»
+0458 Check the «provinces-editor.ts,states-editor.ts»
+0459 Check to not allow system to automatically hide labels «index.html»
+0460 Check to render ocean heights «styles-schema.ts»
+0461 Check to set as a secondary origin «hierarchy-tree.ts»
+0462 Checking the latest version… «app-offer.ts»
+0463 Chiefdom «provinces-editor.ts»
+0464 Choose a preset to instantly show or hide common layer combinations: Political, Physical, Religions, and more. «ui-tour.ts»
+0465 Choose the shape of the ocean embellishments «styles-schema.ts»
+0466 Circle «markers-editor.ts»
+0467 citadel, «burgs-overview.ts»
+0468 Clan «provinces-editor.ts»
+0469 Clear «diplomacy-overview.ts»
+0470 Clear formatting «notes-rich-text.ts»
+0471 Clear water along the shoreline, relative to lake ripple scale «styles-schema.ts»
+0472 Click any layer name to toggle it on or off. Layers can be reordered by dragging and dropping them. «ui-tour.ts»
+0473 Click on «index.html»
+0474 Click on a burg on the map to create a new market there. Hold Shift to add multiple «markets-overview.ts»
+0475 Click on a burg on the map to relocate the market center «market-overview.ts»
+0476 Click on a burg to create a new market — no burg found here «markets-overview.ts»
+0477 Click on a control point to split the route there «route-editor.ts»
+0478 Click on another regiment to initiate battle «regiment-editor.ts»
+0479 Click on another regiment to unite both regiments. The current regiment will be removed «regiment-editor.ts»
+0480 Click on map to add/remove route points «route-creator.ts»
+0481 Click on map to create an iceberg. Hold Shift to add multiple «ice-editor.ts»
+0482 Click on map to create new regiment or fleet «regiment-editor.ts,regiments-overview.ts»
+0483 Click on map to place a burg. Hold Shift to add multiple «tools-tab.ts»
+0484 Click on map to place a marker. Hold Shift to add multiple «tools-tab.ts»
+0485 Click on map to place a river. Hold Shift to add multiple «tools-tab.ts»
+0486 Click on map to place label. Hold Shift to add multiple «tools-tab.ts»
+0487 Click on map to relocate burg. Hold Shift for continuous move «burg-editor.ts»
+0488 Click on the map to add a new culture «cultures-editor.ts»
+0489 Click on the map to add a new religion «religions-editor.ts»
+0490 Click on the map to create a new capital or promote an existing burg «states-editor.ts»
+0491 Click on the map to place a new province center «provinces-editor.ts»
+0492 Click or drag over states to set their relation. Shift + click to select another state «diplomacy-editor.ts»
+0493 Click Save to download a .map file preserving your entire world. Click Load to open a previously saved file and continue where you left off. «ui-tour.ts»
+0494 Click this arrow button to open the main options panel where all configuration tabs live. «ui-tour.ts»
+0495 Click to add a control point «labels-editor.ts»
+0496 Click to add custom province form name to the list «provinces-editor.ts»
+0497 Click to add custom state form name to the list «states-editor.ts»
+0498 Click to add river point, click again to remove «river-creator.ts»
+0499 Click to add route point «route-creator.ts»
+0500 Click to change generation and UI options «index.html»
+0501 Click to change map layers «index.html»
+0502 Click to change wind direction «world-configurator.ts»
+0503 Click to close the picker «color-picker.ts»
+0504 Click to expand deal details «production-overview.ts»
+0505 Click to expand decision details «production-overview.ts»
+0506 Click to generate a map with this seed «seed.ts»
+0507 Click to generate a new map «index.html»
+0508 Click to generate a submap from the current viewport «tools-tab.ts»
+0509 Click to hide the Menu «index.html»
+0510 Click to invert lock state for all markers «markers-overview.ts»
+0511 Click to invert pin state for all markers «markers-overview.ts»
+0512 Click to join the route to another route that starts or ends at the same cell «route-editor.ts»
+0513 Click to name the map, date its calendar and describe the world «options-tab.ts»
+0514 Click to open Biomes Editor «tools-tab.ts»
+0515 Click to open Burgs Overview «tools-tab.ts»
+0516 Click to open Cell details view «tools-tab.ts»
+0517 Click to open Charts to overview cells data «tools-tab.ts»
+0518 Click to open Coastline Editor «tools-tab.ts»
+0519 Click to open Cultures Editor «tools-tab.ts»
+0520 Click to open Diplomatical relationships Editor «tools-tab.ts»
+0521 Click to open Emblem Editor «tools-tab.ts»
+0522 Click to open Geographical Features Overview «tools-tab.ts»
+0523 Click to open Goods Editor «tools-tab.ts»
+0524 Click to open Heightmap customization menu «tools-tab.ts»
+0525 Click to open Journeys Overview «tools-tab.ts»
+0526 Click to open Labels Overview «tools-tab.ts»
+0527 Click to open Markers Overview «tools-tab.ts»
+0528 Click to open Markets Overview «tools-tab.ts»
+0529 Click to open Measurers Editor «tools-tab.ts»
+0530 Click to open Military Forces Overview «tools-tab.ts»
+0531 Click to open minimap overview. Click minimap to center view «tools-tab.ts»
+0532 Click to open Namesbase Editor «tools-tab.ts»
+0533 Click to open Notes Editor «tools-tab.ts»
+0534 Click to open Provinces Editor «tools-tab.ts»
+0535 Click to open Religions Editor «tools-tab.ts»
+0536 Click to open Rivers Overview «tools-tab.ts»
+0537 Click to open Routes Overview «tools-tab.ts»
+0538 Click to open States Editor «tools-tab.ts»
+0539 Click to open style editor «index.html»
+0540 Click to open the Measurers Editor «map-tooltip.ts»
+0541 Click to open the preset gallery and pick a color scheme for the map. The entire map's color palette updates instantly. «ui-tour.ts»
+0542 Click to open tools menu «index.html»
+0543 Click to open Trade Animation Editor «tools-tab.ts»
+0544 Click to open Units Editor «draw-scalebar.ts,load.ts,tools-tab.ts»
+0545 Click to open Zones Editor «tools-tab.ts»
+0546 Click to overview neutral burgs «states-editor.ts»
+0547 Click to overview province burgs «provinces-editor.ts»
+0548 Click to overview state burgs «states-editor.ts»
+0549 Click to perform an operation «heightmap-editor.ts»
+0550 Click to re-generate full name «provinces-editor.ts,states-editor.ts»
+0551 Click to re-generate names for burgs with this culture assigned «cultures-editor.ts»
+0552 Click to re-generate supreme deity «religions-editor.ts»
+0553 Click to recalculate military forces based on current military options «tools-tab.ts»
+0554 Click to recalculate rural and urban population «tools-tab.ts»
+0555 Click to regenerate all emblems «tools-tab.ts»
+0556 Click to regenerate all relief icons based on current cell biome and elevation «tools-tab.ts»
+0557 Click to regenerate all unlocked burgs and routes. States will remain as they are. Note: burgs are only generated in populated areas with culture assigned «tools-tab.ts»
+0558 Click to regenerate all unlocked routes «tools-tab.ts»
+0559 Click to regenerate bonus goods placement «tools-tab.ts»
+0560 Click to regenerate icebergs and glaciers «tools-tab.ts»
+0561 Click to regenerate markets and their territories «tools-tab.ts»
+0562 Click to regenerate non-locked cultures «tools-tab.ts»
+0563 Click to regenerate non-locked provinces. States will remain as they are «tools-tab.ts»
+0564 Click to regenerate non-locked religions «tools-tab.ts»
+0565 Click to regenerate non-locked states. Emblems and military forces will be regenerated as well, burgs will remain as they are, but capitals will be different «tools-tab.ts»
+0566 Click to regenerate production and trade deals «tools-tab.ts»
+0567 Click to regenerate unlocked markers «tools-tab.ts»
+0568 Click to regenerate zones. Hold Ctrl and click to set zones number multiplier «tools-tab.ts»
+0569 Click to remove current custom preset «layers-tab.ts»
+0570 Click to remove the step «heightmap-editor.ts»
+0571 Click to restore default options and reload the page «options-tab.ts»
+0572 Click to restore regiment's default name «regiment-editor.ts»
+0573 Click to save current style as a new preset «style-tab.ts»
+0574 Click to save displayed layers as a new preset «layers-tab.ts»
+0575 Click to see the usage instructions «ai-generator.ts»
+0576 Click to select a style preset «style-tab.ts»
+0577 Click to select regiment «battle-screen.ts»
+0578 Click to select unit icon «military-overview.ts»
+0579 Click to select, drag to paint. Shift + drag resizes the brush, Space + drag pans the map «paint-editor.ts»
+0580 Click to set map size to cover the Northern latitudes «world-configurator.ts»
+0581 Click to set map size to cover the Southern latitudes «world-configurator.ts»
+0582 Click to set map size to cover the Tropical latitudes «world-configurator.ts»
+0583 Click to set map size to cover the whole world «world-configurator.ts»
+0584 Click to set number multiplier «tools-tab.ts»
+0585 Click to show and edit province emblem «provinces-editor.ts»
+0586 Click to show and edit state emblem «states-editor.ts»
+0587 Click to show the Menu «index.html»
+0588 Click to skip the step «heightmap-editor.ts»
+0589 Click to sort by distance to the battlefield «battle-screen.ts»
+0590 Click to sort by regiment name «battle-screen.ts»
+0591 Click to sort by state name «battle-screen.ts»
+0592 Click to sort by state treasury. Click on a value to view and edit taxes «states-editor.ts»
+0593 Click to sort by total military forces «battle-screen.ts»
+0594 Click to test the voice «options-tab.ts»
+0595 Click to toggle a layer, drag to raise or lower a layer. Ctrl + click to edit layer style «layers-tab.ts»
+0596 Click to toggle, drag to raise or lower the layer «layers-tab.ts»
+0597 Click to transform the map «tools-tab.ts»
+0598 Click to update state labels placement based on current borders «tools-tab.ts»
+0599 Click to zoom «market-deals-overview.ts»
+0600 Click to zoom into view «burgs-overview.ts»
+0601 Click to zoom to burg «goods-editor.ts»
+0602 Click to zoom to location «goods-editor.ts»
+0603 Clip «styles-schema.ts»
+0604 Close «ai-generator.ts,app-offer.ts,dialogs.ts»
+0605 Close Image Converter «heightmap-editor.ts»
+0606 Close the window «markers-settings.ts»
+0607 Close the window without saving the changes «military-overview.ts»
+0608 co «names-generator.ts»
+0609 Coast segments shorter than this stay as they are. Raise it to keep tiny isles simple and the map faster to draw «coastline-editor.ts»
+0610 Coastal gap «styles-schema.ts»
+0611 coastline «features-overview.ts,map-entities.ts»
+0612 Coastline bands «styles-schema.ts»
+0613 Coastline rendering cost «coastline-editor.ts»
+0614 Coastline Settings «coastline-editor.ts»
+0615 Coastlines «tools-tab.ts»
+0616 Colony «provinces-editor.ts»
+0617 Color «styles-schema.ts»
+0618 Color of the contour lines «styles-schema.ts»
+0619 Color of the hachure strokes «styles-schema.ts»
+0620 Color of the icon lines «styles-schema.ts»
+0621 Color Picker «color-picker.ts»
+0622 Color scheme «heightmap-selection.ts,styles-schema.ts»
+0623 Color scheme used for heightmap preview «heightmap-selection.ts»
+0624 Color value in different color spaces. Edit to change «color-picker.ts»
+0625 colored «auto-update.ts»
+0626 colours «emblems-generator.ts»
+0627 Column items «styles-schema.ts»
+0628 Columns «charts-overview.ts»
+0629 comma separated «good-editor.ts»
+0630 Common name length «namesbase-editor.ts»
+0631 Compare good stock across markets «markets-overview.ts»
+0632 Compare Prices «compare-prices.ts»
+0633 Complete «heightmap-editor.ts»
+0634 Complete river creation «river-creator.ts»
+0635 Complete route creation «route-creator.ts»
+0636 Complete the conversion «heightmap-editor.ts»
+0637 Complete the conversion. All unassigned colors will be considered as ocean «heightmap-editor.ts»
+0638 Compressed raster image on a white background «emblems-editor.ts»
+0639 Config markers generation options «markers-overview.ts»
+0640 Configure burg groups «burg-editor.ts»
+0641 Configure Burg groups «burg-group-editor.ts»
+0642 Configure Label Groups «labels-group-editor.ts,labels-overview.ts»
+0643 Configure Marker Generation «map-commands.ts»
+0644 Configure World «options-tab.ts,ui-tour.ts,world-configurator.ts»
+0645 Configure world and map size and climate settings «view-3d.ts»
+0646 Confirm «index.html»
+0647 Confluence «fields.ts»
+0648 Conifer «relief-generator.ts»
+0649 Connect «index.html,index.ts»
+0650 Connect your AI key «index.ts»
+0651 Connect your Dropbox account to be able to load maps from it «index.html»
+0652 Conscription percentage for rural population «military-overview.ts»
+0653 Conscription percentage for urban population «military-overview.ts»
+0654 Continents «heightmap-editor.ts,heightmap-templates.ts»
+0655 Continue «heightmap-selection.ts,namesbase-editor.ts»
+0656 Contrast «coastline-editor.ts»
+0657 control «draw-measurers.ts»
+0658 Coordinate extent the next map is generated on. It is fixed for the life of that map and cannot be changed later - the Viewport size below is what you see it through. For full-globe maps use aspect ratio 2:1 «options-tab.ts»
+0659 Copy link to the clipboard «index.html»
+0660 Copy Map URL «map-commands.ts»
+0661 Copy selected relief icon «relief-editor.ts»
+0662 Could not draw this part of the map «widgets.ts»
+0663 Could not open the search result. Please try again. «omnibar.ts»
+0664 Council «provinces-editor.ts»
+0665 Count «burg-group-editor.ts»
+0666 Counterparty «market-deals-overview.ts»
+0667 County «provinces-editor.ts»
+0668 Create «dialogs.ts,tools-tab.ts»
+0669 Create a new group for the lake «lakes-editor.ts»
+0670 Create a new journey «journeys-overview.ts»
+0671 Create a new regiment or fleet «regiment-editor.ts»
+0672 Create a new river selecting river cells «river-editor.ts,rivers-overview.ts»
+0673 Create a new route selecting route cells «route-editor.ts,routes-overview.ts»
+0674 Create a submap «submap-tool.ts»
+0675 Create custom province form name «provinces-editor.ts»
+0676 Create heightmap color scheme «dialogs.ts»
+0677 Create River «river-creator.ts»
+0678 Create Route «route-creator.ts»
+0679 Create Submap «map-commands.ts»
+0680 Crew «military-overview.ts»
+0681 Crisp edges «performance-settings.ts»
+0682 Ctrl + click to edit layer style «layers-tab.ts»
+0683 Cubic Catmull-Rom «elevation-profile.ts»
+0684 Culture «burgs-overview.ts,charts-overview.ts,cultures-editor.ts»
+0685 Culture area «cultures-editor.ts»
+0686 Culture does not have any cells, cannot change population «cultures-editor.ts»
+0687 Culture expansionism. Defines competitive size «cultures-editor.ts»
+0688 Culture expansionism. Defines competitive size. Click to change, then click Recalculate to apply change «cultures-editor.ts»
+0689 Culture name. Click and type to change «cultures-editor.ts»
+0690 Culture namesbase. Click to change. Click on arrows to re-generate names «cultures-editor.ts»
+0691 Culture type production modifier. Produced units are multiplied by this value. «production-overview.ts»
+0692 Culture type. Defines growth model. Click to change «cultures-editor.ts»
+0693 Culture-random «options-tab.ts»
+0694 Culture-specific «options-tab.ts»
+0695 Cultures «burg-group-editor.ts,map-entities.ts,military-overview.ts»
+0696 Cultures Editor «cultures-editor.ts»
+0697 Cultures number «cultures-editor.ts,options-tab.ts»
+0698 Cultures set «options-tab.ts»
+0699 Current name «burgs-overview.ts»
+0700 Current year. Dates state history and battle reports «lore-editor.ts»
+0701 Curve the label along a path «labels-editor.ts»
+0702 Curved «style-choices.ts»
+0703 Custom «heightmap-editor.ts,options-tab.ts,view-3d.ts»
+0704 Custom → Import zip «style-preset.ts»
+0705 Custom icons «style-preset.ts»
+0706 Custom name «units-editor.ts»
+0707 Dark Fantasy «options-tab.ts»
+0708 Dash array «styles-schema.ts»
+0709 Data Analysis «namesbase-editor.ts»
+0710 Data cannot be exported when edit mode is active, please exit the mode and retry «export-json.ts»
+0711 Data Charts «charts-overview.ts»
+0712 Dawn «view-3d.ts»
+0713 dead end «burgs-generator.ts»
+0714 Dead tree «relief-generator.ts»
+0715 Deal calculation: «production-overview.ts»
+0716 Deals «map-entities.ts»
+0717 Deals count «market-deals-overview.ts»
+0718 Deanery «provinces-editor.ts»
+0719 Debian or Ubuntu «app-offer.ts»
+0720 Deciduous tree «relief-generator.ts»
+0721 Decision basis: «production-overview.ts»
+0722 Declare «provinces-editor.ts»
+0723 Declare independence «provinces-editor.ts»
+0724 Decorate coastal and distant water around a clear offshore band «styles-schema.ts»
+0725 Decrease indent «notes-rich-text.ts»
+0726 Deep Ocean «goods-distribution-editor.ts»
+0727 default «burg-editor.ts»
+0728 Default «burg-group-editor.ts»
+0729 Default group for this type, can't be renamed «labels-group-editor.ts»
+0730 Default groups can't be removed «labels-group-editor.ts»
+0731 Defence pact «diplomacy.ts»
+0732 Defenders «battle-screen.ts»
+0733 Defenders army destroyed «battle-screen.ts»
+0734 Defenders morale: «battle-screen.ts»
+0735 Defenders strength during this phase. Strength defines dealt damage «battle-screen.ts»
+0736 defense «battle-screen.ts»
+0737 Defense phase. Prepared defense. Units strength increased «battle-screen.ts»
+0738 Defense phase. Ranged and melee units excel «battle-screen.ts»
+0739 Define a label group to assign the labels to «labels-overview.ts»
+0740 Define heightmap gradient colors from high to low altitude «dialogs.ts»
+0741 Define how many Cultures should be generated «options-tab.ts»
+0742 Define how many organized religions and cults should be generated. Cultures will have their own folk religions in any case «options-tab.ts»
+0743 Define how many states and capitals should be generated «options-tab.ts»
+0744 Define how much states and cultures can vary in size. Defines expansionism value «options-tab.ts»
+0745 Define the coast outline contours scheme «styles-schema.ts»
+0746 Define the density of relief icons. All relief icons are regenerated, discarding manual edits. Highly affects performance! «styles-schema.ts»
+0747 Define the size of relief icons. A render multiplier: the map data is not changed «styles-schema.ts»
+0748 Deity «religions-editor.ts»
+0749 Delete column «notes-rich-text.ts»
+0750 Delete row «notes-rich-text.ts»
+0751 Delete table «notes-rich-text.ts»
+0752 Demand Coverage «good-editor.ts»
+0753 Density «relief-pool-editor.ts»
+0754 Department «provinces-editor.ts»
+0755 Dependency «provinces-editor.ts»
+0756 Depress brush: drag to gradually decrease height of cells in radius by Power value «heightmap-editor.ts»
+0757 Depression depth needed to form a new lake. Increase to reduce the number of generated lakes «customization-tab.ts»
+0758 Depression depth threshold: «customization-tab.ts»
+0759 Describe the map, its age, its peoples – whatever the map should carry with it. «lore-editor.ts»
+0760 Description «zones-editor.ts»
+0761 desktop app «versioning.ts»
+0762 Desktop App «app-offer.ts»
+0763 Detail «coastline-editor.ts»
+0764 Detail octaves: «view-3d.ts»
+0765 Details «production-overview.ts»
+0766 Diaconate «provinces-editor.ts»
+0767 Diamond «emblems-editor.ts,markers-editor.ts,options-tab.ts»
+0768 Dingy «style-choices.ts»
+0769 Diplomacy «tools-tab.ts»
+0770 Diplomacy Editor «diplomacy-editor.ts»
+0771 Diplomacy Overview «diplomacy-overview.ts»
+0772 disabled «labels-group-editor.ts»
+0773 Discard «auto-update.ts,diplomacy-editor.ts,wrap-tool.ts»
+0774 Discard all changes since the last Apply «diplomacy-editor.ts»
+0775 Discard edits «wrap-tool.ts»
+0776 Discharge «rivers-overview.ts»
+0777 Disconnect «index.ts»
+0778 Discord «index.ts»
+0779 Discord server «versioning.ts»
+0780 Display brushes panel «customization-tab.ts»
+0781 Displayed layers and layer order: «layers-tab.ts»
+0782 Disrupt brush: drag to randomize height of cells in radius based on Power value «heightmap-editor.ts»
+0783 Distance «journey-editor.ts,journeys-overview.ts»
+0784 Distance into the sea over which embellishments fade, in cell spacings «styles-schema.ts»
+0785 Distance unit: «units-editor.ts»
+0786 Distribution «goods-distribution-editor.ts»
+0787 Distribution controls where this raw good spawns. Leave empty for manufactured-only goods. «goods-distribution-editor.ts»
+0788 Distribution Editor «goods-distribution-editor.ts»
+0789 District «provinces-editor.ts»
+0790 do not ask again «map-commands.ts»
+0791 Do not override existing «paint-editor.ts»
+0792 Dogfight «battle-screen.ts»
+0793 Dogfight phase. Units strength increased «battle-screen.ts»
+0794 Domain «transport-editor.ts»
+0795 Dominant culture «burgs-overview.ts»
+0796 Dominant culture in the province. This defines culture-based naming. Can be changed via the Cultures Editor «provinces-editor.ts»
+0797 Dominant culture. Click to change «states-editor.ts»
+0798 Dovetail «emblems-editor.ts,options-tab.ts»
+0799 down «sorting.ts,table.ts»
+0800 Download «auto-update.ts»
+0801 Download all «index.ts»
+0802 Download cells data in GeoJSON format «index.html»
+0803 Download cultures-related data «cultures-editor.ts»
+0804 Download full data in JSON «index.html»
+0805 Download goods-related data «goods-editor.ts»
+0806 Download icons «style-preset.ts»
+0807 Download image «index.html»
+0808 Download map metadata and grid cells data in JSON «index.html»
+0809 Download map metadata and pack cells data in JSON «index.html»
+0810 Download markers data in GeoJSON format «index.html»
+0811 Download minimal data in JSON «index.html»
+0812 Download namesbase to PC «namesbase-editor.ts»
+0813 Download notes to PC «notes-editor.ts»
+0814 Download religions-related data «religions-editor.ts»
+0815 Download rivers data in GeoJSON format «index.html»
+0816 Download routes data in GeoJSON format «index.html»
+0817 Download the chart as a PNG image «charts-overview.ts,elevation-profile.ts»
+0818 Download the chart as an SVG image «elevation-profile.ts»
+0819 Download the chart data as a CSV file «elevation-profile.ts»
+0820 Download the emblem as an image «emblems-editor.ts»
+0821 Download the icons as a zip? Import it on the target map via the icon picker: «style-preset.ts»
+0822 Download the template as a text file «heightmap-editor.ts»
+0823 Download tiles «io-panes.ts»
+0824 Download zones data in GeoJSON format «index.html»
+0825 Download zones-related data «zones-editor.ts»
+0826 Downloads «app-offer.ts»
+0827 Drag control points to change the river course. Click on point to remove it. Click on river to add additional control point. For major changes please create a new river instead «river-editor.ts»
+0828 Drag control points to change the route. Click on point to remove it. Click on the route to add additional control point. For major changes please create a new route instead «route-editor.ts»
+0829 Drag the measurer or its points to edit «map-tooltip.ts»
+0830 Drag to change the picker position «color-picker.ts»
+0831 Drag to change the position. Click to hide the legend box «draw-legend.ts,load.ts»
+0832 Drag to check the rule earlier or later «relief-rules-editor.ts»
+0833 Drag to move the label «labels-editor.ts»
+0834 Drag to move the Menu «index.html»
+0835 Drag to move the pane «index.html»
+0836 Drag to move, click to delete the control point «labels-editor.ts»
+0837 Drag to other node to add parent, click to edit «hierarchy-tree.ts»
+0838 Drag to pan, scroll to zoom «positioner.ts»
+0839 Drag to place relief icons within radius «relief-editor.ts»
+0840 Drag to raise or lower the zone «zones-editor.ts»
+0841 Drag to remove relief icons in radius «relief-editor.ts»
+0842 Drag to reorder «heightmap-editor.ts»
+0843 Drag to rotate the regiment «regiment-editor.ts»
+0844 draw «effects.ts»
+0845 Draw a custom path cell by cell «journey-editor.ts»
+0846 Draw another sample «relief-pool-editor.ts»
+0847 Draw concentric bands that follow the coastline «styles-schema.ts»
+0848 Draw downhill pen strokes over the heightmap colors, or show only the strokes «styles-schema.ts»
+0849 Draw heights of water cells «heightmap-selection.ts»
+0850 Draw River «map-commands.ts»
+0851 Draw smooth elevation contours over the heightmap colors, or show only contour lines «styles-schema.ts»
+0852 Drawing the map… «widgets.ts»
+0853 Drop a map file to open «index.html»
+0854 Drop the edits made in this session and its history «wrap-tool.ts»
+0855 Dropbox API error. Can not create link. «load.ts»
+0856 Dry Lake «goods-distribution-editor.ts»
+0857 Dune «relief-generator.ts»
+0858 E «cell-info.ts,world-configurator.ts»
+0859 e.g. wagon, barrel «good-editor.ts»
+0860 Each namebase should be on its own line and follow the format: «namesbase-editor.ts»
+0861 Earldom «provinces-editor.ts»
+0862 Easterling «emblems-editor.ts,options-tab.ts»
+0863 Eastern «features-generator.ts»
+0864 Economy «tools-tab.ts»
+0865 edge «draw-measurers.ts»
+0866 Edit «hierarchy-tree.ts,tools-tab.ts»
+0867 Edit a database used for names generation «cultures-editor.ts»
+0868 Edit biome baseline production «good-editor.ts»
+0869 Edit biomes style in Style Editor «biomes-editor.ts»
+0870 Edit burg «burgs-overview.ts»
+0871 Edit Burg «burg-editor.ts»
+0872 Edit burg groups «burgs-overview.ts»
+0873 Edit cultures style in Style Editor «cultures-editor.ts»
+0874 Edit demand coverage «good-editor.ts»
+0875 Edit emblem «burg-editor.ts»
+0876 Edit Emblem «emblems-editor.ts»
+0877 Edit good «good-editor.ts,goods-editor.ts»
+0878 Edit group style in Style Editor «features-overview.ts»
+0879 Edit Heightmap «heightmap-editor.ts,map-commands.ts»
+0880 Edit icon and anchor style for the burg group in Style Editor «burg-editor.ts»
+0881 Edit in Armoria «emblems-editor.ts»
+0882 Edit individual selected icon «relief-editor.ts»
+0883 Edit journey «journeys-overview.ts»
+0884 Edit Journey «journey-editor.ts»
+0885 Edit journeys style in Style Editor «journeys-overview.ts»
+0886 Edit Label «labels-editor.ts»
+0887 Edit label group style in Style Editor «labels-editor.ts»
+0888 Edit label style for burg group in Style Editor «burg-editor.ts»
+0889 Edit Lake «lakes-editor.ts»
+0890 Edit lake group style in Style Editor «lakes-editor.ts»
+0891 Edit marker «markers-in-radius.ts,markers-overview.ts»
+0892 Edit Marker «markers-editor.ts»
+0893 Edit Military units «military-overview.ts»
+0894 Edit Military Units «military-overview.ts»
+0895 Edit mode: «customization-tab.ts»
+0896 Edit path points «journey-editor.ts»
+0897 Edit provinces style in Style Editor «provinces-editor.ts»
+0898 Edit regiment «regiments-overview.ts»
+0899 Edit Regiment «regiment-editor.ts»
+0900 Edit Relief Icons «relief-editor.ts»
+0901 Edit Relief Icons style in Style Editor «relief-editor.ts»
+0902 Edit religions style in Style Editor «religions-editor.ts»
+0903 Edit river «rivers-overview.ts»
+0904 Edit River «river-editor.ts»
+0905 Edit route «routes-overview.ts»
+0906 Edit Route «route-editor.ts»
+0907 Edit route groups «route-creator.ts,route-editor.ts»
+0908 Edit Route groups «route-groups-editor.ts»
+0909 Edit states style in Style Editor «states-editor.ts»
+0910 Edit style «route-groups-editor.ts»
+0911 Edit style for all rivers in Style Editor «river-editor.ts»
+0912 Edit style for the route group «route-editor.ts»
+0913 Edit style in Style Editor «ice-editor.ts»
+0914 Edit style or remove group «labels-group-editor.ts»
+0915 Edit Templates «heightmap-selection.ts»
+0916 Edit the COA string by hand, or paste an Armoria edit link, API link or COA string «emblems-editor.ts»
+0917 Edit the feature's own coastline settings «features-overview.ts»
+0918 Edit the Heightmap «ui-tour.ts»
+0919 Edit the lake «features-overview.ts»
+0920 Edit the relief rules: hills, mountains and other relief placed by elevation «biomes-editor.ts,relief-editor.ts»
+0921 Edit this burg label «burg-editor.ts»
+0922 Edit transport types «journey-editor.ts»
+0923 Edit visual style «labels-group-editor.ts»
+0924 Edit zones style in Style Editor «zones-editor.ts»
+0925 Element not found «notes-editor.ts»
+0926 Element with this id already exists. Please provide a unique name «lakes-editor.ts»
+0927 Element with this name already exists. Provide a unique name «route-groups-editor.ts»
+0928 Elevate brush: drag to gradually increase height of cells in radius by Power value «heightmap-editor.ts»
+0929 Elevation «goods-distribution-editor.ts»
+0930 Elevation profile «elevation-profile.ts»
+0931 Elevation profile: no data «elevation-profile.ts»
+0932 eli «names-generator.ts»
+0933 Embellishment «styles-schema.ts»
+0934 emblem «auto-update.ts»
+0935 Emblem shape «options-tab.ts»
+0936 Emblem shape associated with culture. Click to change «cultures-editor.ts»
+0937 Emblems «cultures-editor.ts,layer-labels.ts,tools-tab.ts»
+0938 Embowed «emblems-editor.ts,options-tab.ts»
+0939 Enable or disable coastline fractalization. When disabled, coastlines are simple arcs between feature vertices. Enabling adds naturalistic roughness but can increase rendering time «coastline-editor.ts»
+0940 End battle: apply current results and close the screen «battle-screen.ts»
+0941 End of the last segment «journeys-overview.ts»
+0942 endBurgId «trade-details.ts»
+0943 endpoints must be in water, on a coast touching water, or on a navigable river «journey-path-editor.ts»
+0944 Enemies are states at war with each other «diplomacy.ts»
+0945 Engagement progression: «battle-screen.ts»
+0946 English «options-tab.ts»
+0947 Enter a model and API key. «key-sheet.ts»
+0948 Enter a model name. «key-sheet.ts»
+0949 Enter a valid treasury amount «burg-editor.ts»
+0950 Enter API key «ai-generator.ts»
+0951 Enter API key. Note: the Generator doesn't store the key or any generated data «ai-generator.ts»
+0952 Enter conscription percentage for rural population «military-overview.ts»
+0953 Enter conscription percentage for urban population «military-overview.ts»
+0954 Enter custom form name «states-editor.ts»
+0955 Enter seed for template to generate the same heightmap each time «heightmap-editor.ts»
+0956 Enter style preset name «style-preset.ts»
+0957 Equirectangular projection is used «view-3d.ts»
+0958 Equirectangular projection is used: distortion is maximum on poles. Use map with aspect ratio 2:1 for best result «view-3d.ts»
+0959 Erase «heightmap-editor.ts»
+0960 Erebor «emblems-editor.ts,options-tab.ts»
+0961 Erode terrain «view-3d.ts»
+0962 Eroded terrain is not supported on this device «view-3d-renderer.ts»
+0963 Erupting «markers-generator.ts»
+0964 European «options-tab.ts»
+0965 Evaporation from lake surface. If evaporation > supply, the lake water is saline. If difference is high, the lake becomes dry «lakes-editor.ts»
+0966 Evening «view-3d.ts»
+0967 Every Nth Cell «goods-distribution-editor.ts»
+0968 Examples. Click to re-generate «namesbase-editor.ts»
+0969 Exclude neutral «charts-overview.ts»
+0970 Execute the template «heightmap-editor.ts»
+0971 existing «style-preset.ts»
+0972 Exit Customization «index.html»
+0973 Expansion «cultures-editor.ts,religions-editor.ts,states-editor.ts»
+0974 Expansionism «religions-editor.ts»
+0975 Export «index.html,ui-tour.ts»
+0976 Export Full JSON «map-commands.ts»
+0977 Export Grid Cells JSON «map-commands.ts»
+0978 Export in JSON format can be used as an API replacement. «index.html»
+0979 Export map data «io-panes.ts»
+0980 Export Minimal JSON «map-commands.ts»
+0981 Export Options «ui-tour.ts»
+0982 Export Pack Cells JSON «map-commands.ts»
+0983 Export to GeoJSON «index.html»
+0984 Export To JSON «index.html»
+0985 Extreme climate warning «cultures-generator.ts»
+0986 False «burg-group-editor.ts»
+0987 Family «styles-schema.ts»
+0988 Fantasy Map Generator «index.html»
+0989 Fantasy Map Generator map «save-to-file.ts»
+0990 Fantasy Map Generator update «versioning.ts»
+0991 Fantasy1 «emblems-editor.ts,options-tab.ts»
+0992 Fantasy2 «emblems-editor.ts,options-tab.ts»
+0993 Fantasy3 «emblems-editor.ts,options-tab.ts»
+0994 Fantasy4 «emblems-editor.ts,options-tab.ts»
+0995 Fantasy5 «emblems-editor.ts,options-tab.ts»
+0996 Favors higher elevated cells «goods-distribution-editor.ts»
+0997 Favors more habitable cells «goods-distribution-editor.ts»
+0998 Feature «features-overview.ts»
+0999 Feature area «features-overview.ts»
+1000 Feature name «features-overview.ts»
+1001 Feature type, defined by the heightmap «features-overview.ts»
+1002 Feature type. Generators read it, changing it does not regenerate them «features-overview.ts»
+1003 Features «burg-group-editor.ts,burgs-overview.ts,tools-tab.ts»
+1004 Features are added and removed in the Heightmap Editor «features-overview.ts»
+1005 Features displayed «features-overview.ts»
+1006 Field «emblems-editor.ts»
+1007 Field Battle: a standard type of combat «battle-screen.ts»
+1008 file and load it in the app. «app-offer.ts»
+1009 Fill brush is not available with 'only water cells' filter «heightmap-editor.ts»
+1010 Fill: click enclosed water or same-height land area to create a cone blob «heightmap-editor.ts»
+1011 Filter «styles-schema.ts»
+1012 Filter by journey name, type or endpoint «journeys-overview.ts»
+1013 Filter by name or group «routes-overview.ts»
+1014 Filter by name, province, state, culture, or group «burgs-overview.ts»
+1015 Filter by name, type or basin «rivers-overview.ts»
+1016 Filter by name, type or subtype «features-overview.ts»
+1017 Filter by type «markers-overview.ts»
+1018 Filter deals by scope «market-deals-overview.ts»
+1019 Filter elements and groups by name «dialogs.ts»
+1020 Filter goods by tags «goods-editor.ts»
+1021 Filter visible goods by tags «goods-editor.ts»
+1022 Filter… «dialogs.ts»
+1023 Finalize the heightmap and exit the edit mode «index.html»
+1024 Find a built-in icon or emoji by name «index.ts»
+1025 Find or share custom namesbase on Cartography Assets portal «namesbase-editor.ts»
+1026 Find or share custom style preset on Cartography Assets portal «style-preset.ts»
+1027 Find or share custom template on Cartography Assets portal «heightmap-editor.ts»
+1028 Fine detail «coastline-editor.ts»
+1029 Fine ripples along the banks, fading into open water and scaled down for small lakes «styles-schema.ts»
+1030 Finish editing path points «journey-editor.ts»
+1031 First match wins. Land no rule claims takes its biome's relief pool «relief-rules-editor.ts»
+1032 Fit «positioner.ts»
+1033 Fit the frame to the picture's visible content «positioner.ts»
+1034 Fit the viewport to the browser window «options-tab.ts»
+1035 Flag «emblems-editor.ts,options-tab.ts»
+1036 Flee phase. Units strength reduced «battle-screen.ts»
+1037 Fleet «military-generator.ts»
+1038 flex «assistant-bubble.ts,labels-group-editor.ts,labels-overview.ts»
+1039 Flux «river-creator.ts»
+1040 Focus on selected object «notes-editor.ts»
+1041 Folded paper big «textures.ts»
+1042 Folded paper small «textures.ts»
+1043 follows the map settings «coastline-editor.ts»
+1044 Font «notes-rich-text.ts»
+1045 Font and size «notes-rich-text.ts»
+1046 font family «dialogs.ts»
+1047 font file URL «dialogs.ts»
+1048 Font URL «dialogs.ts»
+1049 Fontdesk «dialogs.ts»
+1050 for guidance. «index.html»
+1051 For manufactured goods: recipes define which other goods are required to produce this good «good-editor.ts»
+1052 For raw resources: sets the baseline production per biome «good-editor.ts»
+1053 forces «battle-screen.ts»
+1054 fork «river-generator.ts»
+1055 Form «provinces-editor.ts,religions-editor.ts,states-editor.ts»
+1056 Form name: «provinces-editor.ts,states-editor.ts»
+1057 format, that can be loaded back via the «index.html»
+1058 Fractious «heightmap-editor.ts,heightmap-templates.ts»
+1059 Free icons: «index.ts»
+1060 French «emblems-editor.ts,options-tab.ts»
+1061 Freshwater Lake «goods-distribution-editor.ts»
+1062 from «journey-path-editor.ts»
+1063 From «journey-editor.ts,journeys-overview.ts»
+1064 Frozen Lake «goods-distribution-editor.ts»
+1065 ft «options-model.ts»
+1066 Full name: «provinces-editor.ts,states-editor.ts»
+1067 Function Reference «goods-distribution-editor.ts»
+1068 g.selectAll «charts-overview.ts»
+1069 General «good-editor.ts»
+1070 Generate «lifecycle.ts»
+1071 Generate a new era «lore-editor.ts»
+1072 Generate a new map based on options «index.html»
+1073 Generate a new map name «lore-editor.ts»
+1074 generate a new random map or cancel the loading. «load.ts»
+1075 Generate a random journey «journeys-overview.ts»
+1076 Generate culture-specific name «states-editor.ts»
+1077 Generate culture-specific name for place and battle «battle-screen.ts»
+1078 Generate culture-specific name for the burg «burg-editor.ts»
+1079 Generate culture-specific name for the lake «lakes-editor.ts»
+1080 Generate culture-specific name for the province «provinces-editor.ts»
+1081 Generate culture-specific name for the river «river-editor.ts»
+1082 Generate new map «lifecycle.ts»
+1083 Generate New Map «map-commands.ts»
+1084 Generate random map «options-tab.ts»
+1085 Generate random name «labels-editor.ts,provinces-editor.ts,states-editor.ts»
+1086 Generate random name for place and battle «battle-screen.ts»
+1087 Generate random name for the burg «burg-editor.ts»
+1088 Generate random name for the lake «lakes-editor.ts»
+1089 Generate random name for the river «river-editor.ts»
+1090 Generate route name «route-editor.ts»
+1091 Generated examples: «namesbase-editor.ts»
+1092 Generated text will appear here «ai-generator.ts»
+1093 Generation error «lifecycle.ts»
+1094 Generation Options «ui-tour.ts»
+1095 Generator uses pop-up window to download files. Please ensure your browser does not block popups. «index.html»
+1096 Generic «burg-editor.ts»
+1097 Geographical features «map-entities.ts»
+1098 Geographical Features Overview «features-overview.ts»
+1099 Geometric precision «performance-settings.ts»
+1100 Get Desktop App «map-commands.ts»
+1101 Give the icon a new picture: every use follows «index.ts»
+1102 Glacier «ice-editor.ts,map-entities.ts»
+1103 global «trade-animation.ts»
+1104 Global «market-deals-overview.ts»
+1105 globe «view-3d-renderer.ts»
+1106 Globe «layers-tab.ts»
+1107 Go Back «emblems-editor.ts»
+1108 Gondor «emblems-editor.ts,options-tab.ts»
+1109 Gonfalon «emblems-editor.ts,options-tab.ts»
+1110 Good «charts-overview.ts,market-deals-overview.ts,market-overview.ts»
+1111 Good answer «index.ts»
+1112 Good icon «goods-editor.ts,market-deals-overview.ts,market-overview.ts»
+1113 Good is added «good-editor.ts»
+1114 Good is updated «good-editor.ts»
+1115 Good name «goods-editor.ts,market-deals-overview.ts,market-overview.ts»
+1116 Good price «market-overview.ts»
+1117 Good stock «market-overview.ts»
+1118 Good stock in this market. Click to sort «compare-prices.ts»
+1119 Good types «goods-editor.ts»
+1120 Goods «map-entities.ts,tools-tab.ts»
+1121 Goods Editor «goods-editor.ts»
+1122 Google font «dialogs.ts»
+1123 Google Fonts «dialogs.ts»
+1124 Governorate «provinces-editor.ts»
+1125 grab «burg-editor.ts»
+1126 Grass «relief-generator.ts»
+1127 Gray paper «textures.ts»
+1128 Grayscale «style-choices.ts»
+1129 Grid «layer-labels.ts»
+1130 grid cells «index.html»
+1131 Gross Product is local sale revenue minus purchased ingredient costs during the production. «production-overview.ts»
+1132 Gross product per population point, daily average «burg-editor.ts»
+1133 Gross Product: local sale revenue minus purchased ingredient costs during the production. «burgs-overview.ts»
+1134 Group «burgs-overview.ts,features-overview.ts,labels-group-editor.ts»
+1135 Group by culture «burgs-overview.ts»
+1136 Group by province «burgs-overview.ts»
+1137 Group by province and state «burgs-overview.ts»
+1138 Group by state «burgs-overview.ts»
+1139 group name «lakes-editor.ts»
+1140 Group name should start with a letter «lakes-editor.ts,route-groups-editor.ts»
+1141 Group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes «labels-group-editor.ts»
+1142 Group to assign the selected labels to «labels-overview.ts»
+1143 grouped by «charts-overview.ts»
+1144 Groups referenced by labels but not defined here. Such labels are not rendered until they are reassigned to an existing group «labels-group-editor.ts»
+1145 Growth rate «options-tab.ts»
+1146 guest «index.ts»
+1147 Guest «index.ts»
+1148 Guidon «emblems-editor.ts,options-tab.ts»
+1149 gules «emblems-editor.ts»
+1150 Gully strength: «view-3d.ts»
+1151 H «heightmap-editor.ts»
+1152 h ≥ «heightmap-editor.ts»
+1153 H: «color-picker.ts»
+1154 h/day «transport-editor.ts»
+1155 Habitability «biomes-editor.ts,goods-distribution-editor.ts»
+1156 Heater «emblems-editor.ts,options-tab.ts»
+1157 Height «relief-pool-editor.ts,relief-rules-editor.ts»
+1158 Height scale: «view-3d.ts»
+1159 Height unit: «units-editor.ts»
+1160 Heightmap «options-tab.ts,tools-tab.ts»
+1161 Heightmap customization tools: «customization-tab.ts»
+1162 Heightmap edit mode «customization-tab.ts»
+1163 Heightmap Editor «ui-tour.ts»
+1164 Heightmap is already cleared, please do not click twice if not required «heightmap-editor.ts»
+1165 heightmap preview «dialogs.ts»
+1166 Heightmap preview. Click to download a screen-sized image «heightmap-editor.ts»
+1167 Heightmap templates «heightmap-selection.ts»
+1168 Heptagon «markers-editor.ts»
+1169 Here you can set temperatures at the equator and poles, control wind direction and precipitation, and position the map on the globe. Changes affect biome and climate generation. «ui-tour.ts»
+1170 Hessen «emblems-editor.ts,options-tab.ts»
+1171 Hex «markers-editor.ts»
+1172 Hexagon «emblems-editor.ts,options-tab.ts»
+1173 Hexy «markers-editor.ts»
+1174 hidden «markers-editor.ts»
+1175 Hidden «omnibar.ts,performance-settings.ts»
+1176 hide «options-tab.ts,religions-editor.ts»
+1177 Hide «labels-overview.ts,options-tab.ts»
+1178 Hide on map «widgets.ts»
+1179 Hide rescaler «heightmap-editor.ts»
+1180 Hide rescaler slider «heightmap-editor.ts»
+1181 Hide style edit section «burg-editor.ts»
+1182 Hide the battle name section «battle-screen.ts»
+1183 Hide the edit label text section «labels-editor.ts»
+1184 Hide the font size section «labels-editor.ts»
+1185 Hide the group selection «labels-editor.ts»
+1186 Hide the label offset section «labels-editor.ts»
+1187 Hide the label. You can toggle it on later in Labels Overview «labels-editor.ts»
+1188 Hide the letter spacing section «labels-editor.ts»
+1189 Hide the regeneration menu «states-editor.ts»
+1190 High Fantasy «options-tab.ts»
+1191 High Island «heightmap-editor.ts,heightmap-templates.ts»
+1192 Highest mean precipitation of the year «charts-overview.ts»
+1193 Highest mean temperature of the year «charts-overview.ts»
+1194 Highland «burg-editor.ts»
+1195 Highlight color «notes-rich-text.ts»
+1196 Hill «heightmap-editor.ts,relief-generator.ts»
+1197 Hill: small blob «heightmap-editor.ts»
+1198 History «notes-rich-text.ts»
+1199 Horizontal rule «notes-rich-text.ts»
+1200 Horsehead «emblems-editor.ts,options-tab.ts»
+1201 Horsehead Edgy «emblems-editor.ts,options-tab.ts»
+1202 Hours a day of waiting covers: 24 means a full day passes «transport-editor.ts»
+1203 Hours of travel a day sustains with this transport «transport-editor.ts»
+1204 Hours of travel a day sustains: a caravan walks ~8 h/day, a ship sails 24 «transport-editor.ts»
+1205 Hover Tooltips «ui-tour.ts»
+1206 How closely embellishments are spaced, relative to the default «styles-schema.ts»
+1207 How closely ripple rows are spaced «styles-schema.ts»
+1208 How closely the strokes are packed, relative to the default. Steep ground packs them tighter «styles-schema.ts»
+1209 How far the coast bends in and out. 0 keeps the smooth arcs, high values carve deep bays and headlands «coastline-editor.ts»
+1210 How fine the shore detail is. Higher adds ever smaller bays and points but makes the map slower to draw «coastline-editor.ts»
+1211 How long a calm or rough stretch of coast is. Small mixes them along a single isle, large gives a continent a few long coasts of each kind «coastline-editor.ts»
+1212 How much calmer lake shores are than the sea. 1 is the same, higher gives glassy lakes, 0 makes every lake shore rough «coastline-editor.ts»
+1213 How much of each demand category this good satisfies. Click the pencil icon to edit. «good-editor.ts»
+1214 How much of the coast stays calm. 0 makes every shore rough, high values leave only a few rough stretches «coastline-editor.ts»
+1215 How packed the relief is. 0 places none «relief-pool-editor.ts»
+1216 How sharply calm shores turn into rough ones. Low blends them, high gives clear-cut calm and rough coasts «coastline-editor.ts»
+1217 http://www.example.com/image.jpg «dialogs.ts»
+1218 https://e-cloud.com/test.map «io-panes.ts»
+1219 Huge «notes-rich-text.ts»
+1220 Hunting «burg-editor.ts»
+1221 I «heightmap-editor.ts»
+1222 ia «names-generator.ts»
+1223 Ice «layer-labels.ts,map-entities.ts,tools-tab.ts»
+1224 Iceberg «ice-editor.ts,map-entities.ts»
+1225 icon «auto-update.ts»
+1226 Icon «markers-settings.ts,military-overview.ts»
+1227 Icon colors: «markers-editor.ts»
+1228 Icon fill and stroke colors: they paint the parts the icon leaves uncolored. Emoji keep their own colors «markers-editor.ts»
+1229 Icon Lines «styles-schema.ts»
+1230 Icon shift: «markers-editor.ts»
+1231 Icon size «styles-schema.ts»
+1232 Icon size at the lowest height, growing with height up to the second value «relief-rules-editor.ts»
+1233 Icon size at the lowest height, growing with height. Each pool entry scales it «relief-rules-editor.ts»
+1234 Icon size at the rule's lowest height, growing with height up to the second value. Each entry's size scales it «relief-pool-editor.ts»
+1235 icon-anchor «regiment-editor.ts»
+1236 icon-bezier-curve «labels-editor.ts»
+1237 icon-dot-circled «goods-editor.ts,market-deals-overview.ts»
+1238 icon-eye «journey-editor.ts,journeys-overview.ts,labels-editor.ts»
+1239 icon-eye-off «journey-editor.ts,journeys-overview.ts,labels-editor.ts»
+1240 icon-lock «burgs-overview.ts,journeys-overview.ts,markers-editor.ts»
+1241 icon-lock-open «burgs-overview.ts,markers-editor.ts,pins.ts»
+1242 icon-lock-open inactive «burgs-overview.ts,journeys-overview.ts,markers-in-radius.ts»
+1243 icon-map-signs «journey-editor.ts»
+1244 icon-resize-horizontal «labels-editor.ts»
+1245 icon-right-big «index.ts»
+1246 icon-store «goods-editor.ts,market-deals-overview.ts»
+1247 icon-tree «journey-editor.ts»
+1248 icon-users «regiment-editor.ts»
+1249 Icon* «good-editor.ts»
+1250 Icons «styles-schema.ts»
+1251 Id «burgs-overview.ts»
+1252 If error is critical, clear the stored data and try again. «lifecycle.ts»
+1253 If height is greater or equal to X and less or equal to Y, then perform an operation Z with operand V «heightmap-editor.ts»
+1254 Ignore «lifecycle.ts»
+1255 Ignore zoom bounds and show all labels regardless of the current zoom level «labels-group-editor.ts»
+1256 Image «styles-schema.ts»
+1257 Image Converter «customization-tab.ts,heightmap-editor.ts»
+1258 Image Converter is opened. Upload image and assign height value for each color «heightmap-editor.ts»
+1259 Image size in pixels «emblems-editor.ts»
+1260 Import custom icons «index.ts»
+1261 Import custom icons from a downloaded zip archive. An icon whose id the map uses for another picture is replaced only on confirmation «index.ts»
+1262 Import Heightmap «heightmap-selection.ts»
+1263 Import zip «index.ts»
+1264 in «market-deals-overview.ts»
+1265 In case of errors reload the page to update the code. «versioning.ts»
+1266 in menu. There is no way to restore the progress if file is lost. Please keep old save files on your machine or cloud storage as backups. «index.html»
+1267 In range: «markers-in-radius.ts»
+1268 in the fragment, where a text/html document would hoist it into «notes-rich-text.ts»
+1269 inactive «journey-editor.ts,journeys-overview.ts»
+1270 Income «market-deals-overview.ts,production-overview.ts»
+1271 Increase indent «notes-rich-text.ts»
+1272 Increases the polygon count to smooth the sharp points. Please note that it can take some time to calculate «view-3d.ts»
+1273 Indented 3 «ocean-patterns.ts»
+1274 Independent burgs «emblems-editor.ts»
+1275 Individual Style Settings «ui-tour.ts»
+1276 Initial Demand: «production-overview.ts»
+1277 Initial forces «battle-screen.ts»
+1278 inline «dialogs.ts,labels-overview.ts»
+1279 inline-block «heightmap-editor.ts,ice-editor.ts,labels-editor.ts»
+1280 inn «markers-generator.ts»
+1281 Input «world-configurator.ts»
+1282 Input / «world-configurator.ts»
+1283 Insert «notes-rich-text.ts»
+1284 Insert a symbol «notes-rich-text.ts»
+1285 Insert a table or edit the one under the cursor «notes-rich-text.ts»
+1286 Insert an image from a file «notes-rich-text.ts»
+1287 Insert table «notes-rich-text.ts»
+1288 installed on your computer «dialogs.ts»
+1289 Insufficient land area. There should be at least 200 land cells! «heightmap-editor.ts»
+1290 Interface preferences saved in this browser. Changes apply immediately «options-tab.ts»
+1291 Interface settings: «options-tab.ts»
+1292 Interface size «options-tab.ts»
+1293 Invalid «diplomacy-overview.ts»
+1294 Invalid burg. The selected burg does not exist or was removed. «production-overview.ts»
+1295 Invalid file format «shell.ts»
+1296 Invalid group name «route-groups-editor.ts»
+1297 Invalid market. The selected market does not exist «market-deals-overview.ts,market-overview.ts»
+1298 Invalid market. The selected market has no center burg «market-overview.ts»
+1299 Invalid relation «diplomacy-overview.ts»
+1300 Invert columns visibility «table.ts»
+1301 Invert heightmap along the axes «heightmap-editor.ts»
+1302 Iran small «textures.ts»
+1303 Iron Hills «emblems-editor.ts,options-tab.ts»
+1304 is «style-preset.ts»
+1305 is goods- «auto-update.ts»
+1306 Island «provinces-editor.ts»
+1307 Islands «provinces-editor.ts»
+1308 isolated «burgs-generator.ts»
+1309 Isthmus «heightmap-editor.ts,heightmap-templates.ts»
+1310 It «index.ts»
+1311 It will turn all separable provinces into independent states. «provinces-editor.ts»
+1312 italic «renderer.ts»
+1313 Italic «notes-rich-text.ts,style-choices.ts»
+1314 Iterate battle «battle-screen.ts»
+1315 Its map is not open «widgets.ts»
+1316 its path has to stay on land «journey-path-editor.ts»
+1317 its path has to stay on water or a navigable river «journey-path-editor.ts»
+1318 Join our «versioning.ts»
+1319 Join routes «route-editor.ts»
+1320 Journey «journeys-overview.ts»
+1321 Journey color. Click to change «journey-editor.ts,journeys-overview.ts»
+1322 Journey name «journey-editor.ts»
+1323 Journey not found «journey-editor.ts»
+1324 Journeys «layer-labels.ts,map-entities.ts,tools-tab.ts»
+1325 Journeys number «journeys-overview.ts»
+1326 Journeys Overview «journeys-overview.ts»
+1327 JPG «emblems-editor.ts»
+1328 JSON string is not valid, please check the format «style-preset.ts»
+1329 Jump to page «table.ts»
+1330 Keep the map's «index.ts»
+1331 Keep the proposed label placement «labels-overview.ts»
+1332 keeps a leading «notes-rich-text.ts»
+1333 Key «index.ts»
+1334 Kind of travel this is «journeys-overview.ts»
+1335 Kind of travel this is: a quest, a caravan, a campaign «journey-editor.ts»
+1336 Kite «emblems-editor.ts,options-tab.ts»
+1337 Kiwiroo «ocean-patterns.ts»
+1338 km «options-model.ts»
+1339 l «compony.ts»
+1340 L «compony.ts,pathUtils.ts»
+1341 L: «color-picker.ts»
+1342 label «label-spread.ts»
+1343 Label «tools-tab.ts»
+1344 Label Group Configurator «burg-group-editor.ts»
+1345 Label group, select to reassign the label «labels-overview.ts»
+1346 Label text «labels-overview.ts»
+1347 Label type «labels-overview.ts»
+1348 Label type, cannot be changed after creation «labels-group-editor.ts»
+1349 Label type, fixed after creation «labels-group-editor.ts»
+1350 Labels «labels-group-editor.ts,map-entities.ts,tools-tab.ts»
+1351 Labels Overview «labels-overview.ts»
+1352 lake «features-generator.ts»
+1353 Lake «burg-editor.ts»
+1354 Lake area in selected units «lakes-editor.ts»
+1355 Lake average depth in selected units «lakes-editor.ts»
+1356 Lake elevation in selected units «lakes-editor.ts»
+1357 Lake maximum depth in selected units «lakes-editor.ts»
+1358 Lake outlet river «lakes-editor.ts»
+1359 Lake shore length in selected units «lakes-editor.ts»
+1360 Lake subtype. Generators read it: burgs cannot port on dry, frozen or lava lakes «lakes-editor.ts»
+1361 Lake water supply. If supply > evaporation and there is an outlet, the lake water is fresh. If supply is very low, the lake becomes dry «lakes-editor.ts»
+1362 lake_island «features-generator.ts»
+1363 lakes «features-overview.ts,map-entities.ts»
+1364 Lakes «layer-labels.ts»
+1365 land «names-generator.ts,resample.ts,routes-generator.ts»
+1366 Land «provinces-editor.ts»
+1367 Land area «charts-overview.ts»
+1368 Land cells: «customization-tab.ts»
+1369 Land filter is active, water areas cannot be filled «heightmap-editor.ts»
+1370 land only «heightmap-editor.ts»
+1371 Land slowdown «trade-animation-editor.ts»
+1372 Landgrave «provinces-editor.ts»
+1373 landing «battle-screen.ts»
+1374 Landing phase. Amphibious attack. Units are vulnerable against prepared defense «battle-screen.ts»
+1375 Landing: amphibious attack «battle-screen.ts»
+1376 Language «options-tab.ts»
+1377 Large «notes-rich-text.ts»
+1378 lastSaved «options-tab.ts»
+1379 Latest changes: «versioning.ts»
+1380 Launch UI Tour «index.html»
+1381 Lava Lake «goods-distribution-editor.ts»
+1382 Layer dependency «labels-group-editor.ts»
+1383 Layer Presets «ui-tour.ts»
+1384 Layer that must be toggled on for this group to be shown «labels-group-editor.ts»
+1385 Layers «index.html»
+1386 Layers preset: «layers-tab.ts»
+1387 Layers reduction rate. Increase to improve performance «styles-schema.ts»
+1388 Layers Tab «ui-tour.ts»
+1389 Legend «controls.ts»
+1390 Length «rivers-overview.ts,routes-overview.ts»
+1391 Length of Meridian in pixels «world-configurator.ts»
+1392 Length of Meridian. Almost half of the equator length «world-configurator.ts»
+1393 Limit group «burg-group-editor.ts»
+1394 Limit group by features «burg-group-editor.ts»
+1395 Limit rule «relief-rules-editor.ts»
+1396 Limit unit «military-overview.ts»
+1397 Line simplification rate. Increase to slightly improve performance «styles-schema.ts»
+1398 Line style «styles-schema.ts»
+1399 Line: select two points to change heights along the line «heightmap-editor.ts»
+1400 Linear «elevation-profile.ts,style-choices.ts»
+1401 Linecap «styles-schema.ts»
+1402 Linejoin «styles-schema.ts»
+1403 Lines only «style-choices.ts»
+1404 Link is copied to the clipboard «io-panes.ts»
+1405 Link or upload the new picture of the selected icon. «index.ts»
+1406 Linux «app-offer.ts»
+1407 Load «index.html,io-panes.ts,load.ts»
+1408 Load custom texture «dialogs.ts»
+1409 Load Google Translate «options-tab.ts»
+1410 Load Google Translate and select a language. Automatic translation can break some page functions. If this happens, reset the language to English or refresh the page «options-tab.ts»
+1411 Load image to convert «heightmap-editor.ts»
+1412 Load map «io-panes.ts»
+1413 Load Map «map-commands.ts»
+1414 Load map from «index.html»
+1415 Load Map from File «map-commands.ts»
+1416 Load map from URL «io-panes.ts»
+1417 Load Map from URL «map-commands.ts»
+1418 Load saved map «load.ts»
+1419 Loaded data is not a valid JSON, please check the format «style-preset.ts»
+1420 LOADING «index.html»
+1421 Loading error «load.ts,shell.ts»
+1422 Loading… «registry.ts»
+1423 local «trade-animation.ts»
+1424 Local «index.ts,market-deals-overview.ts»
+1425 LOCAL «production-overview.ts»
+1426 Local bonus resource «production-overview.ts»
+1427 Local font «dialogs.ts»
+1428 Local market purchase «production-overview.ts»
+1429 Local production «production-overview.ts»
+1430 Locate «widgets.ts»
+1431 Locate on map «markers-in-radius.ts»
+1432 Locate the culture «cultures-editor.ts»
+1433 Locate the feature «features-overview.ts»
+1434 Locate the journey «journeys-overview.ts»
+1435 Locate the label «labels-overview.ts»
+1436 Locate the marker «markers-overview.ts»
+1437 Locate the province «provinces-editor.ts»
+1438 Locate the religion «religions-editor.ts»
+1439 Locate the river «rivers-overview.ts»
+1440 Locate the route «routes-overview.ts»
+1441 Locate the state «states-editor.ts»
+1442 Location «goods-editor.ts»
+1443 Lock «markers-overview.ts»
+1444 Lock culture «cultures-editor.ts»
+1445 Lock marker «markers-in-radius.ts»
+1446 Lock or unlock all burgs «burgs-overview.ts»
+1447 Lock or unlock all journeys «journeys-overview.ts»
+1448 Lock or unlock all routes «routes-overview.ts»
+1449 Lock the province «provinces-editor.ts»
+1450 Lock the state to protect it from re-generation «states-editor.ts»
+1451 Lock this religion «religions-editor.ts»
+1452 Locked. Click to unlock the element and allow it to be changed by regeneration tools «tooltips.ts»
+1453 locks pointer icon-lock «markers-in-radius.ts,markers-overview.ts»
+1454 locks pointer icon-lock-open inactive «markers-in-radius.ts,markers-overview.ts»
+1455 Looting phase. Plunder the town. Units strength increased «battle-screen.ts»
+1456 Lossless raster image with a transparent background «emblems-editor.ts»
+1457 Low Island «heightmap-editor.ts,heightmap-templates.ts»
+1458 Lower brush: drag to decrease height of cells in radius by Power value «heightmap-editor.ts»
+1459 Lowest mean precipitation of the year «charts-overview.ts»
+1460 Lowest mean temperature of the year «charts-overview.ts»
+1461 m «options-model.ts»
+1462 M «heightmap-editor.ts,pathUtils.ts»
+1463 Mac with Apple silicon «app-offer.ts»
+1464 Mac with Intel «app-offer.ts»
+1465 main «river-generator.ts»
+1466 Mandate «provinces-editor.ts»
+1467 Maneuvering phase. Units strength reduced «battle-screen.ts»
+1468 Manually assign goods to cells «goods-editor.ts»
+1469 Manually re-assign biomes to not follow the default moisture/temperature pattern «biomes-editor.ts»
+1470 Manually re-assign cultures «cultures-editor.ts»
+1471 Manually re-assign market territories «markets-overview.ts»
+1472 Manually re-assign provinces «provinces-editor.ts»
+1473 Manually re-assign religions «religions-editor.ts»
+1474 Manually re-assign states «states-editor.ts»
+1475 Manufactured goods are produced in burgs «goods-editor.ts»
+1476 Manufacturing step «production-overview.ts»
+1477 Map cannot be saved in EDIT mode, please complete the edit and retry «save.ts»
+1478 Map coordinates on globe «world-configurator.ts»
+1479 Map is saved to the browser storage «save.ts»
+1480 Map is saved to your Dropbox «save.ts»
+1481 Map is successfully loaded «load.ts»
+1482 Map minimap «minimap.ts»
+1483 Map name: «lore-editor.ts»
+1484 Map presentation in 3D scene. Works best for heightmap. Cannot be used for editing «layers-tab.ts»
+1485 Map read failed «index.ts»
+1486 Map seed «options-tab.ts»
+1487 Map seed number. Press 'Enter' to apply. A seed reproduces the same map only if the map size and the settings are the same «options-tab.ts»
+1488 Map size «emblems-editor.ts,options-tab.ts»
+1489 Map size: «world-configurator.ts»
+1490 Map URL is copied to clipboard «url-params.ts»
+1491 Map will be split into tiles and downloaded as a single zip file. Avoid saving too large images «index.html»
+1492 Maps are saved in «index.html»
+1493 Marble big «textures.ts»
+1494 Marble Blue «textures.ts»
+1495 Marble Blue big «textures.ts»
+1496 Marble small «textures.ts»
+1497 Margrave «provinces-editor.ts»
+1498 Marker «tools-tab.ts»
+1499 Marker element size in pixels «markers-editor.ts»
+1500 Marker icon «markers-editor.ts,markers-overview.ts,markers-settings.ts»
+1501 Marker icon size in map units. Wagons render at half this size. Higher = bigger icons «trade-animation-editor.ts»
+1502 Marker icon sizes in pixels «markers-editor.ts»
+1503 Marker marker element and icon sizes in pixels «markers-editor.ts»
+1504 Marker name, shown in the notes editor and overviews «markers-editor.ts»
+1505 Marker number multiplier «markers-settings.ts»
+1506 Marker pin shape «markers-editor.ts»
+1507 Marker size «styles-schema.ts,trade-animation-editor.ts»
+1508 Marker type «markers-overview.ts»
+1509 Marker type name «markers-settings.ts»
+1510 Marker type. Style changes will apply to all markers of the same type. Leave blank if the marker is unique «markers-editor.ts»
+1511 Markers «map-entities.ts,tools-tab.ts»
+1512 Markers generation settings «markers-settings.ts»
+1513 Markers in Radius «markers-in-radius.ts»
+1514 Markers number «markers-overview.ts»
+1515 Markers Overview «markers-overview.ts»
+1516 Market «charts-overview.ts,compare-prices.ts,markets-overview.ts»
+1517 Market center burg name. Click to sort «compare-prices.ts»
+1518 Market name. Click to view details «markets-overview.ts»
+1519 Market value: net trading flow plus unsold inventory value minus tax «markets-overview.ts»
+1520 Market value: net trading flow plus unsold inventory value minus tax. Click to sort «markets-overview.ts»
+1521 Markets «layer-labels.ts,map-entities.ts,tools-tab.ts»
+1522 Markets Overview «markets-overview.ts»
+1523 Mars big «textures.ts»
+1524 Mars small «textures.ts»
+1525 Mask: lower cells near edges or in map center «heightmap-editor.ts»
+1526 Mauritania small «textures.ts»
+1527 max «relief-pool-editor.ts»
+1528 Max depth: «lakes-editor.ts»
+1529 Max Height «goods-distribution-editor.ts»
+1530 Max Temperature «goods-distribution-editor.ts»
+1531 Maximal length should be greater than minimal «namesbase-editor.ts»
+1532 Maximum depression filling iterations: «customization-tab.ts»
+1533 Maximum mean elevation «charts-overview.ts»
+1534 Maximum number of iterations to fill depressions. Increase if rivers end without reaching a lake or the sea «customization-tab.ts»
+1535 Maximum zoom level to show the group «labels-group-editor.ts»
+1536 Maximum zoom to show the group, leave empty for no limit «labels-group-editor.ts»
+1537 Mean height: «customization-tab.ts»
+1538 means names like "Kalla", "Mikkor", "Dalddur" are possible. This parameter can be empty. «namesbase-editor.ts»
+1539 Measurers «map-entities.ts,tools-tab.ts»
+1540 Measurers Editor «measurers-editor.ts»
+1541 Mediterranean «heightmap-editor.ts,heightmap-templates.ts»
+1542 melee «battle-screen.ts»
+1543 Melee phase. Melee units excel «battle-screen.ts»
+1544 member «index.ts»
+1545 Member «index.ts»
+1546 Mercury big «textures.ts»
+1547 Mercury small «textures.ts»
+1548 Merge «provinces-editor.ts,states-editor.ts»
+1549 Merge provinces «provinces-editor.ts»
+1550 Merge Provinces «provinces-editor.ts»
+1551 Merge several provinces into one «provinces-editor.ts»
+1552 Merge several states into one «states-editor.ts»
+1553 Merge states «states-editor.ts»
+1554 Meridian length: «world-configurator.ts»
+1555 mesh «view-3d-renderer.ts»
+1556 Mesh detail: «view-3d.ts»
+1557 metals «emblems-generator.ts»
+1558 MFG «goods-editor.ts,production-overview.ts»
+1559 mi «options-model.ts»
+1560 Military «tools-tab.ts»
+1561 Military Overview «military-overview.ts»
+1562 Milliseconds per map unit travelled. Lower = faster animations «trade-animation-editor.ts»
+1563 min «relief-pool-editor.ts»
+1564 Min Habitability «goods-distribution-editor.ts»
+1565 Min Height «goods-distribution-editor.ts»
+1566 Min Temperature «goods-distribution-editor.ts»
+1567 Minimal length cannot be greater than maximal «namesbase-editor.ts»
+1568 Minimap «minimap.ts,tools-tab.ts»
+1569 Minimum mean elevation «charts-overview.ts»
+1570 Minimum zoom level to show the group «labels-group-editor.ts»
+1571 Minimum zoom to show the group, leave empty for no limit «labels-group-editor.ts»
+1572 MIR — Azgaar Fantasy Map Generator «index.html»
+1573 Mirror «transform-tool.ts»
+1574 Mirror heightmap along axis «heightmap-editor.ts»
+1575 Missing groups: «labels-group-editor.ts»
+1576 Miter «style-choices.ts»
+1577 Mode «labels-group-editor.ts»
+1578 mode also allows you Convert an Image into a heightmap or use Template Editor. «heightmap-editor.ts»
+1579 mode to change the coastline and keep the data. The data will be restored as much as possible, but it can cause unpredictable errors. «heightmap-editor.ts»
+1580 Model «index.ts,key-sheet.ts»
+1581 Model name «key-sheet.ts»
+1582 Money flow for deal rows: negative for BUY, positive for SELL. Pure production rows are blank. «production-overview.ts»
+1583 Monotone X «elevation-profile.ts»
+1584 Moria Orc «emblems-editor.ts,options-tab.ts»
+1585 Mountain «relief-generator.ts»
+1586 Mouth width: «river-editor.ts»
+1587 Move down «labels-group-editor.ts»
+1588 Move selected relief icon back «relief-editor.ts»
+1589 Move selected relief icon to front «relief-editor.ts»
+1590 Move the segment up «journey-editor.ts»
+1591 Move up «labels-group-editor.ts»
+1592 moveToTop «index.ts»
+1593 Multiplier «markers-settings.ts»
+1594 Multiplier applied to travel duration on land segments. Higher = slower land animations «trade-animation-editor.ts»
+1595 Multipliers «good-editor.ts»
+1596 Multiply all cells Height by the value «heightmap-editor.ts»
+1597 Multiply all heights in range by factor «heightmap-editor.ts»
+1598 Municipality «provinces-editor.ts»
+1599 Must start in a cell with a route in it «measurers-editor.ts»
+1600 N «cell-info.ts,world-configurator.ts»
+1601 n/a «cell-info.ts,religions-editor.ts»
+1602 name «sorting.ts,table.ts»
+1603 Name «burg-group-editor.ts,goods-editor.ts,journey-editor.ts»
+1604 Name bases «map-entities.ts»
+1605 Name cannot be empty «transport-editor.ts»
+1606 Name display mode is only applicable to States and Provinces «labels-group-editor.ts»
+1607 Name display mode: auto picks the best fit, short/full force a specific name form «labels-group-editor.ts»
+1608 Name display mode. Only applicable to States and Provinces «labels-group-editor.ts»
+1609 Name of the era the current year belongs to, and its abbreviation «lore-editor.ts»
+1610 Name of the map. Used to name the files it is downloaded as «lore-editor.ts»
+1611 Name* «good-editor.ts»
+1612 Namebase is not found «names-generator.ts»
+1613 Names data should not be empty «namesbase-editor.ts»
+1614 Names data: «namesbase-editor.ts»
+1615 Names data: a comma separated list of source names used for names generation «namesbase-editor.ts»
+1616 Names used more than one time «namesbase-editor.ts»
+1617 Namesbase «cultures-editor.ts,tools-tab.ts»
+1618 Namesbase Editor «namesbase-editor.ts»
+1619 Namesbase is not defined, please select a valid namesbase «cultures-editor.ts»
+1620 Natural «elevation-profile.ts»
+1621 Naval «burg-editor.ts»
+1622 Naval Battle: naval units combat «battle-screen.ts»
+1623 Navigate the Map «ui-tour.ts»
+1624 near «journey-places.ts»
+1625 Near Coast Land «goods-distribution-editor.ts»
+1626 Net burg treasury after local buying, local sales, and final local demand fill. «production-overview.ts»
+1627 Net flow for this market «market-deals-overview.ts»
+1628 Net Flow: «market-deals-overview.ts»
+1629 Neutral culture name. Click and type to change «cultures-editor.ts»
+1630 Neutral lands area «states-editor.ts»
+1631 Neutral lands name. Click to change «states-editor.ts»
+1632 Neutral means states relations are neither positive nor negative «diplomacy.ts»
+1633 Neutrals collect no taxes «states-editor.ts»
+1634 new «style-preset.ts»
+1635 New chat «chats.ts,index.ts»
+1636 New Map «index.html»
+1637 New map cannot be generated when edit mode is active, please exit the mode and retry «lifecycle.ts»
+1638 New Map! «index.html»
+1639 New memory «index.ts»
+1640 New Name «burgs-overview.ts»
+1641 New version released «shell.ts»
+1642 Next page «table.ts»
+1643 next to each province you want to merge. Use the «provinces-editor.ts»
+1644 next to each state you want to merge. Use the «states-editor.ts»
+1645 Night «view-3d.ts»
+1646 no «journey-editor.ts,proposal-card.ts»
+1647 No «markers-editor.ts»
+1648 No biomes to show «biomes-editor.ts»
+1649 No burgs to show «burgs-overview.ts»
+1650 No chats yet. «index.ts»
+1651 No cultures to show «cultures-editor.ts»
+1652 No cultures, states and burgs will be created. «cultures-generator.ts»
+1653 No emblems to edit, please generate states and burgs first «emblems-editor.ts»
+1654 No enclosed area found to fill «heightmap-editor.ts»
+1655 No goods data available. «production-chains.ts»
+1656 No historical records «diplomacy-overview.ts»
+1657 No longer on this map «widgets.ts»
+1658 No map stored. Save map to browser storage first «load.ts»
+1659 No market «markets-overview.ts»
+1660 No market. This burg is not connected to any market. «production-overview.ts»
+1661 No note matched an element on this map. Nothing was loaded «notes-editor.ts»
+1662 No outline «ocean-patterns.ts»
+1663 No pattern «ocean-patterns.ts»
+1664 No production chains found: add manufactured goods with recipes first. «production-chains.ts»
+1665 No production data for this burg. «production-overview.ts»
+1666 No religions to show «religions-editor.ts»
+1667 No result to apply «ai-generator.ts»
+1668 No routes to join with. Route must start or end at current route's start or end cell «route-editor.ts»
+1669 No rules: all land takes its biome's relief pool «relief-rules-editor.ts»
+1670 No states to show «states-editor.ts»
+1671 No tags available «goods-editor.ts»
+1672 No texture «textures.ts»
+1673 No unassigned colors. Please load an image and click the button again «heightmap-editor.ts»
+1674 No unlocked journeys to remove «journeys-overview.ts»
+1675 No valid burg in this cell. Click on a cell with a burg «market-overview.ts»
+1676 No zones to show «zones-editor.ts»
+1677 Noldor «emblems-editor.ts,options-tab.ts»
+1678 Nomadic «burg-editor.ts»
+1679 none «assistant-bubble.ts,controls.ts,dialogs.ts»
+1680 None «emblems-editor.ts,style-choices.ts»
+1681 Noon «view-3d.ts»
+1682 normal «renderer.ts»
+1683 Normal «notes-rich-text.ts»
+1684 Normalized Bar «charts-overview.ts»
+1685 Northern «features-generator.ts,world-configurator.ts»
+1686 Not allowed when 'only land cells' filter is set «heightmap-editor.ts»
+1687 Not allowed when 'only water cells' filter is set «heightmap-editor.ts»
+1688 Not enough forces to split «regiment-editor.ts»
+1689 Not now «shell.ts»
+1690 Note element is not found «notes-editor.ts»
+1691 Note element is not found. Would you like to remove the note? «notes-editor.ts»
+1692 Note formatting «notes-rich-text.ts»
+1693 Notes «tools-tab.ts»
+1694 Notes Editor «notes-editor.ts»
+1695 Notes without an element «auto-update.ts»
+1696 number «commonUtils.ts,schema-form.ts,sorting.ts»
+1697 Number «markers-settings.ts»
+1698 Number of bands around the coast «styles-schema.ts»
+1699 Number of burgs «charts-overview.ts»
+1700 Number of burgs in group «burg-group-editor.ts»
+1701 Number of burgs in market territory «markets-overview.ts»
+1702 Number of burgs with no market «markets-overview.ts»
+1703 Number of cells in market territory «markets-overview.ts»
+1704 Number of cells with no market «markets-overview.ts»
+1705 Number of coastal cells «charts-overview.ts»
+1706 Number of columns «index.html»
+1707 Number of labels currently assigned to this group «labels-group-editor.ts»
+1708 Number of labels currently assigned to this group. Click the list icon to see them «labels-group-editor.ts»
+1709 Number of lake inlet rivers «lakes-editor.ts»
+1710 Number of land biomes «biomes-editor.ts»
+1711 Number of land cells «charts-overview.ts»
+1712 Number of listed labels «labels-overview.ts»
+1713 Number of markers of that type on the current map «markers-settings.ts»
+1714 Number of names provided «namesbase-editor.ts»
+1715 Number of river cells «charts-overview.ts»
+1716 Number of rows «index.html»
+1717 Number of selected labels «labels-overview.ts»
+1718 Number of zones «zones-editor.ts»
+1719 number): Generator «relief-generator.ts»
+1720 number): Record «battle-screen.ts»
+1721 Numbered list «notes-rich-text.ts»
+1722 O «view-3d.ts»
+1723 Occupation zone «provinces-editor.ts»
+1724 ocean «features-generator.ts»
+1725 Ocean «textures.ts»
+1726 Ocean / Sea «goods-distribution-editor.ts»
+1727 Ocean embellishment «styles-schema.ts»
+1728 Ocean layers «styles-schema.ts»
+1729 off «dialogs.ts»
+1730 Off «style-choices.ts»
+1731 Ok «burg-editor.ts,cultures-generator.ts»
+1732 OK «dialog-helpers.ts,load.ts,namesbase-editor.ts»
+1733 ol «markdown.ts»
+1734 Old French «emblems-editor.ts,options-tab.ts»
+1735 Old World «heightmap-editor.ts,heightmap-templates.ts»
+1736 on «dialogs.ts»
+1737 on GitHub. «app-offer.ts»
+1738 On load «options-tab.ts»
+1739 One page dungeon «markers-generator.ts»
+1740 Only an emblem with a charge can show it without a shield «emblems-editor.ts»
+1741 Only goods with at least one selected tag remain visible in the editor list «goods-editor.ts»
+1742 only land cells «heightmap-editor.ts»
+1743 only water cells «heightmap-editor.ts»
+1744 Opacity «styles-schema.ts»
+1745 Opacity of the contour lines «styles-schema.ts»
+1746 Opacity of the hachure strokes «styles-schema.ts»
+1747 Opacity of the lake ripples «styles-schema.ts»
+1748 open «index.ts»
+1749 Open 3D Scene «map-commands.ts»
+1750 Open Azgaar Assistant «index.html,map-commands.ts,notes-editor.ts»
+1751 Open Battle Simulation Tutorial «battle-screen.ts»
+1752 Open Biomes Editor «map-commands.ts»
+1753 Open Burg Groups Editor «map-commands.ts»
+1754 Open burg map in a new tab «burg-editor.ts»
+1755 Open Burgs Overview «map-commands.ts»
+1756 Open Cell Details «map-commands.ts»
+1757 Open Coastline Editor «map-commands.ts»
+1758 Open Cultures Editor «map-commands.ts»
+1759 Open Data Charts «map-commands.ts»
+1760 Open Diplomacy Overview «map-commands.ts»
+1761 Open Emblems Editor «map-commands.ts»
+1762 Open Geographical Features Overview «map-commands.ts»
+1763 Open Globe View «map-commands.ts»
+1764 Open Goods Editor «map-commands.ts»
+1765 Open Image Converter «customization-tab.ts,heightmap-selection.ts»
+1766 Open Journeys Overview «map-commands.ts»
+1767 Open Label Groups Editor «map-commands.ts»
+1768 Open Labels Overview «map-commands.ts»
+1769 Open last saved map «options-tab.ts»
+1770 Open Layers Tab «map-commands.ts»
+1771 Open Map Lore «map-commands.ts»
+1772 Open Markers Overview «map-commands.ts»
+1773 Open Markets Overview «map-commands.ts»
+1774 Open Measurers Editor «map-commands.ts»
+1775 Open Military Forces Tutorial «military-overview.ts»
+1776 Open Military Overview «map-commands.ts»
+1777 Open Minimap «map-commands.ts»
+1778 Open Namesbase Editor «map-commands.ts»
+1779 Open Notes Editor «map-commands.ts»
+1780 Open Options Tab «map-commands.ts»
+1781 Open previously downloaded style file «style-preset.ts»
+1782 Open previously downloaded template «heightmap-editor.ts»
+1783 Open Production Chains «map-commands.ts»
+1784 Open Provinces Editor «map-commands.ts»
+1785 Open Regiments Overview «map-commands.ts»
+1786 Open Relief Rules Editor «map-commands.ts»
+1787 Open Religions Editor «map-commands.ts»
+1788 Open Rivers Overview «map-commands.ts»
+1789 Open route creation dialog «tools-tab.ts»
+1790 Open Route Groups Editor «map-commands.ts»
+1791 Open Routes Overview «map-commands.ts»
+1792 Open States Editor «map-commands.ts»
+1793 Open Style Tab «map-commands.ts»
+1794 Open template editor «customization-tab.ts»
+1795 Open Template Editor «heightmap-selection.ts»
+1796 Open Template Editor Tutorial «heightmap-editor.ts»
+1797 Open the Distribution visual editor «good-editor.ts»
+1798 Open the emblem in Armoria, the heraldry editor: your changes show on the map as you make them «emblems-editor.ts»
+1799 Open the Heightmap editor to manually sculpt terrain by raising or lowering elevation. Changes here reshape coastlines, rivers, and biomes. «ui-tour.ts»
+1800 Open the Label Groups Configurator to create, edit and reorder groups «labels-editor.ts»
+1801 Open the Options Menu «ui-tour.ts»
+1802 Open the performance settings «options-tab.ts»
+1803 Open the World Configurator to set the map position on the globe and the world climate «options-tab.ts»
+1804 Open Tools Tab «map-commands.ts»
+1805 Open Trade Animation Editor «map-commands.ts»
+1806 Open Transports Editor «map-commands.ts»
+1807 Open Units Editor «map-commands.ts»
+1808 Open wiki article scale and distance to know about grid scale «index.ts»
+1809 Open Wikipedia article about the biome «biomes-editor.ts»
+1810 Open World Configurator «map-commands.ts»
+1811 Open Wrap Tool «map-commands.ts»
+1812 Open Zones Editor «map-commands.ts»
+1813 Opening the tool will erase the current map. Are you sure you want to proceed? «heightmap-selection.ts»
+1814 Operand should be a number «heightmap-editor.ts»
+1815 Operand should be an integer «heightmap-editor.ts»
+1816 Optimize speed «performance-settings.ts»
+1817 Options «heightmap-selection.ts,index.html»
+1818 Options Tab «ui-tour.ts»
+1819 or «emblems-editor.ts»
+1820 Or load from your Dropbox account «index.html»
+1821 Order «burg-group-editor.ts,labels-group-editor.ts»
+1822 Oriental «options-tab.ts»
+1823 Other systems «app-offer.ts»
+1824 out «market-deals-overview.ts»
+1825 Output «world-configurator.ts»
+1826 Oval «emblems-editor.ts,options-tab.ts»
+1827 Over colors «style-choices.ts»
+1828 Overlay opacity: «heightmap-editor.ts»
+1829 Overwrite custom path? «journey-editor.ts,journey-path-editor.ts»
+1830 Owner «markets-overview.ts»
+1831 Owning state «markets-overview.ts»
+1832 P «heightmap-editor.ts»
+1833 p-port «burgs-overview.ts»
+1834 pack cells «index.html»
+1835 Paint Biomes «biomes-editor.ts»
+1836 Paint Brushes «customization-tab.ts,heightmap-editor.ts»
+1837 Paint Cultures «cultures-editor.ts»
+1838 Paint Market Cells «markets-overview.ts»
+1839 Paint Provinces «provinces-editor.ts»
+1840 Paint Religions «religions-editor.ts»
+1841 Paint States «states-editor.ts»
+1842 Paint Zones «zones-editor.ts»
+1843 Palm «relief-generator.ts»
+1844 panel.querySelector «index.ts»
+1845 Pangea «heightmap-editor.ts,heightmap-templates.ts»
+1846 Paragraph formatting «notes-rich-text.ts»
+1847 Parish «provinces-editor.ts»
+1848 Parsing error «namesbase-editor.ts»
+1849 Paste a link to an image «index.ts»
+1850 Paste any valid style data in JSON format «style-preset.ts»
+1851 path «label-spread.ts»
+1852 path.reduce «style-reference.ts»
+1853 Patreon «index.ts,versioning.ts»
+1854 Pattern 1 «ocean-patterns.ts»
+1855 Pattern 2 «ocean-patterns.ts»
+1856 Pattern 3 «ocean-patterns.ts»
+1857 Pattern 4 «ocean-patterns.ts»
+1858 Pattern 5 «ocean-patterns.ts»
+1859 Pattern 6 «ocean-patterns.ts»
+1860 Pause between land and water legs of a trip, in milliseconds. Higher = longer pause «trade-animation-editor.ts»
+1861 paused «production-chains.ts»
+1862 Pavise «emblems-editor.ts,options-tab.ts»
+1863 Peninsula «heightmap-editor.ts,heightmap-templates.ts»
+1864 Pennant «emblems-editor.ts,options-tab.ts»
+1865 Pennon «emblems-editor.ts,options-tab.ts»
+1866 Pentagon «markers-editor.ts»
+1867 Per-dimension production multipliers. 1 = no effect, 0 = fully suppressed. «good-editor.ts»
+1868 percentage «compare-prices.ts,goods-editor.ts,markets-overview.ts»
+1869 Percentage of names containing space character «namesbase-editor.ts»
+1870 Performance «options-tab.ts»
+1871 Performance Settings «performance-settings.ts»
+1872 Pergamena small «textures.ts»
+1873 Pick different endpoints first, then change the transport type or use an «journey-editor.ts»
+1874 Pin «markers-editor.ts,markers-overview.ts»
+1875 Pin colors: «markers-editor.ts»
+1876 Pin fill and stroke colors «markers-editor.ts»
+1877 Pin marker «markers-in-radius.ts»
+1878 Pin shape: «markers-editor.ts»
+1879 Pit: round depression «heightmap-editor.ts»
+1880 Place icons in a bulk «relief-editor.ts»
+1881 Placement «styles-schema.ts»
+1882 Plaster «textures.ts»
+1883 Plate size «styles-schema.ts»
+1884 plaza, «burgs-overview.ts»
+1885 Please «heightmap-editor.ts»
+1886 Please assign colors to heights first «heightmap-editor.ts»
+1887 Please click on a regiment «regiment-editor.ts»
+1888 Please click on a regiment to attack «regiment-editor.ts»
+1889 Please enter a prompt «ai-generator.ts»
+1890 Please enter an API key «ai-generator.ts»
+1891 Please exit the customization mode first «tools-tab.ts»
+1892 Please exit the Image Conversion mode first «heightmap-editor.ts»
+1893 Please fill in the biome name «biomes-editor.ts»
+1894 Please note server should allow CORS for file to be loaded. If CORS is not allowed, save file to Dropbox and provide a direct link «io-panes.ts»
+1895 Please provide a font name «dialogs.ts»
+1896 Please provide a preset name «style-preset.ts»
+1897 Please provide a style JSON «style-preset.ts»
+1898 Please provide a valid group name «lakes-editor.ts»
+1899 Please provide a valid number in range 0-9999 «biomes-editor.ts»
+1900 Please provide a valid URL «dialogs.ts,io-panes.ts»
+1901 Please select a model «ai-generator.ts»
+1902 Please select a province to merge into «provinces-editor.ts»
+1903 Please select a regiment first «battle-screen.ts»
+1904 Please select a relief icon on the map «relief-editor.ts»
+1905 Please select a state to merge into «states-editor.ts»
+1906 Please select an icon «relief-editor.ts»
+1907 Please select several provinces to merge «provinces-editor.ts»
+1908 Please select several states to merge «states-editor.ts»
+1909 Please select state from the list «regiments-overview.ts»
+1910 Plot «charts-overview.ts»
+1911 PNG «elevation-profile.ts,emblems-editor.ts»
+1912 PNG / JPEG scale: «index.html»
+1913 pointer «journey-editor.ts,journeys-overview.ts»
+1914 Points number «options-tab.ts,submap-tool.ts,transform-tool.ts»
+1915 Policy «index.ts»
+1916 Polish «emblems-editor.ts,options-tab.ts»
+1917 Poll Tax: «states-editor.ts»
+1918 pool «relief-previews.ts»
+1919 Population «biomes-editor.ts,burg-group-editor.ts,burgs-overview.ts»
+1920 port, «burgs-overview.ts»
+1921 Position «index.ts»
+1922 Position icon «positioner.ts»
+1923 Position x «styles-schema.ts»
+1924 Position y «styles-schema.ts»
+1925 Potential religion extent «religions-editor.ts»
+1926 Power «military-overview.ts»
+1927 Power should not be zero «heightmap-editor.ts»
+1928 Precreated heightmaps «heightmap-selection.ts»
+1929 Prefecture «provinces-editor.ts»
+1930 Preset «coastline-editor.ts»
+1931 Preset name «style-preset.ts»
+1932 Preset name: «layers-presets.ts,style-preset.ts»
+1933 Preview «customization-tab.ts»
+1934 Preview generator «burg-group-editor.ts»
+1935 Preview the heightmap in a 3D scene «customization-tab.ts»
+1936 Previous page «table.ts»
+1937 previous versions «versioning.ts»
+1938 Price «compare-prices.ts,goods-editor.ts,market-overview.ts»
+1939 Price for this good. Click to sort «compare-prices.ts»
+1940 Primary «hierarchy-tree.ts»
+1941 primary province «provinces-editor.ts»
+1942 Probability of inversion, range 0-1 «heightmap-editor.ts»
+1943 Probability to receive the good «goods-distribution-editor.ts»
+1944 Proceed «map-commands.ts»
+1945 Produced «goods-editor.ts»
+1946 Product «burgs-overview.ts»
+1947 Product per capita: gross product divided by population. «production-overview.ts»
+1948 Production «tools-tab.ts»
+1949 Production Chains «production-chains.ts»
+1950 Production value «charts-overview.ts»
+1951 Production volume «charts-overview.ts»
+1952 Project map on globe. Cannot be used for editing «layers-tab.ts»
+1953 Promise «ai-generator.ts,export.ts,global.ts»
+1954 Propose one batch of registered operations. It never changes the map: the user previews the batch and applies or discards it. «map.ts»
+1955 Propose this change «widgets.ts»
+1956 Provide a name for the new group «lakes-editor.ts»
+1957 Provide a names data: a comma separated list of source names «namesbase-editor.ts»
+1958 Provide custom URL to the burg map. It can be a link to a generator or just an image. Leave empty to use the default map preview «burg-editor.ts»
+1959 Provider «index.ts»
+1960 province «emblems-editor.ts»
+1961 Province «burgs-overview.ts,charts-overview.ts,emblems-editor.ts»
+1962 Province area «provinces-editor.ts»
+1963 Province capital. Click to select from burgs within the state. No capital means the province is governed from the state capital «provinces-editor.ts»
+1964 Province capital. Click to zoom into view «provinces-editor.ts»
+1965 Province center cannot be assigned to a different region. Please remove the province first «provinces-editor.ts»
+1966 Province does not have any cells, cannot change population «provinces-editor.ts»
+1967 Province form name «provinces-editor.ts»
+1968 Province form name. Click to change «provinces-editor.ts»
+1969 Province full name «provinces-editor.ts»
+1970 Province name. Click to change «provinces-editor.ts»
+1971 Province owner «provinces-editor.ts»
+1972 Province short name «provinces-editor.ts»
+1973 Provinces «map-entities.ts,tools-tab.ts»
+1974 Provinces chart «provinces-editor.ts»
+1975 Provinces displayed «provinces-editor.ts»
+1976 Provinces Editor «provinces-editor.ts»
+1977 Provinces ratio «options-tab.ts»
+1978 pursue «battle-screen.ts»
+1979 Pursue phase. Mounted units excel «battle-screen.ts»
+1980 Pursue phase. Try to intercept fleeing attackers. Mounted units excel «battle-screen.ts»
+1981 Pursue phase. Units strength increased «battle-screen.ts»
+1982 px «styles-legacy.ts»
+1983 px = «world-configurator.ts»
+1984 Quality «options-tab.ts»
+1985 Quick Load Map «map-commands.ts»
+1986 Quick preset lighting for different times of day «view-3d.ts»
+1987 Quote «notes-rich-text.ts»
+1988 R «heightmap-editor.ts»
+1989 radio button «provinces-editor.ts,states-editor.ts»
+1990 Radius around the marker, in the map's distance unit — markers inside it are listed and shown on the map «markers-in-radius.ts»
+1991 Radius x «styles-schema.ts»
+1992 Radius y «styles-schema.ts»
+1993 Radius: «wrap-tool.ts»
+1994 Raise brush: increase height of cells in radius by Power value «heightmap-editor.ts»
+1995 random «options-tab.ts»
+1996 Random «options-tab.ts»
+1997 Random Chance «goods-distribution-editor.ts»
+1998 Random factor for attackers. Click to re-roll «battle-screen.ts»
+1999 Random factor for defenders. Click to re-roll «battle-screen.ts»
+2000 Randomize Iceberg shape «ice-editor.ts»
+2001 Randomize states Expansion value and re-calculate states and provinces «states-editor.ts»
+2002 Range: elongated elevation «heightmap-editor.ts»
+2003 Rate «military-overview.ts»
+2004 RAW «goods-editor.ts»
+2005 Raw goods are produced by rural population in cells based on biome availability and in cells and burgs when bonus resource is assigned to cells «goods-editor.ts»
+2006 Raw Production «good-editor.ts»
+2007 Re-assign zones «zones-editor.ts»
+2008 Re-generate examples based on provided data «namesbase-editor.ts»
+2009 Re-place «relief-pool-editor.ts»
+2010 Re-place relief «relief-pool-editor.ts»
+2011 Re-place the relief the rules claim, to apply the edits «relief-rules-editor.ts»
+2012 Re-place this good and recompute production, trade and taxes. Uncheck to update the good only, without disturbing the current economy. «good-editor.ts»
+2013 Read the map «index.ts»
+2014 Rebuild market territories, production, trade deals, and taxes from the current goods and markets «tools-tab.ts»
+2015 Recalculate «military-overview.ts»
+2016 Recalculate cultures based on current values of growth-related attributes «cultures-editor.ts»
+2017 Recalculate military «military-overview.ts»
+2018 Recalculate military forces based on current options «military-overview.ts»
+2019 Recalculate religions based on current values of growth-related attributes «religions-editor.ts»
+2020 Recalculate states based on current values of growth-related attributes «states-editor.ts»
+2021 Recipes «good-editor.ts»
+2022 Recolor listed provinces based on state color «provinces-editor.ts»
+2023 Recommended maximum name length «namesbase-editor.ts»
+2024 Recommended minimum name length «namesbase-editor.ts»
+2025 Record «charts-overview.ts»
+2026 Rectangular «style-choices.ts»
+2027 Reddit community «versioning.ts»
+2028 Redo «notes-rich-text.ts»
+2029 Redo the action «heightmap-editor.ts»
+2030 Redraw on zoom «performance-settings.ts»
+2031 Redraw preview «heightmap-selection.ts»
+2032 Reduce layers «styles-schema.ts»
+2033 Refresh «compare-prices.ts»
+2034 Refresh the Deals screen «market-deals-overview.ts»
+2035 Refresh the Editor «biomes-editor.ts,burgs-overview.ts,cultures-editor.ts»
+2036 Refresh the overview «markets-overview.ts»
+2037 Refresh the Overview «diplomacy-overview.ts,features-overview.ts»
+2038 Refresh the overview screen «military-overview.ts,regiments-overview.ts»
+2039 Refresh the Overview screen «labels-overview.ts,markers-overview.ts,market-overview.ts»
+2040 Regenerate «diplomacy-overview.ts,goods-editor.ts,lifecycle.ts»
+2041 Regenerate bonus goods «goods-editor.ts»
+2042 Regenerate bonus goods placement «goods-editor.ts»
+2043 Regenerate burg names based on assigned culture «burgs-overview.ts»
+2044 Regenerate Burgs «map-commands.ts»
+2045 Regenerate culture name «cultures-editor.ts»
+2046 Regenerate Cultures «map-commands.ts»
+2047 Regenerate diplomatical relations «diplomacy-overview.ts»
+2048 Regenerate Economy «map-commands.ts»
+2049 regenerate economy on apply «good-editor.ts»
+2050 Regenerate element «map-commands.ts»
+2051 Regenerate Emblems «map-commands.ts»
+2052 Regenerate Goods «map-commands.ts»
+2053 Regenerate Ice «map-commands.ts»
+2054 Regenerate legend for this regiment «regiment-editor.ts»
+2055 Regenerate Markers «map-commands.ts»
+2056 Regenerate markets «markets-overview.ts»
+2057 Regenerate Markets «map-commands.ts»
+2058 Regenerate markets and their territories «markets-overview.ts»
+2059 Regenerate Military «map-commands.ts»
+2060 Regenerate Population «map-commands.ts»
+2061 Regenerate preview «heightmap-selection.ts»
+2062 Regenerate production «goods-editor.ts,markets-overview.ts»
+2063 Regenerate Production «map-commands.ts»
+2064 Regenerate production and trade «markets-overview.ts»
+2065 Regenerate production and trade deals «goods-editor.ts,markets-overview.ts»
+2066 Regenerate Provinces «map-commands.ts»
+2067 Regenerate relations «diplomacy-overview.ts»
+2068 Regenerate Relief «map-commands.ts»
+2069 Regenerate Religions «map-commands.ts»
+2070 Regenerate Rivers «map-commands.ts»
+2071 Regenerate rivers and allow water flow to change heights and form new lakes. Recommended «customization-tab.ts»
+2072 Regenerate Routes «map-commands.ts»
+2073 Regenerate State Labels «map-commands.ts»
+2074 Regenerate States «map-commands.ts»
+2075 Regenerate the emblem «emblems-editor.ts»
+2076 Regenerate unlocked markers «markers-overview.ts»
+2077 Regenerate Zones «map-commands.ts»
+2078 Regiment «military-generator.ts»
+2079 Regiment base. Drag to re-base the regiment «regiment-editor.ts»
+2080 Regiment cannot attack itself «regiment-editor.ts»
+2081 Regiment has no troops to battle «regiment-editor.ts»
+2082 Regiment icon «regiment-editor.ts»
+2083 Regiment is already in the battle «battle-screen.ts»
+2084 Regiment's emblem «regiments-overview.ts»
+2085 Regiment's name «regiments-overview.ts»
+2086 regiments «battle-screen.ts»
+2087 Regiments «map-entities.ts»
+2088 Regiments Overview «regiments-overview.ts»
+2089 Region «provinces-editor.ts»
+2090 regs.reduce «battle-screen.ts»
+2091 Regular distribution pattern «goods-distribution-editor.ts»
+2092 Relations «diplomacy-overview.ts»
+2093 Relations are unknown if states do not have enough information about each other «diplomacy.ts»
+2094 Relations change «states-generator.ts»
+2095 Relations history «diplomacy-overview.ts»
+2096 Relations matrix «diplomacy-overview.ts»
+2097 Relations severance «diplomacy.ts»
+2098 Relations to «diplomacy-editor.ts»
+2099 Release «provinces-editor.ts»
+2100 Release all provinces. It will make all provinces with burgs independent «provinces-editor.ts»
+2101 Release provinces «provinces-editor.ts»
+2102 releases page «app-offer.ts»
+2103 Relief «biomes-editor.ts,relief-rules-editor.ts,tools-tab.ts»
+2104 Relief icons «map-entities.ts»
+2105 Relief Rules «relief-rules-editor.ts»
+2106 Relief set the icons are drawn in: the style's, or one pinned for the icon «relief-editor.ts»
+2107 Religion «charts-overview.ts,fields.ts,religions-editor.ts»
+2108 Religion area «religions-editor.ts»
+2109 Religion does not have any cells, cannot change population «religions-editor.ts»
+2110 Religion expansionism. Defines competitive size «religions-editor.ts»
+2111 Religion expansionism. Defines competitive size. Click to change, then click Recalculate to apply change «religions-editor.ts»
+2112 Religion form «religions-editor.ts»
+2113 Religion name. Click and type to change «religions-editor.ts»
+2114 Religion supreme deity «religions-editor.ts»
+2115 Religion type «religions-editor.ts»
+2116 Religions «burg-group-editor.ts,map-entities.ts,military-overview.ts»
+2117 Religions Editor «religions-editor.ts»
+2118 Religions number «options-tab.ts»
+2119 Reload «shell.ts»
+2120 Relocate burg. Click on map to move the burg «burg-editor.ts»
+2121 Relocate market. Click on a burg on the map to move the market center «market-overview.ts»
+2122 remove «proposal-card.ts»
+2123 Remove «burg-editor.ts,burg-group-editor.ts,burgs-overview.ts»
+2124 Remove all «markers-overview.ts»
+2125 Remove all journeys «journeys-overview.ts»
+2126 Remove all markers «markers-overview.ts»
+2127 Remove all measurers «measurers-editor.ts»
+2128 Remove all measurers from the map «measurers-editor.ts»
+2129 Remove all provinces «provinces-editor.ts»
+2130 Remove all provinces. States will remain as they are «provinces-editor.ts»
+2131 Remove all rivers «rivers-overview.ts»
+2132 Remove all routes «routes-overview.ts»
+2133 Remove all unlocked burgs except for capitals. To remove a capital remove its state first «burgs-overview.ts»
+2134 Remove all unlocked journeys «journeys-overview.ts»
+2135 Remove all unlocked markers «markers-overview.ts»
+2136 Remove burg «burg-editor.ts,burgs-overview.ts»
+2137 Remove culture «cultures-editor.ts»
+2138 Remove custom icon «index.ts»
+2139 Remove from the pool «relief-pool-editor.ts»
+2140 Remove good «goods-editor.ts»
+2141 Remove group «burg-group-editor.ts,labels-group-editor.ts,route-groups-editor.ts»
+2142 Remove icons in a bulk «relief-editor.ts»
+2143 Remove ingredient «good-editor.ts»
+2144 Remove journey «journey-editor.ts,journeys-overview.ts»
+2145 Remove label «labels-editor.ts»
+2146 Remove Label Group «labels-group-editor.ts»
+2147 Remove lake group «lakes-editor.ts»
+2148 Remove marker «markers-editor.ts,markers-in-radius.ts,markers-overview.ts»
+2149 Remove market «burg-editor.ts»
+2150 Remove Market «markets-overview.ts»
+2151 Remove non-capital burg «burg-editor.ts»
+2152 Remove note «notes-editor.ts»
+2153 Remove province «provinces-editor.ts»
+2154 Remove recipe «good-editor.ts»
+2155 Remove regiment «regiment-editor.ts»
+2156 Remove relief icons «relief-editor.ts»
+2157 Remove religion «religions-editor.ts»
+2158 Remove resource «goods-editor.ts»
+2159 Remove river «river-editor.ts,rivers-overview.ts»
+2160 Remove river and tributaries «river-editor.ts»
+2161 Remove route «route-editor.ts,routes-overview.ts»
+2162 Remove route group «route-groups-editor.ts»
+2163 Remove segment «journey-editor.ts»
+2164 Remove selected relief icon or icon type «relief-editor.ts»
+2165 Remove state «states-editor.ts»
+2166 Remove style preset «style-preset.ts»
+2167 Remove the cell «river-creator.ts»
+2168 Remove the chart «charts-overview.ts»
+2169 Remove the custom biome «biomes-editor.ts»
+2170 Remove the element «ice-editor.ts»
+2171 Remove the group «lakes-editor.ts»
+2172 Remove the group? This won't affect labels unless the changes are applied. «labels-group-editor.ts»
+2173 Remove the icon from the map «index.ts»
+2174 Remove the journey «journey-editor.ts»
+2175 Remove the label «labels-editor.ts»
+2176 Remove the label path, render the label as a straight text «labels-editor.ts»
+2177 Remove the marker «markers-editor.ts»
+2178 Remove the measurer «measurers-editor.ts»
+2179 Remove the point «route-creator.ts»
+2180 Remove the province «provinces-editor.ts»
+2181 Remove the rule «relief-rules-editor.ts»
+2182 Remove the segment «journey-editor.ts»
+2183 Remove the state «states-editor.ts»
+2184 Remove the step «heightmap-editor.ts»
+2185 Remove the transport type «transport-editor.ts»
+2186 Remove the unit «military-overview.ts»
+2187 Remove this market «markets-overview.ts»
+2188 Remove this note «notes-editor.ts»
+2189 Remove transport type «transport-editor.ts»
+2190 Remove unit type «military-overview.ts»
+2191 Remove unlocked routes «routes-overview.ts»
+2192 Remove zone «zones-editor.ts»
+2193 Renaissance «emblems-editor.ts,options-tab.ts»
+2194 Rename «burgs-overview.ts»
+2195 Rename burgs in bulk «burgs-overview.ts»
+2196 Render heightmap data as a small monochrome image «customization-tab.ts»
+2197 Render ocean cells «customization-tab.ts»
+2198 Render ocean heights «heightmap-selection.ts,styles-schema.ts»
+2199 Rendering group «features-overview.ts»
+2200 Rendering group: the svg group the lake is drawn in. Create groups in the Lake Editor «features-overview.ts»
+2201 Rendering group: the svg group the lake is drawn in. Does not affect generation «lakes-editor.ts»
+2202 Rendering order: higher values are rendered on top «burg-group-editor.ts»
+2203 Rendering order: lower groups are rendered on top «labels-group-editor.ts»
+2204 Rendering preset: visual quality traded for speed. Pick 'Speed' if the map feels slow «options-tab.ts»
+2205 Replace «index.ts,journey-editor.ts,journey-path-editor.ts»
+2206 Replace the relief rules with the default hills and mountains? «relief-rules-editor.ts»
+2207 Replace the whole emblem with a picture: choose, link or upload an image, such as a ready coat of arms «emblems-editor.ts»
+2208 Republic «provinces-editor.ts»
+2209 required «labels-group-editor.ts»
+2210 Rerender all preview images «heightmap-selection.ts»
+2211 Rescale burg styles «submap-tool.ts»
+2212 Rescaler: change height if condition is fulfilled «heightmap-editor.ts»
+2213 Reservation «provinces-editor.ts»
+2214 Reset «journey-editor.ts»
+2215 Reset custom override and follow the global map settings «coastline-editor.ts»
+2216 Reset language to English «options-tab.ts»
+2217 Reset map zoom «index.html»
+2218 Reset Options «map-commands.ts,options-tab.ts»
+2219 Reset preview zoom «burg-editor.ts»
+2220 Reset the segment: recompute the path and restore the default color, speed and time «journey-editor.ts»
+2221 Reset to default «coastline-editor.ts,trade-animation-editor.ts»
+2222 Reset to map settings «coastline-editor.ts»
+2223 Reset to the Balance preset value «performance-settings.ts»
+2224 Reset to the map globals «coastline-editor.ts»
+2225 Reset Zoom «map-commands.ts»
+2226 Reshuffles where the calm and rough stretches fall «coastline-editor.ts»
+2227 Restore «goods-editor.ts,namesbase-editor.ts,relief-rules-editor.ts»
+2228 Restore default columns visibility «table.ts»
+2229 Restore default data «namesbase-editor.ts»
+2230 Restore default goods «goods-editor.ts»
+2231 Restore default list and regenerate goods «goods-editor.ts»
+2232 Restore default map size: the window size «options-tab.ts»
+2233 Restore default military units and settings «military-overview.ts»
+2234 Restore default namesbase «namesbase-editor.ts»
+2235 Restore default transport types «transport-editor.ts»
+2236 Restore default units settings «units-editor.ts»
+2237 Restore label placement from before the spread «labels-overview.ts»
+2238 Restore relief rules «relief-rules-editor.ts»
+2239 Restore the default hills and mountains «relief-rules-editor.ts»
+2240 Restore the default label «labels-editor.ts,labels-overview.ts»
+2241 Restore the default transport types, removing custom ones «transport-editor.ts»
+2242 Restore the default transport types? Custom ones will be removed. Segments referencing a removed type keep its name but will no longer resolve. «transport-editor.ts»
+2243 Restore the default zoom extent «options-tab.ts»
+2244 Restore the defaults and re-define biomes based on current moisture and temperature «biomes-editor.ts»
+2245 Restore the icon's default colors «markers-editor.ts»
+2246 Restore the MIR forest-green theme «options-tab.ts»
+2247 Restore winds «world-configurator.ts»
+2248 Restrict brush to specific cell types «heightmap-editor.ts»
+2249 Retreat phase. Units strength reduced «battle-screen.ts»
+2250 Retry «index.ts,save.ts»
+2251 Revert «wrap-tool.ts»
+2252 Revert all vertex edits ever made on this map «wrap-tool.ts»
+2253 Revert vertex edits «wrap-tool.ts»
+2254 Rhombille grid «grid-types.ts»
+2255 Ripple length, fitted to the available water width «styles-schema.ts»
+2256 Ripple stroke width in map pixels «styles-schema.ts»
+2257 Ripples «style-choices.ts»
+2258 Rivalization «diplomacy.ts»
+2259 Rivalry is a state of competing for dominance in the region «diplomacy.ts»
+2260 River «burg-editor.ts,fields.ts,goods-distribution-editor.ts»
+2261 River length from source to mouth «rivers-overview.ts»
+2262 River length in selected units «river-editor.ts»
+2263 River mouth width «rivers-overview.ts»
+2264 River mouth width in selected units «river-editor.ts»
+2265 River name «rivers-overview.ts»
+2266 River source additional width. Default value is 0 «river-editor.ts»
+2267 River type name «rivers-overview.ts»
+2268 River valleys: «view-3d.ts»
+2269 River width multiplier. Default value is 1 «river-editor.ts»
+2270 Rivers «map-entities.ts,tools-tab.ts»
+2271 Rivers number «rivers-overview.ts»
+2272 Rivers Overview «rivers-overview.ts»
+2273 Roll dice to update random factor «battle-screen.ts»
+2274 Roman «emblems-editor.ts,options-tab.ts»
+2275 Rotate «transform-tool.ts»
+2276 Round «emblems-editor.ts,options-tab.ts,style-choices.ts»
+2277 Route «routes-overview.ts,tools-tab.ts»
+2278 Route group «routes-overview.ts»
+2279 Route length «routes-overview.ts»
+2280 Route length in selected units «route-editor.ts»
+2281 Route links «fields.ts»
+2282 Route name «routes-overview.ts»
+2283 Route to join with: «route-editor.ts»
+2284 Routes «map-entities.ts,tools-tab.ts»
+2285 Routes joined «route-editor.ts»
+2286 Routes number «routes-overview.ts»
+2287 Routes Overview «routes-overview.ts»
+2288 row.querySelector «burg-group-editor.ts»
+2289 Ruggedness «coastline-editor.ts»
+2290 rule «relief-previews.ts»
+2291 Rule name «relief-rules-editor.ts»
+2292 Rulers «layer-labels.ts»
+2293 ruling state «states-editor.ts»
+2294 running «production-chains.ts»
+2295 Rural «military-overview.ts»
+2296 Rural population «charts-overview.ts,fields.ts,provinces-editor.ts»
+2297 Rural production «good-editor.ts»
+2298 S «cell-info.ts,heightmap-editor.ts,world-configurator.ts»
+2299 S: «color-picker.ts»
+2300 Sale to local market «production-overview.ts»
+2301 Sales «markets-overview.ts»
+2302 Sales tax is applied to deals with a seller from the state. Poll tax is applied to all population of the state. Tax changes take effect on Production regeneration «states-editor.ts»
+2303 Sales Tax is paid by the seller on local sale deals. It is deducted from gross sale value and transferred to the state treasury. «production-overview.ts»
+2304 Sales Tax: «states-editor.ts»
+2305 Salt Lake «goods-distribution-editor.ts»
+2306 Sample «controls.ts»
+2307 Satellite texture «view-3d.ts»
+2308 Save «diplomacy-overview.ts,index.html,layers-presets.ts»
+2309 Save and Load Maps «ui-tour.ts»
+2310 Save current JSON as a new style preset «style-preset.ts»
+2311 Save data as a CSV file «compare-prices.ts»
+2312 Save files to Dropbox first «io-panes.ts»
+2313 Save fully-functional map file «index.html»
+2314 Save layer preset «layers-presets.ts»
+2315 Save Layers Preset «map-commands.ts»
+2316 Save map «io-panes.ts»
+2317 Save Map As… «map-commands.ts»
+2318 Save Map File «map-commands.ts»
+2319 Save map file to your Dropbox «index.html»
+2320 Save map to «index.html»
+2321 Save Map to browser storage «map-commands.ts»
+2322 Save Map to Dropbox «map-commands.ts»
+2323 Save markets data as a CSV file «markets-overview.ts»
+2324 Save OBJ file of the 3d scene «view-3d.ts»
+2325 Save reminder is turned off. Press CTRL+Q again to re-initiate «autosave.ts»
+2326 Save reminder is turned on. Press CTRL+Q to turn off «autosave.ts»
+2327 Save screenshot of the 3d scene «view-3d.ts»
+2328 save the map «heightmap-editor.ts»
+2329 Save the project to browser storage only «index.html»
+2330 Saving error «save.ts»
+2331 Scalable vector image: best quality, opens in a browser or Inkscape «emblems-editor.ts»
+2332 Scale «transform-tool.ts»
+2333 Scale Bar «layer-labels.ts»
+2334 Scale bar bottom edge, in percents «styles-schema.ts»
+2335 Scale bar right edge, in percents «styles-schema.ts»
+2336 Scroll the mouse wheel to zoom in and out. Click and drag on the map to pan. Double-click a location to center on it. «ui-tour.ts»
+2337 sea_island «features-generator.ts»
+2338 Search «index.html»
+2339 Search built-in icons «index.ts»
+2340 Search fonts «dialogs.ts»
+2341 Search map and commands «index.html,omnibar.ts»
+2342 Search results «omnibar.ts»
+2343 Secondary «hierarchy-tree.ts»
+2344 Seed history «seed.ts»
+2345 segment «map-entities.ts»
+2346 Segment color. Click to change «journey-editor.ts»
+2347 Segment distance «journey-editor.ts»
+2348 Segment pause «trade-animation-editor.ts»
+2349 segments «map-entities.ts»
+2350 Select «heightmap-selection.ts»
+2351 Select a color below and assign a height value for it «heightmap-editor.ts»
+2352 Select a color to assign a height value «heightmap-editor.ts»
+2353 Select a color to re-assign the height value «heightmap-editor.ts»
+2354 Select a distance unit or provide a custom name «units-editor.ts»
+2355 Select a group for this label «labels-editor.ts»
+2356 Select a map layers preset «layers-tab.ts»
+2357 Select a set of cultures to be used for names and cultures generation «options-tab.ts»
+2358 Select a specific map element from this dropdown to adjust its colors, opacity, stroke width, and other visual properties. «ui-tour.ts»
+2359 Select a style preset. State labels may required regeneration if font is changed «style-tab.ts»
+2360 Select allowed biomes «burg-group-editor.ts,military-overview.ts»
+2361 Select allowed cultures «burg-group-editor.ts,military-overview.ts»
+2362 Select allowed features «burg-group-editor.ts»
+2363 Select allowed religions «burg-group-editor.ts,military-overview.ts»
+2364 Select allowed states «burg-group-editor.ts,military-overview.ts»
+2365 Select an altitude unit or provide a custom name «units-editor.ts»
+2366 Select an element to edit its style «style-tab.ts»
+2367 Select any type of icons «relief-editor.ts»
+2368 Select at least one element «limitation-picker.ts»
+2369 Select at least one label «labels-overview.ts»
+2370 Select base template «heightmap-editor.ts»
+2371 Select base to edit «namesbase-editor.ts»
+2372 Select base: «namesbase-editor.ts»
+2373 Select Biomes «goods-distribution-editor.ts»
+2374 Select burg group. Groups defines burg icon, label size and style «burg-editor.ts»
+2375 Select burg in province or state «emblems-editor.ts»
+2376 Select burg type. Type slightly affects emblem generation «burg-editor.ts»
+2377 Select chart type «charts-overview.ts»
+2378 Select color scheme for the element «styles-schema.ts»
+2379 Select dominant culture «burg-editor.ts»
+2380 Select element group «style-tab.ts»
+2381 Select emblem shape. Can be changed individually in the Emblem Editor «options-tab.ts»
+2382 Select entity to group by. If you don't need grouping, set it the same as the entity «charts-overview.ts»
+2383 Select Feature Types «goods-distribution-editor.ts»
+2384 Select feature. Features with custom settings are bullet-marked «coastline-editor.ts»
+2385 Select file and create a link to share with your friends «index.html»
+2386 Select filter for element. Filters may cause performance issues! «styles-schema.ts»
+2387 Select font «dialogs.ts,styles-schema.ts»
+2388 Select font adding method «dialogs.ts»
+2389 Select form name «provinces-editor.ts,states-editor.ts»
+2390 Select good line in editor, click on cells to remove or add a bonus resource «goods-editor.ts»
+2391 Select good to compare stock across markets «compare-prices.ts»
+2392 Select grid overlay type «styles-schema.ts»
+2393 Select group to be assigned if burg doesn't pass the criteria for other groups «burg-group-editor.ts»
+2394 Select group to be assigned if other groups are not passed «burg-group-editor.ts»
+2395 Select Heightmap «heightmap-selection.ts»
+2396 Select Heightmap Template «map-commands.ts»
+2397 Select heightmap template – template provides unique, but similar-looking maps on generation «heightmap-selection.ts»
+2398 Select how many distance units are in one pixel «units-editor.ts»
+2399 Select icon «index.ts,relief-editor.ts,styles-schema.ts»
+2400 Select lake rendering group «lakes-editor.ts»
+2401 Select lake subtype «lakes-editor.ts»
+2402 Select line interpolation type «styles-schema.ts»
+2403 Select marker type for newly added markers. «markers-overview.ts»
+2404 Select ocean pattern «styles-schema.ts»
+2405 Select or deselect all listed labels «labels-overview.ts»
+2406 Select origins «hierarchy-tree.ts»
+2407 Select own your own relief icon «relief-editor.ts»
+2408 Select parent river «river-editor.ts»
+2409 Select precreated heightmap – it will be the same for each map «heightmap-selection.ts»
+2410 Select province in state «emblems-editor.ts»
+2411 Select route group «route-editor.ts»
+2412 Select set of relief icons. Existing icons are restyled, not regenerated «styles-schema.ts»
+2413 Select shape of the emblem «emblems-editor.ts»
+2414 Select Shore Proximity «goods-distribution-editor.ts»
+2415 Select speech synthesis voice to pronounce generated names «options-tab.ts»
+2416 Select state «emblems-editor.ts,regiments-overview.ts»
+2417 Select Temperature scale «units-editor.ts»
+2418 Select template or precreated heightmap to be used on generation «options-tab.ts»
+2419 Select template: «heightmap-editor.ts»
+2420 Select texture image. Big textures can highly affect performance «styles-schema.ts»
+2421 Select the element the note belongs to «notes-editor.ts»
+2422 Select the good's icon «good-editor.ts»
+2423 Select the label for bulk assignment «labels-overview.ts»
+2424 Select unit type to apply special rules on forces recalculation «military-overview.ts»
+2425 Selected paint color «paint-editor.ts»
+2426 Selected water area is open to map border and is not enclosed «heightmap-editor.ts»
+2427 SELL «production-overview.ts»
+2428 Seller «trade-details.ts»
+2429 Send «index.ts»
+2430 Seneschalty «provinces-editor.ts»
+2431 Separate «military-overview.ts»
+2432 Sepia «style-choices.ts»
+2433 Server «index.ts»
+2434 Set a filter to be applied to the map in general «styles-schema.ts»
+2435 Set a height interval. Avoid space, use hyphen as a separator «heightmap-editor.ts»
+2436 Set a North-South map shift, set to 50 to make map center lie on Equator «world-configurator.ts»
+2437 Set a stroke color «good-editor.ts»
+2438 Set a West-East map shift, set to 50 to make map center lie on Prime meridian «world-configurator.ts»
+2439 Set as primary origin «hierarchy-tree.ts»
+2440 Set autosave interval in minutes. Set 0 to disable autosave. Map is saved to browser memory «options-tab.ts»
+2441 Set bar size «styles-schema.ts»
+2442 Set battle name «battle-screen.ts»
+2443 Set burg population «burg-editor.ts»
+2444 Set burg production plate icon size in pixels. Plate and font scale together with it «styles-schema.ts»
+2445 Set clipping. Only non-clipped part will be visible «styles-schema.ts»
+2446 Set curve profile «elevation-profile.ts»
+2447 Set custom burg map URL «burg-editor.ts»
+2448 Set dialog and tool windows transparency «options-tab.ts»
+2449 Set emblems size multiplier «styles-schema.ts»
+2450 Set fill color «styles-schema.ts»
+2451 Set fill opacity. 0: transparent, 1: solid «styles-schema.ts»
+2452 Set flux affects river width «river-creator.ts»
+2453 Set font size in pixels «styles-schema.ts»
+2454 Set font size, relative to the labels layer «styles-schema.ts»
+2455 Set font style «styles-schema.ts»
+2456 Set font weight «styles-schema.ts»
+2457 Set globe rotation speed. Set to 0 is you want to toggle off the rotation «view-3d.ts»
+2458 Set globe texture resolution «view-3d.ts»
+2459 Set grid cells scale multiplier «styles-schema.ts»
+2460 Set height exponent, i.e. a value for altitude change sharpness. Altitude affects temperature and hence biomes «units-editor.ts»
+2461 Set height scale «view-3d.ts»
+2462 Set height: «heightmap-editor.ts»
+2463 Set how deep the valleys are carved along the rivers «view-3d.ts»
+2464 Set how many people are in one population point «units-editor.ts»
+2465 Set icon size «styles-schema.ts»
+2466 Set letter spacing «styles-schema.ts»
+2467 Set Lore «options-tab.ts»
+2468 Set map rotation speed. Set to 0 is you want to toggle off the rotation «view-3d.ts»
+2469 Set map size relative to the world size «world-configurator.ts»
+2470 Set market marker icon size in pixels «styles-schema.ts»
+2471 Set maximum number of colors «heightmap-editor.ts»
+2472 Set maximum number of items in one column «styles-schema.ts»
+2473 Set mesh texture resolution «view-3d.ts»
+2474 Set minimum and maximum possible zoom level «options-tab.ts»
+2475 Set number of points to be used for graph generation. Highly affects performance. 10K is the only recommended value «options-tab.ts»
+2476 Set opacity of the loaded image «heightmap-editor.ts»
+2477 Set opacity. 0: transparent, 1: solid «styles-schema.ts»
+2478 Set palette hue «color-picker.ts»
+2479 Set palette lightness «color-picker.ts»
+2480 Set palette saturation «color-picker.ts»
+2481 Set population percentile: 0-100, where 90 means the burg must have a population higher than 90% of all burgs «burg-group-editor.ts»
+2482 Set precipitation - water amount clouds can bring. Defines rivers and biomes generation. Keep around 100% for default generation «world-configurator.ts»
+2483 Set relative size for the particular label «labels-editor.ts»
+2484 Set scene lightness «view-3d.ts»
+2485 Set sky and water color «view-3d.ts»
+2486 Set smooth fraction. 1 - full smooth, 2 - half-smooth, etc. «heightmap-editor.ts»
+2487 Set starting offset for the particular label «labels-editor.ts»
+2488 Set starting offset numerically «labels-editor.ts»
+2489 Set stroke color «styles-schema.ts»
+2490 Set stroke dash array, e.g. 5 2 «styles-schema.ts»
+2491 Set stroke linecap «styles-schema.ts»
+2492 Set stroke linejoin «styles-schema.ts»
+2493 Set stroke opacity. 0: transparent, 1: solid «styles-schema.ts»
+2494 Set stroke width «styles-schema.ts»
+2495 Set text shadow, case and shift «styles-schema.ts»
+2496 Set the charge: choose, link or upload a picture to place on the field «emblems-editor.ts»
+2497 Set the growth rate of states and cultures. Determines how much land stays neutral «options-tab.ts»
+2498 Set the icon shown inside the market marker «styles-schema.ts»
+2499 Set the letter spacing size for this label «labels-editor.ts»
+2500 Set the number of erosion detail layers. More octaves add finer gullies «view-3d.ts»
+2501 Set the strength of erosion gullies and ridges «view-3d.ts»
+2502 Set theme hue for dialogs and tool windows «options-tab.ts»
+2503 Set tooltip size «options-tab.ts»
+2504 Set treasury balance. Production won't be changed automatically «burg-editor.ts»
+2505 Set urban density: average population per building in Medieval Fantasy City Generator «units-editor.ts»
+2506 Set urban population modifier. Change to increase or decrease burgs population «units-editor.ts»
+2507 Set view mode «layers-tab.ts»
+2508 Set vignette blur propagation, in pixels «styles-schema.ts»
+2509 Set what Generator should do on load «options-tab.ts»
+2510 Set what share of eligible burgs in each state will become province centers. Higher values create more provinces «options-tab.ts»
+2511 Set world parameters like the number of cultures, states, and religions before generating a new map. UI preferences like tooltips and autosave are also here. «ui-tour.ts»
+2512 Settings for the next map. Generate a new map to apply them «options-tab.ts»
+2513 Setup Lore «lore-editor.ts»
+2514 Shading «styles-schema.ts»
+2515 shanty town, «burgs-overview.ts»
+2516 Shape «emblems-editor.ts»
+2517 Shape preview «coastline-editor.ts»
+2518 Shape rendering «performance-settings.ts»
+2519 Share «index.html,relief-pool-editor.ts»
+2520 Share of the pool's relief «relief-pool-editor.ts»
+2521 Shattered «heightmap-editor.ts,heightmap-templates.ts»
+2522 Shelling phase. Naval artillery bombardment of enemy fleet «battle-screen.ts»
+2523 Sheltering phase. Hide behind the walls and wait «battle-screen.ts»
+2524 Shield «markers-editor.ts»
+2525 Shieldy «markers-editor.ts»
+2526 Shift «transform-tool.ts»
+2527 Shift x «styles-schema.ts»
+2528 Shift y «styles-schema.ts»
+2529 Shire «provinces-editor.ts»
+2530 shock «battle-screen.ts»
+2531 Shock phase. Units are not prepared for a defense «battle-screen.ts»
+2532 Shock phase. Units strength reduced «battle-screen.ts»
+2533 Shore gap «styles-schema.ts»
+2534 Shore length: «lakes-editor.ts»
+2535 Shore Proximity «goods-distribution-editor.ts»
+2536 Shore tint «styles-schema.ts»
+2537 Short name: «provinces-editor.ts,states-editor.ts»
+2538 show «options-tab.ts,religions-editor.ts»
+2539 Show «labels-overview.ts,options-tab.ts,tools-tab.ts»
+2540 Show 3D labels «view-3d.ts»
+2541 Show all labels «index.html,labels-group-editor.ts»
+2542 Show burgs bubble chart «burgs-overview.ts»
+2543 Show Burgs Chart «map-commands.ts»
+2544 Show circle «styles-schema.ts»
+2545 Show Cultures Hierarchy «map-commands.ts»
+2546 Show cultures hierarchy tree «cultures-editor.ts»
+2547 Show drainage «customization-tab.ts»
+2548 Show Export Panel «map-commands.ts»
+2549 Show labels of this group in Labels Overview «labels-group-editor.ts»
+2550 Show markers within a radius of this one «markers-editor.ts»
+2551 Show on map «widgets.ts»
+2552 Show on the map «widgets.ts»
+2553 Show only labels containing the entered text «labels-overview.ts»
+2554 Show only labels of the selected group «labels-overview.ts»
+2555 Show only labels of the selected type «labels-overview.ts»
+2556 Show only markers located in the selected culture «markers-overview.ts»
+2557 Show only markers located in the selected state «markers-overview.ts»
+2558 Show only markers of the selected type «markers-overview.ts»
+2559 Show only zones of selected type «zones-editor.ts»
+2560 Show or hide all goods matching the current filter «goods-editor.ts»
+2561 Show or hide circle around good icons «styles-schema.ts»
+2562 Show or hide columns «table.ts»
+2563 Show production chains graph «goods-editor.ts»
+2564 Show production overview for this burg «burg-editor.ts»
+2565 Show provinces chart «provinces-editor.ts»
+2566 Show Provinces Chart «map-commands.ts»
+2567 Show regiments list «military-overview.ts»
+2568 Show relations history «diplomacy-overview.ts»
+2569 Show Relations History «map-commands.ts»
+2570 Show relations matrix «diplomacy-overview.ts»
+2571 Show Religions Hierarchy «map-commands.ts»
+2572 Show religions hierarchy tree «religions-editor.ts»
+2573 Show rescaler slider «heightmap-editor.ts»
+2574 Show Save Panel «map-commands.ts»
+2575 Show Seed History «map-commands.ts»
+2576 Show seed history to apply a previous seed «options-tab.ts»
+2577 Show sky and extend water «view-3d.ts»
+2578 Show states bubble chart «states-editor.ts»
+2579 Show States Chart «map-commands.ts»
+2580 Show style edit section «burg-editor.ts»
+2581 Show temperature graph for the burg «burg-editor.ts»
+2582 Show the area or place of the emblem «emblems-editor.ts»
+2583 Show the charts in 1, 2, 3 or 4 columns «charts-overview.ts»
+2584 Show the edit label text section «labels-editor.ts»
+2585 Show the elevation profile for the river «river-editor.ts»
+2586 Show the elevation profile for the route «route-editor.ts»
+2587 Show the font size section «labels-editor.ts»
+2588 Show the group selection «labels-editor.ts»
+2589 Show the label «labels-editor.ts»
+2590 Show the label offset section «labels-editor.ts»
+2591 Show the letter spacing section «labels-editor.ts»
+2592 Show the regeneration menu and more data «states-editor.ts»
+2593 Show where water flows: arrows point downhill, hatching marks depressions that get filled, blue hatching marks the ones deep enough to become lakes «customization-tab.ts»
+2594 Show wireframe «view-3d.ts»
+2595 Shown «performance-settings.ts»
+2596 Shows whether the burg has a shanty town. Click to toggle «burg-editor.ts»
+2597 Shows whether the burg is a port. Click to toggle «burg-editor.ts»
+2598 Shows whether the burg is a religious center. Click to toggle «burg-editor.ts»
+2599 Shows whether the burg is a state capital. Click to toggle «burg-editor.ts»
+2600 Shows whether the burg is walled. Click to toggle «burg-editor.ts»
+2601 Shows whether there is already a preset with this name «style-preset.ts»
+2602 Siege: burg blockade and storming «battle-screen.ts»
+2603 Sign in «index.ts»
+2604 Sign out «index.ts»
+2605 simple «auto-update.ts»
+2606 Simplify «styles-schema.ts»
+2607 Sinkhole «goods-distribution-editor.ts»
+2608 Size «relief-pool-editor.ts,relief-rules-editor.ts,styles-schema.ts»
+2609 Size of the main charge «emblems-editor.ts»
+2610 Size of the map window on screen. Independent of the map size: it is how much of the map you see at once. Set by hand it is remembered, until you fit it back to the window «options-tab.ts»
+2611 Size variety «options-tab.ts»
+2612 Size: the entry's icons as a multiple of the pool's size «relief-pool-editor.ts»
+2613 Skip «style-preset.ts»
+2614 Skirmish phase. Ranged units excel «battle-screen.ts»
+2615 slider «schema-form.ts»
+2616 small «river-generator.ts»
+2617 Small «notes-rich-text.ts»
+2618 small shape adjustments only «wrap-tool.ts»
+2619 Smallest edge «coastline-editor.ts»
+2620 Smooth 6 «ocean-patterns.ts»
+2621 Smooth 9 «ocean-patterns.ts»
+2622 Smooth all heights a bit «heightmap-editor.ts»
+2623 Smooth brush: drag to level height of cells in radius to height of adjacent cells «heightmap-editor.ts»
+2624 Smooth geometry «view-3d.ts»
+2625 Smooth the map replacing cell heights by an average values of its neighbors «heightmap-editor.ts»
+2626 Snowy conifer «relief-generator.ts»
+2627 Snowy mountain «relief-generator.ts»
+2628 Soiled paper horizontal «textures.ts»
+2629 Soiled paper vertical «textures.ts»
+2630 some «burg-group-editor.ts,military-overview.ts»
+2631 Sortie phase. Make a sortie from besieged town. Melee units excel «battle-screen.ts»
+2632 Sorting type «charts-overview.ts»
+2633 Source «widgets.ts»
+2634 Source width: «river-editor.ts»
+2635 Southern «features-generator.ts,world-configurator.ts»
+2636 Spacing «styles-schema.ts»
+2637 Spain small «textures.ts»
+2638 Spanish «emblems-editor.ts,options-tab.ts»
+2639 Speak the examples. You can change voice and language in options «namesbase-editor.ts»
+2640 Speak the name. You can change voice and language in options «burg-editor.ts,labels-editor.ts,lakes-editor.ts»
+2641 Speaker voice «options-tab.ts»
+2642 Speed «journey-editor.ts,journeys-overview.ts,options-tab.ts»
+2643 Split map into smaller png tiles and download as zip archive «index.html»
+2644 Split regiment into 2 separate ones «regiment-editor.ts»
+2645 Spread currently displayed labels to not collide «labels-overview.ts»
+2646 Square «emblems-editor.ts,markers-editor.ts,options-tab.ts»
+2647 Square 45 degrees grid «grid-types.ts»
+2648 Square grid «grid-types.ts»
+2649 Squarish «markers-editor.ts»
+2650 Stacked Bar «charts-overview.ts»
+2651 Standard «layers-tab.ts»
+2652 Standard 3 «ocean-patterns.ts»
+2653 Standard 4 «ocean-patterns.ts»
+2654 Standard view mode for editing the map «layers-tab.ts»
+2655 Start a new chat «index.ts»
+2656 Start a new chat to continue «index.ts»
+2657 Start Interactive Tour «map-commands.ts»
+2658 Start of the first segment «journeys-overview.ts»
+2659 startBurgId «trade-details.ts»
+2660 state «emblems-editor.ts»
+2661 State «burgs-overview.ts,charts-overview.ts,diplomacy-overview.ts»
+2662 State area «states-editor.ts»
+2663 State capital. Click to zoom into view «states-editor.ts»
+2664 State does not have any cells, cannot change population «states-editor.ts»
+2665 State expansionism «states-editor.ts»
+2666 State form name «states-editor.ts»
+2667 State form name. Click to change «states-editor.ts»
+2668 State full name «states-editor.ts»
+2669 State halos «performance-settings.ts»
+2670 State is friendly to another state when they share some common interests «diplomacy.ts»
+2671 State Labels «tools-tab.ts»
+2672 State name. Click to change «states-editor.ts»
+2673 State population «military-overview.ts»
+2674 State short name «states-editor.ts»
+2675 State type. Defines growth model. Click to change «states-editor.ts»
+2676 State-specific «options-tab.ts»
+2677 States «burg-group-editor.ts,emblems-editor.ts,map-entities.ts»
+2678 States bubble chart «states-editor.ts»
+2679 States Editor «states-editor.ts»
+2680 States number «military-overview.ts,options-tab.ts,states-editor.ts»
+2681 States Number «states-generator.ts»
+2682 States you click get the chosen relation to this state. Shift + click on the map to select another state «diplomacy-editor.ts»
+2683 stationed «military-generator.ts»
+2684 Stock «compare-prices.ts,goods-editor.ts,market-overview.ts»
+2685 Stop «index.ts»
+2686 Storming phase. Storm enemy town. Melee units excel «battle-screen.ts»
+2687 Straight strokes «style-choices.ts»
+2688 Strait direction «heightmap-editor.ts»
+2689 Strait width, use hyphen to get a random number in range «heightmap-editor.ts»
+2690 Strait: centered vertical or horizontal depression «heightmap-editor.ts»
+2691 Stretch length «coastline-editor.ts»
+2692 Strikethrough «notes-rich-text.ts»
+2693 string, suggestedName: string, saveAs = false ): Promise «save-to-file.ts»
+2694 string, suggestedName: string, saveAs: boolean): Promise «save-to-file.ts»
+2695 Stroke length, relative to the default «styles-schema.ts»
+2696 Stroke length, relative to the default. Strokes stop early where the slope levels off «styles-schema.ts»
+2697 Stroke Width «styles-schema.ts»
+2698 Stroke width at its root, relative to the default. Gentler ground draws lighter strokes «styles-schema.ts»
+2699 Strokes only «style-choices.ts»
+2700 Style «styles-schema.ts»
+2701 Style elements «dialogs.ts»
+2702 Style JSON is getting formed based the current settings, but can be entered manually «style-preset.ts»
+2703 Style JSON: «style-preset.ts»
+2704 Style preset is saved and applied «style-preset.ts»
+2705 Style preset is uploaded «style-preset.ts»
+2706 Style presets «dialogs.ts»
+2707 Style Presets «ui-tour.ts»
+2708 Style Saver «style-preset.ts»
+2709 Style Tab «ui-tour.ts»
+2710 Submap «submap-tool.ts,tools-tab.ts»
+2711 Sun position and color: «view-3d.ts»
+2712 Supply line length, affects morale «battle-screen.ts»
+2713 Surprice attack phase. Units strength increased, ranged units excel «battle-screen.ts»
+2714 Surrendering phase. Give up the defense. Units strength reduced «battle-screen.ts»
+2715 Survivors «battle-screen.ts»
+2716 Suspicion means state has a cautious distrust of another state «diplomacy.ts»
+2717 SVG shape-rendering hint for the map. Crisp edges drops anti-aliasing. Chromium-based browsers rasterize on the GPU and ignore the hint for speed purposes, so it makes no difference there «performance-settings.ts»
+2718 Swamp «relief-generator.ts»
+2719 Swiss «emblems-editor.ts,options-tab.ts»
+2720 T «heightmap-editor.ts»
+2721 Table «notes-rich-text.ts»
+2722 table-row «production-overview.ts»
+2723 Tags «good-editor.ts»
+2724 Take an interactive tour of the map generator «index.html»
+2725 Taklamakan «heightmap-editor.ts,heightmap-templates.ts»
+2726 Targe «emblems-editor.ts,options-tab.ts»
+2727 Targe2 «emblems-editor.ts,options-tab.ts»
+2728 Target number of trade animations visible at once. New ones spawn as old ones finish. Higher = more simultaneous animations, can cause lag on slower devices «trade-animation-editor.ts»
+2729 tavern «markers-generator.ts»
+2730 Temperature «relief-rules-editor.ts»
+2731 Temperature must be a number «ai-generator.ts»
+2732 Temperature range in °C «relief-rules-editor.ts»
+2733 Temperature range in °C. An empty bound is open «relief-rules-editor.ts»
+2734 Temperature scale: «units-editor.ts»
+2735 Template Editor «customization-tab.ts,heightmap-editor.ts»
+2736 temple, «burgs-overview.ts»
+2737 Terracing power. Set to 0 to toggle off «styles-schema.ts»
+2738 Territory «provinces-editor.ts»
+2739 Tetrakis square grid «grid-types.ts»
+2740 text «commonUtils.ts»
+2741 Text «labels-overview.ts»
+2742 Text color «notes-rich-text.ts»
+2743 Text formatting «notes-rich-text.ts»
+2744 Text size «notes-rich-text.ts»
+2745 Texture resolution: «view-3d.ts»
+2746 Texture the terrain as a satellite image. Replaces the standard map texture «view-3d.ts»
+2747 Thanks for all supporters on «versioning.ts»
+2748 that will absorb all others. Hover over a row to highlight the province on the map. «provinces-editor.ts»
+2749 that works offline. «versioning.ts»
+2750 The app and this page keep their maps and settings apart, so what you have here does not appear there. To move a map over, save it as a «app-offer.ts»
+2751 The coordinate extent this map was generated on. The next map's is set in Options «world-configurator.ts»
+2752 The current map already has this seed «seed.ts»
+2753 the data, but you won't be able to change the coastline. «heightmap-editor.ts»
+2754 The Desktop App is made for computers, there is no phone or tablet version. «app-offer.ts»
+2755 The Desktop App is not published yet. «app-offer.ts»
+2756 The edits not applied yet will be discarded. Apply them first to keep them «wrap-tool.ts»
+2757 The element name, edited in the element's own editor «notes-editor.ts»
+2758 The emblem's COA string: edit it, or replace it with an Armoria link or COA string, then Apply «emblems-editor.ts»
+2759 The file is not a style preset - the current style is kept «style-preset.ts»
+2760 The following provinces will be «provinces-editor.ts»
+2761 The following states will be «states-editor.ts»
+2762 The font is already added «dialogs.ts»
+2763 The frame is fitted to the picture «positioner.ts»
+2764 The Generator is also available as a «versioning.ts»
+2765 The Heightmap editor panel lets you paint terrain directly on the map. You can raise or lower land, apply templates, convert an image into a heightmap, or preview the terrain in 3D. «ui-tour.ts»
+2766 The icon at map sizes «positioner.ts»
+2767 The JSON is not a style preset - nothing was saved «style-preset.ts»
+2768 The Layer control is not available in the heightmap edit mode «draw-heightmap.ts»
+2769 The Layers tab controls which map elements are visible on the map. «ui-tour.ts»
+2770 the license «emblems-editor.ts»
+2771 The list of downloads could not be loaded right now. «app-offer.ts»
+2772 The longest name length «namesbase-editor.ts»
+2773 The names data provided is too short or incorrect «namesbase-editor.ts»
+2774 The note has markup the rich text editor cannot keep, so it stays in HTML mode «notes-editor.ts»
+2775 The Noun Project «index.ts»
+2776 the open sea «journey-story.ts»
+2777 the open water «journey-story.ts»
+2778 The Options tab lets you configure world generation parameters like the number of states, cultures, religions, and other settings that shape the generated world. «ui-tour.ts»
+2779 The preset on the Options tab these settings amount to «performance-settings.ts»
+2780 The shortest name length «namesbase-editor.ts»
+2781 The Style tab controls the visual appearance of the map — color schemes, opacity, line weights, and other properties for each map element. «ui-tour.ts»
+2782 The Tools tab gives you direct access to all of the map's editors: terrain, biomes, states, cultures, religions, routes, and more. «ui-tour.ts»
+2783 Theme color «options-tab.ts»
+2784 There are 3 ways to add a custom font: «dialogs.ts»
+2785 There are no routes to remove «routes-overview.ts»
+2786 There are no states to show «states-editor.ts»
+2787 There should be at least 2 states to edit the diplomacy «diplomacy-editor.ts,diplomacy-overview.ts»
+2788 These entities have no map location «widgets.ts»
+2789 They «index.ts»
+2790 This burg is a NOT state capital «burgs-overview.ts»
+2791 This burg is a port «burgs-overview.ts»
+2792 This burg is a state capital «burgs-overview.ts»
+2793 This burg is already a center of another market «market-overview.ts»
+2794 This burg is already a market center «markets-generator.ts»
+2795 This burg is already the center of this market «market-overview.ts»
+2796 This burg is NOT a port «burgs-overview.ts»
+2797 This button opens the World Configurator where you can set the map's position on the globe, adjust equatorial and polar temperatures, and configure precipitation to shape the world's climate. «ui-tour.ts»
+2798 This chat is getting long — each question re-sends all of it. «index.ts»
+2799 This element has no map location «widgets.ts»
+2800 This element is not drawn on the map on its own «notes-editor.ts»
+2801 This is one of the default groups, it cannot be removed «lakes-editor.ts»
+2802 This map carries no custom icons yet. «index.ts»
+2803 This operation is destructive and irreversible. It will create a completely new map based on the current one. Don't forget to save the .map file to your machine first! «submap-tool.ts,transform-tool.ts»
+2804 This part of the app failed to load because a new version was released while the page was open.<br />Reload the page to get the new version. If you have unsaved changes, save the map first «shell.ts»
+2805 This part of the app was not downloaded before the connection was lost. Reconnect and try again «shell.ts»
+2806 This quick tour covers the essential controls. Use Next/Previous to navigate, or press Esc to exit at any time. «ui-tour.ts»
+2807 This scheme already exists «dialogs.ts»
+2808 This transport type is «journey-path-editor.ts»
+2809 Timber Cut big «textures.ts»
+2810 Timber Cut small «textures.ts»
+2811 Time «journey-editor.ts»
+2812 Time from start to finish, travel days counted at each transport's travel hours «journeys-overview.ts»
+2813 Time of day: «view-3d.ts»
+2814 Tincture of the field «emblems-editor.ts»
+2815 Tincture of the main charge. A raster picture keeps its own colours «emblems-editor.ts»
+2816 Tint «style-choices.ts»
+2817 Tint over the existing ocean, strongest near the shore «styles-schema.ts»
+2818 tlan «names-generator.ts»
+2819 to «journey-path-editor.ts»
+2820 To «journey-editor.ts,journeys-overview.ts»
+2821 to ask questions, share maps, discuss the Generator and Worldbuilding, report bugs and propose new features. «versioning.ts»
+2822 To change Burg Groups open «labels-group-editor.ts»
+2823 To change capital please assign a capital status to another burg of this state «burg-editor.ts»
+2824 to open the last saved map. «index.html»
+2825 to pick the «provinces-editor.ts,states-editor.ts»
+2826 To remove a capital you have to remove its state first «burgs-overview.ts»
+2827 Toggle 3d labels «view-3d.ts»
+2828 Toggle basin highlight mode «rivers-overview.ts»
+2829 Toggle fullscreen «notes-editor.ts»
+2830 Toggle Individual Layers «ui-tour.ts»
+2831 Toggle journey visibility on the map «journeys-overview.ts»
+2832 Toggle Legend box «biomes-editor.ts,cultures-editor.ts,religions-editor.ts»
+2833 Toggle Menu «map-commands.ts»
+2834 Toggle notes box display: hide or do not hide the box on mouse move «notes-editor.ts»
+2835 Toggle percentage / absolute values display mode «cultures-editor.ts,goods-editor.ts,religions-editor.ts»
+2836 Toggle percentage / absolute values views «biomes-editor.ts,compare-prices.ts,markets-overview.ts»
+2837 Toggle province focus «provinces-editor.ts»
+2838 Toggle Save Reminder «map-commands.ts»
+2839 Toggle segment visibility «journey-editor.ts»
+2840 Toggle sky mode «view-3d.ts»
+2841 Toggle state focus «states-editor.ts»
+2842 Toggle this good on the Goods map «goods-editor.ts»
+2843 Toggle wireframe mode «view-3d.ts»
+2844 Toggle zone focus «zones-editor.ts»
+2845 Toggle zone visibility «zones-editor.ts»
+2846 Tools «index.html»
+2847 Tools Tab «ui-tour.ts»
+2848 Tooltip size «options-tab.ts»
+2849 Top level «hierarchy-tree.ts»
+2850 Total «battle-screen.ts,military-overview.ts,regiments-overview.ts»
+2851 Total area of the displayed features «features-overview.ts»
+2852 Total burgs number «provinces-editor.ts,states-editor.ts»
+2853 Total cells number «zones-editor.ts»
+2854 Total deal value «trade-details.ts»
+2855 Total distance «journey-editor.ts,journeys-overview.ts»
+2856 Total gross sales revenue «markets-overview.ts»
+2857 Total land area «biomes-editor.ts,cultures-editor.ts,religions-editor.ts»
+2858 Total land cells number «biomes-editor.ts,cultures-editor.ts»
+2859 Total map area «zones-editor.ts»
+2860 Total map population «zones-editor.ts»
+2861 Total military «battle-screen.ts»
+2862 Total military forces «military-overview.ts»
+2863 Total number of cults «religions-editor.ts»
+2864 Total number of folk religions «religions-editor.ts»
+2865 Total number of heresies «religions-editor.ts»
+2866 Total number of markets «markets-overview.ts»
+2867 Total number of organized religions «religions-editor.ts»
+2868 Total population «biomes-editor.ts,charts-overview.ts,cultures-editor.ts»
+2869 Total purchase spending «markets-overview.ts»
+2870 Total size: «index.html»
+2871 Total stock of all goods in this market «markets-overview.ts»
+2872 Total stock of this good across all markets «compare-prices.ts»
+2873 Total Tax: «production-overview.ts»
+2874 Total time «journey-editor.ts,journeys-overview.ts»
+2875 Total traded units «trade-details.ts»
+2876 Total units in stock across all markets and burg inventories «goods-editor.ts»
+2877 Total units in stock across all markets and burg inventories. Click to sort «goods-editor.ts»
+2878 Total units produced daily by all cells and burgs «goods-editor.ts»
+2879 Trade «layer-labels.ts,tools-tab.ts»
+2880 Trade Animation Editor «trade-animation-editor.ts»
+2881 Trade type «trade-animation-editor.ts»
+2882 Transform «tools-tab.ts,transform-tool.ts»
+2883 Transform map «transform-tool.ts»
+2884 Transform Map «map-commands.ts»
+2885 Transparency «options-tab.ts»
+2886 Transport «journey-editor.ts»
+2887 Transport type added — rename it and set the speed, travel hours and domain. «transport-editor.ts»
+2888 Transport type name «transport-editor.ts»
+2889 Transport type, sets the default speed and where the segment may go «journey-editor.ts»
+2890 Transport Types «transport-editor.ts»
+2891 Transport types number «transport-editor.ts»
+2892 Transports «map-entities.ts»
+2893 Travel duration «trade-animation-editor.ts»
+2894 Travel time «journey-editor.ts,journeys-overview.ts»
+2895 Treasury «burgs-overview.ts,states-editor.ts»
+2896 Treasury: accumulated cash balance «burgs-overview.ts»
+2897 Tribe «provinces-editor.ts»
+2898 Trihexagonal grid «grid-types.ts»
+2899 Tropical «world-configurator.ts»
+2900 Trough: elongated depression «heightmap-editor.ts»
+2901 True «burg-group-editor.ts»
+2902 Truncated square grid «grid-types.ts»
+2903 Try «heightmap-editor.ts»
+2904 Type «charts-overview.ts,cultures-editor.ts,features-overview.ts»
+2905 Type a prompt here «ai-generator.ts»
+2906 Type any short text «index.ts»
+2907 type form name «provinces-editor.ts,states-editor.ts»
+2908 Type full battle name «battle-screen.ts»
+2909 Type group name «burg-group-editor.ts,route-groups-editor.ts»
+2910 Type group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes. Spaces are not allowed «burg-group-editor.ts»
+2911 Type place name «battle-screen.ts»
+2912 Type scale bar label, leave blank to hide label «styles-schema.ts»
+2913 Type to change a base name «namesbase-editor.ts»
+2914 Type to change the full name «provinces-editor.ts,states-editor.ts»
+2915 Type to change the short name «provinces-editor.ts,states-editor.ts»
+2916 Type to edit. Press Enter to add a new line, empty the element to remove it «diplomacy-overview.ts»
+2917 Type to rename the burg «burg-editor.ts»
+2918 Type to rename the lake «lakes-editor.ts»
+2919 Type to rename the market. Clear the field to reset to the default name «market-overview.ts»
+2920 Type to rename the regiment «regiment-editor.ts»
+2921 Type to rename the river «river-editor.ts»
+2922 Type to rename the route «route-editor.ts»
+2923 Type unit name. If name is changed for existing unit, old unit will be replaced «military-overview.ts»
+2924 type value «index.html»
+2925 ul «markdown.ts»
+2926 Uncheck to not update state label on name change «states-editor.ts»
+2927 Uncovered Demand: «production-overview.ts»
+2928 Underline «notes-rich-text.ts»
+2929 Undiscovered dungeon. See «markers-generator.ts»
+2930 Undo «diplomacy-editor.ts,notes-rich-text.ts,paint-editor.ts»
+2931 Undo last brush stroke «paint-editor.ts»
+2932 Undo last change «diplomacy-editor.ts»
+2933 Undo the latest action «heightmap-editor.ts»
+2934 Unit «good-editor.ts,goods-editor.ts»
+2935 Unit icon «military-overview.ts»
+2936 Unit name «military-overview.ts»
+2937 Unit name. If name is changed for existing unit, old unit will be replaced «military-overview.ts»
+2938 Unit of production «goods-editor.ts»
+2939 Unit of production. Click to sort «goods-editor.ts»
+2940 Unit type to apply special rules on forces recalculation «military-overview.ts»
+2941 Units «goods-editor.ts,market-deals-overview.ts,production-overview.ts»
+2942 Units Editor «burg-group-editor.ts,units-editor.ts»
+2943 Units of goods produced «charts-overview.ts»
+2944 Unlimited questions, and I can read and edit this map. Your key stays in this browser and goes only to the provider. I run scripts in this page to read your map. Only use me on maps from sources you trust. «index.ts»
+2945 Unlocked. Click to lock the element and prevent changes to it by regeneration tools «tooltips.ts»
+2946 Unselect «hierarchy-tree.ts»
+2947 up «sorting.ts,table.ts»
+2948 Update label on Apply «states-editor.ts»
+2949 Update the scene «view-3d.ts»
+2950 Upload «index.ts»
+2951 Upload a namesbase from PC, extending the current set «namesbase-editor.ts»
+2952 Upload a namesbase from PC, replacing the current set «namesbase-editor.ts»
+2953 Upload cultures-related data «cultures-editor.ts»
+2954 Upload notes from PC «notes-editor.ts»
+2955 Urban «military-overview.ts»
+2956 Urban density: «units-editor.ts»
+2957 Urban population «charts-overview.ts,provinces-editor.ts,states-editor.ts»
+2958 Urbanization rate: «units-editor.ts»
+2959 URL «index.html»
+2960 Use for «wrap-tool.ts»
+2961 Use key «index.ts»
+2962 Use Provinces Editor to change the actual province name, not just a label «labels-editor.ts»
+2963 Use States Editor to change the actual state name, not just a label «labels-editor.ts»
+2964 Value «markets-overview.ts,trade-details.ts»
+2965 value * population_point * urbanization_rate «burg-group-editor.ts»
+2966 Variant «coastline-editor.ts»
+2967 Vassalization «diplomacy.ts»
+2968 Vesica Piscis «emblems-editor.ts,options-tab.ts»
+2969 View market deals «market-overview.ts»
+2970 View mode: «layers-tab.ts»
+2971 Viewport size «options-tab.ts»
+2972 Vignette «layer-labels.ts»
+2973 Vignette rectangle height, in percents «styles-schema.ts»
+2974 Vignette rectangle width, in percents «styles-schema.ts»
+2975 Vignette rectangle x, in percents «styles-schema.ts»
+2976 Vignette rectangle y, in percents «styles-schema.ts»
+2977 Vignette X radius, in percents «styles-schema.ts»
+2978 Vignette Y radius, in percents «styles-schema.ts»
+2979 visible «markers-editor.ts»
+2980 Visible «omnibar.ts»
+2981 void, signal: AbortSignal ): Promise «answerer.ts»
+2982 void): Promise «ai-generator.ts»
+2983 Volcano «heightmap-editor.ts,heightmap-templates.ts,relief-generator.ts»
+2984 W «cell-info.ts,world-configurator.ts»
+2985 waiting «battle-screen.ts»
+2986 Waiting phase. Cannot pursue fleeing naval «battle-screen.ts»
+2987 walls, «burgs-overview.ts»
+2988 War Alert «military-overview.ts»
+2989 War Alert. Editable modifier to military forces number, depends on political situation «military-overview.ts»
+2990 War Alert. Modifier to military forces number, depends on political situation. Click to sort «military-overview.ts»
+2991 War declaration «diplomacy.ts»
+2992 Warning! «index.html»
+2993 Watabou City «burg-group-editor.ts»
+2994 Watabou Dwelling «burg-group-editor.ts»
+2995 Watabou Village «burg-group-editor.ts»
+2996 water «resample.ts,routes-generator.ts,style-choices.ts»
+2997 Water flux «fields.ts»
+2998 Waterbody Type «goods-distribution-editor.ts»
+2999 Waves «ocean-patterns.ts,style-choices.ts»
+3000 WE «lore-editor.ts»
+3001 Wealth «burg-editor.ts,burgs-overview.ts»
+3002 Wealth: gross product divided by population «burgs-overview.ts»
+3003 Wedged «emblems-editor.ts,options-tab.ts»
+3004 Weight «relief-pool-editor.ts,styles-schema.ts»
+3005 Weight: how often the entry is picked, relative to the others «relief-pool-editor.ts»
+3006 Welcome to Fantasy Map Generator «ui-tour.ts»
+3007 Western «features-generator.ts»
+3008 When labels, icons and relief are redrawn and text re-sized during a zoom or pan. 'After zoom' does it once per gesture: faster on big maps, but new content appears all at once «performance-settings.ts»
+3009 When supported by your browser, Save updates the chosen file. Shift-click machine or press Ctrl + Shift + S to save a separate copy. «index.html»
+3010 Where to get one «index.ts»
+3011 While zooming «performance-settings.ts»
+3012 white «draw-landmass.ts»
+3013 Whitecaps «ocean-patterns.ts»
+3014 Whole map «coastline-editor.ts»
+3015 Whole world «world-configurator.ts»
+3016 Width «rivers-overview.ts,styles-schema.ts»
+3017 Width modifier: «river-editor.ts»
+3018 Width of minor contours. Every fifth contour is twice as wide «styles-schema.ts»
+3019 Width of the dark lines separating bands «styles-schema.ts»
+3020 Wikimedia Commons «index.ts»
+3021 window.innerWidth «platform.ts»
+3022 Windows «app-offer.ts»
+3023 Windows and macOS will warn about an unknown developer the first time, because the app is not signed yet: on Windows click "More info" and then "Run anyway", on macOS right-click the app and choose "Open". «app-offer.ts»
+3024 Windows on ARM «app-offer.ts»
+3025 Winter Era «lore-editor.ts»
+3026 Withdrawal phase. Naval units try to escape enemy fleet «battle-screen.ts»
+3027 World Configurator «ui-tour.ts»
+3028 Worth of produced goods «charts-overview.ts»
+3029 Wrap «tools-tab.ts»
+3030 Wrap Tool «wrap-tool.ts»
+3031 Wrap tool: drag to reshape cells, Shift + drag to resize the brush, Space + drag to pan the map «wrap-tool.ts»
+3032 write «effects.ts»
+3033 Write the note here. It shows up in the notes box when the element is hovered or clicked «notes-rich-text.ts»
+3034 x «measurers-editor.ts»
+3035 X «route-creator.ts»
+3036 x1 - x0 «map.ts»
+3037 XIV «index.ts»
+3038 y «measurers-editor.ts»
+3039 Y «route-creator.ts»
+3040 yes «journey-editor.ts,proposal-card.ts»
+3041 You are offline «shell.ts»
+3042 You can «heightmap-editor.ts»
+3043 You cannot change the coastline in 'Keep' edit mode «heightmap-editor.ts»
+3044 You cannot overwrite default preset, please change the name «style-preset.ts»
+3045 You cannot remove a market center burg. Please remove the market first «burgs-overview.ts»
+3046 You cannot remove the capital. Please change the state capital first «burgs-overview.ts»
+3047 You have encountered a character. «markers-generator.ts»
+3048 You must provide a correct value «color-picker.ts»
+3049 Your own description of this world. Free text, carried in the map file «lore-editor.ts»
+3050 Your question «index.ts»
+3051 yurt «names-generator.ts»
+3052 z-burg «burgs-overview.ts»
+3053 Zone area «zones-editor.ts»
+3054 Zone description. Click and type to change «zones-editor.ts»
+3055 Zone does not have any land cells, cannot change population «zones-editor.ts»
+3056 Zone type. Click and type to change «zones-editor.ts»
+3057 Zones «map-entities.ts,tools-tab.ts»
+3058 Zones Editor «zones-editor.ts»
+3059 Zoom «positioner.ts»
+3060 Zoom and pan the picture in its frame «index.ts»
+3061 Zoom extent «options-tab.ts»
+3062 Zoom In «map-commands.ts»
+3063 Zoom map and center view in the burg «burg-editor.ts»
+3064 Zoom max «labels-group-editor.ts»
+3065 Zoom min «labels-group-editor.ts»
+3066 Zoom out «index.html»
+3067 Zoom Out «map-commands.ts»
+3068 Zoom to end «trade-details.ts»
+3069 Zoom to start «trade-details.ts»
+3070 Zoom to the marker «markers-in-radius.ts»
+3071 Zoom to the measurer «measurers-editor.ts»
+3072 zoomExtent.min must not exceed max «options-schema.ts»
+3073 Сhase phase. Naval units pursue and rarely shell enemy fleet «battle-screen.ts»

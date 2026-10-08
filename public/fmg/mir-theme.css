@@ -159,3 +159,235 @@ div.tab {
   background: #0d1515;
   border-color: var(--mir-line);
 }
+
+/* ── Экранные размеры: заставка и подсказки ───────────────────────────────────
+   upstream задал шрифт заголовка в 7em — на телефоне он не влезает совсем. */
+#loading > #loading-typography {
+  width: min(86vw, 620px);
+  font-size: clamp(9px, 2.2vw, 13px);
+  color: var(--mir-text);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+#title {
+  font-size: clamp(1.9em, 7vw, 5.4em);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+
+#titleName {
+  font-size: clamp(1.1em, 3.4vw, 2.4em);
+  color: var(--mir-gold);
+}
+
+#versionText {
+  font-size: clamp(0.9em, 2vw, 1.6em);
+  color: var(--mir-muted);
+}
+
+/* ── Телефон: панель управления становится нижней шторкой ──────────────────── */
+@media (max-width: 720px) {
+  #options {
+    position: fixed;
+    inset: auto 0 0 0;
+    margin: 0;
+    max-height: min(70vh, 46em);
+    overflow: auto;
+    border-width: 1px 0 0;
+    border-radius: 12px 12px 0 0;
+    padding-bottom: calc(0.3em + env(safe-area-inset-bottom));
+  }
+
+  #options .drag-trigger {
+    display: none;
+  }
+
+  #options .tab {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 4px 6px 0;
+  }
+
+  #options .tab button.options {
+    width: auto;
+    flex: 1 1 auto;
+    min-height: 38px;
+    padding: 0.35em 0.6em;
+  }
+
+  #options .tabcontent {
+    padding: 0 8px 4px;
+  }
+
+  #sticked {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 4px 0;
+    background: var(--mir-panel);
+    border-top: 1px solid var(--mir-line);
+  }
+
+  #sticked button {
+    flex: 1 1 30%;
+  }
+
+  #optionsTrigger {
+    min-width: 44px;
+    min-height: 40px;
+    padding: 0;
+    font-size: 1.6em;
+  }
+
+  /* таблицы списков (города, сражения, заметки) на узком экране задыхаются в 75vw */
+  #dialogs .table {
+    max-width: 96vw;
+    max-height: 70vh;
+  }
+
+  #exitCustomization {
+    right: auto;
+    left: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  #assistantBubble {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  #tooltip {
+    font-size: clamp(10px, 2.6vw, 13px);
+  }
+}
+
+/* ── Палец: всё, чего касаются, — не меньше 34px; мыши это не касается ─────── */
+@media (pointer: coarse) {
+  #options input:not([type="color"]),
+  #options select,
+  #options textarea {
+    min-height: 34px;
+    /* 16px — иначе Safari на iPhone сам приближает страницу при фокусе поля */
+    font-size: 16px;
+  }
+
+  #options input[type="checkbox"],
+  #options input[type="radio"] {
+    min-height: 0;
+    width: 20px;
+    height: 20px;
+  }
+
+  #options input[type="range"] {
+    min-height: 30px;
+  }
+
+  #options button.options,
+  #sticked button,
+  .tabcontent button,
+  .dialog button,
+  #dialogs button,
+  #options i[data-tip] {
+    min-height: 34px;
+  }
+
+  .tabcontent li {
+    padding: 6px 8px;
+  }
+
+  .ui-dialog {
+    max-width: calc(100vw - 8px);
+  }
+
+  .ui-dialog .ui-dialog-content {
+    max-height: min(76vh, 46em);
+    overflow: auto;
+  }
+
+  .ui-dialog .ui-dialog-titlebar,
+  .ui-dialog .ui-dialog-buttonpane {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ui-dialog .ui-dialog-titlebar-close {
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  /* двойное касание панели не должно зумить страницу: жесты карты это не трогает */
+  #options,
+  #dialogs,
+  .ui-dialog,
+  #sticked,
+  #exitCustomization {
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 420px) {
+  #options .tabcontent {
+    font-size: 12px;
+  }
+}
+
+/* ── ПК: панель не выходит за экран, полосы прокруки в стиле MIR ───────────── */
+@media (min-width: 721px) and (pointer: fine) {
+  #options {
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(216, 193, 132, 0.34) transparent;
+  }
+
+  .ui-dialog .ui-dialog-content {
+    max-height: min(86vh, 68em);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(216, 193, 132, 0.34) transparent;
+  }
+
+  #options::-webkit-scrollbar,
+  .ui-dialog ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  #options::-webkit-scrollbar-track,
+  .ui-dialog ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  #options::-webkit-scrollbar-thumb,
+  .ui-dialog ::-webkit-scrollbar-thumb {
+    background: rgba(201, 221, 208, 0.18);
+    border-radius: 9px;
+  }
+
+  #options::-webkit-scrollbar-thumb:hover,
+  .ui-dialog ::-webkit-scrollbar-thumb:hover {
+    background: rgba(216, 193, 132, 0.4);
+  }
+
+  #options button:hover,
+  .tabcontent button:hover,
+  #sticked button:hover {
+    background-color: #20352e;
+    color: #fff8e7;
+  }
+
+  .tabcontent li:hover {
+    background-color: #1a2a26;
+  }
+
+  #optionsContent table tr:hover td {
+    background-color: rgba(32, 53, 46, 0.6);
+  }
+
+  /* колесо над панелью листает её, а не карту: курсор не «проваливается» сквозь окно */
+  #options {
+    overscroll-behavior: contain;
+  }
+}

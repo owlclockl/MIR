@@ -6,7 +6,6 @@ vi.mock("@/components/options/options-panel", () => ({ hideOptions: vi.fn() }));
 vi.mock("@/controllers", () => ({ Controllers: { Omnibar: { open: mocks.open } } }));
 vi.mock("@/services", () => ({ Services: { Save: { toMachine: mocks.save } } }));
 vi.mock("@/services/autosave", () => ({ toggleSaveReminder: vi.fn() }));
-vi.mock("./app-info", () => ({ showInfo: vi.fn() }));
 vi.mock("./dialog/dialog-helpers", () => ({ closeDialogs: vi.fn() }));
 vi.mock("./options/tabs/layers-tab", () => ({ getLayerByShortcut: mocks.getLayer }));
 vi.mock("./zoom", () => ({ changeMapZoom: vi.fn(), panMap: vi.fn(), setMapZoom: vi.fn() }));
