@@ -1,5 +1,5 @@
 /* Собрать встроенную копию Azgaar's Fantasy Map Generator в public/fmg.
-   Веб-сборка MIR раздаёт её как часть PWA и включает все файлы в офлайн-кэш.
+   Веб-сборка The civilization of the sages раздаёт её как часть PWA и включает все файлы в офлайн-кэш.
    Исходники и точная upstream-зависимость лежат в vendor/azgaar-fantasy-map-generator.
    Запуск: npm run fmg:build (один раз перед этим — npm run fmg:install). */
 
@@ -37,7 +37,7 @@ if (result.error) throw result.error;
 if (result.status !== 0)
   throw new Error(`Сборка Azgaar завершилась с кодом ${result.status ?? result.signal}.`);
 
-/* MIR уже обслуживает /fmg/ корневым service worker и прекэширует все файлы.
+/* Приложение уже обслуживает /fmg/ корневым service worker и прекэширует все файлы.
    Вложенный upstream-worker использует внешний Workbox CDN и перехватил бы
    этот же путь, поэтому он не публикуется. */
 rmSync(join(output, 'sw.js'), { force: true });

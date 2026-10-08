@@ -156,7 +156,7 @@ const ROOT = resolve(args.dir ?? 'dist');
 const BASE_PORT = Number.isFinite(args.port) && args.port > 0 ? args.port : Number(process.env.PORT) || 4173;
 const HOST = process.env.HOST || '0.0.0.0';
 
-logToFile('info', 'server', `Starting MIR server (dir: ${ROOT}, port: ${BASE_PORT}, public: ${args.public})`);
+logToFile('info', 'server', `Starting The civilization of the sages server (dir: ${ROOT}, port: ${BASE_PORT}, public: ${args.public})`);
 
 if (!existsSync(ROOT) || !statSync(ROOT).isDirectory()) {
   const msg = `Каталог «${ROOT}» не найден. Сначала соберите проект: npm run build`;
@@ -341,13 +341,7 @@ function lanAddresses() {
 
 function onReady(port) {
   const lan = lanAddresses();
-  const name = (() => {
-    try {
-      return JSON.parse(readFileSync(fromRoot('package.json'), 'utf8')).name;
-    } catch {
-      return 'сайт';
-    }
-  })();
+  const name = 'The civilization of the sages';
 
   logToFile('info', 'server', `Server ready on port ${port}. LAN addresses: ${lan.join(', ') || 'none'}`);
 

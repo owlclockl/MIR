@@ -1,5 +1,6 @@
 {
   "name": "mir-game-menu",
+  "description": "The civilization of the sages — русскоязычная картографическая игра для создания и исследования миров.",
   "private": true,
   "version": "0.9.5",
   "type": "module",

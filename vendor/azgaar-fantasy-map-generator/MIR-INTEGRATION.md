@@ -1,14 +1,14 @@
-# Azgaar FMG in MIR
+# Azgaar FMG in The civilization of the sages
 
-MIR vendors the complete web source and static assets of [Azgaar's Fantasy Map Generator](https://github.com/Azgaar/Fantasy-Map-Generator), then builds it into `public/fmg/`. Upstream snapshot: commit `546c41d37e1daf842df620139e3228553e2f0847`, package version `1.154.0`, MIT License (copyright Max Haniyeu / Azgaar and contributors). The upstream license is kept in [`LICENSE`](LICENSE).
+The civilization of the sages includes the complete web source and static assets of [Azgaar's Fantasy Map Generator](https://github.com/Azgaar/Fantasy-Map-Generator), then builds them into `public/fmg/`. Upstream snapshot: commit `546c41d37e1daf842df620139e3228553e2f0847`, package version `1.154.0`, MIT License (copyright Max Haniyeu / Azgaar and contributors). The upstream license is kept in [`LICENSE`](LICENSE).
 
-## MIR adaptations
+## Adaptations for The civilization of the sages
 
-- The full editor is hosted at `/fmg/` and shown from the full-screen MIR world studio, not opened in a small dialog.
-- The MIR world seed is passed as Azgaar's `?seed=` parameter. Azgaar saves its maps/options in its own browser storage; export a map from its editor to keep or share it.
+- The full editor is hosted at `/fmg/` and shown from the full-screen world studio, not opened in a small dialog.
+- The current world seed is passed as Azgaar's `?seed=` parameter. Azgaar saves its maps/options in its own browser storage; export a map from its editor to keep or share it.
 - The first map uses Azgaar's built-in `night` style. UI controls use a forest-green / warm-gold palette from `public/mir-theme.css`; other map styles remain selectable in the editor.
-- The nested Azgaar service worker is disabled under `/fmg/`. MIR's root worker caches the full editor offline, avoids conflicting worker scopes, and avoids the upstream Workbox CDN request. The `electron` Vite mode also removes upstream Google Analytics from the built page.
-- The Azgaar interface is fully localized into Russian by a build-time substitution layer (`locale/`), described below. MIR's wrapper, navigation, seed hand-off and attribution are Russian as well.
+- The nested Azgaar service worker is disabled under `/fmg/`. The root service worker caches the full editor offline, avoids conflicting worker scopes, and avoids the upstream Workbox CDN request. The `electron` Vite mode also removes upstream Google Analytics from the built page.
+- The Azgaar interface is fully localized into Russian by a build-time substitution layer (`locale/`), described below. The game wrapper, navigation, seed hand-off and attribution are Russian as well.
 - Zoom is deliberately wider than upstream's: the default `app.zoomExtent` is `{ min: 0.1, max: 150 }`
   and `applyZoomExtent()` no longer forces the floor to the "whole map fits the window" scale — it
   allows four times further back (`ZOOM_OUT_DEPTH` in `src/components/canvas.ts`), which is how a
@@ -18,12 +18,12 @@ MIR vendors the complete web source and static assets of [Azgaar's Fantasy Map G
   full-width bottom sheet (own scroll, sticky `#sticked` footer, 38px tab buttons, 16px inputs so
   iOS does not auto-zoom on focus), `pointer: coarse` grows tap targets to 34px and adds
   `touch-action: manipulation`, and on the desktop the panel is capped to the viewport height with
-  `overscroll-behavior: contain` and MIR-coloured scrollbars. `viewport-fit=cover` is set in
-  `src/index.html` so `env(safe-area-inset-*)` resolves inside the MIR overlay as well. Upstream's
+  `overscroll-behavior: contain` and sage-tinted scrollbars. `viewport-fit=cover` is set in
+  `src/index.html` so `env(safe-area-inset-*)` resolves inside the editor overlay as well. Upstream's
   own `index.css` is not touched, so an Azgaar sync stays conflict-free.
 - The upstream **About** tab is removed: its button, content pane, `components/app-info.ts`, `components/options/tabs/about-tab.ts`, `data/supporters.ts`, the two palette commands (`Open About Tab`, `Show App Info`), the F1 hotkey branch and the two tour steps that pointed at it. The "Interactive Tour" and "Desktop App" buttons lived inside that tab and are gone with it; the tour itself is kept and starts from the Options tab.
 
-These are integration changes, not a rewrite of Azgaar's map-generation model. The MIR voxel atlas remains a separate native generator; the same seed opens a deterministic Azgaar map, but the two engines do not convert each other's geometry or game state.
+These are integration changes, not a rewrite of Azgaar's map-generation model. The voxel atlas remains a separate generator; the same seed opens a deterministic Azgaar map, but the two engines do not convert each other's geometry or game state.
 
 ## Russian interface
 
@@ -51,7 +51,7 @@ next Azgaar sync into a conflict — the translation is substituted at build tim
   inventory changes. Run both flags in a single command: translations are keyed by text, and
   a separate `--seed` would re-key ids under them.
 
-State: 3347 strings, 3094 translated, 253 deliberately English, coverage 100%. Two dynamic tooltips whose
+State: 3347 strings, 3092 translated, 255 deliberately English, coverage 100%. Two dynamic tooltips whose
 `${…}` insertions contain double quotes stay English, since a quoted attribute value cannot hold them.
 
 Deliberately not localized: `docs/wiki` and the in-app Knowledge Base, Changelog, Hotkeys and
@@ -68,4 +68,4 @@ npm run fmg:build
 npm run build
 ```
 
-`fmg:install` installs only the vendored package's lockfile; its `node_modules/` is ignored by Git. `fmg:build` first verifies the Russian dictionary (`node locale/extract.mjs --check`), then emits a Vite production build with base `/fmg/` and omits the nested `sw.js`. The root MIR service worker includes every generated file in its content fingerprint and offline precache. The stand-alone `mir.html` intentionally stays a one-file product and does not embed the 22 MiB editor; its native MIR atlas remains available there.
+`fmg:install` installs only the vendored package's lockfile; its `node_modules/` is ignored by Git. `fmg:build` first verifies the Russian dictionary (`node locale/extract.mjs --check`), then emits a Vite production build with base `/fmg/` and omits the nested `sw.js`. The root product service worker includes every generated file in its content fingerprint and offline precache. The stand-alone `mir.html` intentionally stays a one-file product and does not embed the 22 MiB editor; its native atlas remains available there.

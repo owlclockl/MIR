@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title MIR — Диагностика и логи
+title The civilization of the sages — Диагностика и логи
 cd /d "%~dp0"
 
 echo ============================================================
-echo   MIR — The civilization of the sages
+echo   The civilization of the sages
 echo   Сбор диагностических данных и журнала логов
 echo ============================================================
 echo.

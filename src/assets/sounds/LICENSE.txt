@@ -1,4 +1,4 @@
-MIR menu sound effects
+The civilization of the sages — menu sound effects
 
 Source: UI SFX — open-source library of interface sound effects
         https://github.com/romainsimon/uisfx · npm package `uisfx`

@@ -1,15 +1,15 @@
 {
   "name": "The civilization of the sages",
-  "short_name": "The civilization",
-  "description": "Главное меню игры The civilization of the sages: аккаунты, друзья и коды-приглашения.",
+  "short_name": "Sages",
+  "description": "Цивилизация мудрецов: создавайте миры, исследуйте карты и приглашайте друзей.",
   "lang": "ru",
   "id": "/",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#08080a",
-  "theme_color": "#08080a",
+  "background_color": "#080d0e",
+  "theme_color": "#080d0e",
   "icons": [
     {
       "src": "icons/icon-192.png",

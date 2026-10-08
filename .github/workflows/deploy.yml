@@ -1,4 +1,4 @@
-name: Deploy MIR to Cloudflare
+name: Deploy The civilization of the sages to Cloudflare
 
 on:
   push:

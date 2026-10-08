@@ -138,13 +138,29 @@ const fmgHtml = fmgResponse.ok ? await fmgResponse.text() : '';
 const fmgScript = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
 const fmgScriptResponse = fmgScript ? await fetch(new URL(fmgScript, `${HUB}/`).href) : null;
 const fmgThemeResponse = await fetch(`${HUB}/fmg/mir-theme.css`);
+const fmgTheme = fmgThemeResponse.ok ? await fmgThemeResponse.text() : '';
+const fmgIconsResponse = await fetch(`${HUB}/fmg/icons.css`);
+const fmgIconsCss = fmgIconsResponse.ok ? await fmgIconsResponse.text() : '';
+const legacyIconClasses = new Set([...fmgIconsCss.matchAll(/\.icon-([a-z0-9-]+):(before|after)/g)].map((match) => match[1]));
+const lucideIconClasses = new Set([...fmgTheme.matchAll(/\.icon-([a-z0-9-]+)::before/g)].map((match) => match[1]));
+const textMarkerIcons = new Set(['a', 'f', 'i', 'if', 'n', 'r', 's', 'w', 'half']);
+const unmappedFmgIcons = [...legacyIconClasses].filter((name) => !lucideIconClasses.has(name) && !textMarkerIcons.has(name));
+const fmgLicenseResponse = await fetch(`${HUB}/fmg/LUCIDE-LICENSE.txt`);
 const fmgStyleResponse = await fetch(`${HUB}/fmg/styles/night.json`);
 const fmgWorkerResponse = await fetch(`${HUB}/fmg/sw.js`);
 const mirWorkerResponse = await fetch(`${HUB}/sw.js`);
 const mirWorker = mirWorkerResponse.ok ? await mirWorkerResponse.text() : '';
-ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>MIR — [^<]*(?:Azgaar|Azgaar|карт)[^<]*<\/title>/i.test(fmgHtml));
-ok('веб-редактор получает MIR-тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
-ok('FMG не регистрирует вложенный worker, общий worker MIR обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
+ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>The civilization of the sages — редактор карт<\/title>/i.test(fmgHtml));
+ok('веб-редактор получает фирменную тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
+ok(
+  'Azgaar переведён на единый Lucide SVG-пак, включая кнопки боевых меню',
+  fmgTheme.includes('Lucide 1.53.0') && fmgTheme.includes('.icon-button-melee::before')
+    && fmgTheme.includes('mask: var(--mir-lucide-mask)') && fmgTheme.includes('data:image/svg+xml')
+    && fmgIconsResponse.ok && unmappedFmgIcons.length === 0
+    && fmgLicenseResponse.ok && /ISC License/.test(await fmgLicenseResponse.text()),
+  `классов Font Awesome: ${legacyIconClasses.size}, не переведены: ${unmappedFmgIcons.join(', ') || 'нет'}`,
+);
+ok('FMG не регистрирует вложенный worker, корневой worker обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
 
 /* Веб-бандл открываем отдельно от mir.html: проверяем, что полноэкранный
    iframe действительно остаётся тем же документом при возврате в атлас. */
@@ -180,6 +196,13 @@ try {
   await wait(60);
   webClick('.play-button');
   await wait(40);
+  /* «Играть» открывает экран слотов: мастер заполняет первый слот,
+     и только на его карте появляется полный редактор Azgaar. */
+  const slotCount = webWindow.document.querySelectorAll('[data-action="world-slot-create"]').length;
+  const tabCount = webWindow.document.querySelectorAll('[data-action="world-slot-tab"]').length;
+  ok('экран слотов показывает две вкладки ролей и шесть слотов', tabCount === 2 && slotCount === 6, `вкладок ${tabCount}, слотов ${slotCount}`);
+  webClick('[data-action="world-slot-create"][data-slot-index="0"]');
+  await wait(40);
   const fmgOpenButton = webWindow.document.querySelector('[data-action="world-fmg-open"]');
   ok('веб-сборка показывает кнопку полного Azgaar в атласе', Boolean(fmgOpenButton));
   fmgOpenButton?.click();
@@ -210,31 +233,101 @@ ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail_
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
-/* Кнопка «Играть»: полноценный экран, политическая карта и RTS-камера. */
+/* Кнопка «Играть»: экран слотов с ролями, карты в слотах и два режима. */
 click('.play-button');
 await wait(60);
 ok('кнопка «Играть» открывает отдельную полноэкранную страницу, не модальное окно', !!$('#world-page-root .world-app') && !$('.dialog--world') && window.document.body.classList.contains('world-page-open'));
 ok('однофайловая копия не показывает путь к неупакованному Azgaar', !$('[data-action="world-fmg-open"]'));
 ok('игровая страница отражена в адресе и истории браузера', window.location.hash === '#play');
-/* Правила мира теперь живут в Azgaar: на экране создания остаются seed,
-   подсказка о нём и кнопка генератора — больше настройок тут нет. */
 ok(
-  'экран создания карты даёт seed, кнопку генератора и отсылку к Azgaar',
+  '«Играть» показывает шесть слотов и две вкладки: Мастер и Игрок',
+  $$('[data-action="world-slot-create"]').length === 6
+    && $$('[data-action="world-slot-tab"]').length === 2
+    && $('.world-slot-tab.is-active')?.dataset.tab === 'master'
+    && $('.world-slot-tab[data-tab="player"]') !== null,
+);
+ok(
+  'слоты и переключатель ролей используют Lucide SVG',
+  $$('[data-action="world-slot-tab"]').every((button) => button.querySelector('svg.icon'))
+    && $$('.world-slot-card__ghost svg.icon').length === 6
+    && $$('[data-action="world-slot-create"] svg.icon').length === 6
+    && $('.world-slot-tab[data-tab="master"]')?.getAttribute('aria-label')?.includes('из 6 слотов'),
+);
+ok('на вкладке мастера пустой слот предлагает создать карту', $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Создать карту'));
+click('[data-action="world-slot-tab"][data-tab="player"]');
+await wait(40);
+ok(
+  'вкладка игрока — те же шесть слотов, но вход вместо создания',
+  $$('[data-action="world-slot-create"]').length === 6
+    && $('.world-slot-tab.is-active')?.dataset.tab === 'player'
+    && $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Войти в карту')
+    && !!$('.world-slot-card--empty [data-action="world-slot-import"]'),
+);
+click('[data-action="world-slot-tab"][data-tab="master"]');
+await wait(40);
+click('[data-action="world-slot-create"][data-slot-index="0"]');
+await wait(60);
+ok(
+  'экран создания карты даёт seed, кнопку создания и отсылку к Azgaar',
   !!$('[data-world-setting="seed"]') && !!$('[data-action="world-generate"]')
-    && /Azgaar/.test($('.world-config .world-field__hint')?.textContent || '')
+    && /Seed определяет/.test($('.world-config .world-field__hint')?.textContent || '')
+    && !!$('.world-generate svg.icon')
     && !$('[data-world-setting="continents"]') && !$('[data-world-setting="climate"]')
 );
+ok('экран создания объявляет полные функции мастера', /ПОЛНЫЕ ФУНКЦИИ/.test($('.world-mode-panel')?.textContent || ''));
 const seedBeforeRandom = $('[data-world-setting="seed"]').value;
 click('[data-action="world-random-seed"]');
 ok('кнопка выдаёт новый seed', seedBeforeRandom !== $('[data-world-setting="seed"]')?.value);
 click('[data-action="world-generate"]');
-await wait(60);
-/* Атлас строится из карты Azgaar: в jsdom редактора нет, так что здесь важно
-   одно — кнопка не должна обещать то, чего в однофайловой копии нет.
-   Сама генерация проверена в `npm run test:world`. */
+await wait(80);
+/* Карта из слота: у мастера полный набор инструментов — сохранение,
+   экспорт, новый мир и настройки; редактор Azgaar своё место показывает
+   только в веб-сборке (проверено выше). */
 ok(
-  'в однофайловой копии кнопка не открывает редактор и не ломает экран',
-  !$('[data-role="world-fmg-overlay"]') && !!$('[data-action="world-generate"]') && !!$('#world-page-root .world-app')
+  'карта мастера открывается с полными функциями',
+  !!$('.world-app') && !!$('[data-action="world-edit-config"]') && !!$('[data-action="world-save"]')
+    && !!$('[data-action="world-export"]') && !!$('[data-action="world-export-image"]') && !!$('[data-action="world-new"]')
+    && /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '')
+    && !!$('[data-action="world-layer"]') && !!$('[data-role="world-focus-map"]'),
+);
+ok(
+  'слои, зум и камера используют единый набор SVG-иконок',
+  $$('[data-action="world-layer"]').length === 6
+    && $$('[data-action="world-layer"] svg.icon').length === 6
+    && $$('[data-action="world-map-zoom"] svg.icon').length === 2
+    && $$('[data-action="world-move"] svg.icon').length === 4
+    && !!$('.world-map-crosshair svg.icon')
+    && !!$('.world-camera-home svg.icon'),
+);
+ok('ошибок отрисовки нет', errors.length === 0, errors.join(' | '));
+click('[data-action="world-slots"]');
+await wait(60);
+ok(
+  'слот мастера заполнен: превью карты и кнопка входа',
+  !!$('.world-slot-card canvas[data-role="world-slot-thumb"]') && !!$('[data-action="world-slot-open"][data-slot-index="0"]'),
+);
+click('[data-action="world-slot-tab"][data-tab="player"]');
+await wait(40);
+click('[data-action="world-slot-create"][data-slot-index="0"]');
+await wait(60);
+ok(
+  'вход игрока просит seed мастера и не предлагает генерировать',
+  !!$('[data-world-setting="seed"]') && !!$('[data-action="world-generate"]')
+    && !$('[data-action="world-random-seed"]')
+    && /УРЕЗАННЫЕ ФУНКЦИИ/.test($('.world-mode-panel')?.textContent || ''),
+);
+const joinField = $('[data-world-setting="seed"]');
+joinField.value = seedBeforeRandom;
+joinField.dispatchEvent(new window.Event('change', { bubbles: true }));
+click('[data-action="world-generate"]');
+await wait(80);
+ok(
+  'карта игрока — только просмотр: функции мастера убраны',
+  !!$('.world-app') && !!$('[data-action="world-layer"]') && !!$('[data-role="world-focus-map"]')
+    && !$('[data-action="world-edit-config"]') && !$('[data-action="world-save"]')
+    && !$('[data-action="world-export"]') && !$('[data-action="world-export-image"]') && !$('[data-action="world-new"]')
+    && /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || '')
+    && /только просмотр/.test($('.world-map-actions')?.textContent || ''),
 );
 ok('ошибок отрисовки нет', errors.length === 0, errors.join(' | '));
 click('[data-action="world-exit"]');
@@ -373,7 +466,7 @@ await wait(100);
 /* Скрытая панель админа: вход по знаку игры и заводскому ключу.
    Проверяем в локальном режиме — там панель работает без хаба. */
 const brandMark = $('[data-action="admin-tap"]');
-ok('знак игры — доступная с клавиатуры потайная кнопка', !!brandMark && brandMark.getAttribute('aria-label') === 'Знак игры');
+ok('знак игры — доступная с клавиатуры потайная кнопка', !!brandMark && brandMark.getAttribute('aria-label') === 'Печать The civilization of the sages');
 for (let i = 0; i < 6; i += 1) click('[data-action="admin-tap"]');
 await wait(40);
 ok('неполная комбинация не показывает вход', !$('form[data-form="admin-login"]'));

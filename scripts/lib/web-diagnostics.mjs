@@ -45,7 +45,7 @@ const SCRIPT = String.raw`
 
   function env() {
     var lines = [];
-    lines.push('MIR ' + VERSION + ', сборка ' + BUILT);
+    lines.push('The civilization of the sages (MIR) ' + VERSION + ', сборка ' + BUILT);
     lines.push('адрес: ' + location.href);
     lines.push('браузер: ' + navigator.userAgent);
     lines.push('язык: ' + navigator.language + ', экран: ' + screen.width + 'x' + screen.height +
@@ -72,7 +72,7 @@ const SCRIPT = String.raw`
   }
 
   function report() {
-    var out = ['=== MIR: отчёт об ошибке ===', env(), '', '--- события (' + entries.length + ') ---'];
+    var out = ['=== The civilization of the sages: отчёт об ошибке ===', env(), '', '--- события (' + entries.length + ') ---'];
     for (var i = 0; i < entries.length; i++) {
       out.push(entries[i].time + '  [' + entries[i].kind + '] ' + entries[i].text);
     }
@@ -85,10 +85,10 @@ const SCRIPT = String.raw`
     if (!panel) {
       panel = document.createElement('div');
       panel.setAttribute('style', 'position:fixed;inset:0;left:0;top:0;right:0;bottom:0;z-index:2147483647;' +
-        'background:#0b0d10;color:#ffd7d7;font:12px/1.45 monospace;padding:12px;overflow:auto;' +
+        'background:#080d0e;color:#ffd7d7;font:12px/1.45 monospace;padding:12px;overflow:auto;' +
         '-webkit-user-select:text;user-select:text;white-space:pre-wrap;word-break:break-word');
       var bar = document.createElement('div');
-      bar.setAttribute('style', 'display:flex;gap:8px;margin-bottom:10px;position:sticky;top:0;background:#0b0d10;padding-bottom:8px');
+      bar.setAttribute('style', 'display:flex;gap:8px;margin-bottom:10px;position:sticky;top:0;background:#080d0e;padding-bottom:8px');
       bar.appendChild(button('Скопировать', function () { copy(report()); }));
       bar.appendChild(button('Закрыть', function () { panel.style.display = 'none'; if (badge) badge.style.display = 'block'; }));
       var text = document.createElement('div');
@@ -105,7 +105,7 @@ const SCRIPT = String.raw`
   function button(label, onClick) {
     var b = document.createElement('button');
     b.textContent = label;
-    b.setAttribute('style', 'background:#1b1f26;color:#fff;border:1px solid #444;padding:8px 12px;font:12px monospace');
+    b.setAttribute('style', 'background:#0d1415;color:#c2d9c9;border:1px solid rgba(194,217,201,.28);padding:8px 12px;font:12px monospace');
     b.onclick = onClick;
     return b;
   }

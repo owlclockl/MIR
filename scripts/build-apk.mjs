@@ -42,10 +42,11 @@ import { ANDROID_THEMES } from './lib/apk-read.mjs';
 import { auditApk } from './lib/apk-audit.mjs';
 import { injectDiagnostics } from './lib/web-diagnostics.mjs';
 
-const log = createLogger('apk-build', { title: 'Сборка Android-приложения MIR.apk' });
+const PRODUCT_NAME = 'The civilization of the sages';
+const log = createLogger('apk-build', { title: `Сборка ${PRODUCT_NAME} для Android (MIR.apk)` });
 
 const PACKAGE = 'com.mir.game';
-const LABEL = 'MIR';
+const LABEL = 'Sages';
 /* Тег в системном журнале Android: `adb logcat -s MIR` покажет только нас. */
 const LOG_TAG = 'MIR';
 const MIN_SDK = 21;
@@ -163,7 +164,7 @@ function crc32(buf) {
            Log.e("MIR", trace);
            TextView tv = new TextView(this);
            tv.setTextIsSelectable(true);
-           tv.setText("MIR не запустился. Покажите этот текст разработчику:\n\n" + trace);
+           tv.setText("The civilization of the sages не запустилась. Покажите этот текст разработчику:\n\n" + trace);
            setContentView(tv);
          }
        }
@@ -239,7 +240,7 @@ function buildDex() {
   const READY_MSG = 'onCreate: WebView created, loading assets/mir.html';
   const PICKER_MSG = 'onShowFileChooser: открываю системный выбор файла';
   const RESULT_MSG = 'onActivityResult: выбор файла вернул код ';
-  const CRASH_PREFIX = 'MIR не запустился. Покажите этот экран разработчику:\n\n';
+  const CRASH_PREFIX = 'The civilization of the sages не запустилась. Покажите этот экран разработчику:\n\n';
   /* Код запроса startActivityForResult. Значение произвольное, но своё:
      по нему в логах видно, что вернулся именно выбор файла. */
   const FILE_REQUEST = 1;
@@ -1914,7 +1915,7 @@ function findLocalEntry(apk, wanted) {
    ============================================================ */
 
 console.log('============================================================');
-console.log('  MIR — сборка Android-приложения (.apk)');
+console.log('  The civilization of the sages — Android-приложение (.apk)');
 console.log('============================================================');
 
 const BUILT_AT = new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -2074,7 +2075,7 @@ try {
   if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
   writeFileSync(join('dist-app', 'MIR.apk'), apk);
   writeFileSync('MIR.apk', apk);
-  log.ok(`MIR.apk записан (${human(apk.length)}), копия в dist-app/MIR.apk`);
+  log.ok(`Sages (MIR.apk) записан (${human(apk.length)}), копия в dist-app/MIR.apk`);
   log.detail('SHA-256 файла', sha256(apk));
 
   /* --- 8. Полный разбор того, что реально записалось ---------------- */
@@ -2085,6 +2086,10 @@ try {
     fail: 'диск или антивирус испортили файл при записи',
   });
   const info = auditApk(written, log, { prefix: '8.' });
+  log.check(info.label === LABEL, 'ярлык Android-приложения использует короткое имя Sages', {
+    fail: 'в списке приложений Android будет показано старое или пустое имя',
+    detail: `получено: ${info.label ?? '—'}, ожидалось: ${LABEL}`,
+  });
 
   /* --- Итог --------------------------------------------------------- */
   const ok = log.problems.length === 0;
@@ -2092,11 +2097,11 @@ try {
   console.log('============================================================');
   if (ok) {
     console.log('  ✓ Android-приложение собрано, подписано и проверено');
-    console.log(`     MIR.apk — ${human(apk.length)}, версия ${info.versionName} (${info.versionCode})`);
+    console.log(`     ${info.label} (MIR.apk) — ${human(apk.length)}, версия ${info.versionName} (${info.versionCode})`);
     console.log(`     Пакет ${info.package}, minSdk ${info.minSdk}, targetSdk ${info.targetSdk}`);
     console.log(`     Подпись: v1 + v2, ключ ${info.signature?.keyType ?? '?'} ${info.signature?.keyBits ?? ''} бит`);
     console.log('');
-    console.log('  Установка: перекиньте MIR.apk на телефон (Telegram, USB, диск),');
+    console.log('  Установка: перекиньте Sages (MIR.apk) на телефон (Telegram, USB, диск),');
     console.log('  откройте и разрешите установку из этого источника.');
     console.log('');
     console.log('  Если на телефоне что-то пойдёт не так — ошибка будет видна:');

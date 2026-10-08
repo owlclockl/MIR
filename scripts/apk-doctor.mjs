@@ -29,7 +29,7 @@ const candidates = args.length ? args : ['MIR.apk', 'dist-app/MIR.apk'];
 const target = candidates.find((p) => existsSync(p));
 
 console.log('============================================================');
-console.log('  MIR — разбор Android-приложения (.apk)');
+console.log('  The civilization of the sages — диагностика Android (.apk)');
 console.log('============================================================');
 
 if (!target) {
