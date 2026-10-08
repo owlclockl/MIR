@@ -4366,6 +4366,8 @@ button.admin-row:hover {
   height: 100vh;
   height: 100dvh;
   color: var(--text);
+  /* на телефоне редактор не должен «протягивать» фон атласа, когда список дошёл до края */
+  overscroll-behavior: contain;
   background:
     radial-gradient(ellipse at 52% -14%, rgba(63, 113, 89, 0.17), transparent 53%),
     var(--world-bg);
@@ -4540,7 +4542,10 @@ button.admin-row:hover {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  padding: var(--sp-12);
+  /* на телефоне поля не спорят с вырезом экрана и системной строкой */
+  padding:
+    max(var(--sp-12), env(safe-area-inset-top)) max(var(--sp-12), env(safe-area-inset-right))
+    max(var(--sp-12), env(safe-area-inset-bottom)) max(var(--sp-12), env(safe-area-inset-left));
   color: var(--text);
   background:
     radial-gradient(ellipse at 52% -14%, rgba(63, 113, 89, 0.17), transparent 53%),
@@ -4561,32 +4566,23 @@ button.admin-row:hover {
 }
 
 .world-fmg-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(140px, min(24vw, 340px)) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   flex: none;
   min-width: 0;
   gap: var(--sp-12);
-  padding: var(--sp-8) var(--sp-12);
+  padding: var(--sp-6) var(--sp-12);
   border: 1px solid var(--world-line);
   background: rgba(13, 20, 21, 0.92);
 }
 
-.world-fmg-heading > div:first-child {
+.world-fmg-seed {
+  display: flex;
   min-width: 0;
-}
-
-.world-fmg-heading .world-card__eyebrow {
-  margin-bottom: var(--sp-4);
-  color: var(--world-accent);
-}
-
-.world-fmg-heading h3 {
-  margin: 0;
-  color: var(--text);
-  font-family: var(--font-display);
-  font-size: 15px;
-  letter-spacing: 0.015em;
+  align-items: baseline;
+  gap: var(--sp-8);
+  color: var(--world-muted);
 }
 
 .world-fmg-description {
@@ -4594,15 +4590,6 @@ button.admin-row:hover {
   color: var(--world-muted);
   font-size: 10px;
   line-height: 1.45;
-}
-
-.world-fmg-seed {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--sp-4);
-  color: var(--world-muted);
-  text-align: right;
 }
 
 .world-fmg-seed > span {
@@ -5219,54 +5206,45 @@ button.admin-row:hover {
     padding: var(--sp-8);
   }
 
+  /* на телефоне редактор занимает весь экран: рамка и поля уходят, остаётся узкая строка возврата */
   .world-fmg-overlay {
-    padding: var(--sp-6);
+    padding: 0;
   }
 
   .world-fmg-shell {
-    gap: var(--sp-6);
+    gap: var(--sp-4);
   }
 
   .world-fmg-heading {
-    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-6);
-    padding: var(--sp-6) var(--sp-8);
+    padding: max(var(--sp-4), env(safe-area-inset-top)) var(--sp-8) var(--sp-4);
   }
 
-  .world-fmg-heading > div:first-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .world-fmg-heading h3 {
-    font-size: 12px;
-  }
-
-  .world-fmg-description {
-    max-width: 62vw;
-    font-size: 9px;
-  }
-
-  .world-fmg-seed {
-    grid-column: 1;
-    grid-row: 2;
-    text-align: left;
+  .world-fmg-seed > span {
+    font-size: 7px;
+    letter-spacing: 0.1em;
   }
 
   .world-fmg-seed code {
-    max-width: 100%;
-    font-size: 8px;
+    max-width: 46vw;
+    font-size: 9px;
   }
 
   .world-fmg-back-button {
-    grid-column: 2;
-    grid-row: 1 / span 2;
     width: auto;
-    min-width: 36px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: var(--sp-6) var(--sp-8);
+  }
+
+  .world-fmg-frame {
+    border: 0;
   }
 
   .world-fmg-attribution {
+    padding: 0 var(--sp-8) max(var(--sp-4), env(safe-area-inset-bottom));
     font-size: 7px;
+    text-align: center;
   }
 
   .world-shell--setup,

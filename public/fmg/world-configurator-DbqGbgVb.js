@@ -1,0 +1,154 @@
+import{F as e,Jn as t,Mn as n,On as r,P as i,Yt as a,Zt as o,m as s,n as c,nr as l,qn as u}from"./utils-BXzQ0Tym.js";import{Ct as d,St as f,_t as p,bt as m,gt as h,ht as g,t as _,vt as v,xt as y,yt as b}from"./layers-Bcg3SU5R.js";import{i as x}from"./tooltips-P6FAPAdd.js";import{t as S}from"./pins-BUEQgIuf.js";import{i as C}from"./dialog-helpers-CJ5pbzaw.js";function w(e){return function(t,n){var r=d(t*t+n*n),i=e(r),a=f(i),o=m(i);return[b(t*a,r*o),v(r&&n*a/r)]}}function T(e,t){return[m(t)*f(e),f(t)]}T.invert=w(v);function E(){return g(T).scale(249.5).clipAngle(90+y)}var D=h(E().translate([100,100]).scale(100));function O(){customization||(k(),I(),z(),R(),B(),$(`#worldConfigurator`).dialog({title:`Настройка мира`,resizable:!1,width:`minmax(40em, 85vw)`,buttons:{"Update world":L},open:function(){(this.parentElement?.querySelector(`.ui-dialog-buttonpane`))?.insertAdjacentHTML(`afterbegin`,`<div class="dontAsk" data-tip="Обновлять мир автоматически при изменении полей и нажатии кнопок">
+        <input id="wcAutoChange" class="checkbox" type="checkbox" checked />
+        <label for="wcAutoChange" class="checkbox-label"><i>автоприменение изменений</i></label>
+      </div>`),(this.parentElement?.querySelector(`.ui-dialog-buttonset > button`))?.addEventListener(`mousemove`,()=>x(`Применить текущие настройки к карте`))},close:()=>C(`worldConfigurator`)}))}function k(){C(`worldConfigurator`),i(`dialogs`).insertAdjacentHTML(`beforeend`,A()),j()}function A(){let e=(e,t,n)=>`<div>
+    <i data-locked="0" id="lock_${e}" class="icon-lock-open"></i>
+    <label data-tip="${n}">
+      <i>${t}:</i>
+      <input id="${e}Input" type="number" min="-50" max="50" />
+      <span>°C<span id="${e}Converted"></span></span>
+      <input id="${e}Output" type="range" min="-50" max="50" />
+    </label>
+  </div>`;return`<div id="worldConfigurator" class="dialog stable">
+    <div style="display: flex">
+      <div id="worldControls">
+        ${e(`temperatureEquator`,`Equator`,`Set temperature at equator`)}
+        ${e(`temperatureNorthPole`,`North Pole`,`Set the North Pole average yearly temperature`)}
+        ${e(`temperatureSouthPole`,`South Pole`,`Set the South Pole average yearly temperature`)}
+        <div>
+          <i data-locked="0" id="lock_mapSize" class="icon-lock-open"></i>
+          <label data-tip="Размер карты относительно размера мира">
+            <i>Размер карты:</i>
+            <input id="mapSizeInput" type="number" min="1" max="100" step="0.1" />%
+            <input id="mapSizeOutput" type="range" min="1" max="100" step="0.1" />
+          </label>
+        </div>
+        <div>
+          <i data-locked="0" id="lock_latitude" class="icon-lock-open"></i>
+          <label data-tip="Сдвиг карты с севера на юг; 50 — центр карты на экваторе">
+            <i>Latitudes:</i>
+            <input id="latitudeInput" type="number" min="0" max="100" step="0.1" />
+            <br /><i>С</i
+            ><input
+              id="latitudeOutput"
+              type="range"
+              min="0"
+              max="100"
+              step="0.1"
+              style="width: 10.3em"
+            /><i>Ю</i>
+          </label>
+        </div>
+        <div>
+          <i data-locked="0" id="lock_longitude" class="icon-lock-open"></i>
+          <label data-tip="Сдвиг карты с запада на восток; 50 — центр карты на нулевом меридиане">
+            <i>Longitudes:</i>
+            <input id="longitudeInput" type="number" min="0" max="100" step="0.1" />
+            <br /><i>З</i
+            ><input
+              id="longitudeOutput"
+              type="range"
+              min="0"
+              max="100"
+              step="0.1"
+              style="width: 10.3em"
+            /><i>В</i>
+          </label>
+        </div>
+        <div>
+          <label
+            data-tip="Осадки: сколько воды приносят облака. Определяет реки и биомы. Для стандартной генерации держите около 100%"
+          >
+            <i data-locked="0" id="lock_prec" class="icon-lock-open"></i>
+            <i>Precipitation:</i>
+            <input id="precInput" type="number" />%
+            <input id="precOutput" type="range" min="0" max="500" />
+          </label>
+        </div>
+        <div data-tip="Координатная область, на которой сгенерирована эта карта. Для следующей она задаётся в настройках">
+          <i>Размер карты:</i><br />
+          <span id="mapSize"></span> px = <span id="mapSizeFriendly"></span>
+        </div>
+        <div>
+          <i data-tip="Длина меридиана. Почти половина длины экватора">Длина меридиана:</i><br />
+          <span id="meridianLength" data-tip="Длина меридиана в пикселях"></span> px =
+          <span
+            id="meridianLengthFriendly"
+            data-tip="Длина меридиана в удобных единицах (зависит от настройки)"
+          ></span>
+          <span
+            id="meridianLengthEarth"
+            data-tip="Длина меридиана мира относительно реальной Земли (20 тыс. км)"
+          ></span>
+        </div>
+        <div data-tip="Координаты карты на глобусе"><i>Coords:</i> <span id="mapCoordinates"></span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end">
+        <svg id="globe" width="22em" viewBox="-20 -25 240 240">
+          <defs>
+            <linearGradient id="temperatureGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop id="grad90" offset="0%" stop-color="blue" />
+              <stop id="grad60" offset="16.6%" stop-color="green" />
+              <stop id="grad30" offset="33.3%" stop-color="yellow" />
+              <stop id="grad0" offset="50%" stop-color="red" />
+              <stop id="grad-30" offset="66.6%" stop-color="yellow" />
+              <stop id="grad-60" offset="83.3%" stop-color="green" />
+              <stop id="grad-90" offset="100%" stop-color="blue" />
+            </linearGradient>
+          </defs>
+          <g id="globeNoteLines">
+            <line x1="5" x2="220" y1="0" y2="0" />
+            <line x1="5" x2="220" y1="13" y2="13" />
+            <line x1="5" x2="220" y1="49.5" y2="49.5" />
+            <line x1="-5" x2="220" y1="100" y2="100" />
+            <line x1="5" x2="220" y1="150.5" y2="150.5" />
+            <line x1="5" x2="220" y1="187" y2="187" />
+            <line x1="5" x2="220" y1="200" y2="200" />
+          </g>
+          <g id="globeWindArrows" data-tip="Кликните, чтобы изменить направление ветра" stroke-linejoin="round">
+            <circle cx="210" cy="6" r="12" />
+            <path data-tier="0" d="M210,11 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(225 210 6)" />
+            <circle cx="210" cy="30" r="12" />
+            <path data-tier="1" d="M210,35 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(45 210 30)" />
+            <circle cx="210" cy="75" r="12" />
+            <path data-tier="2" d="M210,80 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(225 210 75)" />
+            <circle cx="210" cy="130" r="12" />
+            <path data-tier="3" d="M210,135 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(315 210 130)" />
+            <circle cx="210" cy="173" r="12" />
+            <path data-tier="4" d="M210,178 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(135 210 173)" />
+            <circle cx="210" cy="194" r="12" />
+            <path data-tier="5" d="M210,199 v-10 l-3,3 m6,0 l-3,-3" transform="rotate(315 210 194)" />
+          </g>
+          <g id="globaAxisLabels">
+            <text x="82%" y="-4%">wind</text>
+            <text x="-8%" y="-4%">latitude</text>
+          </g>
+          <g id="globeLatLabels">
+            <text x="-15" y="5">90°</text>
+            <text x="-15" y="18">60°</text>
+            <text x="-15" y="53">30°</text>
+            <text x="-15" y="103">0°</text>
+            <text x="-15" y="153">30°</text>
+            <text x="-15" y="190">60°</text>
+            <text x="-15" y="204">90°</text>
+          </g>
+          <circle id="globeGradient" cx="100" cy="100" r="100" fill="url(#temperatureGradient)" stroke="none" />
+          <line id="globePrimeMeridian" x1="100" x2="100" y1="0" y2="200" />
+          <line id="globeEquator" x1="1" x2="200" y1="100" y2="100" />
+          <circle id="globeOutline" cx="100" cy="100" r="100" fill="none" />
+          <path id="globeGraticule" />
+          <path id="globeArea" />
+        </svg>
+        <button id="restoreWinds" data-tip="Кликните, чтобы вернуть розы ветров по умолчанию (для Земли)">
+          Вернуть ветра
+        </button>
+      </div>
+    </div>
+    <div style="margin-top: 0.3em">
+      <i>Presets:</i>
+      <button id="wcWholeWorld" data-tip="Кликните, чтобы задать размер карты на весь мир">Весь мир</button>
+      <button id="wcNorthern" data-tip="Кликните, чтобы задать размер карты под северные широты">Северный</button>
+      <button id="wcTropical" data-tip="Кликните, чтобы задать размер карты под тропические широты">Тропический</button>
+      <button id="wcSouthern" data-tip="Кликните, чтобы задать размер карты под южные широты">Южный</button>
+    </div>
+  </div>`}function j(){r(`#globe`).select(`#globeWindArrows`).on(`click`,V),r(`#globe`).select(`#globeGraticule`).attr(`d`,t(D(p()())??``)),i(`worldConfigurator`).addEventListener(`input`,N),i(`restoreWinds`).addEventListener(`click`,H),i(`wcWholeWorld`).addEventListener(`click`,()=>U(100,50)),i(`wcNorthern`).addEventListener(`click`,()=>U(33,25)),i(`wcTropical`).addEventListener(`click`,()=>U(33,50)),i(`wcSouthern`).addEventListener(`click`,()=>U(33,75)),S.bindIcons(i(`worldConfigurator`),M)}function M(e){let{temperature:t}=options.map.climate;if(e===`temperatureEquator`)return t.equator;if(e===`temperatureNorthPole`)return t.northPole;if(e===`temperatureSouthPole`)return t.southPole;if(e===`prec`)return options.map.climate.precipitation;if(e===`mapSize`)return options.map.geography.mapSize;if(e===`latitude`)return options.map.geography.latitude;if(e===`longitude`)return options.map.geography.longitude}function N(t){let n=t.target,r=n.id.match(/^(\w+?)(Input|Output)$/);if(!r||!n.value)return;let[,i,a]=r,o=Number(n.value);if(Number.isNaN(o))return;let s=e(`${i}${a===`Input`?`Вывод`:`Ввод`}`);s&&(s.value=n.value);let{geography:c,climate:l}=options.map;if(i===`temperatureEquator`)l.temperature.equator=o;else if(i===`temperatureNorthPole`)l.temperature.northPole=o;else if(i===`temperatureSouthPole`)l.temperature.southPole=o;else if(i===`prec`)l.precipitation=o;else if(i===`mapSize`||i===`latitude`||i===`longitude`)c[i]=o,Coordinates.calculate();else return;S.set(i,o),Options.save(),F(),e(`wcAutoChange`)?.checked&&L()}function P(e){return options.map.units.temperature.unit===`°C`?``:` = ${c(e)}`}function F(){let{equator:e,northPole:t,southPole:n}=options.map.climate.temperature;i(`temperatureEquatorConverted`).innerText=P(e),i(`temperatureNorthPoleConverted`).innerText=P(t),i(`temperatureSouthPoleConverted`).innerText=P(n)}function I(){let{temperature:t,precipitation:n}=options.map.climate,{mapSize:r,latitude:i,longitude:a}=options.map.geography;for(let[o,s]of Object.entries({temperatureEquator:t.equator,temperatureNorthPole:t.northPole,temperatureSouthPole:t.southPole,prec:n,mapSize:r,latitude:i,longitude:a}))for(let t of[`Input`,`Output`]){let n=e(`${o}${t}`);n&&(n.value=String(s))}F()}function L(){z(),R(),Temperature.generate(),Precipitation.generate();let t=new Uint8Array(pack.cells.h);Rivers.generate(),Rivers.specify(),pack.cells.h=new Float32Array(t),Biomes.define(),Features.defineGroups(),Features.defineNames(),_.draw(`temperature`,`precipitation`),_.draw(`biomes`,`coordinates`,`rivers`),e(`canvas3d`)&&setTimeout(()=>window.Controllers.View3d.update(),500)}function R(){let e=options.map.graph.height/2*100/options.map.geography.mapSize;Coordinates.calculate();let n=options.map.geography.coordinates,a=options.map.units.distance.unit,o=e*2*options.map.units.distance.scale*s();i(`mapSize`).innerHTML=`${options.map.graph.width}x${options.map.graph.height}`,i(`mapSizeFriendly`).innerHTML=`${l(options.map.graph.width*options.map.units.distance.scale)}x${l(options.map.graph.height*options.map.units.distance.scale)} ${a}`,i(`meridianLength`).innerHTML=String(l(e*2)),i(`meridianLengthFriendly`).innerHTML=`${l(e*2*options.map.units.distance.scale)} ${a}`,i(`meridianLengthEarth`).innerHTML=o?` = ${l(o/200)}%🌏`:``,i(`mapCoordinates`).innerHTML=`${c(n.latN)} ${Math.abs(l(n.lonW))}°W; ${c(n.latS)} ${l(n.lonE)}°E`;function c(e){return e>0?`${Math.abs(l(e))}°N`:`${Math.abs(l(e))}°S`}let u=p().extent([[n.lonW??0,n.latN??0],[n.lonE??0,n.latS??0]]);r(`#globe`).select(`#globeArea`).attr(`d`,t(D(u.outline())??``))}function z(){let e=options.map.climate.temperature.equator,t=options.map.climate.temperature.northPole,n=options.map.climate.temperature.southPole,i=o(a),s=e=>i(1-e),[c,l]=[-25,30],u=l-c;r(`#globe`).select(`#grad90`).attr(`stop-color`,s((t-c)/u)),r(`#globe`).select(`#grad60`).attr(`stop-color`,s((e-(e-t)*2/3-c)/u)),r(`#globe`).select(`#grad30`).attr(`stop-color`,s((e-(e-t)*1/4-c)/u)),r(`#globe`).select(`#grad0`).attr(`stop-color`,s((e-c)/u)),r(`#globe`).select(`#grad-30`).attr(`stop-color`,s((e-(e-n)*1/4-c)/u)),r(`#globe`).select(`#grad-60`).attr(`stop-color`,s((e-(e-n)*2/3-c)/u)),r(`#globe`).select(`#grad-90`).attr(`stop-color`,s((n-c)/u))}function B(){r(`#globe`).select(`#globeWindArrows`).selectAll(`path`).each(function(e,t){let n=u(this.getAttribute(`transform`)??``);this.setAttribute(`transform`,`rotate(${options.map.climate.winds[t]} ${n[1]} ${n[2]})`)})}function V(e){let t=e.target,r=t.tagName===`path`?t:t.nextElementSibling;if(!r?.dataset.tier)return;let a=+r.dataset.tier;options.map.climate.winds[a]=(options.map.climate.winds[a]+45)%360,Options.save();let o=u(r.getAttribute(`transform`)??``);r.setAttribute(`transform`,`rotate(${options.map.climate.winds[a]} ${o[1]} ${o[2]})`);let s=n(options.map.geography.coordinates.latN,options.map.geography.coordinates.latS,-30).map(e=>(90-e)/30|0);i(`wcAutoChange`).checked&&s.includes(a)&&L()}function H(){let e=[225,45,225,315,135,315],t=n(options.map.geography.coordinates.latN,options.map.geography.coordinates.latS,-30).map(e=>(90-e)/30|0),r=i(`wcAutoChange`).checked&&t.some(t=>options.map.climate.winds[t]!==e[t]);options.map.climate.winds=e,Options.save(),B(),r&&L()}function U(t,n){options.map.geography.mapSize=t,options.map.geography.latitude=n,Coordinates.calculate(),Options.save(),S.set(`mapSize`,t),S.set(`latitude`,n),I(),e(`wcAutoChange`)?.checked&&L()}var W={open:O};export{W as WorldConfigurator};

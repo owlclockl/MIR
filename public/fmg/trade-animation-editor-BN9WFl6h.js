@@ -1,0 +1,18 @@
+import{P as e}from"./utils-BXzQ0Tym.js";import{i as t,n}from"./dialog-helpers-CJ5pbzaw.js";var r=TradeAnimation.getDefaultOptions(),i=[{type:`select`,id:`tradeAnimDisplayType`,label:`Вид торговли`,tip:`Какие виды торговли показывать: местные (город-рынок), мировые (рынок-рынок) или оба`,key:`displayType`,default:r.displayType,selectOptions:[`local`,`global`,`both`]},{type:`slider`,id:`tradeAnimConcurrent`,label:`Анимации`,tip:`Сколько торговых анимаций видно одновременно; новые появляются, когда старые заканчиваются. Больше — анимаций сразу, возможны тормоза`,min:1,max:500,step:1,key:`concurrent`,default:r.concurrent},{type:`slider`,id:`tradeAnimDuration`,label:`Длительность пути`,tip:`Миллисекунд на единицу пути. Меньше = быстрее анимация`,min:1,max:1e3,step:1,key:`duration`,default:r.duration},{type:`slider`,id:`tradeAnimLandDurationModifier`,label:`Замедление на суше`,tip:`Множитель длительности пути по суше. Больше = медленнее анимация по суше`,min:.1,max:20,step:.1,key:`landDurationModifier`,default:r.landDurationModifier},{type:`slider`,id:`tradeAnimSegmentChangePause`,label:`Пауза отрезка`,tip:`Пауза между сухопутным и водным отрезками в миллисекундах. Больше = длиннее пауза`,min:0,max:5e3,step:100,key:`segmentChangePause`,default:r.segmentChangePause},{type:`slider`,id:`tradeAnimMarkerSize`,label:`Размер маркера`,tip:`Размер иконки маркера в единицах карты. Повозки рисуются вполовину меньше. Больше = крупнее иконки`,min:1,max:50,step:.5,key:`markerSize`,default:r.markerSize}];function a(){customization||(n(`#tradeAnimationEditor, .stable`),o(),$(`#tradeAnimationEditor`).dialog({title:`Редактор анимации торговли`,resizable:!1,position:{my:`right top`,at:`right-10 top+10`,of:`svg`},close:()=>{t(`tradeAnimationEditor`)}}))}function o(){t(`tradeAnimationEditor`),document.body.insertAdjacentHTML(`beforeend`,s());for(let t of i){let n=t.key,r=e(t.id),i=e(`${t.id}Reset`),a=options.app.trade.animation[n]??t.default;r.value=String(a),r.addEventListener(`input`,e=>{if(e.target!==e.currentTarget)return;let i=t.type===`slider`?r.valueAsNumber:r.value;Options.set(e=>e.app.trade.animation={...e.app.trade.animation,[n]:i}),Layers.draw(`trade`)}),i.addEventListener(`click`,()=>{Options.set(e=>e.app.trade.animation={...e.app.trade.animation,[n]:t.default}),r.value=String(t.default),Layers.draw(`trade`)})}}function s(){return`
+    <div id="tradeAnimationEditor" class="dialog" style="display:none">
+      <style>
+        #tradeAnimationEditor slider-input { width: 100%; }
+        #tradeAnimationEditor slider-input input[type=range] { flex: 1; min-width: 0; }
+      </style>
+      <table style="border-collapse: collapse;width:100%">
+        <tbody>${i.map(({id:e,label:t,type:n,selectOptions:r,tip:i,min:a,max:o,step:s,key:c,default:l})=>{let u=options.app.trade.animation[c]??l;return`
+      <tr data-tip="${i}">
+        <td style="padding: 0">${t}</td>
+        <td style="padding: 0">${n===`select`&&r?`<select id="${e}" style="width: 100%; font-size: smaller;">${r.map(e=>`<option value="${e}" ${e===u?`selected`:``}>${e}</option>`).join(``)}</select>`:`<slider-input id="${e}" min="${a}" max="${o}" step="${s}" value="${u}"></slider-input>`}</td>
+        <td style="padding: 0">
+          <button id="${e}Reset" data-tip="К значениям по умолчанию"
+            style="font-size:.85em; padding:1px 5px; margin-left: 0.3em">↺</button>
+        </td>
+      </tr>`}).join(``)}</tbody>
+      </table>
+    </div>`}var c={open:a};export{c as TradeAnimationEditor};

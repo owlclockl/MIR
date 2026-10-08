@@ -3,7 +3,6 @@ import { Controllers } from "@/controllers";
 import { Services } from "@/services";
 import { toggleSaveReminder } from "@/services/autosave";
 import { findEl, minmax } from "@/utils";
-import { showInfo } from "./app-info";
 import { closeDialogs } from "./dialog/dialog-helpers";
 import { getLayerByShortcut } from "./options/tabs/layers-tab";
 import { changeMapZoom, panMap, setMapZoom } from "./zoom";
@@ -40,7 +39,6 @@ function handleKeyup(event: KeyboardEvent): void {
   const brush = getVisibleBrush();
 
   if (code === "Space") openOmnibar(event);
-  else if (code === "F1") showInfo();
   else if (code === "F2") regeneratePrompt();
   else if (code === "F6") Services.Save.toStorage();
   else if (code === "F9") Services.Load.quickLoad();

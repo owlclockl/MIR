@@ -18,7 +18,6 @@ vi.mock("@/components/options/tabs/layers-tab", () => ({
   LAYER_TOGGLES: new Map([["rivers", { label: "Ri<u>v</u>ers" }]]),
   LAYER_PRESETS: {}
 }));
-vi.mock("@/components/app-info", () => ({ showInfo: vi.fn() }));
 vi.mock("@/components/layers-presets", () => ({ applyPreset: vi.fn(), savePreset: vi.fn() }));
 vi.mock("@/components/lifecycle", () => ({ regeneratePrompt: vi.fn() }));
 vi.mock("@/components/options/io-panes", () => ({}));
@@ -518,11 +517,11 @@ describe("Omnibar public behavior", () => {
   });
 
   it("lists every command on a bare >, the recent ones first", () => {
-    localStorage.setItem("fmg-omnibar-history", JSON.stringify(["zoomIn", "showInfo"]));
+    localStorage.setItem("fmg-omnibar-history", JSON.stringify(["zoomIn", "newMap"]));
     Omnibar.open();
     search(">");
     const names = rows().map(row => row.querySelector(".omnibar-name")?.textContent);
-    expect(names.slice(0, 2)).toEqual(["Zoom In", "Show App Info"]);
+    expect(names.slice(0, 2)).toEqual(["Zoom In", "Generate New Map"]);
     expect(names.length).toBe(MAP_COMMANDS.length);
   });
 

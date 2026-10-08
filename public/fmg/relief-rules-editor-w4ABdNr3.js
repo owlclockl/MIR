@@ -1,0 +1,31 @@
+import{Gn as e,P as t,er as n,p as r}from"./utils-BXzQ0Tym.js";import{i,l as a,r as o}from"./dialog-helpers-CJ5pbzaw.js";import{i as s,n as c}from"./table-XWt9IQic.js";import{i as l,t as u}from"./relief-previews-CiQ9sLd2.js";import{n as d,t as f}from"./relief-pool-editor-CytXibdg.js";import{n as p,t as m}from"./limitation-picker-BOShiK5h.js";var h=`reliefRulesEditor`,g={my:`center`,at:`center`,of:`svg`,collision:`fit`},_=[{key:`reorder`,width:`1.1em`,permanent:!0},{key:`name`,label:`Название`,width:`10em`,permanent:!0},{key:`height`,label:`Высота`,width:`7em`,tip:`Диапазон высот: от 20 (уровень моря) до 100`,permanent:!0},{key:`temperature`,label:`Температура`,width:`7em`,tip:`Диапазон температур в °C`},{key:`biomes`,label:`Биомы`,width:`7em`,tip:`Биомы, которые занимает правило`},{key:`size`,label:`Размер`,width:`7em`,tip:`Размер иконки на минимальной высоте, растёт с высотой. Каждая запись пула масштабирует его`},{key:`relief`,label:`Рельеф`,width:`8em`,permanent:!0},{key:`remove`,width:`1.2em`,permanent:!0}],v=`
+  #${h} .states [data-col] input { text-align: center; -moz-appearance: textfield; }
+  #${h} .states [data-col] input::-webkit-inner-spin-button { display: none; }
+  #${h} .states [data-col="name"] input { text-align: left; }
+  #${h} .rulePool { display: inline-flex; align-items: center; gap: .15em; font-size: 2.2em; line-height: 1; }
+  #${h} .rulePool svg { width: 1em; height: 1em; overflow: visible; pointer-events: none; }
+  #${h} .rulePool small { font-size: .35em; opacity: .7; }
+  #${h} .ruleBiomes { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #${h} .empty { margin: .4em; font-style: italic; opacity: .7; }
+`;function y(){i(h),t(`dialogs`).insertAdjacentHTML(`beforeend`,`<div id="${h}" class="dialog editorDialog">
+      <style>${v}</style>
+      ${s({dialogId:h,columns:_})}
+      <div id="${h}Body" class="table"></div>
+      <div class="totalLine">
+        <div style="margin-left: 4px">Первое совпадение выигрывает. Суша без правила получает пул рельефа своего биома</div>
+      </div>
+      <div class="editorToolbar">
+        <button id="${h}Add" data-tip="Добавить правило, проверяемое последним" class="icon-plus"></button>
+        <button id="${h}Restore" data-tip="Вернуть стандартные холмы и горы" class="icon-ccw"></button>
+        <button id="${h}Replace" data-tip="Перерасставить рельеф по правилам, чтобы применить правки" class="icon-arrows-cw"></button>
+      </div>
+    </div>`),c({dialogId:h,columns:_,onUpdate:()=>a(h,{width:`fit-content`,position:g})});let e=t(`${h}Body`);e.addEventListener(`change`,e=>w(e.target)),e.addEventListener(`click`,e=>E(e.target)),$(e).sortable({items:`div.states`,handle:`.icon-resize-vertical`,containment:`parent`,axis:`y`,update:O}),t(`${h}Add`).addEventListener(`click`,k),t(`${h}Restore`).addEventListener(`click`,A),t(`${h}Replace`).addEventListener(`click`,j),b(),$(`#${h}`).dialog({title:`Правила рельефа`,width:`fit-content`,resizable:!1,position:g,close:()=>i(h)})}function b(){let n=t(`${h}Body`),i=(e,t,n)=>`<input type="number" data-field="${e}" value="${t??``}" ${n} />`,a=(e,{min:t,max:n},r)=>`${i(`${e}.min`,t,r)}–${i(`${e}.max`,n,r)}`;n.innerHTML=options.map.relief.rules.map((t,n)=>`<div class="states" data-index="${n}">
+      <span data-col="reorder" data-tip="Тяните, чтобы проверять правило раньше или позже" class="icon-resize-vertical"></span>
+      <div data-col="name"><input data-field="name" value="${e(t.name)}" data-tip="Название правила" /></div>
+      <div data-col="height" data-tip="Диапазон высот: ${r(t.height.min)} — ${r(t.height.max)}">${a(`height`,t.height,`min="20" max="100" step="1"`)}</div>
+      <div data-col="temperature" data-tip="Диапазон температур в °C. Пустая граница — открытая">${a(`temperature`,t.temperature,`step="1" placeholder="любой"`)}</div>
+      <div data-col="biomes"><span class="ruleBiomes pointer" data-tip="${e(`Biomes: ${m(t.biomes,pack.biomes)}. Click to change`)}">${x(t)}</span></div>
+      <div data-col="size" data-tip="Размер иконки на минимальной высоте, растёт с высотой до второго значения">${a(`size`,t.size,`min="0.1" step="0.1"`)}</div>
+      <div data-col="relief">${l(t.icons,t.density,`rulePool`)}</div>
+      <span data-col="remove" data-tip="Удалить правило" class="icon-trash-empty"></span>
+    </div>`).join(``)||`<p class="empty">Правил нет: вся суша берёт пул рельефа своего биома</p>`,u(n,styles.relief.options.set)}var x=({biomes:e})=>e?.length?e.length===1?pack.biomes[e[0]]?.name??`1 biome`:`${e.length} biomes`:`all`,S=e=>options.map.relief.rules[Number(e.closest(`.states`)?.dataset.index)],C=()=>{Options.save(),b()};function w(e){let t=S(e),r=e.dataset.field;if(!(!t||!r)){if(r===`name`)t.name=e.value.trim()||t.name;else{let[i,a]=r.split(`.`),o=e.value===``?null:Number(e.value);i===`temperature`?t.temperature[a]=o===null?null:Math.round(o):i===`height`&&o!==null?t.height[a]=n(Math.round(o),20,100):i===`size`&&o&&(t.size[a]=Math.max(.1,o)),T(t[i],a)}C()}}function T(e,t){let{min:n,max:r}=e;n===null||r===null||n<=r||(t===`min`?e.max=n:e.min=r)}function E(e){let t=S(e);t&&(e.closest(`.rulePool`)?f.open({rule:t,onApply:b}):e.closest(`.ruleBiomes`)?D(t):e.classList.contains(`icon-trash-empty`)&&(options.map.relief.rules.splice(options.map.relief.rules.indexOf(t),1),C()))}function D(e){p({title:`Ограничить правило`,heading:`Biomes the ${e.name} rule claims`,items:pack.biomes,allowed:e.biomes,onApply:t=>{t.length?e.biomes=t:delete e.biomes,C()}})}function O(){let e=options.map.relief.rules,n=t(`${h}Body`).querySelectorAll(`.states`);options.map.relief.rules=Array.from(n,t=>e[Number(t.dataset.index)]),C()}function k(){options.map.relief.rules.push({name:`New rule`,height:{min:50,max:100},temperature:{min:null,max:null},icons:{hill:{weight:1}},density:100,size:{min:8,max:12}}),C()}function A(){o({title:`Восстановить правила рельефа`,message:`Заменить правила рельефа стандартными холмами и горами?`,confirm:`Восстановить`,onConfirm:()=>{options.map.relief.rules=Relief.getDefaultRules(),C()}})}function j(){d(`the cells the rules claim`,e=>!!Relief.claim(e))}var M={open:y};export{M as ReliefRulesEditor};

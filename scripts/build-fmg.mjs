@@ -17,6 +17,16 @@ if (!existsSync(vite)) {
   process.exit(1);
 }
 
+/* Русский интерфейс подставляется плагином vite на этапе сборки, но словарь надо
+   проверить заранее: битый или рассинхронизированный ru.tsv не должен уехать в public/fmg. */
+const localeCheck = spawnSync(process.execPath, [join(vendor, 'locale', 'extract.mjs'), '--check'], {
+  cwd: vendor,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
+if (localeCheck.error) throw localeCheck.error;
+if (localeCheck.status !== 0) throw new Error('Проверка перевода Azgaar не пройдена, см. vendor/azgaar-fantasy-map-generator/locale/ru.tsv.');
+
 rmSync(output, { recursive: true, force: true });
 const result = spawnSync(
   vite,

@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
+import { russianLocale } from "./locale/plugin.mjs";
 
 /**
  * The desktop app ships the same renderer, minus the parts that only make sense on the web:
@@ -17,7 +18,8 @@ const stripWebOnlyTags = {
 export default ({ mode }: { mode: string }) => ({
   root: "./src",
   base: mode === "electron" ? "./" : process.env.NETLIFY ? "/" : "/Fantasy-Map-Generator/",
-  plugins: mode === "electron" ? [stripWebOnlyTags] : [],
+  // русский интерфейс подставляется в код на этапе сборки (см. locale/), поэтому он работает во всех режимах
+  plugins: [russianLocale(), ...(mode === "electron" ? [stripWebOnlyTags] : [])],
   build: {
     outDir: mode === "electron" ? "../dist-electron/renderer" : "../dist",
     assetsDir: "./",

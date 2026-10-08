@@ -142,7 +142,7 @@ const fmgStyleResponse = await fetch(`${HUB}/fmg/styles/night.json`);
 const fmgWorkerResponse = await fetch(`${HUB}/fmg/sw.js`);
 const mirWorkerResponse = await fetch(`${HUB}/sw.js`);
 const mirWorker = mirWorkerResponse.ok ? await mirWorkerResponse.text() : '';
-ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && fmgHtml.includes('MIR — Azgaar Fantasy Map Generator'));
+ok('сервер раздаёт полноэкранный Azgaar FMG и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>MIR — [^<]*(?:Azgaar|Azgaar|карт)[^<]*<\/title>/i.test(fmgHtml));
 ok('веб-редактор получает MIR-тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
 ok('FMG не регистрирует вложенный worker, общий worker MIR обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
 
@@ -152,9 +152,11 @@ const webIndex = readFileSync(fromRoot('dist/index.html'), 'utf8');
 const webScriptPath = webIndex.match(/<script type="module"[^>]*src="([^"]+)"/)?.[1]?.replace(/^\//, '');
 if (!webScriptPath) throw new Error('В dist/index.html не найден входной модуль веб-сборки');
 const webCode = readFileSync(fromRoot(`dist/${webScriptPath}`), 'utf8');
+/* Подстановка — функцией: минифицированный код полон `$`, а строковая замена
+   развернула бы `$&` и `` $` `` в чужой HTML, и скрипт не собрался бы. */
 const webMarkup = webIndex
   .replace(/<script type="module"[^>]*src="[^"]+"[^>]*><\/script>/, '')
-  .replace('</body>', `<script>${webCode.replaceAll('</script', '<\\/script')}</script>\n  </body>`);
+  .replace('</body>', () => `<script>${webCode.replaceAll('</script', '<\\/script')}</script>\n  </body>`);
 const webDom = new JSDOM(webMarkup, {
   runScripts: 'dangerously',
   url: `${HUB}/?fmg-smoke=${Date.now()}`,
@@ -187,6 +189,13 @@ try {
   const inputSeed = webWindow.document.querySelector('[data-world-setting="seed"]')?.value;
   const frameSeed = fmgFrame && new URL(fmgFrame.getAttribute('src'), webWindow.location.href).searchParams.get('seed');
   ok('Azgaar открывается поверх атласа с тем же seed и блокирует фон', Boolean(fmgOverlay && fmgFrame) && !fmgOverlay.hidden && inputSeed === frameSeed && worldApp?.hasAttribute('inert'));
+  const fmgHeading = fmgOverlay?.querySelector('.world-fmg-heading');
+  ok(
+    'шапка редактора — только seed и возврат, без описаний и заголовков',
+    Boolean(fmgHeading) && !fmgHeading.querySelector('h3') && !fmgHeading.querySelector('.world-fmg-description')
+      && fmgHeading.querySelector('[data-role="world-fmg-seed"]') !== null
+      && Boolean(fmgHeading.querySelector('[data-action="world-fmg-back"]'))
+  );
   webClick('[data-action="world-fmg-back"]');
   ok('возврат прячет FMG, не выгружая iframe', fmgOverlay?.hidden && webWindow.document.querySelector('[data-role="world-fmg-frame"]') === fmgFrame && !worldApp?.hasAttribute('inert'));
   webClick('[data-action="world-fmg-open"]');
@@ -207,61 +216,27 @@ await wait(60);
 ok('кнопка «Играть» открывает отдельную полноэкранную страницу, не модальное окно', !!$('#world-page-root .world-app') && !$('.dialog--world') && window.document.body.classList.contains('world-page-open'));
 ok('однофайловая копия не показывает путь к неупакованному Azgaar', !$('[data-action="world-fmg-open"]'));
 ok('игровая страница отражена в адресе и истории браузера', window.location.hash === '#play');
-ok('генератор предлагает seed, континенты, ландшафт, климат и размер блока', !!$('[data-world-setting="seed"]') && !!$('[data-world-setting="continents"]') && !!$('[data-world-setting="landscape"]') && !!$('[data-world-setting="climate"]') && !!$('[data-world-setting="voxelSize"]'));
-ok('минимальная площадь мира больше площади Земли', /2,00×/.test($('[data-world-stat="ratio"]')?.textContent || ''));
-ok('предпросмотр включает слои карты и параметры цивилизаций', !!$('[data-action="world-layer"][data-layer="politics"]') && !!$('[data-world-stat="states"]') && !!$('[data-world-stat="settlements"]'));
+/* Правила мира теперь живут в Azgaar: на экране создания остаются seed,
+   подсказка о нём и кнопка генератора — больше настройок тут нет. */
+ok(
+  'экран создания карты даёт seed, кнопку генератора и отсылку к Azgaar',
+  !!$('[data-world-setting="seed"]') && !!$('[data-action="world-generate"]')
+    && /Azgaar/.test($('.world-config .world-field__hint')?.textContent || '')
+    && !$('[data-world-setting="continents"]') && !$('[data-world-setting="climate"]')
+);
 const seedBeforeRandom = $('[data-world-setting="seed"]').value;
 click('[data-action="world-random-seed"]');
-ok('кнопка выдаёт новый seed и обновляет предпросмотр', seedBeforeRandom !== $('[data-world-setting="seed"]')?.value);
-$('[data-world-setting="climate"]').value = 'arid';
-$('[data-world-setting="climate"]').dispatchEvent(new window.Event('change', { bubbles: true }));
-ok('выбранный климат отображается в атласе', /засушливый/.test($('.world-preview .world-tag')?.textContent || ''));
-$('[data-world-setting="continents"]').value = '5';
-$('[data-world-setting="continents"]').dispatchEvent(new window.Event('change', { bubbles: true }));
-ok('предпросмотр обновляет выбранное число материков', /5 материков/.test($('.world-preview .world-tag')?.textContent || ''));
-click('[data-action="world-layer"][data-layer="height"]');
-ok('слои атласа переключаются без перегенерации seed', $('[data-action="world-layer"][data-layer="height"]')?.getAttribute('aria-pressed') === 'true');
+ok('кнопка выдаёт новый seed', seedBeforeRandom !== $('[data-world-setting="seed"]')?.value);
 click('[data-action="world-generate"]');
 await wait(60);
-ok('генерация показывает полевой атлас, мини-карту и локальный voxel-чанк', !!$('#world-page-root [data-role="world-focus-map"]') && !!$('[data-role="world-map"]') && !!$('[data-role="world-viewport"]') && !!$('[data-role="world-biome"]'));
-ok('созданы государства, поселения и панель разведданных', /Стратегические ресурсы/.test($('[data-role="world-state-details"]')?.textContent || '') && !!$('[data-role="world-map-facts"]'));
-const worldPositionBefore = $('[data-role="world-position"]')?.textContent;
-click('[data-action="world-move"][data-dx="1"][data-dz="0"]');
-ok('кнопка камеры перемещает обзор по миру', worldPositionBefore !== $('[data-role="world-position"]')?.textContent);
-const viewport = $('[data-role="world-viewport"]');
-viewport.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 560, right: 900, bottom: 560 });
-const pointer = (canvas, type, x, y) => {
-  const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
-  Object.defineProperty(event, 'pointerId', { value: 1 });
-  (type === 'pointerdown' || type === 'pointerup' ? canvas : window.document).dispatchEvent(event);
-};
-const positionBeforeDrag = $('[data-role="world-position"]')?.textContent;
-pointer(viewport, 'pointerdown', 300, 300);
-pointer(viewport, 'pointermove', 380, 300);
-pointer(viewport, 'pointerup', 380, 300);
-ok('перетаскивание воксельной сцены панорамирует камеру как в RTS', positionBeforeDrag !== $('[data-role="world-position"]')?.textContent);
-const focusMap = $('[data-role="world-focus-map"]');
-focusMap.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1200, height: 750, right: 1200, bottom: 750 });
-const mapPositionBeforeDrag = $('[data-role="world-position"]')?.textContent;
-pointer(focusMap, 'pointerdown', 300, 300);
-pointer(focusMap, 'pointermove', 380, 340);
-pointer(focusMap, 'pointerup', 380, 340);
-ok('перетаскивание основной карты меняет сектор камеры', mapPositionBeforeDrag !== $('[data-role="world-position"]')?.textContent);
-const mapZoomBeforeWheel = $('[data-role="world-map-zoom"]')?.textContent;
-focusMap.dispatchEvent(new window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120, clientX: 500, clientY: 320 }));
-ok('колесо мыши масштабирует карту вокруг курсора', mapZoomBeforeWheel !== $('[data-role="world-map-zoom"]')?.textContent);
-const zoomBeforeWheel = $('[data-role="world-zoom"]')?.textContent;
-viewport.dispatchEvent(new window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 }));
-ok('колесо мыши отдельно приближает воксельную сцену', zoomBeforeWheel !== $('[data-role="world-zoom"]')?.textContent);
-click('[data-action="world-camera-home"]');
-ok('кнопка возврата центрирует камеру и восстанавливает масштаб', $('[data-role="world-zoom"]')?.textContent === '100%' && $('[data-role="world-map-zoom"]')?.textContent === '210%');
-click('[data-action="world-layer"][data-layer="politics"]');
-ok('в полном атласе отображается слой государств', $('[data-action="world-layer"][data-layer="politics"]')?.getAttribute('aria-pressed') === 'true');
-click('[data-action="world-save"]');
-ok('мир сохраняется на устройстве', !!window.localStorage.getItem('mir-world-last-save'));
-ok('отрисовка Canvas прошла без ошибок', errors.length === 0, errors.join(' | '));
-click('[data-action="world-new"]');
-ok('кнопка нового мира возвращает к полноэкранным настройкам', !!$('#world-page-root .world-preview') && !$('#world-page-root [data-role="world-focus-map"]'));
+/* Атлас строится из карты Azgaar: в jsdom редактора нет, так что здесь важно
+   одно — кнопка не должна обещать то, чего в однофайловой копии нет.
+   Сама генерация проверена в `npm run test:world`. */
+ok(
+  'в однофайловой копии кнопка не открывает редактор и не ломает экран',
+  !$('[data-role="world-fmg-overlay"]') && !!$('[data-action="world-generate"]') && !!$('#world-page-root .world-app')
+);
+ok('ошибок отрисовки нет', errors.length === 0, errors.join(' | '));
 click('[data-action="world-exit"]');
 await wait(50);
 ok('возврат закрывает игровую страницу и показывает меню', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open') && !!$('.shell'));

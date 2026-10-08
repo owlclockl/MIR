@@ -577,10 +577,10 @@ const TEMPLATE = /* html */ `
           id="zoomExtentMin" data-option="zoomExtentMin"
           class="paired"
           type="number"
-          min=".2"
-          step=".1"
+          min=".01"
+          step=".01"
           max="20"
-          value="1"
+          value="0.1"
         />
         <span data-tip="Maximum possible zoom level (should be > 1)">max</span>
         <input
@@ -589,8 +589,9 @@ const TEMPLATE = /* html */ `
           class="paired"
           type="number"
           min="1"
-          max="50"
-          value="20"
+          max="200"
+          step="1"
+          value="150"
         />
       </td>
       <td>
