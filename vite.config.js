@@ -5,6 +5,8 @@
             установщик .exe.
    single — `npm run single` → mir.html: один файл, где JS и стили внутри
             HTML; открывается двойным кликом, едет в .apk и на флешке.
+            Редактор карт Azgaar вшивается в него отдельной сборкой
+            (scripts/lib/fmg-offline.mjs), поэтому нужен `npm run fmg:install`.
             Запускается программно с `write: false` — см. scripts/lib/build.mjs.
 
    Никаких правил «допиши версию в четырёх местах»: версия берётся из
@@ -24,12 +26,10 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
 
   return {
-    /* Версия доступна коду как __APP_VERSION__. Полный редактор Azgaar
-       подключается только в web/PWA: однофайловый mir.html не зависит от
-       каталога public/fmg и остаётся пригоден для file://. */
+    /* Версия доступна коду как __APP_VERSION__. Карта мира — Azgaar в обеих
+       сборках: в web/PWA он берётся из public/fmg, в mir.html вшит целиком. */
     define: {
       __APP_VERSION__: JSON.stringify(version),
-      __MIR_AZGAAR_AVAILABLE__: JSON.stringify(!single),
     },
 
     /* В однофайловой сборке каталога рядом нет: иконки и манифест там не

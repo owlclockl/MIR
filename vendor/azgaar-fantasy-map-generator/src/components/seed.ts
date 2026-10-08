@@ -2,6 +2,7 @@
 import { alertDialog } from "@/components/dialog/dialog-helpers";
 import { Pins } from "@/components/pins";
 import { tip } from "@/components/tooltips";
+import { pageURL } from "@/services/embed";
 import { ensureEl } from "@/utils/nodeUtils";
 import { generateSeed } from "@/utils/probabilityUtils";
 
@@ -9,10 +10,10 @@ export function setSeed(precreatedSeed?: string): void {
   if (precreatedSeed) options.map.seed = precreatedSeed;
   else {
     const isFirstMap = !mapHistory.length;
-    const urlSeed = new URL(window.location.href).searchParams.get("seed");
+    const urlSeed = pageURL().searchParams.get("seed");
 
     if (isFirstMap && urlSeed) {
-      const isMfcgSeed = new URL(window.location.href).searchParams.get("from") === "MFCG" && urlSeed.length === 13;
+      const isMfcgSeed = pageURL().searchParams.get("from") === "MFCG" && urlSeed.length === 13;
       options.map.seed = isMfcgSeed ? urlSeed.slice(0, -4) : urlSeed;
     } else options.map.seed = generateSeed();
   }

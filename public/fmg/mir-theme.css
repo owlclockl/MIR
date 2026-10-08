@@ -160,6 +160,31 @@ div.tab {
   border-color: var(--mir-line);
 }
 
+/* Пустая строка подсказок без рамки и фона: иначе две линии рамки висят
+   внизу карты. Текст подсказки задаёт свой фон встроенным стилем — там правило
+   не действует, потому что у строки уже есть содержимое. */
+#tooltip:empty {
+  border-color: transparent;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+/* Пульс у кнопки меню («Click to show the Menu») — золотом палитры,
+   а не алым цветом Azgaar. Отдельное имя анимации: порядок стилей не важен. */
+#optionsTrigger.glow {
+  animation: mir-glowing 3s infinite ease-in-out;
+}
+
+@keyframes mir-glowing {
+  0%,
+  100% {
+    box-shadow: 0 0 1px rgba(216, 193, 132, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(216, 193, 132, 0.7);
+  }
+}
+
 /* ── Экранные размеры: заставка и подсказки ───────────────────────────────────
    upstream задал шрифт заголовка в 7em — на телефоне он не влезает совсем. */
 #loading > #loading-typography {

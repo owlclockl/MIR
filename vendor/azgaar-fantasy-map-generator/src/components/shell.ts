@@ -5,6 +5,7 @@ import { Pins } from "@/components/pins";
 import { showDataTip } from "@/components/tooltips";
 import { Controllers } from "@/controllers";
 import { Services } from "@/services";
+import { isEmbedded } from "@/services/embed";
 import { isElectron, isLocalhost } from "@/services/platform";
 import { ensureEl, findEl } from "@/utils";
 import { fitMapToScreen } from "./canvas";
@@ -146,7 +147,7 @@ function initTourPromptButton(): void {
 
 /** The app is a static site, but it fetches assets: opening index.html from disk cannot work */
 export function warnIfServerless(): boolean {
-  if (location.hostname) return false;
+  if (location.hostname || isEmbedded()) return false;
 
   const wiki = "https://github.com/Azgaar/Fantasy-Map-Generator/wiki/Run-FMG-locally";
   alertDialog({

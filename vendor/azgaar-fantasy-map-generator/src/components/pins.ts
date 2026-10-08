@@ -2,6 +2,7 @@
 
 import { pinSchemas } from "@/components/options-schema";
 import { tip } from "@/components/tooltips";
+import { pageURL } from "@/services/embed";
 import { safeParseJSON } from "@/utils/stringUtils";
 
 const STORAGE_KEY = "fmg-locks";
@@ -11,7 +12,7 @@ const UNLOCKED_TIP = "Click to unlock the option and allow it to be randomized o
 class PinStore {
   /** `?options=default` asks for the map a fresh browser would make, so every pin is ignored */
   get ignored(): boolean {
-    return new URL(window.location.href).searchParams.get("options") === "default";
+    return pageURL().searchParams.get("options") === "default";
   }
 
   /** Every pin, straight from `localStorage`, which is untrusted like any other stored object */

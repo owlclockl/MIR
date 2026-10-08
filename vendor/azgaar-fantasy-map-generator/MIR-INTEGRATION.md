@@ -5,7 +5,7 @@ The civilization of the sages includes the complete web source and static assets
 ## Adaptations for The civilization of the sages
 
 - The full editor is hosted at `/fmg/` and shown from the full-screen world studio, not opened in a small dialog.
-- The current world seed is passed as Azgaar's `?seed=` parameter. Azgaar saves its maps/options in its own browser storage; export a map from its editor to keep or share it.
+- The world seed, width and height are passed in the query: `?seed=…&width=…&height=…&options=default`. `options=default` ignores the editor's saved browser options, so a slot always opens the same map. Maps saved from the editor are Azgaar `.map` files; a MIR slot does not keep them.
 - The first map uses Azgaar's built-in `night` style. UI controls use a forest-green / warm-gold palette from `public/mir-theme.css`; other map styles remain selectable in the editor.
 - The nested Azgaar service worker is disabled under `/fmg/`. The root service worker caches the full editor offline, avoids conflicting worker scopes, and avoids the upstream Workbox CDN request. The `electron` Vite mode also removes upstream Google Analytics from the built page.
 - The Azgaar interface is fully localized into Russian by a build-time substitution layer (`locale/`), described below. The game wrapper, navigation, seed hand-off and attribution are Russian as well.
@@ -23,7 +23,7 @@ The civilization of the sages includes the complete web source and static assets
   own `index.css` is not touched, so an Azgaar sync stays conflict-free.
 - The upstream **About** tab is removed: its button, content pane, `components/app-info.ts`, `components/options/tabs/about-tab.ts`, `data/supporters.ts`, the two palette commands (`Open About Tab`, `Show App Info`), the F1 hotkey branch and the two tour steps that pointed at it. The "Interactive Tour" and "Desktop App" buttons lived inside that tab and are gone with it; the tour itself is kept and starts from the Options tab.
 
-These are integration changes, not a rewrite of Azgaar's map-generation model. The voxel atlas remains a separate generator; the same seed opens a deterministic Azgaar map, but the two engines do not convert each other's geometry or game state.
+These are integration changes, not a rewrite of Azgaar's map-generation model. MIR has no map generator of its own: the same seed and size always open the same Azgaar map, and a MIR slot keeps only those two values.
 
 ## Russian interface
 
@@ -58,6 +58,26 @@ Deliberately not localized: `docs/wiki` and the in-app Knowledge Base, Changelog
 Quick-Start chunks, heightmap documentation, and map labels plus generated place names, which
 stay in Latin script because they are saved into map files.
 
+## Embedding in mir.html
+
+`mir.html` carries the editor as a `srcdoc` frame. The editor's HTML is stored once, as a JSON string in `<script type="application/json" id="mir-fmg-template">`, and the game fills in the load parameters at runtime:
+
+- MIR builds `iframe.srcdoc` from the template and replaces `__FMG_QUERY__` with the JSON-encoded query string (`?seed=…&width=…&height=…&options=default`; `<` is escaped as `\u003c`).
+- Inside that frame, `src/services/embed.ts` sees `globalThis.MIR_FMG_HOST = { query }`. `isEmbedded()` returns true, and `pageURL()` reads the query from that object, because a srcdoc frame has no address of its own.
+- Behaviour that changes in embedded mode:
+  - `seed.ts` takes the seed from the query.
+  - `url-params.ts` takes `width` and `height`, which set `options.map.graph`.
+  - `pins.ts`: `options=default` ignores the editor's stored browser options, so the map depends only on seed and size.
+  - `shell.ts`: `warnIfServerless()` does not show the "run it from a server" alert on `file://`.
+  - `versioning.ts`: `announceVersion()` does nothing, so the upstream version window does not appear.
+- The web/PWA build has no template. There the editor is the standalone page `/fmg/index.html`, loaded through `src` with the same query.
+
+Build: `scripts/lib/fmg-offline.mjs` builds this package with `scripts/lib/fmg-offline.config.mjs` (mode `electron`, base `./`, one IIFE bundle), assembles the template and embeds it into `mir.html` from `scripts/lib/build.mjs`. The single-file budget is 30 MiB and the editor CSS budget is 280 KB (`scripts/lib/verify-build.mjs`). The vendor's dependencies must be installed first (`npm run fmg:install`).
+
+Player restriction: `src/game/azgaar.js` injects `PLAYER_CSS` into the frame after `load`. It hides `#optionsContainer`, `#exitCustomization`, `#notes`, `#assistantBubble`, `#tourPromptButton`, `#customizationMenu`, `#dialogs` and `.ui-dialog`. This is an interface limit, not access control: direct actions on the map are not blocked.
+
+Upstream behaviour, observed and not changed: after saving a map with `.map` and loading it back, the grid heights were identical, but 1487 of 8452 packed-cell heights differed by 1 to 8 units. Cell, burg, state and river counts and burg names matched. The loader recomputes the packed graph from the grid (`src/services/io/load.ts`), and the river step, which also edits packed heights (`src/generators/river-generator.ts`), is not replayed on load. This was read from the code and not checked against an unmodified upstream build.
+
 ## Rebuilding the vendored editor
 
 The already-built static app in `public/fmg/` is committed, so ordinary `npm ci` + `npm run build` do not need Azgaar's development dependencies. To rebuild after editing vendored source, use Node 24 or newer (upstream engine requirement):
@@ -68,4 +88,4 @@ npm run fmg:build
 npm run build
 ```
 
-`fmg:install` installs only the vendored package's lockfile; its `node_modules/` is ignored by Git. `fmg:build` first verifies the Russian dictionary (`node locale/extract.mjs --check`), then emits a Vite production build with base `/fmg/` and omits the nested `sw.js`. The root product service worker includes every generated file in its content fingerprint and offline precache. The stand-alone `mir.html` intentionally stays a one-file product and does not embed the 22 MiB editor; its native atlas remains available there.
+`fmg:install` installs only the vendored package's lockfile; its `node_modules/` is ignored by Git. `fmg:build` first verifies the Russian dictionary (`node locale/extract.mjs --check`), then emits a Vite production build with base `/fmg/` and omits the nested `sw.js`. The root product service worker includes every generated file in its content fingerprint and offline precache. The stand-alone `mir.html` (and the APK and EXE built from it) embeds this same editor through `scripts/lib/fmg-offline.mjs`; see the section above. After a vendor change, `npm run single` rebuilds the embedded copy from the vendor source, so it needs the vendor dependencies installed.

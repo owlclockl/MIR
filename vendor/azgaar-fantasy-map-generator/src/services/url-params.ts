@@ -10,12 +10,13 @@ import { tip } from "@/components/tooltips";
 import { zoomTo } from "@/components/zoom";
 import type { Burg } from "@/generators/burgs-generator";
 import { Services } from "@/services";
+import { pageURL } from "@/services/embed";
 import { getRequestedMapSize } from "@/services/map-size";
 import { ensureEl } from "@/utils/nodeUtils";
 
 const MAP_LINK_PATTERN = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/;
 
-const searchParams = () => new URL(window.location.href).searchParams;
+const searchParams = () => pageURL().searchParams;
 
 /** Decide what to put on screen on start-up: a linked map, a stored map, or a fresh one */
 export async function checkLoadParameters(): Promise<void> {
