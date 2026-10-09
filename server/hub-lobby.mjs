@@ -8,6 +8,17 @@
      по WebSocket → хаб запоминает последний кадр и пересылает его
      остальным участникам → игроки загружают карту в редактор.
 
+   Два вида кадров, оба шлёт только мастер:
+   — «map» — полная карта .map. Хранится в памяти и уходит тем, кто
+     вошёл позже. Игрок применяет её целиком (разбор занимает секунды),
+     поэтому во время правки она идёт редко: после генерации и в конце
+     сеанса правок;
+   — «live» — лёгкий снимок отрисованной карты (SVG) для живого
+     предпросмотра. Не хранит состояние игры и не применяется как карта:
+     игрок показывает его поверх своей карты без перезагрузки, поэтому
+     правки мастера видны почти сразу. Хранится только последний снимок,
+     чтобы вошедший позже сразу видел, что происходит.
+
    Что здесь главное:
    — правит только мастер: кадр от игрока хаб отбрасывает, и это
      проверяет сервер, а не интерфейс (панели скрыты лишь стилем);
@@ -24,13 +35,21 @@
    WebSocketPair внутри Durable Object. Правило то же, что у ядра:
    никаких node:* модулей.
 
-   Кадр карты (бинарный): [u32 длина заголовка][JSON-заголовок][gzip .map].
-   Заголовок: { t:'map', lobbyId, seed, width, height, enc:'gzip' }.
+   Кадр (бинарный): [u32 длина заголовка][JSON-заголовок][gzip-данные].
+   Заголовок карты: { t:'map', lobbyId, seed, width, height, enc:'gzip' }.
+   Заголовок снимка: { t:'live', lobbyId, vw, vh, enc:'gzip' }.
    =========================================================== */
 
 export const LOBBY_MAX_MEMBERS = 8;
 /* Кадр с картой: .map сжатый gzip — обычно сотни килобайт, с запасом до 16 МБ. */
 export const LOBBY_MAX_MAP_BYTES = 16 * 1024 * 1024;
+/* Снимок предпросмотра: сжатый SVG — обычно десятки–сотни килобайт. */
+export const LOBBY_MAX_LIVE_BYTES = 6 * 1024 * 1024;
+/* Снимки идут потоком во время правок, поэтому ограничены ещё и по частоте:
+   клиент тормозит сам, а это страховка от клиента, который про лимит не знает.
+   Лишние снимки молча пропадают — это не ошибка, следующий дойдёт. */
+const LIVE_WINDOW_MS = 2_000;
+const LIVE_PER_WINDOW = 8;
 const LOBBY_IDLE_MS = 10 * 60_000;
 const INVITE_TTL_MS = 15 * 60_000;
 const AUTH_DEADLINE_MS = 10_000;
@@ -122,6 +141,10 @@ export function createLobbies({
   const invites = new Map();
   /* Последний кадр карты лобби: lobbyId → { seq, bytes, at }. */
   const frames = new Map();
+  /* Последний живой снимок предпросмотра: lobbyId → { bytes, at, vw, vh }. */
+  const liveFrames = new Map();
+  /* Окно частоты снимков: lobbyId → { at, count }. */
+  const liveWindow = new Map();
   /* Когда в лобби в последний раз кто-то был онлайн: lobbyId → ms. После
      перезапуска записей нет: отсчёт тогда ведём от момента запуска, а не от
      даты создания — иначе хаб сразу снёс бы лобби, участники которого ещё
@@ -154,6 +177,7 @@ export function createLobbies({
       })),
     role: selfId === lobby.masterId ? 'master' : 'player',
     hasMap: frames.has(lobby.id),
+    live: liveFrames.has(lobby.id),
   });
 
   const invitesOf = (userId) =>
@@ -203,6 +227,8 @@ export function createLobbies({
     const members = [...lobby.members];
     db.lobbies = db.lobbies.filter((item) => item.id !== lobby.id);
     frames.delete(lobby.id);
+    liveFrames.delete(lobby.id);
+    liveWindow.delete(lobby.id);
     activity.delete(lobby.id);
     needMapAt.delete(lobby.id);
     for (const id of members) {
@@ -527,6 +553,7 @@ export function createLobbies({
       return;
     }
     const frame = frames.get(lobby.id);
+    const live = liveFrames.get(lobby.id);
     sendTo(
       conn,
       JSON.stringify({
@@ -537,16 +564,21 @@ export function createLobbies({
         role: lobby.masterId === state.userId ? 'master' : 'player',
       }),
     );
-    if (frame) {
-      sendTo(conn, frame.bytes);
-    } else if (lobby.masterId !== state.userId) {
-      /* Карты ещё нет — просим мастера прислать её. Несколько игроков, зашедших
-         подряд, дают один запрос: мастер и так пришлёт карту всем сразу. */
-      const t = now();
-      if (t - (needMapAt.get(lobby.id) ?? -Infinity) >= NEED_MAP_EVERY_MS) {
-        needMapAt.set(lobby.id, t);
-        sendUser(lobby.masterId, JSON.stringify({ t: 'need-map', lobbyId: lobby.id }));
+    if (frame) sendTo(conn, frame.bytes);
+    /* Живой снимок идёт после карты: он либо новее её, либо равен по смыслу.
+       Вошедший сразу видит предпросмотр и не ждёт очередную полную карту. */
+    if (live && (!frame || live.at > frame.at)) sendTo(conn, live.bytes);
+    if (!frame) {
+      if (lobby.masterId !== state.userId) {
+        /* Карты ещё нет — просим мастера прислать её. Несколько игроков, зашедших
+           подряд, дают один запрос: мастер и так пришлёт карту всем сразу. */
+        const t = now();
+        if (t - (needMapAt.get(lobby.id) ?? -Infinity) >= NEED_MAP_EVERY_MS) {
+          needMapAt.set(lobby.id, t);
+          sendUser(lobby.masterId, JSON.stringify({ t: 'need-map', lobbyId: lobby.id }));
+        }
       }
+      /* А если снимок есть — он уже ушёл выше: мастер, наверное, правит карту. */
     }
   };
 
@@ -605,16 +637,21 @@ export function createLobbies({
       sendTo(conn, JSON.stringify({ t: 'error', message: 'Карту может присылать только мастер лобби.' }));
       return;
     }
+    const header = parseMapFrame(bytes);
+    if (!header || header.lobbyId !== lobby.id || header.enc !== 'gzip') {
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Кадр карты повреждён.' }));
+      return;
+    }
+    if (header.t === 'live') return handleLiveFrame(conn, state, lobby, header, bytes);
+    if (header.t !== 'map') {
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Кадр карты повреждён.' }));
+      return;
+    }
     if (bytes.byteLength > LOBBY_MAX_MAP_BYTES) {
       sendTo(conn, JSON.stringify({ t: 'error', message: 'Карта слишком большая для лобби.' }));
       return;
     }
-    const header = parseMapFrame(bytes);
     if (
-      !header ||
-      header.t !== 'map' ||
-      header.lobbyId !== lobby.id ||
-      header.enc !== 'gzip' ||
       typeof header.seed !== 'string' ||
       header.seed.length > MAX_SEED ||
       !sizeAllowed(header.width, header.height)
@@ -623,8 +660,9 @@ export function createLobbies({
       return;
     }
     const seq = (frames.get(lobby.id)?.seq ?? 0) + 1;
-    frames.set(lobby.id, { seq, bytes, at: now() });
-    activity.set(lobby.id, now());
+    const at = now();
+    frames.set(lobby.id, { seq, bytes, at });
+    activity.set(lobby.id, at);
     /* Мастер мог сменить seed или размер прямо в редакторе Azgaar —
        лобби должно показывать ту карту, которая реально идёт. */
     const paramsChanged =
@@ -647,6 +685,38 @@ export function createLobbies({
       }
     }
     sendTo(conn, JSON.stringify({ t: 'ack', seq, delivered }));
+  };
+
+  /* Живой снимок: сохраняем только последний, пересылаем остальным без
+     подтверждения. Частоту ограничивает окно; лишние молча пропадают —
+     снимок это предпросмотр, потеря одного не ломает синхронизацию. */
+  const handleLiveFrame = (conn, state, lobby, header, bytes) => {
+    if (bytes.byteLength > LOBBY_MAX_LIVE_BYTES) {
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Снимок предпросмотра слишком большой.' }));
+      return;
+    }
+    const vw = Math.trunc(Number(header.vw));
+    const vh = Math.trunc(Number(header.vh));
+    if (!(vw >= 1 && vw <= 16384 && vh >= 1 && vh <= 16384)) {
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Кадр предпросмотра повреждён.' }));
+      return;
+    }
+    const t = now();
+    const window = liveWindow.get(lobby.id);
+    if (!window || t - window.at > LIVE_WINDOW_MS) {
+      liveWindow.set(lobby.id, { at: t, count: 1 });
+    } else {
+      window.count += 1;
+      if (window.count > LIVE_PER_WINDOW) return;
+    }
+    liveFrames.set(lobby.id, { bytes, at: t, vw, vh });
+    activity.set(lobby.id, t);
+    for (const id of lobby.members) {
+      if (id === state.userId) continue;
+      for (const other of online.get(id) ?? []) {
+        if (sockets.get(other)?.authed) sendTo(other, bytes);
+      }
+    }
   };
 
   const socket = {
@@ -716,6 +786,6 @@ export function createLobbies({
     forgetUser,
     sweep,
     tick,
-    stats: () => ({ lobbies: db.lobbies.length, sockets: sockets.size, frames: frames.size }),
+    stats: () => ({ lobbies: db.lobbies.length, sockets: sockets.size, frames: frames.size, live: liveFrames.size }),
   };
 }

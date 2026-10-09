@@ -15,6 +15,7 @@ import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
+import { seedArtOrIcon, seedArtSvg } from './ui/seed-art.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -1993,7 +1994,7 @@ const worldSlotCardHtml = (role, index, entry) => {
         <span class="world-slot-card__state world-slot-card__state--filled"><i aria-hidden="true"></i>Сохранён</span>
       </header>
       <div class="world-slot-card__plate" aria-hidden="true">
-        ${icon('map', 'icon--lg')}
+        ${seedArtOrIcon(entry.seed, `${role}-${index}`)}
         <span>${escapeHtml(size.label)}</span>
         <small>${entry.width} × ${entry.height}</small>
       </div>
@@ -2005,6 +2006,7 @@ const worldSlotCardHtml = (role, index, entry) => {
         <button class="mini-button mini-button--accent" type="button" data-action="world-slot-open" data-slot-index="${index}">
           ${icon(player ? 'eye' : 'play', 'icon--xs')}<span>${player ? 'Играть' : 'Вести карту'}</span>
         </button>
+        <button class="mini-button world-slot-copy" type="button" data-action="world-slot-copy-seed" data-seed="${escapeHtml(entry.seed)}" aria-label="Скопировать seed ${escapeHtml(entry.seed)}" title="Скопировать seed">${icon('copy', 'icon--xs')}</button>
         <button class="mini-button mini-button--danger world-slot-clear" type="button" data-action="world-slot-clear" data-slot-index="${index}" aria-label="Очистить слот ${index + 1}" title="Очистить слот">${icon('trash', 'icon--xs')}</button>
       </div>
     </article>`;
@@ -2091,6 +2093,7 @@ const worldSetupHtml = (session) => {
           <span class="world-seed-row">
             <input class="input input--code" type="text" maxlength="${store.WORLD_SEED_MAX}" autocomplete="off" spellcheck="false" data-role="world-seed" value="${escapeHtml(config.seed)}" />
             ${player ? '' : `<button class="icon-button icon-button--sm world-seed-random" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('dices', 'icon--xs')}</button>`}
+            <span class="world-seed-art" data-role="world-seed-art" title="Узор этого seed — настоящий мир построит Azgaar">${seedArtOrIcon(config.seed, 'setup')}</span>
           </span>
           <span class="world-field__hint">${player
             ? 'Seed выдаёт мастер. Введите его без изменений.'
@@ -2124,6 +2127,21 @@ const worldMapHtml = () => `
     <p class="world-attribution">${WORLD_ATTRIBUTION}</p>
   </div>`;
 
+/* Строка сеанса в верхней панели. Seed лобби берём из живого состояния хаба:
+   мастер мог построить новый мир, и панель обязана назвать актуальный мир. */
+const worldSessionInfo = (session) => {
+  if (!session) return '';
+  const { screen, slot, config } = session;
+  if (screen === 'slots') return 'ШЕСТЬ СЛОТОВ · ДВЕ РОЛИ';
+  if (screen === 'lobby') return 'ДО 8 ИГРОКОВ · ОДНА КАРТА';
+  if (session.lobby) {
+    const live = lobby.lobbyState().lobby;
+    const seed = live?.seed ?? config.seed;
+    return `КОД ${escapeHtml(session.lobby.code)} · SEED ${escapeHtml(seed || '—')}`;
+  }
+  return `${slot ? `СЛОТ ${slot.index + 1}` : 'НОВАЯ КАРТА'} · SEED ${escapeHtml(config.seed || '—')}`;
+};
+
 const worldPageHtml = () => {
   const session = ui.world;
   if (!session) return '';
@@ -2141,13 +2159,7 @@ const worldPageHtml = () => {
     map: session.lobby ? 'ОБЩАЯ КАРТА' : player ? 'РЕЖИМ ИГРОКА' : 'РЕЖИМ МАСТЕРА',
     lobby: 'ЛОББИ',
   };
-  const sessionInfo = screen === 'slots'
-    ? 'ШЕСТЬ СЛОТОВ · ДВЕ РОЛИ'
-    : screen === 'lobby'
-      ? 'ДО 8 ИГРОКОВ · ОДНА КАРТА'
-      : session.lobby
-        ? `КОД ${escapeHtml(session.lobby.code)} · SEED ${escapeHtml(config.seed || '—')}`
-        : `${slot ? `СЛОТ ${slot.index + 1}` : 'НОВАЯ КАРТА'} · SEED ${escapeHtml(config.seed || '—')}`;
+  const sessionInfo = worldSessionInfo(session);
   const backToSlots = screen === 'slots'
     ? ''
     : screen === 'map' && session.lobby
@@ -3329,6 +3341,11 @@ document.addEventListener('input', (event) => {
     ui.admin.requestQuery = event.target.value;
     renderModal({ focus: false });
   }
+  /* Узор мини-карты живёт вместе с seed: печатаете — узор меняется. */
+  if (role === 'world-seed' || role === 'lobby-seed') {
+    const art = event.target.closest('.world-seed-row')?.querySelector('[data-role="world-seed-art"]');
+    if (art) art.innerHTML = seedArtOrIcon(event.target.value.trim());
+  }
   if (role === 'admin-event-search') {
     ui.admin.eventQuery = event.target.value;
     renderModal({ focus: false });
@@ -3548,11 +3565,19 @@ const lobbyNewMap = async () => {
 const paintLobbyChip = () => {
   const session = ui.world;
   const chip = worldRoot()?.querySelector('[data-role="lobby-chip"]');
-  if (!chip || !session?.lobby) return;
-  const html = lobbyChipHtml(lobby.lobbyState(), session.lobby);
-  if (chip.dataset.html !== html) {
-    chip.innerHTML = html;
-    chip.dataset.html = html;
+  if (chip && session?.lobby) {
+    const html = lobbyChipHtml(lobby.lobbyState(), session.lobby);
+    if (chip.dataset.html !== html) {
+      chip.innerHTML = html;
+      chip.dataset.html = html;
+    }
+  }
+  /* Строка сеанса обновляется на месте: мастер мог построить новый мир,
+     и панель не должна показывать старый seed до полной перерисовки. */
+  const seedLine = worldRoot()?.querySelector('.world-topbar__seed');
+  if (seedLine && session?.open) {
+    const html = worldSessionInfo(session);
+    if (seedLine.innerHTML !== html) seedLine.innerHTML = html;
   }
 };
 
@@ -4267,6 +4292,12 @@ const actions = {
   'copy-code': async (el) => {
     const ok = await copyText(el.dataset.code);
     toast(ok ? `Код ${el.dataset.code} скопирован. Отправьте его другу.` : 'Не получилось скопировать — выделите код вручную.', ok ? 'ok' : 'error');
+  },
+
+  'world-slot-copy-seed': async (el) => {
+    const seed = el.dataset.seed || '';
+    const ok = await copyText(seed);
+    toast(ok ? `Seed ${seed} скопирован.` : 'Не получилось скопировать — выделите seed вручную.', ok ? 'ok' : 'error');
   },
 
   'regen-code': async () => {

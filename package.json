@@ -2,7 +2,7 @@
   "name": "mir-game-menu",
   "description": "The civilization of the sages — русскоязычная картографическая игра для создания и исследования миров.",
   "private": true,
-  "version": "0.9.5",
+  "version": "0.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -28,6 +28,8 @@
     "host:dev": "npm run build && npx --yes wrangler@4 dev",
     "host:logs": "npx --yes wrangler@4 tail",
     "doctor": "node scripts/doctor.mjs",
+    "skills": "node scripts/skills-sync.mjs",
+    "skills:check": "node scripts/skills-sync.mjs --check",
     "logs": "node -e \"import('node:fs').then(fs => console.log(fs.readFileSync('logs/mir-server.log','utf8')))\"",
     "test:p2p": "node scripts/test-p2p.mjs",
     "test:hub": "node scripts/test-hub.mjs",

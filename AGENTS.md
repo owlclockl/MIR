@@ -100,7 +100,10 @@ MIR/
 │  │  └─ update.js       проверка обновлений: новая сборка на сервере,
 │  │                     ожидание worker'а, применение и уведомления
 │  ├─ game/              встраивание Azgaar: iframe, seed и размер, ограничение игрока
-│  │  └─ azgaar.js       createEditorFrame: srcdoc из шаблона или /fmg/, PLAYER_CSS
+│  │  ├─ azgaar.js       createEditorFrame: srcdoc из шаблона или /fmg/, PLAYER_CSS
+│  │  ├─ lobby-sync.js   синхронизация лобби без перезагрузок: полная карта —
+│  │  │                  раз в сеанс правок, живые снимки — во время правок
+│  │  └─ map-frame.js    формат бинарных кадров лобби (карта и снимок)
 │  └─ ui/                интерфейсные мелочи
 │     ├─ icons.js        Lucide SVG-пак и helper icon()
 │     ├─ LUCIDE-LICENSE.txt  условия Lucide/Feather
@@ -115,8 +118,9 @@ MIR/
 │  │                     служебные маршруты панели (/api/admin/*):
 │  │                     снимок, блокировки, настройки, журнал событий;
 │  │                     подключает лобби (hub-lobby.mjs)
-│  ├─ hub-lobby.mjs      лобби и живая карта: состав в db.lobbies, кадр
-│  │                     карты только в памяти, сокетные обработчики
+│  ├─ hub-lobby.mjs      лобби и живая карта: состав в db.lobbies, кадры
+│  │                     карты и живого предпросмотра только в памяти,
+│  │                     сокетные обработчики
 │  ├─ ws.mjs             WebSocket для ПК (RFC 6455, без зависимостей, /api/ws)
 │  ├─ hub.mjs            адаптер для ПК: JSON-файл + node:http + ws.mjs
 │  └─ serve.mjs          статика + хаб + туннель для друзей
@@ -200,6 +204,11 @@ npm run test:avatar # выбор аватарки: поле выбора фай�
 npm run test:perf  # отзывчивость меню: разбор базы, перерисовки, анимации
 npm run test:build # артефакты сборки: ссылки, версия, кэш SW, бюджеты веса
 npm run test:spacing # отступы: шкала и совпадение полей однотипных блоков
+npm run test:lobby-client # клиент лобби против настоящего хаба: кадры карты,
+                   # живой предпросмотр, переподключение (нужен jsdom)
+npm run test:realtime # ядро лобби с подменённым временем: уборка, лимиты
+npm run skills    # обновить скиллы ИИ-агентов из GitHub (.agents/skills и .claude/skills)
+npm run skills:check # только сверить хеши с skills-lock.json
 ```
 
 `test:hub` принимает адрес: `npm run test:hub -- https://mir.имя.workers.dev`
@@ -234,6 +243,21 @@ npm run test:spacing # отступы: шкала и совпадение пол
 сети и хаба, ему нужен только тот же jsdom: он проверяет `src/ui/avatar.js` —
 то самое место, где в APK ломалось добавление аватарки. В обычной сборке этих
 зависимостей нет — скрипты нужны только разработчику.
+
+## Скиллы ИИ-агентов
+
+В `.agents/skills/` и `.claude/skills/` лежат одинаковые копии скиллов —
+инструкций, по которым ИИ-агент работает с проектом. Источники: `cloudflare/skills`
+(хаб, Workers, Durable Objects, производительность) и `anthropics/skills`
+(интерфейс — `frontend-design`, темы — `theme-factory`, проверка веб-приложений —
+`webapp-testing`). Замок `skills-lock.json` хранит sha256 файла `SKILL.md` на
+момент установки: `npm run skills:check` показывает, у каких скиллов источник
+ушёл вперёд, `npm run skills` скачивает свежие копии и переписывает замок.
+Новый скилл добавляется строкой в список `SOURCES` в `scripts/skills-sync.mjs`.
+
+При правках интерфейса сначала загляните в `frontend-design`, при работе с
+хабом и воркером — в `workers-best-practices` и `durable-objects`, при
+оптимизации загрузки — в `web-perf`.
 
 ## Договорённости
 
