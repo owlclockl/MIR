@@ -770,6 +770,51 @@ for (let i = 0; i < 6 && !sFlood.closed; i += 1) sFlood.send(megabytes15);
 for (const started = Date.now(); !sFlood.closed && Date.now() - started < 15_000; ) await sleep(20);
 expect('поток кадров сверх бюджета по байтам обрывается с кодом 4008', sFlood.closed?.code === 4008, JSON.stringify(sFlood.closed));
 
+/* --- живой предпросмотр: тот же канал, другой вид кадра --- */
+
+/* Почта мастера чиста: подтверждение за большой кадр уже забрано. */
+await sMaster.take(sMaster.kind('ack'), 300);
+
+const liveFrame = (n) => mapFrame({ t: 'live', lobbyId: LOBBY.id, vw: 1280, vh: 800, enc: 'gzip' }, 500 + n);
+const liveSent = liveFrame(1);
+sMaster.send(liveSent);
+const liveGot = await sPlayer.take((msg) => msg.t === 'bin' && msg.bytes.length === liveSent.length);
+expect('снимок предпросмотра доходит игроку без изменений', !!liveGot && sameBytes(liveGot.bytes, liveSent));
+const noAck = await sMaster.take(sMaster.kind('ack'), 300);
+expect('снимок не требует подтверждения', noAck === null);
+
+sPlayer.send(mapFrame({ t: 'live', lobbyId: LOBBY.id, vw: 1280, vh: 800, enc: 'gzip' }));
+const liveFromPlayer = await sPlayer.take(sPlayer.kind('error'));
+expect('снимок от игрока отвергнут', liveFromPlayer?.message?.includes('только мастер'), liveFromPlayer?.message);
+
+sMaster.send(mapFrame({ t: 'live', lobbyId: LOBBY.id, vw: 0, vh: 99999, enc: 'gzip' }));
+const liveBroken = await sMaster.take(sMaster.kind('error'));
+expect('снимок с чужим размером окна отвергнут', liveBroken?.message === 'Кадр предпросмотра повреждён.', liveBroken?.message);
+
+/* Частота снимков ограничена окном: лишние пропадают молча, без ошибки. */
+sPlayer.inbox.length = 0;
+for (let i = 0; i < 14; i += 1) sMaster.send(liveFrame(100 + i));
+await sleep(500);
+const liveFlood = sPlayer.inbox.filter((msg) => msg.t === 'bin').length;
+sPlayer.inbox.length = 0;
+expect('лишние снимки за окно не пересылаются', liveFlood > 0 && liveFlood <= 9, `прошло: ${liveFlood} из 14`);
+
+/* Поздний вход: за картой приходит и свежий снимок — вошедший сразу
+   видит, что мастер прямо сейчас правит мир. */
+await sleep(2100); // окно частоты закрылось
+const freshLive = liveFrame(7);
+sMaster.send(freshLive);
+await sPlayer.take((msg) => msg.t === 'bin' && msg.bytes.length === freshLive.length);
+sPlayer.send(JSON.stringify({ t: 'watch' }));
+await sPlayer.take(sPlayer.kind('watched'));
+const watchMap = await sPlayer.take((msg) => msg.t === 'bin');
+const watchLive = await sPlayer.take((msg) => msg.t === 'bin');
+expect(
+  'поздний вход получает карту, а за ней свежий снимок',
+  (sameBytes(watchMap?.bytes ?? [], bigFrame) && sameBytes(watchLive?.bytes ?? [], freshLive)) ||
+    (sameBytes(watchMap?.bytes ?? [], freshLive) && sameBytes(watchLive?.bytes ?? [], bigFrame)),
+);
+
 sMaster.send(JSON.stringify({ t: 'progress', step: 'heights', name: 'Высоты рельефа', index: 3, total: 40 }));
 const progress = await sPlayer.take(sPlayer.kind('progress'));
 expect('ход генерации мастера виден игроку', progress?.index === 3 && progress.total === 40 && progress.name === 'Высоты рельефа', JSON.stringify(progress));

@@ -3762,6 +3762,7 @@ button.admin-row:hover {
   --world-panel-raised: #121c1b;
   --world-accent: #d8c184;
   --world-accent-soft: rgba(216, 193, 132, 0.09);
+  --world-accent-glow: rgba(216, 193, 132, 0.45);
   --world-line: rgba(201, 221, 208, 0.13);
   --world-line-strong: rgba(201, 221, 208, 0.24);
   --world-muted: #91a39b;
@@ -4006,7 +4007,9 @@ button.admin-row:hover {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  background: #000;
+  /* Фон карты — лесная ночь, не чистый чёрный: между открытием карты и
+     прорисовкой редактора чёрный прямоугольник мигает. */
+  background: var(--world-bg);
 }
 
 .world-shell {
@@ -4298,6 +4301,25 @@ button.admin-row:hover {
   color: var(--world-accent);
 }
 
+/* Мини-карта seed'а: занимает верх пластины, подписи остаются под ней.
+   SVG масштабируется целиком (meet), поля вокруг — фон пластины. */
+.world-slot-card__plate .seed-art {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  max-height: 176px;
+  border: 0;
+}
+
+/* Мини-карта занимает пластину с полем: рамка остаётся вокруг узора. */
+.world-slot-card__plate:has(.seed-art) {
+  padding: var(--sp-8);
+}
+
+.world-slot-card__plate:has(.seed-art) > span {
+  font-size: 13px;
+}
+
 .world-slot-card__plate > span {
   color: var(--text);
   font-family: var(--font-display);
@@ -4473,6 +4495,28 @@ button.admin-row:hover {
 .world-seed-row .input {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Узор seed'а рядом с полем: живой намёк на будущий мир. */
+.world-seed-art {
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--world-line);
+  background: #0c1413;
+}
+
+.world-seed-art .seed-art {
+  display: block;
+  width: 84px;
+  height: 56px;
+}
+
+@media (max-width: 560px) {
+  .world-seed-art .seed-art {
+    width: 64px;
+    height: 44px;
+  }
 }
 
 .world-seed-random {
@@ -4728,6 +4772,23 @@ button.admin-row:hover {
   background: var(--accent);
 }
 
+/* Правки мастера идут в эфир: точка пульсирует, как на накладке снимка. */
+.lobby-chip--live i {
+  background: var(--world-accent);
+  border-radius: 50%;
+  animation: world-live-pulse 1.6s ease-in-out infinite;
+}
+
+.lobby-chip--live .lobby-chip__line {
+  color: var(--world-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-chip--live i {
+    animation: none;
+  }
+}
+
 .lobby-chip__status {
   color: var(--text-dim);
 }
@@ -4747,6 +4808,97 @@ button.admin-row:hover {
   color: var(--text-soft);
   pointer-events: auto;
 }
+
+/* ---------- карта: живой предпросмотр правок мастера ---------- */
+
+/* Накладка поверх редактора: показывает снимки карты мастера, пока тот
+   правит мир. Правки видны сразу и без перезагрузки; когда поток снимков
+   стихает, накладка плавно гаснет — под ней та же карта. Для мыши накладка
+   прозрачна: шапка и кнопки игры остаются доступны. */
+.world-live {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.world-live.is-on {
+  opacity: 1;
+}
+
+.world-live__layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Верхний слой всегда последний показанный: под ним предыдущий снимок,
+   поэтому смена кадра — плавное перекрытие, а не мигание. */
+.world-live__layer--top {
+  z-index: 1;
+}
+
+.world-live__layer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Подпись «в эфире»: видна только при активном предпросмотре. */
+.world-live__badge {
+  position: absolute;
+  top: var(--sp-12);
+  left: var(--sp-12);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-10);
+  border: 1px solid rgba(216, 193, 132, 0.35);
+  background: rgba(8, 13, 14, 0.82);
+  color: var(--world-accent);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  backdrop-filter: blur(6px);
+}
+
+.world-live__badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--world-accent);
+  animation: world-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes world-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--world-accent-glow);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-live,
+  .world-live__layer {
+    transition: none;
+  }
+
+  .world-live__badge i {
+    animation: none;
+  }
+}
+
 
 .world-editor-cover svg {
   width: 44px;
@@ -4784,7 +4936,10 @@ button.admin-row:hover {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .world-topbar__session {
+  /* На узких экранах из строки сеанса остаётся только плашка лобби:
+     живой статус связи и правок мастера нужен и на телефоне. */
+  .world-topbar__live,
+  .world-topbar__seed {
     display: none;
   }
 
@@ -4844,6 +4999,11 @@ button.admin-row:hover {
   .world-slot-grid,
   .world-size-list {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Плашке лобби хватает первой строки: задержка канала — деталь для wide. */
+  .lobby-chip__status {
+    display: none;
   }
 }
 

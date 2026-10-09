@@ -11,7 +11,8 @@
      только появилась сеть;
    — пинг раз в 15 секунд: задержка канала видна в интерфейсе, а
      молчащий канал закрывается и открывается заново;
-   — кадры карты: мастер шлёт, хаб пересылает остальным, все
+   — бинарные кадры двух видов — полная карта («map») и живой снимок
+     предпросмотра («live»): мастер шлёт, хаб пересылает остальным, все
      события доставляются в порядке прихода;
    — отказ сессии или блокировка останавливают переподключение: стучаться
      с отозванным токеном незачем.
@@ -25,6 +26,7 @@
 
 import { getCurrentUser, isHub, subscribe as subscribeStore } from './store.js';
 import * as remote from './remote.js';
+import { peekFrameType } from '../game/map-frame.js';
 
 const PING_EVERY_MS = 15_000;
 const PONG_TIMEOUT_MS = 40_000;
@@ -45,6 +47,9 @@ const state = {
   rtt: null, // миллисекунды, медиана последних замеров
   masterStage: null, // { name, index, total } — что сейчас строит мастер
   notice: '', // последнее сообщение хаба о лобби
+  live: false, // мастер сейчас правит карту — идёт живой предпросмотр
+  applying: false, // идёт применение полной карты у этого игрока
+  delivered: null, // сколько игроков получили последнюю карту мастера
 };
 
 const stateListeners = new Set();
@@ -89,6 +94,25 @@ export const onLobbyEvent = (fn) => {
 /** Сообщение для интерфейса (тост): синхронизация карты не справилась. */
 export const reportLobbyError = (message) => emit({ type: 'error', message });
 
+/* Пометки о живом предпросмотре. Их ставит синхронизация (lobby-sync.js),
+   а читает плашка статуса в main.js. setState сам будит подписчиков. */
+
+/** Мастер сейчас правит карту: снимки предпросмотра идут потоком. */
+export const setLobbyLive = (live) => {
+  if (state.live !== !!live) setState({ live: !!live });
+};
+
+/** У этого игрока идёт применение полной карты. */
+export const setLobbyApplying = (applying) => {
+  if (state.applying !== !!applying) setState({ applying: !!applying });
+};
+
+/** Мастер: сколько игроков получили последнюю карту (ответ хаба «ack»). */
+export const setLobbyDelivered = (delivered) => {
+  const value = Number.isFinite(delivered) ? delivered : null;
+  if (state.delivered !== value) setState({ delivered: value });
+};
+
 /** Можно ли пользоваться лобби: нужен общий хаб и вход в аккаунт. */
 export const lobbyAvailable = () => isHub();
 
@@ -126,7 +150,7 @@ export const declineInvite = async (lobbyId) => {
 
 export const leaveLobby = async () => {
   const data = await remote.apiLobbyLeave();
-  setState({ lobby: null, masterStage: null, invites: data.invites ?? state.invites });
+  setState({ lobby: null, masterStage: null, live: false, applying: false, delivered: null, invites: data.invites ?? state.invites });
   return data;
 };
 
@@ -196,7 +220,7 @@ const handleJson = (text) => {
       return;
     case 'lobby':
       if (!msg.lobby) {
-        setState({ lobby: null, masterStage: null });
+        setState({ lobby: null, masterStage: null, live: false, applying: false, delivered: null });
         emit({ type: 'left' });
       } else {
         setState({ lobby: msg.lobby, notice: '' });
@@ -220,7 +244,7 @@ const handleJson = (text) => {
       emit({ type: 'ack', seq: msg.seq, delivered: msg.delivered });
       return;
     case 'closed':
-      setState({ lobby: null, masterStage: null, notice: closeNotice(msg.reason) });
+      setState({ lobby: null, masterStage: null, live: false, applying: false, delivered: null, notice: closeNotice(msg.reason) });
       emit({ type: 'closed', reason: msg.reason, lobbyId: msg.lobbyId });
       return;
     case 'pong': {
@@ -244,7 +268,7 @@ const handleJson = (text) => {
 const giveUp = (notice) => {
   wantOpen = false;
   clearTimers();
-  setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, notice });
+  setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, live: false, applying: false, delivered: null, notice });
 };
 
 const openSocket = () => {
@@ -284,8 +308,14 @@ const openSocket = () => {
   };
   ws.onmessage = (event) => {
     if (socket !== ws) return;
-    if (typeof event.data === 'string') handleJson(event.data);
-    else emit({ type: 'map', bytes: new Uint8Array(event.data) });
+    if (typeof event.data === 'string') {
+      handleJson(event.data);
+      return;
+    }
+    /* Бинарь — кадр лобби. Полная карта и живой снимок идут одним потоком:
+       тип смотрим в заголовке кадра (см. game/map-frame.js). */
+    const bytes = new Uint8Array(event.data);
+    emit({ type: peekFrameType(bytes) === 'live' ? 'live' : 'map', bytes });
   };
   ws.onclose = (event) => {
     /* Закрылся устаревший сокет: текущий уже работает, его состояние не трогаем. */
@@ -329,7 +359,7 @@ export const disconnectLobby = () => {
   } catch {
     /* уже закрыт */
   }
-  setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, notice: '' });
+  setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, live: false, applying: false, delivered: null, notice: '' });
 };
 
 /* Выход из аккаунта (здесь или в соседней вкладке) гасит живой канал: токен
@@ -356,6 +386,9 @@ export const sendLobbyMap = (bytes) => {
   socket.send(bytes);
   return true;
 };
+
+/** Живой снимок предпросмотра: тот же бинарный кадр, хаб не подтверждает его. */
+export const sendLobbyLive = sendLobbyMap;
 
 /** Ход генерации для игроков: шаг, номер и количество шагов. */
 export const sendLobbyProgress = ({ step, name, index, total }) =>

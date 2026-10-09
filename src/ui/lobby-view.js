@@ -9,6 +9,7 @@
 
 import { escapeHtml } from './dom.js';
 import { icon } from './icons.js';
+import { seedArtSvg } from './seed-art.js';
 
 const CODE_LENGTH = 9; // XXXX-XXXX
 
@@ -31,14 +32,16 @@ export const lobbyChipHtml = (state, session) => {
   let line;
   if (session.role === 'master') {
     const count = (state.lobby?.members ?? []).filter((member) => member.online).length;
-    line = `Вы ведёте карту · на связи ${count}`;
+    line = state.live ? `Правки видны игрокам сразу · на связи ${count}` : `Вы ведёте карту · на связи ${count}`;
+  } else if (state.live) {
+    line = state.applying ? 'Мастер вносит правки · получаю полную карту…' : 'Мастер вносит правки · видно сразу';
   } else if (state.masterStage && Date.now() - state.masterStage.at < 6000) {
     const { name, index, total } = state.masterStage;
     line = `Мастер строит карту: ${escapeHtml(name || '')} ${index}/${total}`;
   } else {
     line = 'Карта мастера';
   }
-  return `<span class="lobby-chip lobby-chip--${online ? 'online' : 'offline'}" data-role="lobby-chip-text"><i aria-hidden="true"></i><span class="lobby-chip__line">${line}</span><span class="lobby-chip__status">${escapeHtml(status)}</span></span>`;
+  return `<span class="lobby-chip lobby-chip--${online ? 'online' : 'offline'}${state.live ? ' lobby-chip--live' : ''}" data-role="lobby-chip-text"><i aria-hidden="true"></i><span class="lobby-chip__line">${line}</span><span class="lobby-chip__status">${escapeHtml(status)}</span></span>`;
 };
 
 const sizeButtons = (draft) =>
@@ -60,6 +63,7 @@ const createCardHtml = (draft) => `
       <span class="world-seed-row">
         <input class="input input--code" type="text" maxlength="48" autocomplete="off" spellcheck="false" data-role="lobby-seed" value="${escapeHtml(draft.seed)}" />
         <button class="icon-button icon-button--sm world-seed-random" type="button" data-action="world-lobby-seed-random" aria-label="Случайный seed" title="Случайный seed">${icon('dices', 'icon--xs')}</button>
+        <span class="world-seed-art" data-role="world-seed-art" title="Узор этого seed — настоящий мир построит Azgaar">${seedArtSvg(draft.seed, { id: 'lobby' })}</span>
       </span>
     </label>
     <div class="world-field">
