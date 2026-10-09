@@ -24,14 +24,21 @@ import {
 } from './hub-core.mjs';
 import { acceptWebSocket } from './ws.mjs';
 
-const clientIp = (req) =>
-  String(req.headers['cf-connecting-ip'] || '')
-    .trim() ||
-  String(req.headers['x-forwarded-for'] || '')
-    .split(',')[0]
-    .trim() ||
-  req.socket.remoteAddress ||
-  'unknown';
+/* Адрес клиента для лимитов по IP. Заголовки «за прокси» (туннель cloudflared
+   или localtunnel, Cloudflare) верим только тогда, когда запрос пришёл с
+   этого же компьютера — от своего прокси. Напрямую из сети любой подставил бы
+   свой X-Forwarded-For и обошёл лимит. */
+const isLoopback = (address) => address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+
+const clientIp = (req) => {
+  const peer = req.socket.remoteAddress || 'unknown';
+  if (!isLoopback(peer)) return peer;
+  return (
+    String(req.headers['cf-connecting-ip'] || '').trim() ||
+    String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    peer
+  );
+};
 
 /* Ключ администратора панели. Порядок такой: ключ, сменённый через
    панель (лежит в файле данных), затем переменная окружения
@@ -84,6 +91,18 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
     renameSync(tmp, dbFile);
   };
 
+  /* Отложенная запись не должна ронять процесс: иначе ошибка диска (файл занят
+     антивирусом на Windows) обрывала бы хаб. Не вышло — пробуем снова позже. */
+  const writeLater = () => {
+    try {
+      writeFile();
+    } catch (error) {
+      console.error(`Не удалось записать данные хаба (${error.message}) — повторю.`);
+      saveTimer = setTimeout(writeLater, 5000);
+      saveTimer.unref?.();
+    }
+  };
+
   /* Сердцебиения приходят часто — их дебаунсим, мутации пишем сразу. */
   const persist = (_db, { immediate }) => {
     if (immediate) {
@@ -91,11 +110,23 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
       return;
     }
     if (saveTimer) return;
-    saveTimer = setTimeout(writeFile, 1000);
+    saveTimer = setTimeout(writeLater, 1000);
     saveTimer.unref?.();
   };
 
+  /* Записываем то, что ещё ждёт дебаунса. Вызывает serve.mjs при остановке:
+     иначе последняя секунда изменений (аккаунт, лобби) терялась бы. */
+  const flush = () => {
+    if (saveTimer) writeLater();
+  };
+
   const core = createHubCore({ db, persist, limits, adminKey: envKey });
+
+  /* Уборка лобби и молчащих сокетов по таймеру, без ожидания HTTP-запроса.
+     Таймер не держит процесс: за ним ничего не происходит, что не случилось бы
+     при следующем запросе. */
+  const ticker = setInterval(() => core.tick(), 15_000);
+  ticker.unref?.();
 
   /* ---------- разбор запроса ---------- */
 
@@ -182,6 +213,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
       return true;
     },
     stats: core.stats,
+    flush,
     dbFile,
     /* Ключ нужен serve.mjs, чтобы предупредить о заводском на публичной
        ссылке и подсказать его владельцу в консоли. */

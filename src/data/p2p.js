@@ -53,6 +53,9 @@ const TIMING = {
 
 const HISTORY_LIMIT = 200;
 const MESSAGE_LIMIT = 2000; // символов в одном сообщении
+/* Сколько раз повторяем сообщение через хаб, прежде чем признать его
+   недоставленным (раз в retryBase — это около десяти секунд). */
+const MAX_SIGNAL_TRIES = 5;
 
 export const MANUAL_ID = 'direct';
 
@@ -227,6 +230,16 @@ const sendDirect = (peer, payload) => {
   }
 };
 
+/* Сообщение не ушло ни через хаб, ни напрямую: отмечаем его в переписке,
+   чтобы человек видел это, а не считал доставленным. */
+const markUndelivered = (signal) => {
+  if (signal.kind !== 'relay' || signal.data?.t !== 'chat') return;
+  const own = (history.get(signal.to) ?? []).find((message) => message.id === signal.data.id);
+  if (!own || own.via === 'failed') return;
+  own.via = 'failed';
+  emit({ type: 'transport', peerId: signal.to });
+};
+
 async function flushSignals() {
   flushTimer = null;
   if (flushing || outbox.length === 0) return;
@@ -235,24 +248,34 @@ async function flushSignals() {
   const batch = outbox.splice(0, 32);
   const retry = [];
   try {
-    await remote.apiSignal(batch);
-  } catch {
+    /* Хаб разбирает пачку построчно и перечисляет отклонённые записи. Такую
+       запись повторять бессмысленно: помечаем её и не трогаем остальные. */
+    const answer = await remote.apiSignal(batch);
+    const refused = new Set((answer?.rejected ?? []).map((item) => item.index));
+    batch.forEach((signal, index) => {
+      if (refused.has(index)) markUndelivered(signal);
+    });
+  } catch (error) {
     /* Не теряем сообщения: сначала пробуем вторичный P2P, иначе повторяем
-       только пользовательские сообщения через хаб. Устаревший SDP не повторяем. */
-    if (epoch === signalEpoch) {
-      for (const signal of batch) {
-        if (signal.kind !== 'relay' || signal.data?.t !== 'chat') continue;
-        const peer = peers.get(signal.to);
-        if (peer && sendDirect(peer, signal.data)) {
-          const ownMessage = (history.get(peer.id) ?? []).find((message) => message.id === signal.data.id);
-          if (ownMessage && ownMessage.via !== 'direct') {
-            ownMessage.via = 'direct';
-            emit({ type: 'transport', peerId: peer.id });
-          }
-        } else {
-          retry.push(signal);
+       пользовательские сообщения через хаб — ограниченное число раз. Устаревший
+       SDP не повторяем. Отказ по существу (4xx, кроме 408 и 429) повтора не
+       требует: сессия закрыта или запрос некорректен. */
+    const refusedAsWhole =
+      error?.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+    for (const signal of batch) {
+      if (signal.kind !== 'relay' || signal.data?.t !== 'chat') continue;
+      const peer = peers.get(signal.to);
+      if (epoch === signalEpoch && peer && sendDirect(peer, signal.data)) {
+        const ownMessage = (history.get(peer.id) ?? []).find((message) => message.id === signal.data.id);
+        if (ownMessage && ownMessage.via !== 'direct') {
+          ownMessage.via = 'direct';
+          emit({ type: 'transport', peerId: peer.id });
         }
+        continue;
       }
+      signal.tries = (signal.tries ?? 0) + 1;
+      if (epoch !== signalEpoch || refusedAsWhole || signal.tries >= MAX_SIGNAL_TRIES) markUndelivered(signal);
+      else retry.push(signal);
     }
   } finally {
     flushing = false;
@@ -590,17 +613,32 @@ const maintain = () => {
   }
 };
 
-const runInbox = async () => {
-  while (running) {
+/* Входящий цикл. Каждый запуск модуля получает свой номер поколения: цикл
+   прошлого запуска, ещё висящий на длинном опросе, сам выходит, а не
+   работает рядом с новым. */
+let inboxGen = 0;
+
+const runInbox = async (gen) => {
+  while (running && gen === inboxGen) {
     if (!store.isHub() || !store.getCurrentUser()) {
       await new Promise((r) => setTimeout(r, 1500));
       continue;
     }
+    /* Ответ длинного опроса относится к тому аккаунту, чей токен ушёл в запросе.
+       Если за время ожидания вошли в другой аккаунт или модуль остановили,
+       чужие сообщения здесь не показываем. */
+    const owner = store.getCurrentUser()?.id;
     try {
       const { messages: incoming = [], self } = await remote.apiInbox({ wait: true });
+      if (gen !== inboxGen) return;
+      if (!running || store.getCurrentUser()?.id !== owner) continue;
       if (self) selfId = self;
-      for (const message of incoming) await handleSignal(message);
+      for (const message of incoming) {
+        if (gen !== inboxGen || !running) return;
+        await handleSignal(message);
+      }
     } catch (error) {
+      if (gen !== inboxGen) return;
       /* Таймаут длинного опроса — это норма, остальное гасим паузой. */
       await new Promise((r) => setTimeout(r, error?.status === 401 ? 5000 : 1200));
     }
@@ -613,13 +651,15 @@ export const start = () => {
   running = true;
   maintain();
   tickTimer = setInterval(maintain, TIMING.tick);
-  inboxLoop = runInbox();
+  inboxGen += 1;
+  inboxLoop = runInbox(inboxGen);
   emit();
 };
 
 /** Выключить все каналы и очистить очередь текущей сессии. */
 export const stop = () => {
   running = false;
+  inboxGen += 1;
   /* Не переносим неотправленные сообщения в следующую сессию/к другому аккаунту. */
   signalEpoch += 1;
   if (flushTimer) clearTimeout(flushTimer);

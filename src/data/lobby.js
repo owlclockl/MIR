@@ -7,17 +7,23 @@
 
    Что умеет канал:
    — вход по токену сессии (первым сообщением, а не в адресе);
-   — переподключение с нарастающей паузой и сразу повторный вход;
+   — переподключение с нарастающей паузой и сразу повторный вход, как
+     только появилась сеть;
    — пинг раз в 15 секунд: задержка канала видна в интерфейсе, а
      молчащий канал закрывается и открывается заново;
    — кадры карты: мастер шлёт, хаб пересылает остальным, все
-     события доставляются в порядке прихода.
+     события доставляются в порядке прихода;
+   — отказ сессии или блокировка останавливают переподключение: стучаться
+     с отозванным токеном незачем.
+
+   Устаревший сокет (его уже заменили новым) не трогает состояние: все
+   обработчики сначала проверяют, что сокет всё ещё текущий.
 
    Состояние лобби хаб присылает целиком при каждом изменении, поэтому
    клиент ничего не «догадывает»: что пришло, то и показываем.
    =========================================================== */
 
-import { isHub } from './store.js';
+import { getCurrentUser, isHub, subscribe as subscribeStore } from './store.js';
 import * as remote from './remote.js';
 
 const PING_EVERY_MS = 15_000;
@@ -25,6 +31,11 @@ const PONG_TIMEOUT_MS = 40_000;
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 8_000;
 const RTT_SAMPLES = 5;
+
+/* Коды закрытия из hub-lobby.mjs: сессия не принята и аккаунт заблокирован.
+   С ними переподключаться бессмысленно. */
+const CLOSE_AUTH = 4001;
+const CLOSE_BANNED = 4003;
 
 const state = {
   status: 'idle', // idle | connecting | online | offline
@@ -74,6 +85,9 @@ export const onLobbyEvent = (fn) => {
   eventListeners.add(fn);
   return () => eventListeners.delete(fn);
 };
+
+/** Сообщение для интерфейса (тост): синхронизация карты не справилась. */
+export const reportLobbyError = (message) => emit({ type: 'error', message });
 
 /** Можно ли пользоваться лобби: нужен общий хаб и вход в аккаунт. */
 export const lobbyAvailable = () => isHub();
@@ -159,6 +173,12 @@ const scheduleReconnect = () => {
   reconnectDelay = Math.min(RECONNECT_MAX_MS, reconnectDelay * 2);
 };
 
+const closeNotice = (reason) => {
+  if (reason === 'kicked') return 'Мастер исключил вас из лобби.';
+  if (reason === 'idle') return 'Лобби закрыто: в нём никого не было в сети.';
+  return 'Мастер закрыл лобби.';
+};
+
 const handleJson = (text) => {
   let msg;
   try {
@@ -219,10 +239,12 @@ const handleJson = (text) => {
   }
 };
 
-const closeNotice = (reason) => {
-  if (reason === 'kicked') return 'Мастер исключил вас из лобби.';
-  if (reason === 'idle') return 'Лобби закрыто: в нём никого не было в сети.';
-  return 'Мастер закрыл лобби.';
+/* Переподключаться незачем: сессия не принята или аккаунт заблокирован.
+   Канал закрываем насовсем; вход в аккаунт откроет его снова. */
+const giveUp = (notice) => {
+  wantOpen = false;
+  clearTimers();
+  setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, notice });
 };
 
 const openSocket = () => {
@@ -240,9 +262,11 @@ const openSocket = () => {
   ws.binaryType = 'arraybuffer';
   socket = ws;
   ws.onopen = () => {
+    if (socket !== ws) return; // сокет уже заменили — этот не наш
     const token = remote.currentToken();
     if (!token) {
-      ws.close(4001, 'no-token');
+      giveUp('Войдите в аккаунт, чтобы открыть лобби.');
+      ws.close(CLOSE_AUTH, 'no-token');
       return;
     }
     ws.send(JSON.stringify({ t: 'auth', token }));
@@ -259,14 +283,25 @@ const openSocket = () => {
     }, PING_EVERY_MS);
   };
   ws.onmessage = (event) => {
+    if (socket !== ws) return;
     if (typeof event.data === 'string') handleJson(event.data);
     else emit({ type: 'map', bytes: new Uint8Array(event.data) });
   };
-  ws.onclose = () => {
-    if (socket === ws) socket = null;
+  ws.onclose = (event) => {
+    /* Закрылся устаревший сокет: текущий уже работает, его состояние не трогаем. */
+    if (socket !== ws) return;
+    socket = null;
     clearInterval(pingTimer);
     pingTimer = 0;
     pingSent.clear();
+    if (event?.code === CLOSE_AUTH) {
+      giveUp('Сессия закрыта — войдите в аккаунт снова.');
+      return;
+    }
+    if (event?.code === CLOSE_BANNED) {
+      giveUp('Аккаунт заблокирован администратором.');
+      return;
+    }
     setState({ status: wantOpen ? 'offline' : 'idle', rtt: null });
     scheduleReconnect();
   };
@@ -296,6 +331,21 @@ export const disconnectLobby = () => {
   }
   setState({ status: 'idle', user: null, lobby: null, invites: [], rtt: null, masterStage: null, notice: '' });
 };
+
+/* Выход из аккаунта (здесь или в соседней вкладке) гасит живой канал: токен
+   уже отозван, а открытый сокет продолжал бы вести лобби от его имени. */
+subscribeStore(() => {
+  if (wantOpen && !getCurrentUser()) disconnectLobby();
+});
+
+/* Сеть вернулась — не ждём остаток паузы: переподключаемся сразу. */
+globalThis.addEventListener?.('online', () => {
+  if (!wantOpen || socket) return;
+  clearTimeout(reconnectTimer);
+  reconnectTimer = 0;
+  reconnectDelay = RECONNECT_MIN_MS;
+  openSocket();
+});
 
 /** Просим хаб прислать текущую карту лобби (или сообщить, что её ещё нет). */
 export const watchLobbyMap = () => sendJson({ t: 'watch' });

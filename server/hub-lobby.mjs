@@ -38,6 +38,16 @@ const MAX_TEXT_CHARS = 64 * 1024;
 const MAP_HEADER_MAX = 4096;
 const MESSAGE_WINDOW_MS = 10_000;
 const MESSAGES_PER_WINDOW = 400;
+/* Бюджет по байтам за то же окно: сотни сообщений по мегабайту не должны
+   проходить так же легко, как десятки коротких. Мастер, который правит карту
+   непрерывно, укладывается в него с большим запасом. */
+const MESSAGE_BYTES_PER_WINDOW = 64 * 1024 * 1024;
+/* Клиент шлёт пинг каждые 15 секунд. Сокет, который молчит полторы минуты,
+   мёртв: TCP может не сообщить о разрыве часами (телефон ушёл из сети). */
+const SOCKET_IDLE_MS = 90_000;
+/* Запрос мастеру «пришлите карту» не чаще раза в несколько секунд на лобби:
+   каждый такой запрос заставляет мастера сжать и отправить карту заново. */
+const NEED_MAP_EVERY_MS = 3_000;
 const MAX_SEED = 48;
 /* Размеры совпадают с пресетами игры (store.js, WORLD_SIZES). */
 export const LOBBY_SIZES = [
@@ -48,6 +58,7 @@ export const LOBBY_SIZES = [
 
 /* Коды закрытия: 4xxx — зона приложения, её принимают и сокеты ПК, и
    WebSocketPair Cloudflare (стандартные 1008/1009 там не разрешены). */
+export const CLOSE_IDLE = 4000;
 export const CLOSE_AUTH = 4001;
 export const CLOSE_BANNED = 4003;
 export const CLOSE_POLICY = 4008;
@@ -102,16 +113,23 @@ export function createLobbies({
 }) {
   db.lobbies ??= [];
 
-  /* Сокеты: conn → { userId, authed, windowAt, count }. Онлайн — только
-     авторизованные. Всё в памяти: после перезапуска клиенты переподключатся. */
+  /* Сокеты: conn → { userId, authed, seenAt, windowAt, count, bytes }.
+     Онлайн — только авторизованные. Всё в памяти: после перезапуска клиенты
+     переподключатся. */
   const sockets = new Map();
   const online = new Map(); // userId → Set<conn>
   /* Приглашения: userId → Map<lobbyId, { lobbyId, from, fromName, at }>. */
   const invites = new Map();
   /* Последний кадр карты лобби: lobbyId → { seq, bytes, at }. */
   const frames = new Map();
-  /* Когда в лобби в последний раз кто-то был онлайн: lobbyId → ms. */
+  /* Когда в лобби в последний раз кто-то был онлайн: lobbyId → ms. После
+     перезапуска записей нет: отсчёт тогда ведём от момента запуска, а не от
+     даты создания — иначе хаб сразу снёс бы лобби, участники которого ещё
+     не успели переподключиться. */
   const activity = new Map();
+  const bootAt = now();
+  /* Когда последний раз просили мастера прислать карту: lobbyId → ms. */
+  const needMapAt = new Map();
 
   const isOnline = (userId) => (online.get(userId)?.size ?? 0) > 0;
   const lobbyById = (id) => db.lobbies.find((lobby) => lobby.id === id) ?? null;
@@ -186,6 +204,7 @@ export function createLobbies({
     db.lobbies = db.lobbies.filter((item) => item.id !== lobby.id);
     frames.delete(lobby.id);
     activity.delete(lobby.id);
+    needMapAt.delete(lobby.id);
     for (const id of members) {
       dropInvite(id, lobby.id);
       sendUser(id, JSON.stringify({ t: 'closed', lobbyId: lobby.id, reason }));
@@ -205,7 +224,7 @@ export function createLobbies({
     for (const lobby of [...db.lobbies]) {
       if (lobby.members.some(isOnline)) {
         activity.set(lobby.id, t);
-      } else if (t - (activity.get(lobby.id) ?? lobby.createdAt) > LOBBY_IDLE_MS) {
+      } else if (t - (activity.get(lobby.id) ?? bootAt) > LOBBY_IDLE_MS) {
         removeLobby(lobby, 'idle');
         changed = true;
       }
@@ -222,6 +241,14 @@ export function createLobbies({
   /* Уборка перед каждым запросом. Если что-то удалили — запись догонит
      отложенное сохранение, иначе лобби «воскреснет» после перезапуска. */
   const tidy = () => {
+    sweepSockets();
+    if (sweep()) persistSoon();
+  };
+
+  /* Для адаптеров: та же уборка по таймеру, чтобы мёртвые сокеты и пустые
+     лобби не ждали HTTP-запроса. Возвращает ничего: запись уже запрошена. */
+  const tick = () => {
+    sweepSockets();
     if (sweep()) persistSoon();
   };
 
@@ -421,13 +448,40 @@ export function createLobbies({
     }
   };
 
-  const takeBudget = (state, t) => {
+  /* Лимит на сокет за окно: по числу сообщений и по байтам. Одно число
+     пропускало бы 400 кадров по 16 МБ — шесть гигабайт за десять секунд. */
+  const takeBudget = (state, t, size) => {
     if (t - state.windowAt > MESSAGE_WINDOW_MS) {
       state.windowAt = t;
       state.count = 0;
+      state.bytes = 0;
     }
     state.count += 1;
-    return state.count <= MESSAGES_PER_WINDOW;
+    state.bytes += size;
+    return state.count <= MESSAGES_PER_WINDOW && state.bytes <= MESSAGE_BYTES_PER_WINDOW;
+  };
+
+  /* Молчащие сокеты закрываем как ушедших: присутствие и состав лобби должны
+     отражать правду, а не «онлайн» с мёртвым TCP. */
+  const sweepSockets = () => {
+    const t = now();
+    for (const [conn, state] of [...sockets]) {
+      if (t - state.seenAt <= SOCKET_IDLE_MS) continue;
+      leave(conn);
+      closeConn(conn, CLOSE_IDLE, 'idle');
+    }
+  };
+
+  /* Соединение ушло (клиент, сеть или сам хаб): снимаем присутствие и
+     сообщаем лобби. Вызывается и адаптером, и уборкой — повторный вызов безвреден. */
+  const leave = (conn) => {
+    const state = detach(conn);
+    if (!state?.authed) return;
+    const lobby = lobbyOf(state.userId);
+    if (lobby) {
+      activity.set(lobby.id, now());
+      notifyLobby(lobby);
+    }
   };
 
   const handleAuth = (conn, state, msg) => {
@@ -486,8 +540,13 @@ export function createLobbies({
     if (frame) {
       sendTo(conn, frame.bytes);
     } else if (lobby.masterId !== state.userId) {
-      /* Карты ещё нет — просим мастера прислать её, как только она будет готова. */
-      sendUser(lobby.masterId, JSON.stringify({ t: 'need-map', lobbyId: lobby.id }));
+      /* Карты ещё нет — просим мастера прислать её. Несколько игроков, зашедших
+         подряд, дают один запрос: мастер и так пришлёт карту всем сразу. */
+      const t = now();
+      if (t - (needMapAt.get(lobby.id) ?? -Infinity) >= NEED_MAP_EVERY_MS) {
+        needMapAt.set(lobby.id, t);
+        sendUser(lobby.masterId, JSON.stringify({ t: 'need-map', lobbyId: lobby.id }));
+      }
     }
   };
 
@@ -593,7 +652,8 @@ export function createLobbies({
   const socket = {
     /** Новое соединение. Без входа в сессию за десять секунд оно закрывается. */
     open(conn) {
-      sockets.set(conn, { userId: null, authed: false, windowAt: now(), count: 0 });
+      const t = now();
+      sockets.set(conn, { userId: null, authed: false, seenAt: t, windowAt: t, count: 0, bytes: 0 });
       setTimeout(() => {
         const state = sockets.get(conn);
         if (state && !state.authed) closeConn(conn, CLOSE_AUTH, 'auth-timeout');
@@ -604,7 +664,10 @@ export function createLobbies({
     message(conn, data) {
       const state = sockets.get(conn);
       if (!state) return;
-      if (!takeBudget(state, now())) {
+      const t = now();
+      state.seenAt = t;
+      const size = typeof data === 'string' ? data.length : data.byteLength;
+      if (!takeBudget(state, t, size)) {
         closeConn(conn, CLOSE_POLICY, 'rate');
         return;
       }
@@ -626,13 +689,7 @@ export function createLobbies({
 
     /** Соединение закрыто (клиентом, сетью или адаптером). */
     close(conn) {
-      const state = detach(conn);
-      if (!state?.authed) return;
-      const lobby = lobbyOf(state.userId);
-      if (lobby) {
-        activity.set(lobby.id, now());
-        notifyLobby(lobby);
-      }
+      leave(conn);
     },
   };
 
@@ -658,6 +715,7 @@ export function createLobbies({
     socket,
     forgetUser,
     sweep,
+    tick,
     stats: () => ({ lobbies: db.lobbies.length, sockets: sockets.size, frames: frames.size }),
   };
 }

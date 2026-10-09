@@ -32,6 +32,8 @@
     "test:p2p": "node scripts/test-p2p.mjs",
     "test:hub": "node scripts/test-hub.mjs",
     "test:worker": "node scripts/test-worker.mjs",
+    "test:realtime": "node scripts/test-realtime.mjs",
+    "test:lobby-client": "node scripts/test-lobby-client.mjs",
     "test:ui": "node scripts/test-ui.mjs",
     "test:avatar": "node scripts/test-avatar.mjs",
     "test:perf": "node scripts/test-perf.mjs",

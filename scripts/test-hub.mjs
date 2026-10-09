@@ -196,6 +196,33 @@ const back = await call('POST', '/api/password', {
 });
 expect('пароль возвращён обратно', back.status === 200);
 
+/* Смена пароля выкидывает другие устройства, а устройство, с которого она
+   сделана, остаётся в аккаунте. Раньше сохранялся последний выданный токен,
+   и уходил как раз тот, с которого меняли. Здесь основной аккаунт: после
+   проверки его вход переносим на ноутбук, и остальные проверки работают как
+   раньше. Аккаунт не плодим — регистраций и так немного в минуту. */
+const phone = (await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } })).data.token;
+const laptop = (await call('POST', '/api/login', { body: { name: A.name, passHash: A.passHash } })).data.token;
+const passNext = hex(16);
+const passNextHash = await sha256(`${passNext}:иной-пароль`);
+const fromLaptop = await call('POST', '/api/password', {
+  token: laptop,
+  body: { oldHash: A.passHash, newSalt: passNext, newHash: passNextHash },
+});
+expect('смена пароля с ноутбука проходит', fromLaptop.status === 200, fromLaptop.data.error);
+const laptopAfter = await call('GET', '/api/state', { token: laptop });
+expect('ноутбук, сменивший пароль, остаётся в аккаунте', laptopAfter.status === 200, `${laptopAfter.status}`);
+const phoneAfter = await call('GET', '/api/state', { token: phone });
+expect('телефон выкинут после смены пароля', phoneAfter.status === 401, `${phoneAfter.status}`);
+const originalAfter = await call('GET', '/api/state', { token: A.token });
+expect('прежний вход выкинут после смены пароля', originalAfter.status === 401, `${originalAfter.status}`);
+const restoredHash = await call('POST', '/api/password', {
+  token: laptop,
+  body: { oldHash: passNextHash, newSalt: A.salt, newHash: A.passHash },
+});
+expect('пароль возвращён (с ноутбука)', restoredHash.status === 200, restoredHash.data.error);
+A.token = laptop; // основной вход теперь — ноутбук: его токен цел
+
 /* ---------- 5. сигналинг P2P ---------- */
 
 /* Длинный опрос: B висит на входящих, A шлёт сигнал — ответ обязан
@@ -224,6 +251,30 @@ const notFriend = await call('POST', '/api/p2p/signal', {
   body: { batch: [{ to: A.id, kind: 'relay', data: { x: 1 } }] },
 });
 expect('чужому сигналить нельзя', notFriend.status === 403, notFriend.data.error);
+
+/* Пачка из годной записи и негодной: годная доходит, негодная названа по
+   номеру. Раньше вся пачка падала с ошибкой, и отправитель повторял её вечно. */
+const mixedSignal = await call('POST', '/api/p2p/signal', {
+  token: A.token,
+  body: {
+    batch: [
+      { to: B.id, kind: 'relay', data: { t: 'chat', id: `mix-${n}`, text: 'доставится' } },
+      { to: stranger.id, kind: 'relay', data: { t: 'chat', id: `mix2-${n}`, text: 'не доставится' } },
+    ],
+  },
+});
+expect(
+  'пачка с негодной записью: годная принята, негодная названа',
+  mixedSignal.status === 200 &&
+    mixedSignal.data.sent === 1 &&
+    mixedSignal.data.rejected?.[0]?.index === 1 &&
+    mixedSignal.data.rejected[0].status === 403,
+  JSON.stringify(mixedSignal.data),
+);
+const bInbox = await call('GET', '/api/p2p/inbox', { token: B.token });
+expect('годная запись дошла до адресата', !!bInbox.data.messages?.some((m) => m.data?.id === `mix-${n}`));
+const strangerInbox = await call('GET', '/api/p2p/inbox', { token: stranger.token });
+expect('негодная запись никому не ушла', !strangerInbox.data.messages?.length);
 
 const empty = await call('GET', '/api/p2p/inbox', { token: A.token });
 expect('пустой ящик отвечает сразу', empty.status === 200 && Array.isArray(empty.data.messages));
@@ -524,9 +575,18 @@ const openSocket = (timeout = 8000) =>
 
 /* Кадр карты: [u32 длина заголовка][JSON][полезная нагрузка]. Сервер не
    распаковывает gzip, поэтому здесь достаточно случайных байтов. */
+/* getRandomValues отдаёт не больше 64 КБ за вызов — наполняем по частям. */
+const randomBytes = (count) => {
+  const out = new Uint8Array(count);
+  for (let offset = 0; offset < count; offset += 65536) {
+    crypto.getRandomValues(out.subarray(offset, Math.min(count, offset + 65536)));
+  }
+  return out;
+};
+
 const mapFrame = (header, payloadBytes = 4000) => {
   const json = new TextEncoder().encode(JSON.stringify(header));
-  const payload = crypto.getRandomValues(new Uint8Array(payloadBytes));
+  const payload = randomBytes(payloadBytes);
   const out = new Uint8Array(4 + json.length + payload.length);
   new DataView(out.buffer).setUint32(0, json.length);
   out.set(json, 4);
@@ -647,6 +707,20 @@ expect('карты ещё нет: watched hasMap=false', watchEmpty?.hasMap === 
 const needMap = await sMaster.take(sMaster.kind('need-map'));
 expect('мастер получает need-map и публикует карту', needMap?.lobbyId === LOBBY.id);
 
+/* Второй игрок, зашедший следом, не заставляет мастера слать карту заново:
+   один запрос на несколько секунд — мастер и так пришлёт карту всем сразу. */
+const joinedStranger = await call('POST', '/api/lobby/join', { token: stranger.token, body: { code: LOBBY.code } });
+expect('посторонний входит в лобби по коду', joinedStranger.status === 200, joinedStranger.data.error);
+const sStranger = await openSocket();
+sStranger.send(JSON.stringify({ t: 'auth', token: stranger.token }));
+await sStranger.take(sStranger.kind('ready'));
+sStranger.send(JSON.stringify({ t: 'watch' }));
+await sStranger.take(sStranger.kind('watched'));
+const repeatAsk = await sMaster.take(sMaster.kind('need-map'), 1500);
+expect('второй запрос карты в ту же секунду мастеру не уходит', repeatAsk === null, JSON.stringify(repeatAsk));
+await call('POST', '/api/lobby/leave', { token: stranger.token, body: {} });
+sStranger.ws.close();
+
 const frame1 = mapFrame({ t: 'map', lobbyId: LOBBY.id, seed: `lobby-${n}-v2`, width: 1600, height: 1000, enc: 'gzip' });
 sMaster.send(frame1);
 const got1 = await sPlayer.take((msg) => msg.t === 'bin');
@@ -675,6 +749,26 @@ const watchHas = await sPlayer.take(sPlayer.kind('watched'));
 expect('поздний вход получает кадр из памяти', watchHas?.hasMap === true && watchHas.seq === 1, JSON.stringify(watchHas));
 const late = await sPlayer.take((msg) => msg.t === 'bin');
 expect('и сам кадр вслед за ответом', !!late && sameBytes(late.bytes, frame1));
+
+/* Большой кадр (3 МБ) приходит кусками TCP: хаб должен собрать его целиком,
+   иначе игрок получил бы повреждённую карту. */
+const bigFrame = mapFrame(
+  { t: 'map', lobbyId: LOBBY.id, seed: `lobby-${n}-big`, width: 1280, height: 800, enc: 'gzip' },
+  3 * 1024 * 1024,
+);
+sMaster.send(bigFrame);
+const bigGot = await sPlayer.take((msg) => msg.t === 'bin' && msg.bytes.length === bigFrame.length, 15_000);
+expect('большой кадр собран целиком и доставлен без изменений', !!bigGot && sameBytes(bigGot.bytes, bigFrame), `${bigFrame.length} байт`);
+
+/* Лимит по байтам: кадры в пределах допустимого всё равно обрывают поток, если
+   их слишком много за окно. Раньше считались только сообщения. */
+const sFlood = await openSocket();
+sFlood.send(JSON.stringify({ t: 'auth', token: B.token }));
+await sFlood.take(sFlood.kind('ready'));
+const megabytes15 = new Uint8Array(15 * 1024 * 1024);
+for (let i = 0; i < 6 && !sFlood.closed; i += 1) sFlood.send(megabytes15);
+for (const started = Date.now(); !sFlood.closed && Date.now() - started < 15_000; ) await sleep(20);
+expect('поток кадров сверх бюджета по байтам обрывается с кодом 4008', sFlood.closed?.code === 4008, JSON.stringify(sFlood.closed));
 
 sMaster.send(JSON.stringify({ t: 'progress', step: 'heights', name: 'Высоты рельефа', index: 3, total: 40 }));
 const progress = await sPlayer.take(sPlayer.kind('progress'));

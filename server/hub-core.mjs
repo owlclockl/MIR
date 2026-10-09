@@ -260,6 +260,23 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     }
   };
 
+  /* Проверка одного сигнала от me. Годный возвращает { to, kind, data },
+     негодный — { status, problem }: по нему ответ скажет, что не так. */
+  const SIGNAL_KINDS = ['offer', 'answer', 'ice', 'bye', 'relay'];
+  const signalProblem = (me, item) => {
+    const target = byId(item?.to);
+    if (!target) return { status: 404, problem: 'Игрок не найден.' };
+    if (target.id === me.id) return { status: 400, problem: 'Нельзя звонить самому себе.' };
+    if (!me.friends.includes(target.id))
+      return { status: 403, problem: 'Прямое соединение доступно только друзьям.' };
+    const kind = String(item.kind || '');
+    if (!SIGNAL_KINDS.includes(kind)) return { status: 400, problem: 'Неизвестный тип сигнала.' };
+    const data = item.data ?? null;
+    if (JSON.stringify(data).length > SIGNAL_MAX_CHARS)
+      return { status: 413, problem: 'Сигнал слишком большой.' };
+    return { to: target.id, kind, data };
+  };
+
   /* ---------- лимиты по IP ---------------------------------- */
 
   const buckets = new Map(); // "ip путь" → { count, resetAt }
@@ -323,6 +340,9 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
 
   /* Токен приходит заголовком (обычный путь) либо телом/параметром —
      так же, как его ищет auth. Нужен и входу, и явному выходу. */
+  /* Токен — из заголовка Authorization, из тела (закрытие вкладки уходит без
+     заголовка) или из строки запроса: так работают сборки, выпущенные до
+     заголовка. Журналы адреса запросов не пишут полностью — см. serve.mjs. */
   const tokenOf = (req) => {
     const header = req.headers?.authorization || req.headers?.Authorization || '';
     if (header.startsWith('Bearer ')) return header.slice(7);
@@ -547,8 +567,10 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
         throw httpError(400, 'Некорректные данные пароля.');
       user.salt = body.newSalt;
       user.passHash = body.newHash;
-      /* Смена пароля выкидывает остальные устройства. */
-      user.tokens = user.tokens.slice(-1);
+      /* Смена пароля выкидывает остальные устройства, а это — оставляет.
+         Берём токен самого запроса: последний выданный мог быть с другого телефона. */
+      const current = tokenOf(req);
+      user.tokens = (user.tokens ?? []).filter((token) => token === current);
       logEvent('password', { userId: user.id, name: user.name });
       save.now();
       return { state: stateFor(user) };
@@ -874,33 +896,34 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       const me = auth(req);
       const items = Array.isArray(body.batch) ? body.batch : [body];
       if (items.length > 32) throw httpError(400, 'Слишком много сигналов за раз.');
+      /* Каждую запись проверяем отдельно. Негодная не губит остальные и не
+         оставляет половину пачки доставленной: ответ перечисляет отклонённые
+         по номеру, и отправитель знает, какое сообщение не дошло. */
+      const rejected = [];
       let sent = 0;
-      for (const item of items) {
-        const target = byId(item?.to);
-        if (!target) throw httpError(404, 'Игрок не найден.');
-        if (target.id === me.id) throw httpError(400, 'Нельзя звонить самому себе.');
-        if (!me.friends.includes(target.id))
-          throw httpError(403, 'Прямое соединение доступно только друзьям.');
-        const kind = String(item.kind || '');
-        if (!['offer', 'answer', 'ice', 'bye', 'relay'].includes(kind))
-          throw httpError(400, 'Неизвестный тип сигнала.');
-        const data = item.data ?? null;
-        if (JSON.stringify(data ?? null).length > SIGNAL_MAX_CHARS)
-          throw httpError(413, 'Сигнал слишком большой.');
-        pushSignal(target.id, {
+      items.forEach((item, index) => {
+        const checked = signalProblem(me, item);
+        if (checked.problem) {
+          rejected.push({ index, status: checked.status, error: checked.problem });
+          return;
+        }
+        pushSignal(checked.to, {
           id: `s_${(signalSeq += 1).toString(36)}`,
           from: me.id,
-          kind,
-          data,
+          kind: checked.kind,
+          data: checked.data,
           at: Date.now(),
         });
         sent += 1;
-      }
+      });
+      /* Ничего не доставлено — это ошибка запроса, как и раньше (код и текст
+         первой причины). Частичный успех отвечает 200 с перечнем. */
+      if (sent === 0 && rejected.length > 0) throw httpError(rejected[0].status, rejected[0].error);
       /* Живой сигналинг — тоже признак присутствия. */
       me.online = true;
       me.seenAt = Date.now();
       save.soon();
-      return { ok: true, sent };
+      return { ok: true, sent, rejected };
     },
 
     /* Длинный опрос: висим до первого сигнала или 20 секунд. Так
@@ -942,6 +965,11 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
        сокета (см. hub-lobby.mjs, раздел WebSocket). */
     socket: lobbies.socket,
 
+    /* Периодическая уборка: мёртвые сокеты и пустые лобби. Адаптер вызывает её
+       по таймеру (ПК — setInterval, хостинг — пока объект жив), чтобы не ждать
+       HTTP-запроса. Сохранение адаптер делает сам через persist. */
+    tick: lobbies.tick,
+
     /** Разбор одного запроса к /api/*. Ответ — { status, json }. */
     async handle(req) {
       const path = req.path;
@@ -974,6 +1002,11 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       }
     },
 
-    stats: () => ({ users: db.users.length, requests: db.requests.length, p2p: inboxes.size }),
+    stats: () => ({
+      users: db.users.length,
+      requests: db.requests.length,
+      p2p: inboxes.size,
+      sockets: lobbies.stats().sockets,
+    }),
   };
 }

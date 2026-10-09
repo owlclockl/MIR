@@ -97,6 +97,8 @@ export class MirHub {
     this.snapshot = new Map(); // ключ хранилища → как он выглядел при последней записи
     this.lastPresenceWrite = 0;
     this.pending = null;
+    this.trailingWrite = null; // отложенная запись, когда окно PRESENCE_WRITE_MS ещё закрыто
+    this.ticker = null; // уборка мёртвых сокетов; работает, пока открыт хотя бы один
 
     /* Пока идёт загрузка, объект не обрабатывает запросы — иначе
        первый же игрок увидел бы пустой хаб и «зарегистрировался»
@@ -206,10 +208,35 @@ export class MirHub {
   persist(immediate) {
     if (immediate) return this.flush();
     const now = Date.now();
-    if (now - this.lastPresenceWrite < PRESENCE_WRITE_MS) return undefined;
+    const wait = PRESENCE_WRITE_MS - (now - this.lastPresenceWrite);
+    if (wait > 0) {
+      /* Окно записи закрыто, но изменение не отбрасываем: записываем, когда
+         окно откроется. Раньше такая запись пропадала вовсе, если больше
+         ничего не менялось, — и потом терялась при остановке объекта. */
+      if (!this.trailingWrite) {
+        this.trailingWrite = setTimeout(() => {
+          this.trailingWrite = null;
+          this.persist(false);
+        }, wait);
+      }
+      return undefined;
+    }
     this.lastPresenceWrite = now;
     this.pending = this.flush().catch(() => {});
     return undefined;
+  }
+
+  /* Уборка мёртвых сокетов и пустых лобби. Таймер заводим только при открытом
+     сокете: пустой объект без таймера может уснуть, а не платить за простой. */
+  ensureTicker() {
+    if (this.ticker) return;
+    this.ticker = setInterval(() => {
+      this.core.tick();
+      if (this.core.stats().sockets === 0) {
+        clearInterval(this.ticker);
+        this.ticker = null;
+      }
+    }, 15_000);
   }
 
   /* Живой канал лобби: WebSocket на той же самой Durable Object, что и весь хаб.
@@ -218,6 +245,7 @@ export class MirHub {
      кто-то в нём открыл «Играть». */
   upgrade(request) {
     if (!this.core) return json(503, { error: 'Хаб временно недоступен.' });
+    this.ensureTicker();
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
