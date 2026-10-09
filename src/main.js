@@ -637,7 +637,7 @@ const CLOCK = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-dig
 const chatRowHtml = (message) => `
   <div class="chat__row${message.mine ? ' chat__row--mine' : ''}">
     <p class="chat__bubble">${escapeHtml(message.text)}</p>
-    <small class="chat__meta">${CLOCK.format(new Date(message.at))}${message.via === 'relay' ? ' · через хаб' : ''}</small>
+    <small class="chat__meta">${CLOCK.format(new Date(message.at))}${message.via === 'relay' ? ' · через хаб' : message.via === 'failed' ? ' · не доставлено' : ''}</small>
   </div>`;
 
 const chatHtml = (peerId, { placeholder }) => {

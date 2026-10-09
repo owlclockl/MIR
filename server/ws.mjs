@@ -74,10 +74,17 @@ export function acceptWebSocket(req, socket, head, handlers) {
   );
   socket.setNoDelay(true);
   socket.setTimeout(0);
+  /* Keepalive ловит разрыв, о котором TCP молчит часами (телефон ушёл из сети). */
+  socket.setKeepAlive(true, 15_000);
 
-  let buffer = Buffer.alloc(0);
   let closed = false;
   let fragments = null; // { opcode, parts, size }
+  /* Входящие куски копим списком и склеиваем, только когда набрался весь
+     текущий кадр: склейка на каждом куске TCP давала квадратичную работу
+     (кадр карты в 16 МБ приходит сотнями кусков). */
+  let pieces = [];
+  let pendingBytes = 0;
+  let need = 0; // сколько байт нужно для текущего кадра, когда его заголовок разобран
 
   const finish = () => {
     if (closed) return;
@@ -162,11 +169,25 @@ export function acceptWebSocket(req, socket, head, handlers) {
     conn.close(code, 'protocol');
   }
 
+  /* Оставляем недособранный кусок до следующих данных. wanted — сколько байт
+     нужно для кадра целиком (0, если заголовок ещё не полный). */
+  const park = (rest, wanted) => {
+    pieces = rest.length ? [rest] : [];
+    pendingBytes = rest.length;
+    need = wanted;
+  };
+
   const feed = (chunk) => {
     if (closed) return;
-    buffer = buffer.length ? Buffer.concat([buffer, chunk]) : chunk;
+    pieces.push(chunk);
+    pendingBytes += chunk.length;
+    if (pendingBytes < need) return;
+    let buffer = pieces.length === 1 ? pieces[0] : Buffer.concat(pieces, pendingBytes);
+    pieces = [];
+    pendingBytes = 0;
+    need = 0;
     while (!closed) {
-      if (buffer.length < 2) return;
+      if (buffer.length < 2) return park(buffer, 0);
       const b0 = buffer[0];
       const b1 = buffer[1];
       const fin = (b0 & 0x80) !== 0;
@@ -175,11 +196,11 @@ export function acceptWebSocket(req, socket, head, handlers) {
       let length = b1 & 0x7f;
       let offset = 2;
       if (length === 126) {
-        if (buffer.length < 4) return;
+        if (buffer.length < 4) return park(buffer, 0);
         length = buffer.readUInt16BE(2);
         offset = 4;
       } else if (length === 127) {
-        if (buffer.length < 10) return;
+        if (buffer.length < 10) return park(buffer, 0);
         const big = buffer.readBigUInt64BE(2);
         if (big > BigInt(MAX_MESSAGE_BYTES)) return fail(1009);
         length = Number(big);
@@ -190,7 +211,7 @@ export function acceptWebSocket(req, socket, head, handlers) {
       if (opcode >= 0x8 && (!fin || length > 125)) return fail(1002);
       if (length > MAX_MESSAGE_BYTES) return fail(1009);
       const total = offset + 4 + length;
-      if (buffer.length < total) return;
+      if (buffer.length < total) return park(buffer, total);
       const mask = buffer.subarray(offset, offset + 4);
       const payload = Buffer.allocUnsafe(length);
       for (let i = 0; i < length; i += 1) payload[i] = buffer[offset + 4 + i] ^ mask[i & 3];

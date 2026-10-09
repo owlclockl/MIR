@@ -294,7 +294,9 @@ const server = createServer((req, res) => {
 
 function log(req, status, started) {
   const mark = status >= 400 ? '×' : '·';
-  const path = (req.url || '/').slice(0, 60);
+  /* Строка запроса в журнал не идёт: в ней бывает токен сессии (старые сборки
+     передают его так). Путь достаточен для диагностики. */
+  const path = (req.url || '/').split('?')[0].slice(0, 60);
   const duration = Date.now() - started;
   /* Метод в строке обязателен: 404 GET /api/invite/use («нет такого
      метода») и 404 POST /api/invite/use («код не найден») — два
@@ -718,6 +720,12 @@ async function openTunnel(port) {
 
 const cleanup = () => {
   stopTunnelWatchdog();
+  /* Остановка не должна терять то, что хаб ещё не записал на диск. */
+  try {
+    hub?.flush();
+  } catch (error) {
+    console.error(`Данные хаба не сохранились при остановке: ${error.message}`);
+  }
   if (activeChildProcess && !activeChildProcess.killed) {
     activeChildProcess.kill();
   }
