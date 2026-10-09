@@ -307,6 +307,16 @@ function log(req, status, started) {
 
 /* ---------- запуск с подбором свободного порта ---------- */
 
+/* Живой канал лобби: обновление соединения отдаём хабу; всё, что не /api/ws, рвём. */
+server.on('upgrade', (req, socket, head) => {
+  const path = (req.url || '').split('?')[0];
+  if (hub && path === '/api/ws') {
+    hub.upgrade(req, socket, head);
+    return;
+  }
+  socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+});
+
 function listen(port, attemptsLeft = 10) {
   const onError = (err) => {
     server.off('listening', onListening);

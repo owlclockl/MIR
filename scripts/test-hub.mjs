@@ -474,6 +474,241 @@ const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body
   expect('после сброса снова исходный ключ', afterReset.status === 200, `${afterReset.status}`);
 }
 
+/* ---------- 5б. лобби и живая карта ----------
+   Лобби живёт в хабе: состав и параметры — по HTTP, карта и ход лобби —
+   по WebSocket (/api/ws). Проверяем оба канала и правило «карту шлёт
+   только мастер», которое держит сервер, а не интерфейс. */
+
+const wsBase = BASE.replace(/^http/, 'ws');
+const lobbyCode = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+const waitInbox = async (inbox, match, timeout = 8000) => {
+  const until = Date.now() + timeout;
+  for (;;) {
+    const index = inbox.findIndex(match);
+    if (index >= 0) return inbox.splice(index, 1)[0];
+    if (Date.now() > until) return null;
+    await sleep(20);
+  }
+};
+
+/* Открываем сокет и складываем входящие (JSON и бинарь) в очередь. */
+const openSocket = (timeout = 8000) =>
+  new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${wsBase}/api/ws`);
+    ws.binaryType = 'arraybuffer';
+    const inbox = [];
+    const client = {
+      ws,
+      inbox,
+      closed: null,
+      send: (value) => ws.send(value),
+      take: (match, ms) => waitInbox(inbox, match, ms),
+      /* Удобно ждать конкретный тип: take(t('lobby')). */
+      kind: (type) => (msg) => msg.t === type,
+    };
+    ws.onmessage = (event) => {
+      inbox.push(
+        typeof event.data === 'string'
+          ? JSON.parse(event.data)
+          : { t: 'bin', bytes: new Uint8Array(event.data) },
+      );
+    };
+    ws.onclose = (event) => {
+      client.closed = { code: event.code, reason: event.reason };
+    };
+    ws.onopen = () => resolve(client);
+    ws.onerror = () => reject(new Error('сокет не открылся'));
+    setTimeout(() => reject(new Error('сокет не открылся вовремя')), timeout);
+  });
+
+/* Кадр карты: [u32 длина заголовка][JSON][полезная нагрузка]. Сервер не
+   распаковывает gzip, поэтому здесь достаточно случайных байтов. */
+const mapFrame = (header, payloadBytes = 4000) => {
+  const json = new TextEncoder().encode(JSON.stringify(header));
+  const payload = crypto.getRandomValues(new Uint8Array(payloadBytes));
+  const out = new Uint8Array(4 + json.length + payload.length);
+  new DataView(out.buffer).setUint32(0, json.length);
+  out.set(json, 4);
+  out.set(payload, 4 + json.length);
+  return out;
+};
+
+const sameBytes = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+const noLobbyToken = await call('GET', '/api/lobby');
+expect('лобби без входа закрыто', noLobbyToken.status === 401, `${noLobbyToken.status}`);
+
+const badSize = await call('POST', '/api/lobby/create', {
+  token: A.token,
+  body: { seed: 'lobby-test', width: 999, height: 999 },
+});
+expect('лобби с чужим размером карты → 400', badSize.status === 400, badSize.data.error);
+
+const emptySeed = await call('POST', '/api/lobby/create', {
+  token: A.token,
+  body: { seed: '   ', width: 1280, height: 800 },
+});
+expect('лобби без seed → 400', emptySeed.status === 400, emptySeed.data.error);
+
+const created = await call('POST', '/api/lobby/create', {
+  token: A.token,
+  body: { seed: `lobby-${n}`, width: 1280, height: 800 },
+});
+expect('мастер создаёт лобби', created.status === 200 && lobbyCode.test(created.data.lobby?.code), created.data.lobby?.code);
+expect('создатель — мастер', created.data.lobby?.role === 'master');
+const LOBBY = created.data.lobby;
+
+const twice = await call('POST', '/api/lobby/create', {
+  token: A.token,
+  body: { seed: 'again', width: 1280, height: 800 },
+});
+expect('второе лобби того же мастера → 409', twice.status === 409, twice.data.error);
+
+const strangerInvite = await call('POST', '/api/lobby/invite', {
+  token: A.token,
+  body: { friendId: stranger.id },
+});
+expect('приглашать можно только друзей → 403', strangerInvite.status === 403, strangerInvite.data.error);
+
+const invited = await call('POST', '/api/lobby/invite', { token: A.token, body: { friendId: B.id } });
+expect('друг получает приглашение', invited.status === 200 && invited.data.ok === true, invited.data.error);
+
+const bState = await call('GET', '/api/lobby', { token: B.token });
+const invite = bState.data.invites?.find((item) => item.lobbyId === LOBBY.id);
+expect('приглашение видно в списке друга', !!invite && invite.code === LOBBY.code, invite?.fromName);
+
+const declinedTry = await call('POST', '/api/lobby/invite/decline', {
+  token: stranger.token,
+  body: { lobbyId: LOBBY.id },
+});
+expect('чужое отклонение не трогает приглашение друга', declinedTry.status === 200 && (await call('GET', '/api/lobby', { token: B.token })).data.invites.length === 1);
+
+const accepted = await call('POST', '/api/lobby/invite/accept', { token: B.token, body: { lobbyId: LOBBY.id } });
+expect('друг принимает приглашение', accepted.status === 200 && accepted.data.lobby?.members.length === 2, accepted.data.error);
+expect('принятое приглашение пропадает', !accepted.data.invites?.some((item) => item.lobbyId === LOBBY.id));
+
+const playerParams = await call('POST', '/api/lobby/params', {
+  token: B.token,
+  body: { seed: 'hijack', width: 1280, height: 800 },
+});
+expect('игрок не меняет параметры карты → 403', playerParams.status === 403, playerParams.data.error);
+
+const playerKick = await call('POST', '/api/lobby/kick', { token: B.token, body: { userId: A.id } });
+expect('игрок не исключает мастера → 403', playerKick.status === 403, playerKick.data.error);
+
+const byCode = await call('POST', '/api/lobby/join', { token: stranger.token, body: { code: LOBBY.code.toLowerCase() } });
+expect('вход по коду (в любом регистре) → 200', byCode.status === 200 && byCode.data.lobby?.members.length === 3, byCode.data.error);
+const leftByCode = await call('POST', '/api/lobby/leave', { token: stranger.token, body: {} });
+expect('игрок выходит из лобби', leftByCode.status === 200 && leftByCode.data.lobby === null);
+
+const badCode = await call('POST', '/api/lobby/join', { token: stranger.token, body: { code: 'ZZ' } });
+expect('кривой код → 400', badCode.status === 400, badCode.data.error);
+const noLobbyCode = await call('POST', '/api/lobby/join', { token: stranger.token, body: { code: 'ZZZZ-ZZZZ' } });
+expect('несуществующий код → 404', noLobbyCode.status === 404, noLobbyCode.data.error);
+
+const paramsOk = await call('POST', '/api/lobby/params', {
+  token: A.token,
+  body: { seed: `lobby-${n}-v2`, width: 1600, height: 1000 },
+});
+expect('мастер меняет карту лобби', paramsOk.status === 200 && paramsOk.data.lobby?.seed === `lobby-${n}-v2`, paramsOk.data.error);
+
+/* --- живой канал --- */
+
+const sMaster = await openSocket();
+const sPlayer = await openSocket();
+const sNoAuth = await openSocket();
+
+sNoAuth.send(JSON.stringify({ t: 'watch' }));
+const needAuth = await sNoAuth.take(sNoAuth.kind('error'));
+expect('без входа в сессию сокет получает отказ', needAuth?.message?.includes('войдите'), needAuth?.message);
+await sleep(100);
+expect('и закрывается с кодом 4001', sNoAuth.closed?.code === 4001, JSON.stringify(sNoAuth.closed));
+
+const sBadToken = await openSocket();
+sBadToken.send(JSON.stringify({ t: 'auth', token: 'ненастоящий' }));
+await sleep(150);
+expect('чужой токен на сокете → закрытие 4001', sBadToken.closed?.code === 4001, JSON.stringify(sBadToken.closed));
+
+sMaster.send(JSON.stringify({ t: 'auth', token: A.token }));
+const readyMaster = await sMaster.take(sMaster.kind('ready'));
+expect('мастер входит по сокету и видит своё лобби', readyMaster?.lobby?.id === LOBBY.id && readyMaster.lobby.role === 'master', readyMaster?.lobby?.role);
+
+sPlayer.send(JSON.stringify({ t: 'auth', token: B.token }));
+const readyPlayer = await sPlayer.take(sPlayer.kind('ready'));
+expect('игрок входит по сокету в то же лобби', readyPlayer?.lobby?.id === LOBBY.id && readyPlayer.lobby.role === 'player');
+
+const presenceOn = await sMaster.take((msg) => msg.t === 'lobby' && msg.lobby?.members.some((m) => m.id === B.id && m.online));
+expect('мастер видит игрока в сети', !!presenceOn);
+
+sPlayer.send(JSON.stringify({ t: 'watch' }));
+const watchEmpty = await sPlayer.take(sPlayer.kind('watched'));
+expect('карты ещё нет: watched hasMap=false', watchEmpty?.hasMap === false && watchEmpty.role === 'player', JSON.stringify(watchEmpty));
+const needMap = await sMaster.take(sMaster.kind('need-map'));
+expect('мастер получает need-map и публикует карту', needMap?.lobbyId === LOBBY.id);
+
+const frame1 = mapFrame({ t: 'map', lobbyId: LOBBY.id, seed: `lobby-${n}-v2`, width: 1600, height: 1000, enc: 'gzip' });
+sMaster.send(frame1);
+const got1 = await sPlayer.take((msg) => msg.t === 'bin');
+expect('кадр мастера доходит игроку без изменений', !!got1 && sameBytes(got1.bytes, frame1), `${got1?.bytes.length} байт`);
+const ack1 = await sMaster.take(sMaster.kind('ack'));
+expect('мастер получает подтверждение доставки', ack1?.seq === 1 && ack1.delivered === 1, JSON.stringify(ack1));
+
+sPlayer.send(mapFrame({ t: 'map', lobbyId: LOBBY.id, seed: 'подмена', width: 1280, height: 800, enc: 'gzip' }));
+const playerFrame = await sPlayer.take(sPlayer.kind('error'));
+expect('кадр от игрока отброшен сервером', playerFrame?.message?.includes('только мастер'), playerFrame?.message);
+
+sMaster.send(new Uint8Array([0, 0, 0, 9, 1, 2, 3]));
+const broken = await sMaster.take(sMaster.kind('error'));
+expect('испорченный кадр отвергнут', broken?.message === 'Кадр карты повреждён.', broken?.message);
+
+sMaster.send(mapFrame({ t: 'map', lobbyId: 'l_чужое', seed: 'x', width: 1280, height: 800, enc: 'gzip' }));
+const foreign = await sMaster.take(sMaster.kind('error'));
+expect('кадр чужого лобби отвергнут', foreign?.message === 'Кадр карты повреждён.', foreign?.message);
+
+sMaster.send(mapFrame({ t: 'map', lobbyId: LOBBY.id, seed: 'x', width: 777, height: 1, enc: 'gzip' }));
+const badSizeFrame = await sMaster.take(sMaster.kind('error'));
+expect('кадр с чужим размером отвергнут', badSizeFrame?.message === 'Кадр карты повреждён.', badSizeFrame?.message);
+
+sPlayer.send(JSON.stringify({ t: 'watch' }));
+const watchHas = await sPlayer.take(sPlayer.kind('watched'));
+expect('поздний вход получает кадр из памяти', watchHas?.hasMap === true && watchHas.seq === 1, JSON.stringify(watchHas));
+const late = await sPlayer.take((msg) => msg.t === 'bin');
+expect('и сам кадр вслед за ответом', !!late && sameBytes(late.bytes, frame1));
+
+sMaster.send(JSON.stringify({ t: 'progress', step: 'heights', name: 'Высоты рельефа', index: 3, total: 40 }));
+const progress = await sPlayer.take(sPlayer.kind('progress'));
+expect('ход генерации мастера виден игроку', progress?.index === 3 && progress.total === 40 && progress.name === 'Высоты рельефа', JSON.stringify(progress));
+
+const kicked = await call('POST', '/api/lobby/kick', { token: A.token, body: { userId: B.id } });
+expect('мастер исключает игрока', kicked.status === 200 && kicked.data.lobby?.members.length === 1, kicked.data.error);
+const kickMsg = await sPlayer.take(sPlayer.kind('closed'));
+expect('исключённый получает причину kicked', kickMsg?.reason === 'kicked', JSON.stringify(kickMsg));
+const bAfterKick = await call('GET', '/api/lobby', { token: B.token });
+expect('после исключения лобби у игрока пустое', bAfterKick.data.lobby === null);
+
+const reinvite = await call('POST', '/api/lobby/invite', { token: A.token, body: { friendId: B.id } });
+const liveInvite = await sPlayer.take((msg) => msg.t === 'invites' && msg.invites.some((item) => item.lobbyId === LOBBY.id));
+expect('приглашение приходит по открытому сокету сразу', reinvite.status === 200 && !!liveInvite, liveInvite?.invites.length);
+const reaccept = await call('POST', '/api/lobby/invite/accept', { token: B.token, body: { lobbyId: LOBBY.id } });
+expect('исключённого можно пригласить снова и он вернулся', reaccept.status === 200 && reaccept.data.lobby?.members.length === 2);
+
+/* Игрок падает с сокета — мастер видит, что он вышел из сети. */
+sPlayer.ws.close();
+const offlineSeen = await sMaster.take((msg) => msg.t === 'lobby' && msg.lobby?.members.some((m) => m.id === B.id && !m.online));
+expect('обрыв сокета виден мастеру как «не в сети»', !!offlineSeen);
+
+const masterLeaves = await call('POST', '/api/lobby/leave', { token: A.token, body: {} });
+expect('мастер закрывает лобби', masterLeaves.status === 200 && masterLeaves.data.lobby === null);
+const closedMsg = await sMaster.take(sMaster.kind('closed'));
+expect('мастер тоже получает closed (master-left)', closedMsg?.reason === 'master-left', JSON.stringify(closedMsg));
+const bAfterClose = await call('GET', '/api/lobby', { token: B.token });
+expect('лобби пропало и у игрока', bAfterClose.data.lobby === null && bAfterClose.data.invites.length === 0);
+
+sMaster.ws.close();
+sBadToken.ws.close();
+sNoAuth.ws.close();
+
 /* ---------- 7. уход из меню и явный выход ----------
 
    Разница принципиальная: закрытие вкладки и обновление страницы (F5)

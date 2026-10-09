@@ -19,6 +19,8 @@ export const getBase = () => base;
 export const setTokenGetter = (fn) => {
   tokenGetter = fn;
 };
+/* Токен нужен живому каналу лобби: он уходит первым сообщением, а не в адресе. */
+export const currentToken = () => tokenGetter();
 export const applyState = (state) => {
   cache = { users: state.users ?? [], requests: state.requests ?? [] };
 };
@@ -143,3 +145,17 @@ export const apiAdminRequest = (key, requestId) =>
 /** Смена ключа панели на хабе: { key } — новый ключ, { reset: true } — возврат заводского. */
 export const apiAdminKey = (key, payload) =>
   call('POST', '/api/admin/key', payload, { headers: adminHeaders(key), timeout: 15_000 });
+
+/* ---------- лобби и живая карта ------------------------------
+   Состав лобби и параметры — HTTP; сама карта и ход синхронизации —
+   по WebSocket (src/data/lobby.js). Ошибки приходят с текстом от хаба. */
+
+export const apiLobbyGet = () => call('GET', '/api/lobby');
+export const apiLobbyCreate = (payload) => call('POST', '/api/lobby/create', payload);
+export const apiLobbyJoin = (code) => call('POST', '/api/lobby/join', { code });
+export const apiLobbyInvite = (friendId) => call('POST', '/api/lobby/invite', { friendId });
+export const apiLobbyAccept = (lobbyId) => call('POST', '/api/lobby/invite/accept', { lobbyId });
+export const apiLobbyDecline = (lobbyId) => call('POST', '/api/lobby/invite/decline', { lobbyId });
+export const apiLobbyLeave = () => call('POST', '/api/lobby/leave', {});
+export const apiLobbyKick = (userId) => call('POST', '/api/lobby/kick', { userId });
+export const apiLobbyParams = (payload) => call('POST', '/api/lobby/params', payload);

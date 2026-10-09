@@ -14,6 +14,8 @@
    Ограничение игрока — интерфейсное: панели правки скрываются стилями,
    а не запрещаются. Тот, кто откроет инструменты разработчика, их увидит. */
 
+import { attachGenerationStage, injectGenerationHook } from './generation-stage.js';
+
 const TEMPLATE_ID = 'mir-fmg-template';
 /* В шаблоне стоит JSON-строка с этим плейсхолдером — сюда подставляется запрос. */
 const QUERY_PLACEHOLDER = '"__FMG_QUERY__"';
@@ -56,7 +58,10 @@ const restrictEditor = (frame) => {
  * iframe с картой. Каждый вызов создаёт новый документ: Azgaar строит карту
  * при загрузке, поэтому смена seed или размера — это новый документ.
  * @param {{ seed: string, width: number, height: number }} config
- * @param {{ restricted?: boolean }} [options] restricted — панели правки скрыты (игрок).
+ * @param {{ restricted?: boolean }} [options]
+ *   restricted — панели правки скрыты (игрок). События хода генерации —
+ *   через attachGenerationStage (generation-stage.js), см. синхронизацию лобби.
+ * Анимация создания карты подключается всегда — и в одиночной игре, и в лобби.
  */
 export const createEditorFrame = ({ seed, width, height }, { restricted = false } = {}) => {
   const query = editorQuery({ seed, width, height });
@@ -68,7 +73,7 @@ export const createEditorFrame = ({ seed, width, height }, { restricted = false 
   frame.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
   if (template) {
     /* Функция в replace: `$` внутри seed не должна стать спецсимволом подстановки. */
-    frame.srcdoc = template.replace(QUERY_PLACEHOLDER, () => JSON.stringify(query).replace(/</g, '\\u003c'));
+    frame.srcdoc = injectGenerationHook(template.replace(QUERY_PLACEHOLDER, () => JSON.stringify(query).replace(/</g, '\\u003c')));
   } else {
     frame.src = new URL(`fmg/index.html${query}`, document.baseURI).href;
   }
@@ -77,5 +82,6 @@ export const createEditorFrame = ({ seed, width, height }, { restricted = false 
   frame.addEventListener('load', () => {
     if (restricted) restrictEditor(frame);
   });
+  attachGenerationStage(frame);
   return frame;
 };

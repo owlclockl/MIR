@@ -22,6 +22,7 @@ import {
   HUB_DEFAULT_ADMIN_KEY,
   MAX_REQUEST_BYTES,
 } from './hub-core.mjs';
+import { acceptWebSocket } from './ws.mjs';
 
 const clientIp = (req) =>
   String(req.headers['cf-connecting-ip'] || '')
@@ -55,9 +56,11 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
            Файлы старых версий этих полей не знают — ядро дополнит. */
         settings: parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : undefined,
         events: Array.isArray(parsed.events) ? parsed.events : [],
+        /* Состав лобби (без карт): переживает перезапуск вместе с данными. */
+        lobbies: Array.isArray(parsed.lobbies) ? parsed.lobbies : [],
       };
     } catch {
-      return { users: [], requests: [], adminKey: '', events: [] };
+      return { users: [], requests: [], adminKey: '', events: [], lobbies: [] };
     }
   };
 
@@ -134,6 +137,20 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   };
 
   return {
+    /** Обновление до WebSocket: живой канал лобби (/api/ws). */
+    upgrade(req, socket, head) {
+      const url = new URL(req.url || '/', 'http://x');
+      if (url.pathname !== '/api/ws') {
+        socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+        return;
+      }
+      acceptWebSocket(req, socket, head, {
+        open: (conn) => core.socket.open(conn),
+        message: (conn, data) => core.socket.message(conn, data),
+        close: (conn) => core.socket.close(conn),
+      });
+    },
+
     /** true, если запрос был про API. */
     async handle(req, res) {
       const url = new URL(req.url || '/', 'http://x');
