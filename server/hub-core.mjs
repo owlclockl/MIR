@@ -30,6 +30,8 @@
              отложить» (сердцебиения приходят часто).
    =========================================================== */
 
+import { createLobbies } from './hub-lobby.mjs';
+
 const MAX_AVATAR_CHARS = 300 * 1024;
 export const MAX_REQUEST_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
@@ -403,6 +405,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
   });
 
   const adminDropUser = (user) => {
+    lobbies.forgetUser(user.id, 'Аккаунт удалён администратором.');
     db.users = db.users.filter((u) => u.id !== user.id);
     for (const other of db.users) {
       if (other.friends?.includes(user.id))
@@ -411,11 +414,28 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     db.requests = db.requests.filter((r) => r.from !== user.id && r.to !== user.id);
   };
 
+  /* ---------- лобби и живой канал карты ------------------------
+     Состав лобби живёт в db.lobbies, кадры карты — только в памяти.
+     Маршруты и WebSocket-обработчики — в hub-lobby.mjs. */
+
+  const lobbies = createLobbies({
+    db,
+    auth,
+    byId,
+    byToken,
+    banOf,
+    makeCode: makeInviteCode,
+    normalizeCode,
+    hex,
+    persistSoon,
+  });
+
   /* ---------- обработчики маршрутов ----------------------------
      Возвращают тело ответа. Мутации сами просят сохранение:
      save.now() — ответ ждёт записи, save.soon() — можно отложить. */
 
   const routes = {
+    ...lobbies.routes,
     'GET /api/ping': () => ({ ok: true, hub: 'mir', users: db.users.length }),
 
     'GET /api/salt': (req) => {
@@ -709,6 +729,7 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
             text: reason || (hours ? '' : 'навсегда'),
             until: user.ban.until,
           });
+          lobbies.forgetUser(user.id, 'Аккаунт заблокирован администратором.');
           break;
         }
         case 'unban': {
@@ -917,6 +938,10 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
   };
 
   return {
+    /* Живой канал: адаптер передаёт сюда открытие, сообщения и закрытие
+       сокета (см. hub-lobby.mjs, раздел WebSocket). */
+    socket: lobbies.socket,
+
     /** Разбор одного запроса к /api/*. Ответ — { status, json }. */
     async handle(req) {
       const path = req.path;

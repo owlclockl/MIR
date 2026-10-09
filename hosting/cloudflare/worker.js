@@ -119,12 +119,16 @@ export class MirHub {
       this.snapshot.set('settings', JSON.stringify(settings));
       const events = (await state.storage.get('events')) ?? [];
       this.snapshot.set('events', JSON.stringify(events));
+      /* Состав лобби (без карт): переживает перезапуск объекта. */
+      const lobbies = (await state.storage.get('lobbies')) ?? [];
+      this.snapshot.set('lobbies', JSON.stringify(lobbies));
       this.db = {
         users,
         requests,
         adminKey: typeof adminKey === 'string' ? adminKey : '',
         settings: settings && typeof settings === 'object' ? settings : undefined,
         events: Array.isArray(events) ? events : [],
+        lobbies: Array.isArray(lobbies) ? lobbies : [],
       };
       this.core = createHubCore({
         db: this.db,
@@ -177,6 +181,11 @@ export class MirHub {
       puts.events = this.db.events ?? [];
       snapshotsAfterWrite.set('events', events);
     }
+    const lobbies = JSON.stringify(this.db.lobbies ?? []);
+    if (this.snapshot.get('lobbies') !== lobbies) {
+      puts.lobbies = this.db.lobbies ?? [];
+      snapshotsAfterWrite.set('lobbies', lobbies);
+    }
     const gone = [...this.snapshot.keys()].filter((key) => key.startsWith('u:') && !alive.has(key));
     /* Больше 128 ключей за раз хранилище не принимает. */
     const keys = Object.keys(puts);
@@ -203,9 +212,52 @@ export class MirHub {
     return undefined;
   }
 
+  /* Живой канал лобби: WebSocket на той же самой Durable Object, что и весь хаб.
+     Соединение принимаем сами (не hibernation API): так кадр карты уходит
+     без задержки на пробуждение объекта, а лобби работает только пока
+     кто-то в нём открыл «Играть». */
+  upgrade(request) {
+    if (!this.core) return json(503, { error: 'Хаб временно недоступен.' });
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+    server.accept();
+    const conn = {
+      send: (payload) => server.send(payload),
+      close: (code, reason) => {
+        try {
+          server.close(code, reason);
+        } catch {
+          /* соединение уже закрыто */
+        }
+      },
+    };
+    /* Текст приходит строкой, бинарь — Blob (так отдаёт локальный workerd;
+       в продакшене — ArrayBuffer). Ядру нужны байты, поэтому Blob читаем до
+       передачи. Очередь на соединение сохраняет порядок: авторизация и
+       команды не обгоняют кадры карты, и наоборот. */
+    let inbox = Promise.resolve();
+    server.addEventListener('message', (event) => {
+      inbox = inbox
+        .then(async () => {
+          const data =
+            event.data && typeof event.data === 'object' && typeof event.data.arrayBuffer === 'function'
+              ? await event.data.arrayBuffer()
+              : event.data;
+          this.core.socket.message(conn, data);
+        })
+        .catch(() => {});
+    });
+    server.addEventListener('close', () => this.core.socket.close(conn));
+    server.addEventListener('error', () => this.core.socket.close(conn));
+    this.core.socket.open(conn);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return json(204, null);
+    if (url.pathname === '/api/ws' && request.headers.get('Upgrade') === 'websocket') return this.upgrade(request);
     let body = {};
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       const parsed = await readJsonBody(request);
@@ -242,6 +294,12 @@ export default {
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
     try {
+      /* Обновление до WebSocket проходит без пересборки тела: поток нужен
+         только для обычных запросов с JSON. */
+      if (url.pathname === '/api/ws' && request.headers.get('Upgrade') === 'websocket') {
+        return await env.HUB.get(env.HUB.idFromName('mir')).fetch(request);
+      }
+
       let requestForHub = request;
       if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS') {
         const contentLength = request.headers.get('Content-Length');

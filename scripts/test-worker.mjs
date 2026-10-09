@@ -279,5 +279,154 @@ ok(
   `${failedWorkerResponse.status} ${errorEvent.event || 'лога нет'}`,
 );
 
+/* ---------- лобби поверх хостингового адаптера ----------
+   Состав лобби лежит в хранилище объекта (ключ 'lobbies') и обязан
+   пережить перезапуск. Живой канал идёт через WebSocketPair, которого в
+   Node нет: ставим свою пару. Node также не принимает Response со
+   статусом 101 — для этого ответа нужна тонкая обёртка. */
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+class FakeEnd {
+  constructor() {
+    this.listeners = {};
+    this.peer = null;
+  }
+  accept() {}
+  addEventListener(type, fn) {
+    (this.listeners[type] ??= []).push(fn);
+  }
+  emit(type, event) {
+    for (const fn of this.listeners[type] ?? []) fn(event);
+  }
+  send(data) {
+    /* Как настоящий workerd: бинарь приходит Blob, а не ArrayBuffer. */
+    const delivered = data instanceof ArrayBuffer ? new Blob([data]) : data;
+    this.peer.emit('message', { data: delivered });
+  }
+  close(code, reason) {
+    this.peer.emit('close', { code, reason });
+  }
+}
+
+globalThis.WebSocketPair = class {
+  constructor() {
+    const client = new FakeEnd();
+    const server = new FakeEnd();
+    client.peer = server;
+    server.peer = client;
+    this[0] = client;
+    this[1] = server;
+  }
+};
+
+const NativeResponse = globalThis.Response;
+globalThis.Response = class extends NativeResponse {
+  constructor(body, init) {
+    if (init?.status === 101) {
+      super(body, { status: 200, headers: init.headers });
+      Object.defineProperty(this, 'status', { value: 101 });
+      this.webSocket = init.webSocket;
+    } else {
+      super(body, init);
+    }
+  }
+};
+
+const lobbyStore = makeStorage();
+let lobbyCall = await boot(lobbyStore);
+
+const registerLive = async (name) => {
+  const salt = hex(16);
+  const passHash = await sha256(`${salt}:secret123`);
+  const r = await lobbyCall('POST', '/api/register', { name, salt, passHash });
+  const token = r.data.token;
+  const auth = { Authorization: `Bearer ${token}` };
+  const s = await lobbyCall('GET', '/api/state', undefined, auth);
+  const self = s.data.users.find((u) => u.name === name);
+  return { name, token, auth, id: self.id, invite: self.inviteCode };
+};
+
+const M = await registerLive('lobbymaster');
+const P = await registerLive('lobbyplayer');
+const linked = await lobbyCall('POST', '/api/invite/use', { code: M.invite }, P.auth);
+ok('игрок подружился с мастером по коду (хостинг)', linked.status === 200, `${linked.status}`);
+
+const created = await lobbyCall('POST', '/api/lobby/create', { seed: 'cloud-lobby', width: 1280, height: 800 }, M.auth);
+const CODE = created.data.lobby?.code ?? '';
+const LID = created.data.lobby?.id ?? '';
+ok('мастер создаёт лобби на хостинге', created.status === 200 && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(CODE), CODE);
+
+const sent = await lobbyCall('POST', '/api/lobby/invite', { friendId: P.id }, M.auth);
+const accepted = await lobbyCall('POST', '/api/lobby/invite/accept', { lobbyId: LID }, P.auth);
+ok('друг принимает приглашение', sent.status === 200 && accepted.status === 200 && accepted.data.lobby?.members.length === 2);
+
+/* «Перезапуск»: объект создаётся заново поверх того же хранилища. */
+lobbyCall = await boot(lobbyStore);
+const afterRestart = await lobbyCall('GET', '/api/lobby', undefined, P.auth);
+ok(
+  'состав лобби переживает перезапуск объекта',
+  afterRestart.data.lobby?.code === CODE && afterRestart.data.lobby.members.length === 2 && afterRestart.data.lobby.seed === 'cloud-lobby',
+  `${afterRestart.data.lobby?.members.length ?? 0} в лобби`,
+);
+
+/* --- живой канал через Durable Object --- */
+
+const openLive = async (who) => {
+  const response = await lobbyCall.hub.fetch(
+    new Request('https://mir.example.workers.dev/api/ws', { headers: { Upgrade: 'websocket' } }),
+  );
+  const end = response.webSocket;
+  const inbox = [];
+  end.addEventListener('message', (event) => {
+    inbox.push(typeof event.data === 'string' ? JSON.parse(event.data) : new Uint8Array(event.data));
+  });
+  end.send(JSON.stringify({ t: 'auth', token: who.token }));
+  await sleep(20);
+  return { status: response.status, end, inbox };
+};
+
+const frameOf = (header, size = 3000) => {
+  const json = new TextEncoder().encode(JSON.stringify(header));
+  const payload = crypto.getRandomValues(new Uint8Array(size));
+  const out = new Uint8Array(4 + json.length + payload.length);
+  new DataView(out.buffer).setUint32(0, json.length);
+  out.set(json, 4);
+  out.set(payload, 4 + json.length);
+  return out;
+};
+
+const mLive = await openLive(M);
+ok('WebSocket открывается через Durable Object', mLive.status === 101, `${mLive.status}`);
+const mReady = mLive.inbox.find((m) => m?.t === 'ready');
+ok('мастер входит по сокету и видит лобби', mReady?.lobby?.id === LID && mReady.lobby.role === 'master');
+
+const pLive = await openLive(P);
+const pReady = pLive.inbox.find((m) => m?.t === 'ready');
+ok('игрок входит по сокету в то же лобби', pReady?.lobby?.id === LID && pReady.lobby.role === 'player');
+
+const frame = frameOf({ t: 'map', lobbyId: LID, seed: 'cloud-lobby', width: 1280, height: 800, enc: 'gzip' });
+mLive.end.send(frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength));
+await sleep(40);
+const relayed = pLive.inbox.find((m) => m instanceof Uint8Array);
+ok(
+  'кадр мастера уходит игроку через Durable Object без изменений',
+  !!relayed && relayed.length === frame.length && relayed.every((v, i) => v === frame[i]),
+  `${relayed?.length ?? 0} байт`,
+);
+const acked = mLive.inbox.find((m) => m?.t === 'ack');
+ok('мастер получает подтверждение', acked?.seq === 1 && acked.delivered === 1, JSON.stringify(acked ?? null));
+
+pLive.end.send(frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength));
+await sleep(40);
+const playerRefused = pLive.inbox.find((m) => m?.t === 'error' && m.message?.includes('только мастер'));
+ok('кадр от игрока отброшен и на хостинге', !!playerRefused, playerRefused?.message ?? '');
+
+const late = await openLive(P);
+late.end.send(JSON.stringify({ t: 'watch' }));
+await sleep(40);
+const watched = late.inbox.find((m) => m?.t === 'watched');
+ok('поздний вход получает кадр из памяти объекта', watched?.hasMap === true && watched.seq === 1, JSON.stringify(watched ?? null));
+
 console.log(failures === 0 ? '\nВСЁ ХОРОШО' : `\nПЛОХО: провалов ${failures}`);
 process.exit(failures === 0 ? 0 : 1);
