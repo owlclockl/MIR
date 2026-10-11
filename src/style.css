@@ -4610,6 +4610,124 @@ button.admin-row:hover {
   font-size: 13px;
 }
 
+/* ---------- карта: воксельный вид того же мира ---------------- */
+
+/* Режим — надстройка над редактором, а не новый экран: документ Azgaar живёт
+   под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
+   просто скрывается visibility, а не вынимается из DOM. */
+.world-app.is-voxel .world-editor-frame {
+  visibility: hidden;
+}
+
+.world-app.is-voxel .world-attribution {
+  display: none;
+}
+
+.world-topbar-button.is-on {
+  color: var(--world-bg);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.world-voxel {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(#8fb6d4 0%, #cfe0ea 62%, #a9c1cf 100%);
+}
+
+.world-voxel-canvas {
+  flex: 1 1 auto;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  outline: none;
+  cursor: grab;
+  /* Без этого жест на телефоне прокручивал бы страницу вместо поворота камеры. */
+  touch-action: none;
+}
+
+.world-voxel-canvas:active {
+  cursor: grabbing;
+}
+
+.world-voxel-canvas:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Строка состояния: координаты, блок под курсором, цена кадра. Лежит поверх
+   холста и мыши не перехватывает — всем управляет canvas. */
+.world-voxel-hud {
+  position: absolute;
+  left: var(--sp-12);
+  bottom: var(--sp-12);
+  max-width: calc(100% - var(--sp-32));
+  padding: var(--sp-6) var(--sp-10);
+  border: 1px solid var(--world-line);
+  background: rgba(8, 13, 14, 0.72);
+  color: var(--text-soft);
+  font: 500 11px/1.45 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.world-voxel-toolbar {
+  position: absolute;
+  top: var(--sp-12);
+  right: var(--sp-12);
+  display: flex;
+  gap: var(--sp-6);
+}
+
+.world-voxel-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--world-line);
+  background: rgba(8, 13, 14, 0.72);
+  color: var(--text-soft);
+  font: 600 12px/1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.world-voxel-button:hover,
+.world-voxel-button:focus-visible {
+  color: var(--text);
+  border-color: var(--world-line-strong);
+  background: var(--fill-hover);
+  outline: none;
+}
+
+.world-voxel-button.is-on {
+  color: var(--world-bg);
+  border-color: var(--warn);
+  background: var(--warn);
+}
+
+/* Пояснение режима: чем засеян мир, чего не хватает. Тонкая тёплая плашка —
+   это не ошибка, это состояние. */
+.world-voxel-note {
+  position: absolute;
+  top: var(--sp-12);
+  left: 50%;
+  margin: 0;
+  padding: var(--sp-6) var(--sp-14);
+  border: 1px solid var(--warn-glow);
+  background: rgba(8, 13, 14, 0.82);
+  color: var(--warn);
+  font: 500 11px/1.45 var(--font-ui);
+  text-align: center;
+  transform: translateX(-50%);
+  max-width: calc(100% - var(--sp-32));
+}
+
 /* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.
    Снимается, когда пошёл первый шаг генерации (generation-stage.js). */
 /* ---------- лобби: экран, плашка статуса, вход из слотов ---------- */
