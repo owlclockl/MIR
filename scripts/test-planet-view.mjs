@@ -104,6 +104,8 @@ for (const name of GLOBALS) {
 
 const { mountPlanetView } = await import('../src/planet/view.js');
 const { LAYERS } = await import('../src/planet/paint.js');
+const { blobsSource } = await import('./lib/planet-source.mjs');
+const { fakeEditorWindow } = await import('./lib/fake-fmg.mjs');
 
 const host = window.document.querySelector('[data-role="world-editor-host"]');
 const frame = host.querySelector('.world-editor-frame');
@@ -181,6 +183,44 @@ if (view) {
   add(Number.isFinite(stats.mpp) && stats.mpp > 0, 'масштаб кадра известен', `${stats.mpp} м/пиксель`);
   add(Boolean(el.querySelector('[data-role="status"]')?.textContent?.includes('/пиксель')), 'строка состояния показывает масштаб',
     el.querySelector('[data-role="status"]')?.textContent ?? '—');
+
+  /* География: документ Azgaar в jsdom пуст (about:blank), поэтому мир
+     процедурный — и вид обязан сказать об этом прямо, а не молча рисовать
+     выдуманные материки. */
+  const sourceNote = () => el.querySelector('[data-role="source"]')?.textContent ?? '';
+  add(view.stats?.().geography === 'procedural', 'без данных генератора мир процедурный',
+    `география: ${view.stats?.().geography}`);
+  add(/не готова/.test(sourceNote()), 'причина отказа не перезатерта общей фразой', sourceNote());
+
+  /* Кнопка пересъёма есть и работает даже тогда, когда снять нечего. */
+  const resync = el.querySelector('[data-action="resync"]');
+  add(Boolean(resync?.textContent?.trim()), 'кнопка «С карты» на месте', resync?.textContent?.trim() ?? '—');
+  resync?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await wait(40);
+  add(/Azgaar/i.test(sourceNote()), 'отказ пересъёма объяснён, а не проглочен', sourceNote());
+
+  /* Живой документ: те же поля, что читает воксельный мост, наклеены на окно
+     iframe — вид обязан подхватить географию и пересобрать мир. */
+  Object.assign(frame.contentWindow, fakeEditorWindow());
+  resync.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await wait(120);
+  const sourcedStats = view.stats?.() ?? {};
+  add(sourcedStats.geography === 'azgaar', 'карта Azgaar подхвачена: мир пересобран по её берегам',
+    `география: ${sourcedStats.geography}`);
+  add(/карта Azgaar/.test(sourceNote()), 'подпись показывает, чем засеян мир', sourceNote());
+  add(Number.isFinite(sourcedStats.detailFrom), 'известно, с какой октавы начинается деталь',
+    `октава ${sourcedStats.detailFrom}`);
+
+  /* ---------- вид с готовым снимком (без iframe) ---------- */
+  const spare = window.document.createElement('div');
+  spare.className = 'world-editor';
+  spare.dataset.role = 'world-editor-host';
+  window.document.body.append(spare);
+  const second = mountPlanetView(spare, { seed: 'proba', size: 1, source: blobsSource(), onExit: () => {} });
+  add(second.stats?.().geography === 'azgaar', 'снимок, переданный напрямую, тоже задаёт географию',
+    `география: ${second.stats?.().geography}`);
+  second.dispose();
+  spare.remove();
 
   /* Снятие вида. */
   view.dispose();
