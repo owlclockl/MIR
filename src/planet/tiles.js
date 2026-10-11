@@ -227,13 +227,12 @@ export const createTiles = ({ planet, elevation, climate, hydro }) => {
       let fallback = 0;
       for (let ty = ty0; ty <= ty1; ty += 1) {
         for (let tx = tx0; tx <= tx1; tx += 1) {
-          /* По долготе мир замкнут, поэтому тайлы повторяются; по широте
-             кадр может выйти за полюс — такие тайлы просто не рисуем. */
-          const wrapped = ((tx % tiles.tx) + tiles.tx) % tiles.tx;
-          if (ty < 0 || ty >= tiles.ty) continue;
-          const found = this.best(level, wrapped, ty);
+          /* Мир не замкнут: тайлы за рамкой карты не повторяются с другого
+             края, их вовсе нет. Кадр, выехавший за рамку, показывает фон. */
+          if (ty < 0 || ty >= tiles.ty || tx < 0 || tx >= tiles.tx) continue;
+          const found = this.best(level, tx, ty);
           if (!found) {
-            this.request(level, wrapped, ty);
+            this.request(level, tx, ty);
             continue;
           }
           const dx = (tx * TILE * mpp - left) / mpp;
