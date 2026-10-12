@@ -5365,6 +5365,12 @@ button.admin-row:hover {
   cursor: grabbing;
 }
 
+/* display: grid ниже перебивал бы атрибут hidden (UA-правило display: none),
+   и вуаль «Считаю мир…» висела бы поверх холста всегда. */
+.planet-view__veil[hidden] {
+  display: none;
+}
+
 .planet-view__veil {
   position: absolute;
   inset: 0;
