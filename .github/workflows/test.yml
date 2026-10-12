@@ -19,8 +19,11 @@ name: Проверки The civilization of the sages
 # правка в src/ разошлась с ней, test:build это скажет.
 
 on:
+  # Правку в main проверяем всегда (её видит deploy.yml), а в ветке — через
+  # pull request: если слушать ещё и push по всем веткам, каждый коммит в
+  # ветке с открытым PR запускал бы один и тот же прогон дважды.
   push:
-    branches-ignore: [main]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
