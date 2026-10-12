@@ -189,6 +189,49 @@ const registerWorker = async () => {
   }
 };
 
+/* ---------- прогрев редактора карт ---------------------------- */
+
+/* Редактор Azgaar — двадцать с лишним мегабайт картинок и библиотек, и в
+   оболочку офлайн-кэша он не входит: её service worker кладёт при установке,
+   а редактор догружает отдельным проходом. Просит о прогреве страница —
+   только она знает, что игра уже открылась и что сеть этого хочет:
+
+   - «экономная» сеть (saveData) и мобильные второго поколения — не просим
+     вовсе: игрок за этот трафик платит, и карта ему сейчас не нужна;
+   - вкладка не на экране — не просим: догрузка идёт в фоне самой игры, но
+     начинать её в свёрнутом окне незачем;
+   - офлайн — не просим: скачивать нечего.
+
+   Проход у worker'а возобновляемый (уже сложенное он пропускает), поэтому
+   просить можно при каждом запуске и при возвращении во вкладку: цена
+   повторной просьбы — только чтение кэша. */
+const WARM_DELAY_MS = 20_000;
+
+const connection = () => navigator.connection || navigator.mozConnection || null;
+
+const warmAllowed = () => {
+  if (!info.supported) return false;
+  const link = connection();
+  if (link?.saveData) return false;
+  if (/^(slow-)?2g$/.test(link?.effectiveType || '')) return false;
+  if (navigator.onLine === false) return false;
+  return document.visibilityState === 'visible';
+};
+
+/* Пока worker не управляет страницей (первый запуск), он всё равно умеет
+   складывать в кэш — берём его из регистрации. */
+const warmTarget = () => navigator.serviceWorker?.controller || info.registration?.active || null;
+
+const requestWarm = () => {
+  if (!warmAllowed()) return;
+  const worker = warmTarget();
+  try {
+    worker?.postMessage({ type: 'mir:warm-editor' });
+  } catch {
+    /* Нет живого worker'а — карта догрузится в следующий раз. */
+  }
+};
+
 const onControllerChange = () => {
   syncNotifyPreference();
   /* Управление перешло к новому worker. Если это сделали мы по кнопке
@@ -477,9 +520,15 @@ export const start = () => {
      проверяем отдельно: за время в фоне сборка могла смениться. */
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    /* Возврат во вкладку — подходящий момент догрузить карту: меню уже
+       открыто, игрок ничего не ждёт. */
+    requestWarm();
     if (Date.now() - info.lastCheck < RESUME_CHECK_MS) return;
     check();
   });
 
   window.addEventListener('online', () => check());
+
+  /* Первый экран важнее карты: просим о догрузке, когда меню уже живёт. */
+  setTimeout(requestWarm, WARM_DELAY_MS);
 };

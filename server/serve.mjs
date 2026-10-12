@@ -60,7 +60,12 @@ const MIME = {
   '.map': 'application/json; charset=utf-8',
 };
 
-const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.map']);
+const COMPRESSIBLE = new Set([
+  '.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.map',
+  /* Манифест PWA — тоже текст, и он обещается 2048 символами: без сжатия
+     ярлык приложения отдаётся целиком. */
+  '.webmanifest',
+]);
 
 /* ---------- логирование в файл logs/mir-server.log ---------- */
 
@@ -257,12 +262,21 @@ const server = createServer((req, res) => {
   const stat = statSync(file);
   const etag = `W/"${stat.size}-${stat.mtimeMs.toString(36)}"`;
 
+  const compressible = COMPRESSIBLE.has(ext) && stat.size > 1024;
   const headers = {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Last-Modified': stat.mtime.toUTCString(),
     ETag: etag,
     'Cache-Control': /\/assets\//.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
+    /* Адрес игры не уезжает на чужие сайты: в строке запроса старые сборки
+       ещё передают токен сессии (см. комментарий к tokenOf в hub-core).
+       Правила те же, что в public/_headers для Cloudflare. */
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=(), usb=(), serial=()',
+    /* Меняется ли ответ от Accept-Encoding — обязаны сказать все сжимаемые
+       файлы, иначе промежуточный кеш отдаст gzip тому, кто его не просил. */
+    ...(compressible ? { Vary: 'Accept-Encoding' } : {}),
   };
 
   if (req.headers['if-none-match'] === etag) {
@@ -282,8 +296,8 @@ const server = createServer((req, res) => {
   const wantsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
   const stream = createReadStream(file);
 
-  if (wantsGzip && COMPRESSIBLE.has(ext) && stat.size > 1024) {
-    res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+  if (wantsGzip && compressible) {
+    res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip' });
     pipeline(stream, createGzip(), res, () => {});
   } else {
     res.writeHead(200, { ...headers, 'Content-Length': stat.size });

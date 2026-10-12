@@ -83,7 +83,107 @@ export function mirBuildInfo({ version }) {
   };
 }
 
-/* ---------- 2. Однофайловая сборка --------------------------------- */
+/* ---------- 2. Шрифты в веб-сборке --------------------------------- */
+
+/* Шрифты интерфейса (src/assets/fonts/) грузятся из CSS, а CSS браузер
+   сначала скачивает и разбирает — то есть первая буква ждёт два круга по
+   сети. Предзагрузка начинает качать их сразу, вместе со стилями, и
+   заголовок не мигает системным начертанием.
+
+   Почему в однофайловой сборке этого нет: там woff2 вшиты в CSS как data:
+   URL, качать нечего. Поэтому плагин просто ничего не находит в бандле —
+   и это правильное поведение, а не пропущенный случай.
+
+   `crossorigin` обязателен: шрифт по спецификации запрашивается в режиме
+   CORS, и предзагрузка без него считается «другим» запросом — браузер
+   скачает файл дважды. */
+export function mirFontPreload() {
+  return {
+    name: 'mir:font-preload',
+    apply: 'build',
+    /* Файлы woff2 попадают в бандл только на этапе generateBundle (их
+       emits Vite, разбирая CSS), поэтому плагин обязан идти после ядра —
+       enforce: 'post'. Проверка `npm run test:build` ловит ситуацию, когда
+       предзагрузки в разметке не оказалось. */
+    enforce: 'post',
+
+    generateBundle(_options, bundle) {
+      const fonts = Object.keys(bundle)
+        .filter((name) => name.endsWith('.woff2'))
+        .sort();
+      if (!fonts.length) return;
+
+      const htmlName = Object.keys(bundle).find(
+        (name) => name.endsWith('.html') && bundle[name].type === 'asset',
+      );
+      if (!htmlName) return;
+
+      const tags = fonts
+        .map((name) => `  <link rel="preload" as="font" type="font/woff2" crossorigin href="/${name}" />\n`)
+        .join('');
+      /* Ставим сразу после кодировки, а не перед ней: meta charset обязана
+         попасть в первые 1024 байта документа. Заодно предзагрузка встаёт
+         выше ссылки на стили — то есть раньше, чем браузер о них узнает. */
+      const html = String(bundle[htmlName].source);
+      const anchor = html.match(/[ \t]*<meta charset[^>]*>\n/);
+      bundle[htmlName].source = anchor
+        ? html.replace(anchor[0], `${anchor[0]}${tags}`)
+        : html.replace('<head>', `<head>\n${tags}`);
+      log(`шрифты: предзагрузка ${fonts.length} файлов`);
+    },
+  };
+}
+
+/* ---------- 3. Политика безопасности разметки ---------------------- */
+
+/* CSP для страницы игры. Смысл — запретить исполнять чужой скрипт, если он
+   когда-нибудь попадёт в разметку: `script-src 'self'` закрывает инлайновые
+   <script> и обработчики-атрибуты, а `object-src 'none'` и `base-uri 'self'`
+   убирают известные обходы. Всё остальное, что приложению нужно, разрешено
+   явно и с объяснением:
+
+     style-src 'unsafe-inline'  — цвета аватарок ставятся атрибутом style;
+     img-src data: blob:        — аватарки (data:) и выбранные файлы (blob:);
+     media-src data: blob:      — звуки в однофайловой версии приходят data:;
+     connect-src http(s)/ws(s)  — адрес хаба выбирает игрок (`?hub=`), какой
+                                  угодно; WebRTC политика не ограничивает;
+     frame-src 'self' data:     — редактор карт Azgaar живёт в iframe /fmg/,
+                                  в однофайловых сборках — в srcdoc.
+
+   Почему это только веб-сборка. В mir.html редактор открывается через
+   `srcdoc`, а такой документ наследует политику родителя — CSP на страницу
+   означает CSP и на редактор Azgaar, который писался без оглядки на неё.
+   Ломать редактор ради заголовка нельзя, поэтому в однофайловых сборках
+   политики нет; разметка /fmg/ тоже раздаётся без неё (свой документ). */
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' http: https: ws: wss:",
+  "frame-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
+export function mirSecurityPolicy() {
+  return {
+    name: 'mir:security-policy',
+    transformIndexHtml: {
+      order: 'post',
+      handler: (html) =>
+        html.replace(
+          '</head>',
+          `  <meta http-equiv="Content-Security-Policy" content="${APP_CSP}" />\n  </head>`,
+        ),
+    },
+  };
+}
+
+/* ---------- 4. Однофайловая сборка --------------------------------- */
 
 const stripTags = (html, pattern) => html.replace(pattern, '');
 
@@ -255,7 +355,7 @@ export function mirServiceWorker({ version }) {
       /* Cloudflare Workers Static Assets metadata controls response headers;
          it is not a public asset and must not enter the offline precache. */
       const staticMetadata = new Set(['_headers', '_redirects']);
-      const precache = [
+      const all = [
         ...new Set([
           '/',
           '/manifest.webmanifest',
@@ -264,10 +364,24 @@ export function mirServiceWorker({ version }) {
         ]),
       ];
 
+      /* Оболочка и редактор карт — два разных обещания. Без оболочки игра
+         не откроется, и её кладём в кэш при установке worker'а. Редактор
+         Azgaar — это двадцать с лишним мегабайт картинок и библиотек,
+         которые игроку нужны далеко не в первый же запуск: качать их на
+         первом экране значит соревноваться за сеть с самой игрой и жечь
+         мобильный трафик молча. Поэтому редактор едет во второй список:
+         его догружает отдельный проход по просьбе страницы, уже после
+         старта, и только когда сеть не «экономная». Обещание офлайна при
+         этом остаётся: полностью прогретый кэш содержит и карту. */
+      const isEditor = (url) => url.startsWith('/fmg/');
+      const precache = all.filter((url) => !isEditor(url));
+      const warm = all.filter(isEditor);
+
       const template = readFileSync('src/sw.js', 'utf8');
       const source = template
         .replace('__MIR_CACHE__', cacheName)
         .replace('__MIR_PRECACHE__', JSON.stringify(precache, null, 2))
+        .replace('__MIR_WARM__', JSON.stringify(warm, null, 2))
         .replace('__MIR_BUILD__', buildId)
         .replace('__MIR_VERSION__', version);
       if (/__MIR_[A-Z_]+__/.test(source))

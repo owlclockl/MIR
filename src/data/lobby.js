@@ -26,7 +26,7 @@
 
 import { getCurrentUser, isHub, subscribe as subscribeStore } from './store.js';
 import * as remote from './remote.js';
-import { peekFrameType } from '../game/map-frame.js';
+import { peekFrameType } from './map-frame.js';
 
 const PING_EVERY_MS = 15_000;
 const PONG_TIMEOUT_MS = 40_000;
@@ -313,7 +313,7 @@ const openSocket = () => {
       return;
     }
     /* Бинарь — кадр лобби. Полная карта и живой снимок идут одним потоком:
-       тип смотрим в заголовке кадра (см. game/map-frame.js). */
+       тип смотрим в заголовке кадра (см. data/map-frame.js). */
     const bytes = new Uint8Array(event.data);
     emit({ type: peekFrameType(bytes) === 'live' ? 'live' : 'map', bytes });
   };

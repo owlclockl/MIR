@@ -426,8 +426,8 @@ stopSync();
 
 /* ---------- мастер: сборка снимка -------------------------------- */
 
-const { captureSnapshot, prefixSnapshotIds, sanitizeSnapshot, LIVE_ID_PREFIX } = await import('../src/game/map-frame.js').then(() => import('../src/game/lobby-sync.js'));
-const { peekFrameType } = await import('../src/game/map-frame.js');
+const { captureSnapshot, prefixSnapshotIds, sanitizeSnapshot, LIVE_ID_PREFIX } = await import('../src/data/map-frame.js').then(() => import('../src/game/lobby-sync.js'));
+const { peekFrameType } = await import('../src/data/map-frame.js');
 
 const artWindow = new JSDOM('<!doctype html><body><svg id="map" width="100%" height="100%"><defs><linearGradient id="sea"><stop offset="0" stop-color="#123"/></linearGradient></defs><g id="viewbox" transform="translate(3 4) scale(1)"><circle cx="10" cy="10" r="5" fill="url(#sea)" onclick="pwn()"/><use href="#viewbox"/><script>1</script></g></svg></body>');
 const artWin = artWindow.window;

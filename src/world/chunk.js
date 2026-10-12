@@ -397,7 +397,7 @@ export const isChunkEmpty = (chunk) => {
 
 /**
  * Сериализация: список id + индексы по 1/2/4/6/8 бит. Нужна экспорту мира и
- * каналу лобби; формат версионируется полем `v` (см. src/game/map-frame.js).
+ * каналу лобби; формат версионируется полем `v` (см. src/data/map-frame.js).
  */
 export const encodePalette = (blocks) => {
   const palette = [];

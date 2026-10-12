@@ -6,7 +6,7 @@
    • игрок — принимает. Полная карта применяется в фоне, правки
      мастера во время правки видны через живой снимок поверх карты.
 
-   Два кадра (см. server/hub-lobby.mjs и game/map-frame.js):
+   Два кадра (см. server/hub-lobby.mjs и data/map-frame.js):
 
    • «map» — полная карта .map: [u32 длина заголовка][JSON][gzip .map].
      Мастер шлёт её после генерации и один раз в конце сеанса правок.
@@ -58,7 +58,7 @@ import {
   watchLobbyMap,
 } from '../data/lobby.js';
 import { attachGenerationStage, hideEditorStage, showEditorStage } from './generation-stage.js';
-import { FRAME_VERSION, canCompress, decodeFrame, encodeFrame, fingerprint, gunzip } from './map-frame.js';
+import { FRAME_VERSION, canCompress, decodeFrame, encodeFrame, fingerprint, gunzip } from '../data/map-frame.js';
 
 const EDIT_DEBOUNCE_MS = 700;
 /* Повторная публикация той же карты раньше этого срока не нужна: состояние

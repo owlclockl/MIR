@@ -27,6 +27,12 @@ const clientDir = () => {
   return pathToFileURL(join(dir, '/')).href;
 };
 
+/* Хаб пускает 10 регистраций в минуту с одного адреса — это защита от чужих,
+   а не от проверки. Если её запустили сразу после другой (test:hub, test:ui
+   или этой же), регистрация упирается в лимит: ждём окно и пробуем снова,
+   как это делают соседние проверки. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const mk = async (dir, name) => {
   const store = await import(`${dir}store.js`);
   const remote = await import(`${dir}remote.js`);
@@ -34,7 +40,18 @@ const mk = async (dir, name) => {
   remote.setBase(BASE);
   const mode = await store.initBackend();
   if (mode !== 'hub') throw new Error('хаб не подхватился');
-  const me = await store.register(name, 'secret123');
+  let me = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      me = await store.register(name, 'secret123');
+      break;
+    } catch (error) {
+      if (error?.status !== 429) throw error;
+      console.log('  · лимит регистраций хаба: ждём 20 секунд и пробуем снова');
+      await sleep(20_000);
+    }
+  }
+  if (!me) throw new Error(`регистрация ${name}: хаб отвечает «слишком часто»`);
   return { store, remote, p2p, me };
 };
 

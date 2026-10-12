@@ -4,11 +4,17 @@
    просьбе страницы (сообщение mir:skip-waiting): так работает кнопка
    «Обновить сейчас» — открытую игру она не прерывает сама, её нажимает игрок.
 
-   Этот файл — шаблон: сборщик подставляет в него имя кэша, список файлов
-   оболочки, метку и версию сборки (см. scripts/lib/vite-mir.mjs). Имя кэша
-   включает версию и хеш содержимого сборки, поэтому «забыть поднять ключ
-   кэша» больше нельзя, а неизменившаяся сборка не гонит пользователю новый
-   worker.
+   Этот файл — шаблон: сборщик подставляет в него имя кэша, два списка файлов
+   (оболочку и редактор карт), метку и версию сборки (см.
+   scripts/lib/vite-mir.mjs). Имя кэша включает версию и хеш содержимого
+   сборки, поэтому «забыть поднять ключ кэша» больше нельзя, а неизменившаяся
+   сборка не гонит пользователю новый worker.
+
+   Оболочка ставится сразу — без неё игра не открывается. Редактор карт
+   (PRECACHE_WARM) догружается отдельным проходом по просьбе страницы: это
+   двадцать с лишним мегабайт, и тянуть их вместе с первым экраном значит
+   отбирать сеть у самой игры. Проход возобновляемый: уже сложенное
+   пропускается, поэтому прерванный сеанс продолжается в следующий.
 
    Документы берём из сети (свежесть важнее), остальное — stale-while-
    revalidate: экран не мигает, а следующий запуск получает обновление.
@@ -18,8 +24,13 @@
 
 const CACHE = '__MIR_CACHE__';
 const PRECACHE = __MIR_PRECACHE__;
+const PRECACHE_WARM = __MIR_WARM__;
 const BUILD = '__MIR_BUILD__';
 const VERSION = '__MIR_VERSION__';
+
+/* Сколько файлов редактора качаем разом. Два потока не отбирают сеть у
+   игры и не поднимают лестницу запросов до небес на слабом канале. */
+const WARM_CONCURRENCY = 2;
 
 /* Файл, по которому приложение узнаёт о новой сборке на сервере. */
 const BUILD_INFO_PATH = '/mir-build.json';
@@ -31,16 +42,44 @@ const UPDATE_TAG = 'mir-update-check';
 const PREFS_CACHE = 'mir-prefs';
 const PREF_URL = '/mir-notify-preference';
 
+/* Складывать по одному файлу, а не одним списком, — правило для всех
+   проходов: один недоступный ресурс (например, иконка, которую владелец
+   хостинга убрал) не должен срывать установку целиком, иначе офлайн
+   ломается из-за мелочи. */
+const fill = (cache, url) => cache.add(url).catch(() => {});
+
 self.addEventListener('install', (event) => {
-  /* Каждый файл кладём отдельно: один недоступный ресурс (например, иконка,
-     которую владелец хостинга убрал) не должен срывать установку целиком —
-     иначе офлайн ломается из-за мелочи. */
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => Promise.all(PRECACHE.map((url) => cache.add(url).catch(() => {})))),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => Promise.all(PRECACHE.map((url) => fill(cache, url)))));
 });
+
+/* Прогрев редактора карт. Проход идемпотентный: то, что уже лежит в кэше,
+   не запрашивается повторно, поэтому его можно звать сколько угодно раз —
+   брошенный на полпути сеанс продолжается со следующего раза. Просьбу
+   присылает страница (src/data/update.js): она одна знает, что игрок уже
+   в меню и что сеть не «экономная». */
+let warming = null;
+
+const warmEditor = async () => {
+  if (!PRECACHE_WARM.length) return;
+  const cache = await caches.open(CACHE);
+  let index = 0;
+  const take = async () => {
+    while (index < PRECACHE_WARM.length) {
+      const url = PRECACHE_WARM[index++];
+      /* ignoreSearch: Azgaar вешает на свои файлы ?v=…, а в списке они без
+         него — иначе один и тот же файл лёг бы в кэш дважды. */
+      if (await cache.match(url, { ignoreSearch: true })) continue;
+      await fill(cache, url);
+    }
+  };
+  await Promise.all(Array.from({ length: WARM_CONCURRENCY }, take));
+};
+
+const requestEditorWarmup = () => {
+  /* Проход уже идёт — второй не нужен: он всё равно пропустит сложенное. */
+  if (!warming) warming = warmEditor().catch(() => {}).finally(() => { warming = null; });
+  return warming;
+};
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -130,6 +169,10 @@ self.addEventListener('message', (event) => {
      не спорила с выбором игрока. */
   if (data.type === 'mir:notify-preference') {
     event.waitUntil(writeNotifyPreference(Boolean(data.value)));
+  }
+  /* «Догрузи карту»: страница уже показала меню и сеть позволяет. */
+  if (data.type === 'mir:warm-editor') {
+    event.waitUntil(requestEditorWarmup());
   }
 });
 
