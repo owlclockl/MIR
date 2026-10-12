@@ -2295,11 +2295,6 @@ const syncPlanetMap = () => {
   session.planetView = mountPlanetView(host, {
     seed: session.config?.seed || 'mir-2026',
     size: 1,
-    /* Кадр редактора передаётся явно: карта планеты берёт из него географию
-       (материки и берега — те же, что на карте), а документ при этом остаётся
-       в DOM — пересоздания iframe вид не вызывает. */
-    frame: host.querySelector('[data-role="world-editor"]'),
-    config: session.config,
     onExit: () => setPlanetMap(false),
   });
 };

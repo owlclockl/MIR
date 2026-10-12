@@ -132,7 +132,8 @@ const routeCells = ({ width, height, elevation, parent, resolved, lake, isOutlet
   for (let i = 0; i < count; i += 1) {
     resolved[i] = elevation[i];
     parent[i] = -1;
-    /* Клеток вне карты не существует: край мира — рамка, а не шов. */
+    /* Клетки вне планеты не существуют: по долготе мир замкнут, а по широте
+       область на грубом уровне может выйти за полюс. */
     if ((mask && !mask[i]) || !isOutlet(i)) continue;
     heap.push(resolved[i], i);
   }
@@ -153,12 +154,7 @@ const routeCells = ({ width, height, elevation, parent, resolved, lake, isOutlet
       if (ny < 0 || ny >= height) continue;
       for (let dx = -1; dx <= 1; dx += 1) {
         if (!dx && !dy) continue;
-        const nx = x + dx;
-        /* За краем карты клеток нет: вода уходит за рамку, как за полюс.
-           Замыкание по долготе здесь раньше не только соединяло берега на
-           другой стороне мира — оно ещё и переносило сток с правого края
-           области на левый, потому что той же функцией считаются области. */
-        if (nx < 0 || nx >= width) continue;
+        const nx = (x + dx + width) % width; // мир замкнут по долготе
         const index = ny * width + nx;
         if (done[index] || (mask && !mask[index])) continue;
         /* Впадины заливаются: вода стоит на отметке стока, а не дна. */
@@ -255,10 +251,9 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
     const originY = ry * REGION_N;
     const height = new Float32Array(count);
     const weight = new Float32Array(count);
+    /* Маска существования: по долготе мир замкнут, по широте область может
+       выйти за полюс — такие клетки не маршрутизируются и не считаются. */
     const pixels = levelPixels(planet, level);
-    /* Маска существования: карта ограничена рамкой со всех сторон — ни
-       замкнуть долготу, ни продолжить её за полюсом нечем. Такие клетки
-       не маршрутизируются и не считаются. */
     const mask = new Uint8Array(count);
     for (let y = 0; y < REGION_N; y += 1) {
       const row = originY + y >= 0 && originY + y < pixels.h ? 1 : 0;
@@ -317,10 +312,8 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
       const cgy = Math.floor((originY + y) / ratio);
       const nx = cgx + dx;
       const ny = cgy + dy;
-      /* За рамкой карты грубой сети нет: ни замыкания по долготе, ни
-         продолжения через полюс. Приток просто не приходит. */
-      if (ny < 0 || ny >= gh || nx < 0 || nx >= gw) return;
-      const nIndex = ny * gw + nx;
+      if (ny < 0 || ny >= gh) return;
+      const nIndex = (((ny % gh) + gh) % gh) * gw + (((nx % gw) + gw) % gw);
       const cIndex = cgy * gw + cgx;
       if (coarseParent[nIndex] === cIndex) inflow[y * REGION_N + x] += coarseFlux[nIndex] * ratio;
     };
@@ -571,15 +564,11 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
       regions: regions.size,
       rivers: [...regions.values()].reduce((sum, region) => sum + region.riverCells, 0),
     }),
-    /* Отладочный доступ к грубой сети: `height` — число строк решётки, а
-       массив высот называется `heights`. Два ключа `height` в одном литерале
-       означали, что dimensions никто не получит: второй всегда перекрывал
-       первый, и esbuild ругался на сборку. */
     coarse: () => ({
       width: gw,
       height: gh,
       cell: coarseM,
-      heights: coarseHeight,
+      height: coarseHeight,
       parent: coarseParent,
       flux: coarseFlux,
       lake: coarseLake,

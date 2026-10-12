@@ -2,12 +2,8 @@
 
    Это не редактор и не игра, а рассматривание: колесо — приближение,
    перетаскивание — перенос, один ползунок перебирает двадцать слоёв, от рельефа
-   до плотности населения. География берётся из карты Azgaar, которая живёт в
-   соседнем iframe (src/planet/source.js), а деталь — из шума: любой кадр можно
-   увеличивать до тех пор, пока в пикселе не останется метр. Если документа
-   генератора нет или он ещё строит карту, вид не ждёт: мир собирается
-   процедурно, а снимок подхватывается, как только генератор дойдёт до нужных
-   шагов.
+   до плотности населения. Мир считается процедурно, поэтому любой кадр можно
+   увеличивать до тех пор, пока в пикселе не останется метр.
 
    Устройство вида:
 
@@ -32,7 +28,6 @@ import { createElevation, heightMeters, SEA_LEVEL } from './elevation.js';
 import { createHydro } from './hydro.js';
 import { LAYERS } from './paint.js';
 import { createPlanet, levelPixels, levelTiles, metersToGeo, mppAt, TILE } from './scale.js';
-import { describeSource, mapsReady, missingMapsPart, readSource } from './source.js';
 import { createTiles } from './tiles.js';
 
 const clamp = (value, min, max) => (value < min ? min : value > max ? max : value);
@@ -64,13 +59,10 @@ const formatGeo = (lat, lon) => {
  * Собрать вид планеты в узле `host`.
  *
  * @param {HTMLElement} host — контейнер (в проекте это .world-editor)
- * @param {object} options — seed, size (1 | 2 | 4), onExit; `frame` — iframe с
- *   Azgaar (оттуда снимается география; по умолчанию ищется в host по
- *   data-role="world-editor"), `config` — { seed, width, height } слота (нужно,
- *   если документ не отдал размеры), `source` — готовый снимок (проверки)
+ * @param {object} options — seed, size (1 | 2 | 4), onExit
  * @returns {object} view — element, error, stats, dispose
  */
-export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, frame: editorFrameElement = null, config = null, source = null } = {}) => {
+export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit } = {}) => {
   const element = document.createElement('div');
   element.className = 'planet-view';
   element.innerHTML = `
@@ -89,11 +81,6 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
         <div class="planet-sizes" role="radiogroup" aria-label="Размер планеты">
           ${[1, 2, 4].map((value) => `<button class="planet-size${value === size ? ' is-active' : ''}" type="button" role="radio" aria-checked="${value === size}" data-action="size" data-size="${value}"><strong>${value}×</strong><span>${Math.round((40075 * value) / 1000)} тыс. км</span></button>`).join('')}
         </div>
-      </div>
-      <div class="planet-panel__row planet-panel__row--source">
-        <span class="planet-field__label">География</span>
-        <span class="planet-source" data-role="source">—</span>
-        <button class="planet-button" type="button" data-action="resync" title="Снять карту Azgaar заново: правки высот в редакторе попадут на карту планеты">${icon('refresh', 'icon--xs')}<span>С карты</span></button>
       </div>
       <label class="planet-layer">
         <span class="planet-layer__head"><span class="planet-field__label">Слой</span><strong data-role="layer-name">—</strong></span>
@@ -118,7 +105,6 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
 
   const canvas = element.querySelector('[data-role="canvas"]');
   const veil = element.querySelector('[data-role="veil"]');
-  const sourceEl = element.querySelector('[data-role="source"]');
   const statusEl = element.querySelector('[data-role="status"]');
   const readoutEl = element.querySelector('[data-role="readout"]');
   const scaleEl = element.querySelector('[data-role="scale"]');
@@ -131,7 +117,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   scratch.width = TILE;
   scratch.height = TILE;
 
-  const view = { element, error: null, seed, size, source, sourceNote: '' };
+  const view = { element, error: null, seed, size };
   let disposed = false;
   let world = null;
   let level = 0;
@@ -143,87 +129,17 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   let layerIndex = 0;
   const toggles = { shading: true, rivers: true, graticule: false };
 
-  /* ---------- география: карта Azgaar ---------- */
-
-  /** Кадр редактора: тот же хост, что держит вид; ищем по data-role, чтобы
-      вид можно было смонтировать и с явным frame (проверки, лобби). */
-  const editorFrame = () => editorFrameElement ?? host?.querySelector?.('[data-role="world-editor"]');
-
-  /**
-   * Снять географию с документа редактора. Отказ — не ошибка вида: карта может
-   * ещё строиться, может быть закрыта, может быть старым документом без pack.
-   * Возвращаем причину человеческим языком, её видно в панели.
-   */
-  const readEditorSource = () => {
-    const win = editorFrame()?.contentWindow;
-    if (!win) return { source: null, note: 'документ Azgaar не открыт: мир процедурный' };
-    if (!mapsReady(win)) return { source: null, note: `карта Azgaar не готова: ${missingMapsPart(win)}` };
-    try {
-      return { source: readSource(win, { seed: view.seed, width: config?.width, height: config?.height }), note: '' };
-    } catch (error) {
-      return { source: null, note: `карту Azgaar не прочитать: ${error instanceof Error ? error.message : String(error)}` };
-    }
-  };
-
-  const setSourceNote = (text) => {
-    view.sourceNote = text || '';
-    if (sourceEl) sourceEl.textContent = text || '—';
-  };
-
-  /* Генератор строит карту секунд десять; за это время вид уже показан. Ждём
-     с паузами, а не в кадре: кадры должны остаться плавными. */
-  const SOURCE_POLL_MS = 700;
-  const SOURCE_POLL_LIMIT = 160; // ~110 с: дольше — это отказ, а не ожидание
-  let sourceTimer = 0;
-  let sourceAttempts = 0;
-
-  /** @returns {boolean} удалось ли снять карту (заметка в панели — в любом случае) */
-  const takeSource = () => {
-    const taken = readEditorSource();
-    if (!taken.source) {
-      setSourceNote(taken.note);
-      return false;
-    }
-    sourceAttempts = 0;
-    view.source = taken.source;
-    setSourceNote(describeSource(taken.source));
-    return true;
-  };
-
-  const scheduleSourcePoll = () => {
-    if (disposed || view.source || sourceTimer) return;
-    sourceTimer = setTimeout(() => {
-      sourceTimer = 0;
-      if (disposed || view.source) return;
-      if (sourceAttempts++ > SOURCE_POLL_LIMIT) {
-        setSourceNote('карта Azgaar так и не дошла до высот: мир остался процедурным');
-        return;
-      }
-      if (takeSource()) rebuild();
-      else scheduleSourcePoll();
-    }, SOURCE_POLL_MS);
-  };
-
   /* ---------- мир ---------- */
 
   const buildWorld = () => {
     const planet = createPlanet({ seed: view.seed || 'mir-2026', size: view.size });
     /* Бюджеты кэшей: тайлы высот дороже всего (их пересчёт — цепочка предков),
        поэтому им отдано больше всего; климат и картинки дешевле пересчитать. */
-    const elev = createElevation(planet, { bytes: 64 * 1024 * 1024, source: view.source });
+    const elev = createElevation(planet, { bytes: 64 * 1024 * 1024 });
     const cli = createClimate(planet, elev, { tiles: 64 });
     const water = createHydro(planet, elev, cli);
     const tileCache = createTiles({ planet, elevation: elev, climate: cli, hydro: water });
     world = { planet, elevation: elev, climate: cli, hydro: water, tiles: tileCache };
-    /* География из карты генератора — а если её нет, процедурная: об этом
-       говорит подпись в панели, и её же видно в stats(). */
-    /* Отказ важнее общей фразы: «карта ещё строится» и «карты нет вовсе» — это
-       разные действия человека, и терять причину при пересборке нельзя. */
-    setSourceNote(
-      elev.geography
-        ? `${describeSource(view.source)} · деталь с ${elev.detailFrom}-й октавы`
-        : view.sourceNote || 'карты Azgaar нет: материки из шума',
-    );
     /* Первый кадр — весь мир: начинаем с уровня, на котором планета целиком
        помещается в экран. */
     minLevel = fitLevel(planet);
@@ -236,9 +152,6 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     view.stats = () => ({
       ...tileCache.stats(),
       seed: planet.seed,
-      geography: elev.stats().geography,
-      detailFrom: elev.stats().detailFrom,
-      source: elev.stats().source,
       size: planet.size,
       widthM: planet.widthM,
       heightM: planet.heightM,
@@ -290,13 +203,12 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     const ty0 = Math.floor(top / (TILE * mpp));
     const ty1 = Math.floor((top + height * mpp) / (TILE * mpp));
     tiles.setCenter(centerX, centerY);
-    const { tx: countX, ty: countY } = levelTiles(planet, level);
     for (let ty = ty0; ty <= ty1; ty += 1) {
       for (let tx = tx0; tx <= tx1; tx += 1) {
-        /* Тайлов за рамкой карты не существует: мир не замкнут по долготе, и
-           просить их с другого края — значит рисовать в кадре чужую половину. */
-        if (tx < 0 || tx >= countX || ty < 0 || ty >= countY) continue;
-        tiles.request(level, tx, ty);
+        const { tx: countX, ty: countY } = levelTiles(planet, level);
+        const wrapped = ((tx % countX) + countX) % countX;
+        if (ty < 0 || ty >= countY) continue;
+        tiles.request(level, wrapped, ty);
       }
     }
   };
@@ -331,11 +243,11 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     const height = canvas.clientHeight || 600;
     const mx = centerX + (pointer.x - width / 2) * mpp;
     const my = centerY + (pointer.y - height / 2) * mpp;
-    if (my < 0 || my > planet.heightM || mx < 0 || mx > planet.widthM) {
-      readoutEl.textContent = 'За рамкой карты ничего нет: мир не замкнут, это край проекции.';
+    if (my < 0 || my > planet.heightM) {
+      readoutEl.textContent = 'За полюсом карты нет: это край проекции.';
       return;
     }
-    const wrapped = mx;
+    const wrapped = ((mx % planet.widthM) + planet.widthM) % planet.widthM;
     const { lon, lat } = metersToGeo(planet, wrapped, my);
     const px = Math.floor(wrapped / mpp);
     const py = Math.floor(my / mpp);
@@ -379,12 +291,10 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
 
   /* ---------- управление ---------- */
 
-  /* Центр кадра прижимается к карте по обеим осям: мир не замкнут, и за
-     рамкой показывать нечего — там фон, а не продолжение с другого края. */
   const clampCenter = () => {
     if (!world) return;
     const { planet } = world;
-    centerX = clamp(centerX, 0, planet.widthM);
+    centerX = ((centerX % planet.widthM) + planet.widthM) % planet.widthM;
     centerY = clamp(centerY, 0, planet.heightM);
   };
 
@@ -510,14 +420,6 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     }
     if (action === 'zoom-in') zoomAt(level + 1);
     if (action === 'zoom-out') zoomAt(level - 1);
-    if (action === 'resync') {
-      /* Правки высот в Azgaar попадают на карту планеты только по запросу:
-         пересобирать мир на каждое движение мыши значило бы терять камеру. */
-      const taken = takeSource();
-      if (taken) rebuild();
-      else view.source = null;
-      return;
-    }
     if (action === 'toggle') {
       flipToggle(button.dataset.toggle);
       return;
@@ -566,9 +468,6 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     }
     if (token !== buildToken) return;
     veil.hidden = true;
-    /* Нет географии — ждём документ: генератор строит карту секунд десять, и
-       снимок приходит сам, без нажатия кнопки. */
-    if (!view.source) scheduleSourcePoll();
     minLevel = fitLevel(world.planet);
     level = clamp(level || minLevel, minLevel, world.planet.maxLevel);
     applyLayer();
@@ -592,10 +491,8 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     pointer = null;
   });
   window.addEventListener('keydown', onKeyDown);
-  /* ResizeObserver есть во всех поддерживаемых браузерах; без него — событие окна. */
-  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => resize()) : null;
-  if (observer) observer.observe(element);
-  else window.addEventListener('resize', resize);
+  const observer = new ResizeObserver(() => resize());
+  observer.observe(element);
 
   /* Хост не очищаем: в нём живёт iframe с документом Azgaar. Его удаление
      заставило бы генератор карты строиться заново (секунды), поэтому вид
@@ -603,20 +500,14 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   host.appendChild(element);
   seedInput.value = view.seed;
   applyLayer();
-  /* Первый снимок — сразу при монтировании: если генератор уже достроил карту,
-     мир с первого кадра берёт её географию, а не пересобирается через секунду. */
-  takeSource();
   rebuild();
   resize();
   frameHandle = requestAnimationFrame(frame);
 
   view.dispose = () => {
     disposed = true;
-    if (sourceTimer) clearTimeout(sourceTimer);
-    sourceTimer = 0;
     cancelAnimationFrame(frameHandle);
-    observer?.disconnect();
-    window.removeEventListener('resize', resize);
+    observer.disconnect();
     window.removeEventListener('keydown', onKeyDown);
     element.remove();
   };

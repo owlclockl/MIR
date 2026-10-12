@@ -5411,20 +5411,6 @@ button.admin-row:hover {
   grid-template-columns: 1fr 1fr;
 }
 
-/* Строка «География»: чем засеян мир — картой Azgaar или шумом, и кнопка
-   пересъёма. Подпись длинная и мелкая, поэтому переносится, а не режется. */
-.planet-panel__row--source {
-  align-items: center;
-}
-
-.planet-source {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-soft);
-  font: 500 10px/1.35 var(--font-ui);
-  overflow-wrap: anywhere;
-}
-
 .planet-field {
   display: flex;
   flex: 1;

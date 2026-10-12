@@ -5,7 +5,6 @@
      node scripts/planet-preview.mjs --level 4 --out preview.png
      node scripts/planet-preview.mjs --stats --samples 40000
      node scripts/planet-preview.mjs --layer temperature --level 4
-     node scripts/planet-preview.mjs --azgaar --level 4 --diff   # берега из карты Azgaar
 
    Ничего, кроме Node, не нужно: PNG собирается здесь же, на zlib. Скрипт —
    инструмент разработчика, в сборку игры не входит. */
@@ -16,8 +15,6 @@ import { deflateSync } from 'node:zlib';
 import './lib/root.mjs';
 import { createPlanet, levelPixels, levelTiles, mppAt, TILE, metersToGeo } from '../src/planet/scale.js';
 import { createElevation, heightMeters, SEA_LEVEL } from '../src/planet/elevation.js';
-import { heightFromRaw } from '../src/planet/zscale.js';
-import { blobsSource } from './lib/planet-source.mjs';
 import { createClimate, BIOMES } from '../src/planet/climate.js';
 import { LAYERS, paintTile } from '../src/planet/paint.js';
 import { createHydro } from '../src/planet/hydro.js';
@@ -79,20 +76,10 @@ const layerId = option('layer', 'relief');
 const out = option('out', 'planet-preview.png');
 const planet = createPlanet({ seed, size });
 
-/* География. По умолчанию своя, процедурная. С флагом --azgaar — из снимка
-   карт генератора (тот же формат, что мост читает из окна редактора): тогда
-   картинкой можно сверить берега планеты с берегами источника. --cells —
-   разрешение решётки клеток источника. */
-const source = flag('azgaar')
-  ? blobsSource({ cellsX: Number(option('cells', '100')), cellsY: Math.round(Number(option('cells', '100')) * 0.63) })
-  : null;
-
 /* ---------- статистика ---------- */
 
 if (flag('stats')) {
-  const elevation = createElevation(planet, { source });
-  const stats = elevation.stats();
-  console.log(`География: ${stats.geography}${stats.source ? `, клетка источника ${(stats.source.cellM / 1000).toFixed(0)} тыс. км, деталь с ${stats.detailFrom}-й октавы` : ''}`);
+  const elevation = createElevation(planet);
   const { w, h } = levelPixels(planet, level);
   const counts = new Array(BIOMES.length).fill(0);
   let land = 0;
@@ -146,71 +133,24 @@ if (flag('stats')) {
 
 /* ---------- картинка ---------- */
 
-const elevation = createElevation(planet, { source });
+const elevation = createElevation(planet);
 const climate = createClimate(planet, elevation);
 const hydro = createHydro(planet, elevation, climate);
 while (!hydro.ready()) hydro.step(500);
 
-/* Кадр: по умолчанию — верхний левый угол уровня, целиком. --tx/--ty сдвигают
-   окно на тайл, --tw/--th задают его размер в тайлах: так можно разглядеть
-   берег вблизи и увидеть, что он не рассыпался в ступени на глубоком уровне. */
-const all = levelTiles(planet, level);
-const whole = levelPixels(planet, level);
-const tx0 = Math.max(0, Math.min(Number(option('tx', '0')), all.tx - 1));
-const ty0 = Math.max(0, Math.min(Number(option('ty', '0')), all.ty - 1));
-const tw = Math.max(1, Math.min(Number(option('tw', '0')) || Math.ceil(Math.min(whole.w, 1224) / TILE), all.tx - tx0));
-const th = Math.max(1, Math.min(Number(option('th', '0')) || Math.ceil(Math.min(whole.h, 612) / TILE), all.ty - ty0));
-const w = tw * TILE;
-const h = th * TILE;
-const originX = tx0 * TILE;
-const originY = ty0 * TILE;
+const { w, h } = levelPixels(planet, level);
+const tiles = levelTiles(planet, level);
 const layer = LAYERS.find((entry) => entry.id === layerId) ?? LAYERS[0];
 const image = new Uint8ClampedArray(w * h * 4);
 const started = performance.now();
 
-for (let ty = ty0; ty < ty0 + th; ty += 1) {
-  for (let tx = tx0; tx < tx0 + tw; tx += 1) {
+for (let ty = 0; ty < tiles.ty; ty += 1) {
+  for (let tx = 0; tx < tiles.tx; tx += 1) {
     const tile = { level, tx, ty, elevation, climate, hydro };
-    paintTile(image, w, h, tx * TILE - originX, ty * TILE - originY, tile, layer, { shading: true, rivers: true, graticule: false });
+    paintTile(image, w, h, tx * TILE, ty * TILE, tile, layer, { shading: true, rivers: true, graticule: false });
   }
 }
 
 writeFileSync(out, encodePng(w, h, image));
 console.log(`${out}: ${w} × ${h}, слой «${layer.name}», ${(performance.now() - started).toFixed(0)} мс`);
-
-/* --diff: карта расхождения берегов. Без неё «совпадает» выглядит правдоподобно
-   и на чужой географии, а здесь видно каждую клетку: зелёный — суша на обеих
-   картах, тёмно-синий — вода на обеих, красный — планета добавила берег,
-   голубой — планета его съела. Идея проверки ровно та же, что у
-   `npm run test:planet`, только глазами. */
-if (flag('diff')) {
-  if (!elevation.geography) {
-    console.log('--diff нужен --azgaar: сравнивать береги не с чем, мир процедурный.');
-  } else {
-    const diff = new Uint8ClampedArray(w * h * 4);
-    const mpp = mppAt(planet, level);
-    let mismatch = 0;
-    for (let py = 0; py < h; py += 1) {
-      for (let px = 0; px < w; px += 1) {
-        const mx = (originX + px + 0.5) * mpp;
-        const my = (originY + py + 0.5) * mpp;
-        /* rawPixel ждёт абсолютные пиксели уровня: окно сдвинуто, поэтому к px
-           и py прибавлено начало кадра — иначе берег сравнивался бы с берегом
-           из другой половины света (и расхождение вышло бы 100 %). */
-        const here = heightFromRaw(elevation.rawPixel(level, originX + px, originY + py)) >= SEA_LEVEL;
-        const there = elevation.geography.landAt(mx, my);
-        const at = (py * w + px) * 4;
-        const color = here && there ? [28, 74, 46] : !here && !there ? [18, 32, 48] : here ? [200, 62, 46] : [52, 138, 220];
-        if (here !== there) mismatch += 1;
-        diff[at] = color[0];
-        diff[at + 1] = color[1];
-        diff[at + 2] = color[2];
-        diff[at + 3] = 255;
-      }
-    }
-    const diffOut = `${out.replace(/\.png$/, '')}-diff.png`;
-    writeFileSync(diffOut, encodePng(w, h, diff));
-    console.log(`${diffOut}: расхождение берега ${(mismatch / (w * h) * 100).toFixed(4)} % пикселей`);
-  }
-}
 console.log(`Центр кадра: ${JSON.stringify(metersToGeo(planet, planet.widthM / 2, planet.heightM / 2))}`);
