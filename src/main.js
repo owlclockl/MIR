@@ -2171,7 +2171,7 @@ const worldPageHtml = () => {
   /* Кнопка режима не зависит от session.voxel: перерисовка страницы убила бы
      iframe с документом Azgaar, а режим переключается классом (syncWorldVoxel). */
   const voxelAction = screen === 'map'
-    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Воксельный мир" title="Воксельный мир: та же карта блок за блоком">${icon('mountain', 'icon--xs')}<span>Воксельный мир</span></button>`
+    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Блочная карта" title="Блочная карта: тот же мир по ярусам, 1 блок = 1 пиксель">${icon('layers', 'icon--xs')}<span>Блочная карта</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -3859,7 +3859,7 @@ const actions = {
       session.voxelView = null;
       syncWorldVoxel();
       const error = session.voxelView?.error;
-      toast(error ?? 'Воксельный мир построен.', error ? 'error' : 'ok');
+      toast(error ?? 'Блочная карта готова.', error ? 'error' : 'ok');
       return;
     }
     setWorldVoxel(!session.voxel);

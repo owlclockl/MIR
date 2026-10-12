@@ -4635,7 +4635,7 @@ button.admin-row:hover {
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(#8fb6d4 0%, #cfe0ea 62%, #a9c1cf 100%);
+  background: #0c1114;
 }
 
 .world-voxel-canvas {
@@ -4646,7 +4646,9 @@ button.admin-row:hover {
   border: 0;
   outline: none;
   cursor: grab;
-  /* Без этого жест на телефоне прокручивал бы страницу вместо поворота камеры. */
+  /* Пиксель карты — блок: растягивать его сглаживанием нельзя. */
+  image-rendering: pixelated;
+  /* Без этого жест на телефоне прокручивал бы страницу вместо панорамы. */
   touch-action: none;
 }
 
@@ -4726,6 +4728,77 @@ button.admin-row:hover {
   text-align: center;
   transform: translateX(-50%);
   max-width: calc(100% - var(--sp-32));
+}
+
+/* Группа масштаба в верхней панели: три кнопки стоят впритык. */
+.world-voxel-group {
+  display: inline-flex;
+  gap: var(--sp-4);
+}
+
+/* Панель слоёв: пресеты и ползунок яруса — слева сверху, не перекрывают кнопки. */
+.world-voxel-layers {
+  position: absolute;
+  top: var(--sp-12);
+  left: var(--sp-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  max-width: calc(100% - var(--sp-32));
+  padding: var(--sp-8) var(--sp-10);
+  border: 1px solid var(--world-line);
+  background: rgba(8, 13, 14, 0.72);
+}
+
+.world-voxel-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+
+.world-voxel-chip {
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-10);
+  border: 1px solid var(--world-line);
+  background: transparent;
+  color: var(--text-soft);
+  font: 600 12px/1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.world-voxel-chip:hover,
+.world-voxel-chip:focus-visible {
+  color: var(--text);
+  border-color: var(--world-line-strong);
+  background: var(--fill-hover);
+  outline: none;
+}
+
+.world-voxel-chip[aria-pressed="true"] {
+  color: var(--world-bg);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.world-voxel-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  color: var(--text-soft);
+  font: 500 11px/1.4 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.world-voxel-slider-label {
+  min-width: 190px;
+}
+
+.world-voxel-slider input {
+  width: 220px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.

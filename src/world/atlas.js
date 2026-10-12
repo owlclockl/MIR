@@ -1,22 +1,14 @@
-/* Рендер воксельного мира: WebGL2 + процедурный атлас.
+/* Процедурный атлас блоков: 8 × 8 тайлов по 32 px, без файлов.
 
-   Никаких внешних движков и никаких файловых текстур: атлас рисуется пикселями
-   в Uint8Array при первом открытии (TILES в blocks.js задаёт сетку), поэтому
-   репозиторий и однофайловая сборка не тяжелеют ни на байт, а PWA не просит
-   новых ресурсов в precache.
+   Атлас рисуется пикселями в Uint8ClampedArray при первом обращении (порядок
+   TILES в blocks.js задаёт сетку), поэтому репозиторий и однофайловая сборка
+   не тяжелеют ни на байт. Тот же атлас используется для цвета блоков в
+   2D-виде: средний цвет тайла — это цвет клетки на карте.
 
-   Вершинный формат — 8 float (позиция, UV, свет, поток); он же описан в
-   mesher.js. Свет и оттенок грани запечены в геометрию, поэтому в шейдере нет
-   ни таблиц освещённости, ни теней: умножение на vLight и туман по расстоянию.
+   Вынесено из бывшего WebGL-рендерера; GL-код удалён вместе с 3D-видом. */
 
-   Вода: uv текут по направлению потока из вершины (aFlow) — это и есть
-   «течение рек» из генератора, без физики жидкости. */
-
-import { ATLAS_COLUMNS, ATLAS_SIZE, TILE_PX, TILES } from './blocks.js';
-import { POSITION_SCALE, VERTEX_BYTES } from './mesher.js';
-import { clamp, mat4Identity, mat4Perspective, mat4View, rand01 } from './math.js';
-
-/* ---------- атлас ---------- */
+import { ATLAS_COLUMNS, ATLAS_SIZE, BLOCKS, TILE_PX, TILES } from './blocks.js';
+import { rand01 } from './math.js';
 
 const hex = (value) => [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 
@@ -377,328 +369,37 @@ const valueNoise = (seed, x, y, scale, salt) => {
   return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
 };
 
-/* ---------- шейдеры ---------- */
-
-const VERT = `#version 300 es
-precision highp float;
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec2 aUV;
-layout(location = 2) in float aLight;
-layout(location = 3) in vec2 aFlow;
-layout(location = 4) in float aLiquid;
-uniform float uPositionScale;
-uniform mat4 uProj;
-uniform mat4 uView;
-uniform vec3 uOrigin;
-uniform vec3 uEye;
-uniform float uTime;
-uniform float uFogNear;
-uniform float uFogFar;
-uniform float uLiquid;
-out vec2 vUV;
-out vec2 vFlow;
-out float vLight;
-out float vFog;
-out float vLiquid;
-void main() {
-  vec3 world = aPos * uPositionScale + uOrigin;
-  float speed = length(aFlow);
-  if (uLiquid > 0.5) {
-    /* Волна поперёк течения: гладь шевелится вниз по реке, а не вся сразу. */
-    world.y += sin(uTime * 1.9 + world.x * 0.62 + world.z * 0.71) * 0.035 * speed;
-  }
-  gl_Position = uProj * uView * vec4(world, 1.0);
-  float dist = length(uEye - world);
-  vFog = clamp((dist - uFogNear) / max(1.0, uFogFar - uFogNear), 0.0, 1.0);
-  vUV = aUV;
-  vFlow = aFlow;
-  vLight = aLight;
-  vLiquid = aLiquid;
-}`;
-
-const FRAG = `#version 300 es
-precision highp float;
-uniform sampler2D uAtlas;
-uniform vec4 uTint;
-uniform vec3 uFogColor;
-uniform float uTime;
-uniform float uAlphaCut;
-uniform float uAlpha;
-uniform float uLiquid;
-uniform float uColumns;
-in vec2 vUV;
-in vec2 vFlow;
-in float vLight;
-in float vFog;
-in float vLiquid;
-out vec4 fragColor;
-void main() {
-  vec2 uv = vUV;
-  if (vLiquid > 0.5) {
-    /* Прокрутка внутри тайла: берём целую ячейку атласа и дробную часть со
-       сдвигом по течению. Иначе uv уползёт за границу тайла и вода начнёт
-       показывать песок или листву соседа. */
-    vec2 cell = floor(vUV * uColumns - vec2(0.001));
-    vec2 local = fract(vUV * uColumns + vFlow * uTime * 0.11);
-    uv = (cell + local) / uColumns;
-  }
-  vec4 tex = texture(uAtlas, uv);
-  if (tex.a < uAlphaCut) discard;
-  vec3 color = tex.rgb * uTint.rgb * vLight;
-  color = mix(color, uFogColor, vFog);
-  fragColor = vec4(color, tex.a * uAlpha);
-}`;
-
-const SKY_VERT = `#version 300 es
-precision highp float;
-out vec2 vNdc;
-void main() {
-  vec2 p = vec2(float((gl_VertexID & 1) << 2) - 1.0, float(gl_VertexID & 2) * 2.0 - 1.0);
-  vNdc = p;
-  gl_Position = vec4(p, 1.0, 1.0);
-}`;
-
-const SKY_FRAG = `#version 300 es
-precision highp float;
-uniform vec3 uTop;
-uniform vec3 uBottom;
-in vec2 vNdc;
-out vec4 fragColor;
-void main() {
-  float t = clamp(vNdc.y * 0.5 + 0.5, 0.0, 1.0);
-  fragColor = vec4(mix(uBottom, uTop, pow(t, 0.75)), 1.0);
-}`;
-
-const compile = (gl, type, source) => {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`WEBGL: шейдер не собрался — ${log}`);
-  }
-  return shader;
+/** Средний цвет каждого тайла атласа (ключ — индекс в TILES). */
+export const tileAverages = (atlas = buildAtlas()) => {
+  const out = new Map();
+  TILES.forEach((_name, index) => {
+    const x0 = (index % ATLAS_COLUMNS) * TILE_PX;
+    const y0 = Math.floor(index / ATLAS_COLUMNS) * TILE_PX;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let y = 0; y < TILE_PX; y += 1) {
+      for (let x = 0; x < TILE_PX; x += 1) {
+        const at = ((y0 + y) * atlas.size + (x0 + x)) << 2;
+        r += atlas.data[at];
+        g += atlas.data[at + 1];
+        b += atlas.data[at + 2];
+      }
+    }
+    const n = TILE_PX * TILE_PX;
+    out.set(index, [Math.round(r / n), Math.round(g / n), Math.round(b / n)]);
+  });
+  return out;
 };
 
-const link = (gl, vertSource, fragSource) => {
-  const program = gl.createProgram();
-  gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vertSource));
-  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragSource));
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`WEBGL: линковка не прошла — ${gl.getProgramInfoLog(program)}`);
-  return program;
-};
-
-/* ---------- буферы чанка ---------- */
-
-/**
- * @returns {{opaque: object, water: object, bounds: number[]}}
- */
-export const uploadChunkMesh = (gl, mesh) => {
-  const make = (part) => {
-    if (!part || part.indexCount === 0) return null;
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    const vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, part.vertices, gl.STATIC_DRAW);
-    const stride = VERTEX_BYTES;
-    /* 0: позиция (3 × Uint16, шаг = 1/16 блока); 1: UV (2 × Uint16, нормализованные);
-       2: свет (Uint8, нормализованный); 3: поток (2 × Int8) + 4: флаг жидкости. */
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.UNSIGNED_SHORT, false, stride, 0);
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 2, gl.UNSIGNED_SHORT, true, stride, 6);
-    gl.enableVertexAttribArray(2);
-    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, true, stride, 10);
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 2, gl.BYTE, false, stride, 11);
-    gl.enableVertexAttribArray(4);
-    gl.vertexAttribPointer(4, 1, gl.UNSIGNED_BYTE, false, stride, 13);
-    const ibo = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, part.indices, gl.STATIC_DRAW);
-    gl.bindVertexArray(null);
-    return { vao, vbo, ibo, count: part.indexCount, type: part.indexType === 'uint32' ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, bytes: part.bytes };
-  };
-  const opaque = make(mesh.opaque);
-  const water = make(mesh.water);
-  return {
-    opaque,
-    water,
-    quads: mesh.quads,
-    bytes: mesh.bytes,
-    dispose: () => {
-      for (const part of [opaque, water]) {
-        if (!part) continue;
-        gl.deleteVertexArray(part.vao);
-        gl.deleteBuffer(part.vbo);
-        gl.deleteBuffer(part.ibo);
-      }
-    },
-  };
-};
-
-/**
- * @param {HTMLCanvasElement} canvas
- * @param {{ onError?: (error: Error) => void }} [hooks]
- */
-export const createRenderer = (canvas, hooks = {}) => {
-  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance', premultipliedAlpha: true });
-  if (!gl) {
-    const error = new Error('WEBGL2: контекст недоступен');
-    if (hooks.onError) hooks.onError(error);
-    throw error;
+/** Цвет блока на 2D-карте: верхняя грань; воздух — без цвета (null). */
+export const blockColors = () => {
+  const averages = tileAverages();
+  const colors = new Map();
+  for (const block of BLOCKS) {
+    if (!block || block.hole || block.id === 0) continue;
+    const color = averages.get(block.top);
+    if (color) colors.set(block.id, color);
   }
-  const program = link(gl, VERT, FRAG);
-  const sky = link(gl, SKY_VERT, SKY_FRAG);
-  const uniform = (name) => gl.getUniformLocation(program, name);
-  const u = {
-    proj: uniform('uProj'),
-    positionScale: uniform('uPositionScale'),
-    view: uniform('uView'),
-    origin: uniform('uOrigin'),
-    eye: uniform('uEye'),
-    time: uniform('uTime'),
-    fogNear: uniform('uFogNear'),
-    fogFar: uniform('uFogFar'),
-    fogColor: uniform('uFogColor'),
-    tint: uniform('uTint'),
-    alphaCut: uniform('uAlphaCut'),
-    alpha: uniform('uAlpha'),
-    liquid: uniform('uLiquid'),
-    columns: uniform('uColumns'),
-    atlas: uniform('uAtlas'),
-  };
-  const su = { top: gl.getUniformLocation(sky, 'uTop'), bottom: gl.getUniformLocation(sky, 'uBottom') };
-  const empty = gl.createVertexArray();
-
-  const atlas = buildAtlas();
-  const texture = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, atlas.size, atlas.size, 0, gl.RGBA, gl.UNSIGNED_BYTE, atlas.data);
-  gl.generateMipmap(gl.TEXTURE_2D);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthFunc(gl.LEQUAL);
-  gl.enable(gl.CULL_FACE);
-  gl.cullFace(gl.BACK);
-  gl.frontFace(gl.CCW);
-  gl.clearColor(0.55, 0.68, 0.82, 1);
-
-  const proj = mat4Identity();
-  const view = mat4Identity();
-  const stats = { draws: 0, triangles: 0, water: 0 };
-
-  const api = {
-    gl,
-    stats,
-    /** @param {{width:number,height:number,dpr:number}} viewport */
-    resize(viewport) {
-      const dpr = clamp(viewport.dpr || 1, 1, 2);
-      const width = Math.max(1, Math.floor(viewport.width * dpr));
-      const height = Math.max(1, Math.floor(viewport.height * dpr));
-      if (canvas.width === width && canvas.height === height) return;
-      canvas.width = width;
-      canvas.height = height;
-      gl.viewport(0, 0, width, height);
-    },
-
-    /**
-     * @param {{ chunks: Array<{x0:number,y0:number,z0:number,handle:object}>,
-     *            eye: number[], target: number[], yaw: number, pitch: number,
-     *            time: number, radius: number, sky?: number[], fog?: number[],
-     *            water?: {tint:number[], alpha:number}, cut?: number }} scene
-     */
-    render(scene) {
-      const aspect = canvas.height ? canvas.width / canvas.height : 1;
-      const near = 0.35;
-      const far = Math.max(64, (scene.radius || 96) * 3.4);
-      mat4Perspective(proj, ((scene.fov || 66) * Math.PI) / 180, aspect, near, far);
-      mat4View(view, scene.eye, scene.yaw, scene.pitch);
-
-      const skyTop = scene.sky ? scene.sky[0] : [0.34, 0.55, 0.82];
-      const skyBottom = scene.sky ? scene.sky[1] : [0.72, 0.84, 0.94];
-      gl.disable(gl.DEPTH_TEST);
-      gl.depthMask(false);
-      gl.useProgram(sky);
-      gl.uniform3fv(su.top, skyTop);
-      gl.uniform3fv(su.bottom, skyBottom);
-      gl.bindVertexArray(empty);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthMask(true);
-
-      gl.useProgram(program);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.uniform1i(u.atlas, 0);
-      gl.uniform1f(u.positionScale, 1 / POSITION_SCALE);
-      gl.uniformMatrix4fv(u.proj, false, proj);
-      gl.uniformMatrix4fv(u.view, false, view);
-      gl.uniform3fv(u.eye, scene.eye);
-      gl.uniform1f(u.time, scene.time || 0);
-      gl.uniform1f(u.fogNear, (scene.radius || 96) * 0.55);
-      gl.uniform1f(u.fogFar, (scene.radius || 96) * 1.5);
-      gl.uniform3fv(u.fogColor, scene.fog || skyBottom);
-
-      stats.draws = 0;
-      stats.triangles = 0;
-      stats.water = 0;
-      gl.uniform4f(u.tint, 1, 1, 1, 1);
-      gl.uniform1f(u.alphaCut, scene.cut === undefined ? 0.5 : scene.cut);
-      gl.uniform1f(u.alpha, 1);
-      gl.uniform1f(u.liquid, 0);
-      gl.uniform1f(u.columns, ATLAS_COLUMNS);
-      for (const chunk of scene.chunks) {
-        const handle = chunk.handle;
-        if (!handle || !handle.opaque) continue;
-        gl.uniform3f(u.origin, chunk.x0, chunk.y0 || 0, chunk.z0);
-        gl.bindVertexArray(handle.opaque.vao);
-        gl.drawElements(gl.TRIANGLES, handle.opaque.count, handle.opaque.type, 0);
-        stats.draws += 1;
-        stats.triangles += handle.opaque.count / 3;
-      }
-
-      const water = scene.water || { tint: [0.86, 0.94, 1.0], alpha: 0.74 };
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.depthMask(false);
-      gl.uniform4f(u.tint, water.tint[0], water.tint[1], water.tint[2], 1);
-      gl.uniform1f(u.alpha, water.alpha);
-      gl.uniform1f(u.alphaCut, 0.02);
-      gl.uniform1f(u.liquid, 1);
-      gl.uniform1f(u.time, scene.time || 0);
-      for (const chunk of scene.chunks) {
-        const handle = chunk.handle;
-        if (!handle || !handle.water) continue;
-        gl.uniform3f(u.origin, chunk.x0, chunk.y0 || 0, chunk.z0);
-        gl.bindVertexArray(handle.water.vao);
-        gl.drawElements(gl.TRIANGLES, handle.water.count, handle.water.type, 0);
-        stats.draws += 1;
-        stats.water += handle.water.count / 3;
-      }
-      gl.depthMask(true);
-      gl.disable(gl.BLEND);
-      gl.bindVertexArray(null);
-      return stats;
-    },
-
-    dispose() {
-      gl.deleteProgram(program);
-      gl.deleteProgram(sky);
-      gl.deleteTexture(texture);
-      gl.deleteVertexArray(empty);
-      const lose = gl.getExtension('WEBGL_lose_context');
-      if (lose) lose.loseContext();
-    },
-  };
-  return api;
+  return colors;
 };

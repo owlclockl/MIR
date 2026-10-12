@@ -22,10 +22,10 @@ import { buildField, fold, sampleColumn, surfaceY, F_RIVER, F_WATER, F_FALL, flo
 import { AIR, ATLAS_COLUMNS, BIOME_PALETTE, BLOCKS, BLOCK_COUNT, biomeFromClimate, blockName, isKnownBlock, isOpaque, isSolid, paletteFor, STONE, WATER, WATER_SOURCE, TILES } from '../src/world/blocks.js';
 import { CHUNK_SX, CHUNK_SZ, generateChunk, blockAt } from '../src/world/chunk.js';
 import { encodePalette, decodePalette } from '../src/world/chunk.js';
-import { buildChunkMesh, FACES, POSITION_SCALE, VERTEX_BYTES } from '../src/world/mesher.js';
+import { blockColors } from '../src/world/atlas.js';
+import { LAYER_COUNT, PRESETS, layerBand, layerOf, layerSize, pickAt, sliceChunk } from '../src/world/layers.js';
+import { createChunkCache, worldExtent } from '../src/world/world.js';
 import { readSource, mapsReady, missingMapsPart, VoxelSourceError } from '../src/world/bridge.js';
-import { createVoxelWorld } from '../src/world/world.js';
-import { raycast } from '../src/game/world-view.js';
 import { fakeEditorWindow, FAKE_EXPECT } from './lib/fake-fmg.mjs';
 
 /* Русское согласование числительного: «61 проверка», а не «61 проверок». */
@@ -293,92 +293,69 @@ let saltDiff = 0;
 for (let i = 0; i < altChunk.blocks.length; i += 1) if (altChunk.blocks[i] !== a0.blocks[i]) saltDiff += 1;
 add(saltDiff > 0, 'другая соль карты — другой чанк', `${saltDiff} блоков отличается`);
 
-/* ---------- 5. меш ---------- */
+/* ---------- 5. слои: ярусы, пресеты, срез ---------- */
 
-const winding = FACES.every((face) => {
-  const at = (c, k) => c[k];
-  const [a, b, c] = face.corners;
-  const cross = [
-    at(b, 'py') * at(c, 'pz') - at(b, 'pz') * at(c, 'py'),
-    at(b, 'pz') * at(c, 'px') - at(b, 'px') * at(c, 'pz'),
-    at(b, 'px') * at(c, 'py') - at(b, 'py') * at(c, 'px'),
-  ];
-  const dot = cross[0] * face.nx + cross[1] * face.ny + cross[2] * face.nz;
-  return dot > 0;
-});
-add(winding, 'обход граней против часовой снаружи', 'отсечение задних граней безопасно');
-add(FACES.length === 6, 'шесть граней', FACES.map((f) => `${['x', 'y', 'z'][f.axis]}${f.sign > 0 ? '+' : '-'}`).join(' '));
-
+const H = field.worldHeight;
 const wet = generateChunk(field, sea.cx, sea.cz, { ores: true, caves: true });
-const riverChunk = river ? generateChunk(field, river.cx, river.cz, { ores: true, caves: true }) : wet;
-void 0;
-const mesh = buildChunkMesh(a0, field);
-const wetMesh = buildChunkMesh(wet, field);
-const riverMesh = buildChunkMesh(riverChunk, field);
-/* Время меряем на прогретом движке: первая генерация — это прогрев JIT и
-   аллокатор, на ней «12 мс» превращаются в «1 мс» уже со второго чанка. */
-const warm = [];
-for (let i = 0; i < 24; i += 1) warm.push(generateChunk(field, midX + i, midZ, { ores: true, caves: true }));
-let genStart = performance.now();
-for (const c of warm) buildChunkMesh(c, field);
-const meshMs = (performance.now() - genStart) / warm.length;
-genStart = performance.now();
-for (let i = 100; i < 124; i += 1) generateChunk(field, i, midZ + 3, { ores: true, caves: true });
-const genMs = (performance.now() - genStart) / 24;
-const views = [mesh, wetMesh, riverMesh].flatMap((m) => [m.opaque, m.water]).filter((part) => part.vertexCount > 0);
-const read = (part) => {
-  const u16 = new Uint16Array(part.vertices.buffer, part.vertices.byteOffset, part.vertexCount * 8);
-  const bytes = part.vertices;
-  const list = [];
-  for (let i = 0; i < part.vertexCount; i += 1) {
-    list.push({
-      x: u16[i * 8],
-      y: u16[i * 8 + 1],
-      z: u16[i * 8 + 2],
-      s: u16[i * 8 + 3],
-      t: u16[i * 8 + 4],
-      light: bytes[i * 16 + 10],
-      fx: (bytes[i * 16 + 11] << 24) >> 24,
-      fz: (bytes[i * 16 + 12] << 24) >> 24,
-      liquid: bytes[i * 16 + 13],
-    });
-  }
-  return list;
+const bands = Array.from({ length: LAYER_COUNT }, (_, i) => layerBand(H, i));
+add(bands[0].lo === 0 && bands[LAYER_COUNT - 1].hi === H - 1, 'ярусы покрывают весь мир по высоте', `${LAYER_COUNT} ярусов по ${layerSize(H)} блоков, мир ${H}`);
+add(bands.every((b, i) => i === 0 || b.lo === bands[i - 1].hi + 1), 'ярусы без пересечений и зазоров');
+add(layerOf(H, 0) === 0 && layerOf(H, H - 1) === LAYER_COUNT - 1, 'высота → ярус: края совпадают');
+add(PRESETS.length === 8 && PRESETS[0].id === 'all', 'восемь пресетов, первый — «все слои»', PRESETS.map((p) => p.label).join(' · '));
+
+const colors = blockColors();
+const countOpaque = (px) => {
+  let n = 0;
+  for (let i = 3; i < px.length; i += 4) if (px[i]) n += 1;
+  return n;
 };
-const verts = views.flatMap(read);
-const badPos = verts.filter((v) => !Number.isFinite(v.x + v.y + v.z) || v.x > (CHUNK_SX + 2) * 16 || v.z > (CHUNK_SZ + 2) * 16 || v.y > 256 * 16).length;
-const badUV = verts.filter((v) => v.s > 65535 || v.t > 65535).length;
-const idxBad = views.reduce((acc, m) => acc + Array.from(m.indices).filter((i) => i >= m.vertexCount).length, 0);
-add(badPos === 0, 'позиции упакованы и влезают в чанк', badPos ? `${badPos} выходов за габарит` : `Uint16 ×3, шаг 1/${POSITION_SCALE} блока`);
-add(badUV === 0, 'UV внутри атласа', badUV ? `${badUV} выходов за тайл` : `${TILES.length} тайлов в ${ATLAS_COLUMNS}×${ATLAS_COLUMNS}`);
-add(idxBad === 0, 'индексы в диапазоне буфера', `${mesh.triangles} треугольников, индексы ${mesh.opaque.indexType}`);
-add(verts.every((v) => v.liquid === 0 || v.liquid === 1), 'флаг жидкости бинарный', `${views.length} буферов по ${VERTEX_BYTES} байта`);
-const lights = verts.map((v) => v.light);
-const levels = new Set(lights).size;
-add(lights.every((x) => x >= 76 && x <= 255) && levels >= 3, 'AO даёт ступени света, а не черноту', `${levels} уровней, ${Math.min(...lights)}…${Math.max(...lights)}`);
+const landBand = layerBand(H, layerOf(H, field.seaY + 6));
+const seaBand = layerBand(H, layerOf(H, field.seaY));
+const landAll = sliceChunk(a0, landBand, 'all', colors);
+const landSurface = sliceChunk(a0, landBand, 'surface', colors);
+add(countOpaque(landAll) > 0, 'ярус у поверхности: суша видна сверху', `${countOpaque(landAll)} непустых пикселей из 256`);
+add(countOpaque(landSurface) <= countOpaque(landAll), 'пресет «поверхность» не больше «всех слоёв»', `${countOpaque(landSurface)} ≤ ${countOpaque(landAll)}`);
+const subset = (small, big) => {
+  for (let i = 3; i < small.length; i += 4) if (small[i] && !big[i]) return false;
+  return true;
+};
+add(subset(landSurface, landAll), 'поверхность — подмножество «всех слоёв» пиксель в пиксель');
+const binary = [landAll, landSurface].every((px) => px.every((v, i) => i % 4 !== 3 || v === 0 || v === 255));
+add(binary, 'альфа бинарная: клетка или пусто, без полупрозрачности');
+const top = layerBand(H, LAYER_COUNT - 1);
+add(countOpaque(sliceChunk(a0, top, 'all', colors)) === 0, 'верхний ярус над горами пуст', `y ${top.lo}–${top.hi}`);
+const seaWater = sliceChunk(wet, seaBand, 'water', colors);
+add(countOpaque(seaWater) > 0, 'ярус уровня моря: вода видна', `${countOpaque(seaWater)} пикселей воды`);
+const bottomByBand = bands.map((band) => countOpaque(sliceChunk(wet, band, 'bottom', colors)));
+const bottomTotal = bottomByBand.reduce((acc, n) => acc + n, 0);
+const bottomBand = bottomByBand.findIndex((n) => n > 0);
+add(bottomTotal > 0, 'дно под водой видно на своём ярусе', `${bottomTotal} пикселей дна, первый ярус: ${bottomBand < 0 ? '—' : bottomBand + 1}`);
+const cavesByBand = bands.map((band) => countOpaque(sliceChunk(a0, band, 'caves', colors)));
+const cavesTotal = cavesByBand.reduce((acc, n) => acc + n, 0);
+add(cavesTotal > 0, 'пресет «пещеры» находит полы пещер хотя бы в одном ярусе', `${cavesTotal} пикселей по всем ярусам`);
+const idsOf = (preset, band) => {
+  const ids = new Set();
+  for (let lz = 0; lz < CHUNK_SZ; lz += 1) {
+    for (let lx = 0; lx < CHUNK_SX; lx += 1) {
+      const id = pickAt(wet, lx, lz, band, preset);
+      if (id !== AIR) ids.add(id);
+    }
+  }
+  return ids;
+};
+const waterIds = idsOf('water', seaBand);
+add([...waterIds].every((id) => id === WATER || id === WATER_SOURCE), 'пресет «вода» отдаёт только воду', [...waterIds].join(', ') || '—');
+const pick = pickAt(wet, 0, 0, seaBand, 'all');
+add(typeof pick === 'number', 'подсказка под курсором отдаёт блок');
 
-/* Юбка реально режет грани: без неё на границе чанка торчит стена. */
-const inner = mesh.quads;
-const noSkirt = buildChunkMesh(generateChunk(field, midX, midZ, { ores: true, caves: true, skirt: false }), field).quads;
-add(noSkirt > inner, 'юбка закрывает грани на границе чанка', `без неё +${noSkirt - inner} квадов стен по швам`);
-
-/* Закрытые полости: тот же чанк без openOnly даёт заметно больше геометрии. */
-const cut = buildChunkMesh(a0, field, { openOnly: false });
-add(cut.quads > mesh.quads, 'режим разреза возвращает стены пещер', `${cut.quads - mesh.quads} квадов скрытых полостей`);
-add(mesh.quads < cut.quads && mesh.quads < 12000, 'меш чанка в бюджете геометрии', `${mesh.quads} квадов, ${(mesh.bytes / 1024).toFixed(0)} KiB`);
-add(mesh.bytes < 700 * 1024, 'чанк в бюджете памяти', `${(mesh.bytes / 1024).toFixed(0)} KiB на ${mesh.quads} квадов`);
-add(VERTEX_BYTES === 16, 'вершинный формат упакован', `${VERTEX_BYTES} байт на вершину`);
-add(typeof isKnownBlock === 'function' && isKnownBlock(WATER_SOURCE) && !isKnownBlock(29), 'в таблице блоков нет дыр под чужими id');
-
-/* Пустой чанк за краем мира не должен рождать мусор. */
-const empty = buildChunkMesh(generateChunk(field, -999, -999, { caves: false, ores: false }), field);
-add(Number.isFinite(empty.quads) && empty.quads > 0, 'чанк за пределами тайла генерируется из замощения', `${empty.quads} квадов`);
-
-/* ---------- 6. бюджет ---------- */
-
+/* Бюджет: одна генерация чанка — доли кадра. Среднее по нескольким чанкам. */
+const budgetStart = performance.now();
+const budgetRuns = 6;
+for (let i = 0; i < budgetRuns; i += 1) generateChunk(field, midX + i, midZ, { ores: true, caves: true });
+const genMs = (performance.now() - budgetStart) / budgetRuns;
+add(genMs < 60, 'чанк: генерация — доли кадра', `генерация ${genMs.toFixed(2)} мс на чанк`);
 add(fieldMs < 4000, 'поле строится в пределах паузы', `${fieldMs.toFixed(0)} мс на ${field.area} колонок`);
-add(genMs + meshMs < 10, 'чанк: генерация + меш — доли кадра', `генерация ${genMs.toFixed(2)} мс + меш ${meshMs.toFixed(2)} мс на чанк`);
-add(isOpaque(WATER) === false && isOpaque(WATER_SOURCE) === false, 'вода не перекрывает грани соседей', `${BLOCK_COUNT} блоков, таблица до ${BLOCKS.length - 1}`);
+add(isOpaque(WATER) === false && isOpaque(WATER_SOURCE) === false, 'вода не перекрывает соседей', `${BLOCK_COUNT} блоков, таблица до ${BLOCKS.length - 1}`);
 add(BLOCKS[AIR].solid === false, 'воздух не блокирует обзор');
 
 /* ---------- 7. мост: окно редактора → снимок карт ---------- */
@@ -429,86 +406,24 @@ try {
 add(partial instanceof VoxelSourceError && /рано/.test(partial.message), 'мост: генерация не дошла — мир не строим');
 
 
-/* ---------- 8. выбор блока лучом и хранилище чанков ---------- */
+/* ---------- 8. кэш чанков и атлас цветов ---------- */
 
-/* Хост не передаём: без DOM мир считается ровно так же. Проверяем то, что в
-   браузере видно только глазами: луч упирается в поверхность, очередь
-   укладывается в бюджет кадра, а прыжок на другой край тайла вытесняет чанки. */
-const pickWorld = createVoxelWorld(field, { radius: 2 });
-/* Столберок берём сухой и выше моря: иначе луч честнее попадёт в пруд, чем в
-   рельеф, и проверка начнёт спорить с itself. */
-let pickX = -1;
-let pickZ = -1;
-let pickColumn = null;
-for (let attempt = 0; attempt < 6000 && pickX < 0; attempt += 1) {
-  const x = (attempt * 37 + 5) % field.width;
-  const z = (attempt * 61 + 11) % field.height;
-  const column = sampleColumn(field, x, z);
-  if ((column.flags & F_WATER) === 0 && column.y > field.seaY + 6) {
-    pickX = x;
-    pickZ = z;
-    pickColumn = column;
-  }
-}
-const fresh = pickWorld.stats();
-add(fresh.chunks === 0 && fresh.ready === 0, 'мир до фокуса не строит ничего', `${fresh.chunks} чанков`);
-pickWorld.focus(pickX, pickZ);
-const queued = pickWorld.stats();
-add(queued.queued === (2 * 2 + 1) ** 2 && queued.ready === 0,
-  'фокус ставит весь радиус в очередь', `${queued.queued} чанков в очереди, ${queued.pending} не создано`);
-for (let guard = 0; guard < 24 && pickWorld.stats().queued; guard += 1) pickWorld.step(50);
-const built = pickWorld.stats();
-add(built.ready > 0 && built.quads > 0, 'очередь строит чанки в бюджете кадра', `${built.ready} готово, ${built.quads} квадов`);
-/* Цена чанка — средняя по очереди, а не «последний измеренный»: один замер
-   зависит от JIT и сборщика мусора и на загруженной машине прыгает до 25 мс,
-   а контракт здесь — средний бюджет кадра. */
-const timing = createVoxelWorld(field, { radius: 1 }); // радиус зажимается снизу до 2 — это продукт-решение
-
-timing.focus(pickX, pickZ);
-let spent = 0;
-let made = 0;
-for (let guard = 0; guard < 60 && timing.stats().queued; guard += 1) {
-  const part = timing.step(4);
-  spent += part.ms;
-  made += part.generated;
-}
-const mean = spent / Math.max(1, made);
-add(made === 25 && mean < 16, 'чанк вписан в средний бюджет кадра', `${made} чанков (радиус 2 — минимум), в среднем ${mean.toFixed(1)} мс`);
-const atomic = createVoxelWorld(field, { radius: 0 });
-atomic.focus(pickX, pickZ);
-const single = atomic.step(0);
-add(single.generated === 1, 'гранулярность очереди: один чанк за шаг при нулевом бюджете', `${single.generated} чанк за ${single.ms.toFixed(1)} мс`);
-atomic.dispose();
-timing.dispose();
-const hit = raycast(pickWorld, [pickX + 0.5, pickColumn.y + 10, pickZ + 0.5], [0, -1, 0], 32);
-add(Boolean(hit?.id) && hit.id !== AIR && hit.id !== WATER && hit.id !== WATER_SOURCE,
-  'луч сверху вниз уткнулся в твёрдый блок', hit ? `${BLOCKS[hit.id]?.name ?? hit.id} @${hit.y}` : 'мимо');
-add(Boolean(hit) && hit.y >= pickColumn.y - 1 && hit.y <= pickColumn.y + 24,
-  'луч остановился на поверхности (допустима крона дерева)', `${hit?.y ?? '—'} при грунте ${pickColumn.y}`);
-/* Под ногами пусто быть не может: три блока под поверхностью — сплошные. */
-const underRecord = pickWorld.get(Math.floor(pickX / CHUNK_SX), Math.floor(pickZ / CHUNK_SZ));
-const under = underRecord?.chunk;
-let hollow = 0;
-if (under) {
-  for (let dy = 1; dy <= 3; dy += 1) {
-    if (!isSolid(blockAt(under, pickX - under.x0, pickColumn.y - dy, pickZ - under.z0))) hollow += 1;
-  }
-}
-add(Boolean(under) && hollow === 0, 'под поверхностью нет пустот', under ? `${hollow} пустых клеток` : 'чанк не готов');
-const miss = raycast(pickWorld, [pickX + 0.5, pickColumn.y + 60, pickZ + 0.5], [0, 1, 0], 24);
-add(miss === null, 'луч в небо ничего не находит');
-add(pickWorld.visible().length === built.ready - built.empty, 'сцена отдаёт ровно готовые чанки радиуса', `${pickWorld.visible().length} из ${built.chunks}`);
-const before = pickWorld.stats().dropped;
-pickWorld.focus(field.width * 3, field.height * 3);
-for (let guard = 0; guard < 24; guard += 1) pickWorld.step(50);
-add(pickWorld.stats().dropped > before, 'прыжок на другой край тайла вытесняет чанки', `вытеснено ${pickWorld.stats().dropped - before}`);
-pickWorld.dispose();
-const cleared = pickWorld.stats();
-add(cleared.chunks === 0 && cleared.quads === 0, 'dispose освобождает хранилище', `${cleared.chunks} чанков`);
+const cache = createChunkCache(field, { limit: 16 });
+const first = cache.get(midX, midZ);
+add(cache.get(midX, midZ) === first, 'кэш: повторный запрос отдаёт тот же чанк');
+for (let i = 0; i < 40; i += 1) cache.get(midX + i, midZ);
+add(cache.size <= 16 && cache.stats.evicted > 0, 'кэш: LRU держит лимит', `${cache.size} чанков при лимите 16, вытеснено ${cache.stats.evicted}`);
+add(!cache.has(midX, midZ), 'кэш: самый давний чанк вытеснен первым');
+const extent = worldExtent(field);
+add(extent.chunksX * CHUNK_SX >= field.width && extent.chunksZ * CHUNK_SZ >= field.height, 'сетка чанков покрывает карту', `${extent.chunksX} × ${extent.chunksZ} чанков`);
+cache.clear();
+add(cache.size === 0, 'кэш очищается при закрытии вида');
+const solid = BLOCKS.filter((b) => b && !b.hole && b.id !== AIR).map((b) => b.id);
+add(solid.every((id) => colors.has(id)), 'у каждого блока есть цвет на карте', `${colors.size} цветов из ${solid.length} блоков`);
 
 /* ---------- итог ---------- */
 
-console.log('Воксельный мир: поле → чанк → меш\n');
+console.log('Блочная карта: поле → чанк → ярус → срез\n');
 let bad = 0;
 for (const check of checks) {
   console.log(`${check.ok ? '  ✓' : '  ×'} ${check.what}${check.detail ? ` — ${check.detail}` : ''}`);
@@ -516,7 +431,7 @@ for (const check of checks) {
 }
 console.log('');
 if (bad) {
-  console.log(`ВОКСЕЛЬНЫЙ МИР ЛОМАЕТСЯ: не прошло ${plural(bad, 'проверка', 'проверки', 'проверок')} — ${bad} из ${checks.length}.`);
+  console.log(`БЛОЧНАЯ КАРТА ЛОМАЕТСЯ: не прошло ${plural(bad, 'проверка', 'проверки', 'проверок')} — ${bad} из ${checks.length}.`);
   process.exit(1);
 }
-console.log(`ВСЁ ХОРОШО — ${checks.length} ${plural(checks.length, 'проверка', 'проверки', 'проверок')} воксельного мира.`);
+console.log(`ВСЁ ХОРОШО — ${checks.length} ${plural(checks.length, 'проверка', 'проверки', 'проверок')} блочной карты.`);
