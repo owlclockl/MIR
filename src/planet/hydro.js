@@ -43,14 +43,24 @@ export const REGION_N = 256;
 const MIN_BASIN_M2 = 8_000_000;
 /** Минимальная глубина впадины, которая считается озером (единицы шкалы). */
 const LAKE_DEPTH = 0.15;
-/** Ссылочные осадки для перевода стока в расход: 60 единиц Azgaar ≈ 942 мм. */
+/** Ссылочные осадки для перевода стока в расход: 60 единиц Azgaar ≈ 942 мм.
+    Нужны только там, где расход считается без климата (проверки, реки карты
+    Azgaar); настоящий сток берётся из осадков, посчитанных переносом влаги. */
 const REFERENCE_PREC_MM = 942;
-const RUNOFF = 0.45;
+/** Доля осадков, уходящая в сток: остальное испаряется. У Земли ≈ 0,4. */
+export const RUNOFF = 0.45;
 const SECONDS_PER_YEAR = 3.156e7;
 
-/** Расход из стока: м³/с. */
-export const discharge = (flux, cellAreaM2) =>
-  (flux * cellAreaM2 * (REFERENCE_PREC_MM / 1000) * RUNOFF) / SECONDS_PER_YEAR;
+/**
+ * Расход из стока: м³/с.
+ *
+ * `precMm` — годовые осадки в точке, мм: **настоящие**, посчитанные переносом
+ * влаги (climate.js), а не ссылочная константа. Отсюда и полноводность рек:
+ * сток обязан отвечать дождю, который выпал, иначе в пустыне течёт Амазонка.
+ * Без `precMm` берётся ссылочный уровень — для карт Azgaar, где климат свой.
+ */
+export const discharge = (flux, cellAreaM2, precMm = REFERENCE_PREC_MM) =>
+  (flux * cellAreaM2 * (precMm / 1000) * RUNOFF) / SECONDS_PER_YEAR;
 
 /** Ширина реки в метрах из расхода. */
 export const riverWidth = (q) => 12 * Math.sqrt(Math.max(q, 0));
@@ -207,9 +217,11 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
       for (let gx = 0; gx < gw; gx += 1) {
         const index = gy * gw + gx;
         coarseHeight[index] = heightFromRaw(elevation.rawPixel(coarseLevel, gx, gy));
+        /* Сток — из настоящих осадков, посчитанных переносом влаги. Делим на
+           ссылочные 942 мм: столько воды в единице стока. */
         coarsePrec[index] = clamp(
-          climate.approximatePrec((gx + 0.5) * coarseM, (gy + 0.5) * coarseM, coarseLevel) / 60,
-          0.08,
+          climate.approximatePrec((gx + 0.5) * coarseM, (gy + 0.5) * coarseM, coarseLevel) / REFERENCE_PREC_MM,
+          0.02,
           4,
         );
       }
@@ -255,6 +267,9 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
     const originY = ry * REGION_N;
     const height = new Float32Array(count);
     const weight = new Float32Array(count);
+    /* Осадки в клетке, мм: по ним расход ниже по течению пересчитывается в
+       кубометры — вода не берётся «из среднего по миру». */
+    const precipitation = new Float32Array(count);
     const pixels = levelPixels(planet, level);
     /* Маска существования: карта ограничена рамкой со всех сторон — ни
        замкнуть долготу, ни продолжить её за полюсом нечем. Такие клетки
@@ -274,7 +289,7 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
       for (let sx = 0; sx < WEIGHT_SUB; sx += 1) {
         const mx = (originX + (sx + 0.5) * step) * mpp;
         const my = (originY + (sy + 0.5) * step) * mpp;
-        weightGrid[sy * WEIGHT_SUB + sx] = clamp(climate.approximatePrec(mx, my, level) / 60, 0.08, 4);
+        weightGrid[sy * WEIGHT_SUB + sx] = clamp(climate.approximatePrec(mx, my, level) / REFERENCE_PREC_MM, 0.02, 4);
       }
     }
 
@@ -290,6 +305,11 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
           continue;
         }
         height[index] = heightFromRaw(elevation.rawPixel(level, originX + x, originY + y));
+        precipitation[index] = climate.approximatePrec(
+          (originX + x + 0.5) * mpp,
+          (originY + y + 0.5) * mpp,
+          level,
+        );
         const fx = clamp((x + 0.5) / step - 0.5, 0, WEIGHT_SUB - 1);
         const x0 = Math.floor(fx);
         const x1 = Math.min(x0 + 1, WEIGHT_SUB - 1);
@@ -391,7 +411,7 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
           (originY + y + 0.5) * cell,
           (originX + tx + 0.5) * cell,
           (originY + ty + 0.5) * cell,
-          riverWidth(discharge(flux[index], cellArea)),
+          riverWidth(discharge(flux[index], cellArea, precipitation[index] * REFERENCE_PREC_MM)),
         );
       }
     }
@@ -563,7 +583,10 @@ export const createHydro = (planet, elevation, climate, { regions: regionLimit =
     widthAt: (mpp, mx, my) => {
       const level = levelForView(mpp);
       const cell = mppAt(planet, level);
-      return riverWidth(discharge(fluxAt(mpp, mx, my), cell * cell));
+      /* Осадки берём из климата прямо здесь: у региона своя сетка, но поле
+         осадков одно на весь мир. */
+      const precMm = climate.approximatePrec(mx, my, level);
+      return riverWidth(discharge(fluxAt(mpp, mx, my), cell * cell, precMm));
     },
     stats: () => ({
       coarse: coarseCount,

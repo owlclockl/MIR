@@ -1,39 +1,56 @@
-/* Климат планеты: температура, осадки, биомы и всё, что из них выводится.
+/* Климат планеты: температура, осадки, испаряемость, биомы и классификации.
 
    Модель — переработанная модель Azgaar (vendor/azgaar-fantasy-map-generator,
    `temperature-generator.ts`, `precipitation-generator.ts`, `biomes-generator.ts`).
    Взяты без изменений:
 
      • шкала высот 0…100 с уровнем моря 20 (оттуда же порог «земля с 20»);
-     • температура: тропический пояс 16°…−20°, градиент 0,15 °C на градус
-       широты в поясе, линейный градиент к полюсам, падение 6,5 °C на километр
-       высоты (в Azgaar — `((h − 18)^e / 1000) · 6,5`);
-     • модификатор осадков по 5-градусным широтным поясам `LATITUDE_MODIFIER`
-       (подъём у экватора, сушь 20…30°, вторая влажная зона 50…60°);
      • матрица биомов 5 × 26 «влажность × температура», правила «морская вода»,
        «вечная мерзлота», «жаркая пустыня», «болото» — теми же порогами;
-     • таблица биомов: названия, цвета, пригодность.
+     • таблица биомов: названия, цвета, пригодность, шкала влажности
+       (5 единиц ≈ 400 мм).
 
-   Переписано под планету:
+   Переписано под планету и под физику (подробности — в atmosphere.js,
+   ocean.js, precip.js, docs/planet-physics.md):
 
-     • **Осадки считаются по точке, а не прогоном ветра по всей карте.** Azgaar
-       ведёт ветер через каждую строку решётки — это O(клеток) на весь мир, на
-       40-миллионной карте немыслимо. Здесь то же физическое содержание выражено
-       через локальные величины: влажность приносит океан, поэтому «океаничность»
-       считается как взвешенная доля воды в окрестностях 8…2048 км (мульти-
-       масштабная выборка той же пирамиды высот), плюс орографический подъём на
-       наветренном склоне и дождевая тень за хребтом — чего у Azgaar нет вовсе.
-     • **Температура считается по строке:** широта зависит только от y, поэтому
-       на тайл это одна формула на строку и одно вычитание на пиксель.
-     • **Ветры — функция широты** (пассаты, западный перенос, полярные восточные),
-       а не случайный угол: от них же идут осадки, течения и слой «Ветры». */
+     • **Температура — из прихода тепла.** Широта и наклон оси дают годовое
+       среднее и годовую амплитуду; у воды амплитуда втрое меньше, чем у суши,
+       поэтому морской климат от континентального отличается сам, без порогов.
+       Высота отнимает 6,5 °C на километр.
+     • **Осадки — переносом влаги с ветром** (precip.js), а не формулой по
+       точке: пустыни получаются там, где воздух пришёл с холодной воды или
+       опустился в субтропиках, а не там, где «мало океаничности».
+     • **Испаряемость считается отдельно** (Харгривз, atmosphere.js), отсюда
+       настоящая засушливость P/PET и классы засушливости ЮНЕП. Пустыня — это
+       не «мало дождя», а «дождя меньше, чем может испариться».
+     • **Класс Кёппена — по критериям Кёппена** (Beck et al., 2018): пороги
+       сухости зависят от температуры и сезонности осадков, а не только от
+       годовой суммы; появились Cs, Cw, Ds, Dw, тропические Af/Am/Aw разделяются
+       по осадкам самого сухого месяца.
+     • **Зоны жизни Холдриджа** — вторая, независимая классификация (тепло ×
+       осадки × испаряемость). Она не заменяет Кёппена: Кёппен описывает
+       климат, Холдридж — что на этом месте растёт.
+     • **Продуктивность (NPP)** — модель Майами (Lieth, 1975): минимум из
+       «сколько даёт тепло» и «сколько даёт влага»; из неё считается слой флоры.
+     • **Снег и лёд** — из зимней и летней температуры, а не из одной годовой:
+       ледник там, где и летом ниже нуля, а не просто «холодно».
+
+   В отличие от прежней версии всё это считается **один раз на грубой решётке
+   мира** и опрашивается билинейно, поэтому климат перестал зависеть от уровня
+   пирамиды: родитель и ребёнок видят одно и то же число, и тайл любого уровня
+   согласован с соседями. */
 
 import { clamp, levelForMpp, metersToGeo, mppAt, TILE } from './scale.js';
-import { heightFromRaw, heightMeters, SEA_LEVEL } from './elevation.js';
+import { createGrid, smoothGrid } from './fields.js';
+import { heightFromRaw, heightMeters, SEA_LEVEL } from './zscale.js';
+import { SEASONS, annualSeaTemperature, createSeasonAtmosphere, extraterrestrial } from './atmosphere.js';
+import { createOcean } from './ocean.js';
+import { createPrecipitation } from './precip.js';
 
 /* ---------- таблицы, перенесённые из Azgaar ---------- */
 
-/** Модификатор осадков по 5-градусным поясам: 0—5°, 5—10°, … 85—90°. */
+/** Модификатор осадков по 5-градусным поясам: 0—5°, 5—10°, … 85—90°.
+    Оставлен для совместимости и для слоя «Осадки по Азгаару». */
 export const LATITUDE_MODIFIER = [4, 2, 2, 2, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 0.5];
 
 /** Биомы Azgaar: порядок, цвета и пригодность — как в `getDefaultBiomes()`. */
@@ -62,58 +79,57 @@ export const BIOME_MATRIX = [
   new Uint8Array([7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 10, 10]),
 ];
 
-/** Классификация Кёппена (упрощённая, по среднегодовым). Цвета — школьные. */
+/** Классификация Кёппена: 30 типов (Beck et al., 2018). Цвета — школьные. */
 export const KOPPEN = [
-  { id: 'Af', name: 'Влажный тропический', color: '#004b85' },
-  { id: 'Am', name: 'Муссонный', color: '#2b7fbe' },
-  { id: 'Aw', name: 'Саванна', color: '#7fbf7f' },
-  { id: 'BWh', name: 'Жаркая пустыня', color: '#f2a05f' },
-  { id: 'BWk', name: 'Холодная пустыня', color: '#d9c08a' },
-  { id: 'BSh', name: 'Жаркая полупустыня', color: '#f6d08a' },
-  { id: 'BSk', name: 'Холодная полупустыня', color: '#cdbd7a' },
-  { id: 'Csa', name: 'Средиземноморский', color: '#c9d94f' },
-  { id: 'Csb', name: 'Тёплое лето, сухое', color: '#a8cf6a' },
-  { id: 'Cfa', name: 'Влажный субтропический', color: '#6cc04f' },
-  { id: 'Cfb', name: 'Морской умеренный', color: '#3fa055' },
-  { id: 'Dfa', name: 'Влажный континентальный', color: '#4b8f45' },
-  { id: 'Dfb', name: 'Влажный континентальный, прохладный', color: '#37703c' },
-  { id: 'Dfc', name: 'Субарктический', color: '#4b6b32' },
-  { id: 'ET', name: 'Тундра', color: '#8c8f6b' },
-  { id: 'EF', name: 'Ледяной покров', color: '#d5e7eb' },
+  { id: 'Af', name: 'Влажный тропический', color: '#0000ff' },
+  { id: 'Am', name: 'Муссонный', color: '#0077ff' },
+  { id: 'Aw', name: 'Саванна', color: '#46a9fa' },
+  { id: 'BWh', name: 'Жаркая пустыня', color: '#fe0000' },
+  { id: 'BWk', name: 'Холодная пустыня', color: '#fd9696' },
+  { id: 'BSh', name: 'Жаркая полупустыня', color: '#f5a401' },
+  { id: 'BSk', name: 'Холодная полупустыня', color: '#fdd68b' },
+  { id: 'Csa', name: 'Средиземноморский', color: '#fffc33' },
+  { id: 'Csb', name: 'Тёплое лето, сухое', color: '#fdfd96' },
+  { id: 'Csc', name: 'Прохладное лето, сухое', color: '#ffffb3' },
+  { id: 'Cfa', name: 'Влажный субтропический', color: '#c6ff4e' },
+  { id: 'Cfb', name: 'Морской умеренный', color: '#66ff33' },
+  { id: 'Cfc', name: 'Прохладный морской', color: '#b3ff66' },
+  { id: 'Cwa', name: 'Субтропический с сухой зимой', color: '#96ff33' },
+  { id: 'Cwb', name: 'Умеренный с сухой зимой', color: '#b0ff33' },
+  { id: 'Cwc', name: 'Прохладный с сухой зимой', color: '#ccff33' },
+  { id: 'Dfa', name: 'Влажный континентальный', color: '#4dff00' },
+  { id: 'Dfb', name: 'Влажный континентальный, прохладный', color: '#00d400' },
+  { id: 'Dfc', name: 'Субарктический', color: '#00a100' },
+  { id: 'Dfd', name: 'Экстремально континентальный', color: '#008000' },
+  { id: 'Dsa', name: 'Континентальный с сухим летом', color: '#95ff00' },
+  { id: 'Dsb', name: 'Прохладный с сухим летом', color: '#aaff00' },
+  { id: 'Dsc', name: 'Субарктический с сухим летом', color: '#ccff66' },
+  { id: 'Dwa', name: 'Континентальный с сухой зимой', color: '#78ff00' },
+  { id: 'Dwb', name: 'Прохладный с сухой зимой', color: '#90ff33' },
+  { id: 'Dwc', name: 'Субарктический с сухой зимой', color: '#b0ff66' },
+  { id: 'ET', name: 'Тундра', color: '#b3b3b3' },
+  { id: 'EF', name: 'Ледяной покров', color: '#cccccc' },
+];
+
+/** Зоны жизни Холдриджа: 30 сочетаний тепла и влаги (из 36 возможных). */
+export const HOLDRIDGE_BELTS = ['Полярный', 'Субполярный', 'Бореальный', 'Прохладный', 'Тёплый', 'Субтропический', 'Тропический'];
+export const HOLDRIDGE_HUMIDITY = ['Супервлажный', 'Влажный', 'Влажно-лесной', 'Сырой лес', 'Степной', 'Сухой лес', 'Колючий лес', 'Пустынный'];
+export const HOLDRIDGE_COLORS = [
+  '#2b7a5a', '#3d9c6a', '#57b57c', '#7ccb8f', '#a8d98f', '#d6e08a', '#e8d27a', '#e0b063',
+  '#c98f52', '#b3763f', '#9c6234', '#7f4f2c',
 ];
 
 /* ---------- параметры климата ---------- */
 
-const TROPIC_N = 16;
-const TROPIC_S = -20;
-const TROPIC_GRADIENT = 0.15;
-const EQUATOR_TEMP = 27;
-const NORTH_POLE_TEMP = -26;
-const SOUTH_POLE_TEMP = -32;
-
 /** Единица осадков Azgaar → миллиметры в год (шкала доведена до 4000 мм). */
 export const PREC_TO_MM = 4000 / 255;
-/** Осадки: множитель перед «широтный пояс × океаничность». */
-const PREC_BASE = 55;
-/** Масштабы океаничности, метры (увеличиваются вместе с планетой). */
-const OCEANITY_SCALES = [8, 32, 128, 512, 2048].map((km) => km * 1000);
-const OCEANITY_WEIGHTS = [0.06, 0.1, 0.16, 0.26, 0.42];
-/** Расстояние, на котором берётся наветренный перепад высот. */
-const ORO_STEP_M = 24_000;
+/** Осадки Azgaar: сколько миллиметров в одной единице влажности матрицы. */
+export const MM_PER_MOISTURE = PREC_TO_MM * 5;
+/** Шаг температурной оси матрицы биомов, °C. */
+const BIOME_TEMP_STEP = 1;
 
-/** Температура на уровне моря для широты (модель Azgaar). */
-export const seaLevelTemperature = (lat) => {
-  const equator = EQUATOR_TEMP;
-  if (lat <= TROPIC_N && lat >= TROPIC_S) return equator - Math.abs(lat) * TROPIC_GRADIENT;
-  const northTropic = equator - TROPIC_N * TROPIC_GRADIENT;
-  const southTropic = equator + TROPIC_S * TROPIC_GRADIENT;
-  if (lat > TROPIC_N) {
-    const gradient = (northTropic - NORTH_POLE_TEMP) / (90 - TROPIC_N);
-    return northTropic - (lat - TROPIC_N) * gradient;
-  }
-  const gradient = (southTropic - SOUTH_POLE_TEMP) / (90 + TROPIC_S);
-  return southTropic + (lat - TROPIC_S) * gradient;
-};
+/** Температура на уровне моря для широты — годовое среднее (atmosphere.js). */
+export const seaLevelTemperature = (lat) => annualSeaTemperature(lat);
 
 /** Падение температуры с высотой: 6,5 °C на километр выше уровня моря. */
 export const altitudeDrop = (h) => (h < SEA_LEVEL ? 0 : (heightMeters(h) / 1000) * 6.5);
@@ -124,15 +140,11 @@ export const temperatureAt = (lat, h) => seaLevelTemperature(lat) - altitudeDrop
 /** Модификатор осадков для широты: таблица Azgaar по 5-градусным поясам. */
 export const latitudeModifier = (lat) => LATITUDE_MODIFIER[clamp(Math.floor(Math.abs(lat) / 5), 0, LATITUDE_MODIFIER.length - 1)];
 
-/**
- * Господствующий ветер: пассаты до 30°, западный перенос 30…60°, полярные
- * восточные дальше. Возвращает единичный вектор, куда воздух движется.
- */
+/** Господствующий ветер (atmosphere.js): оставлен экспортом ради слоя «Ветры». */
 export const prevailingWind = (lat) => {
   const abs = Math.abs(lat);
-  const east = abs < 30 || abs > 60;
   const sign = lat >= 0 ? 1 : -1;
-  /* Пассаты дуют к экватору (на юг в северном полушарии), западные ветры — к полюсу. */
+  const east = abs < 30 || abs > 60;
   return east ? { x: -0.87, y: -0.5 * sign } : { x: 0.87, y: 0.5 * sign };
 };
 
@@ -147,22 +159,93 @@ export const biomeId = (moisture, temperature, height, hasRiver) => {
   return BIOME_MATRIX[moistureBand][temperatureBand];
 };
 
-/** Класс Кёппена по среднегодовым температуре, осадкам и континентальности. */
-export const koppenId = (temperature, precMm, lat, oceanity) => {
-  const amplitude = 3 + 13 * (1 - oceanity); // полуамплитуда года: континент качается сильнее
-  const hot = temperature + amplitude;
-  const cold = temperature - amplitude;
-  if (hot <= 10) return temperature < -20 ? 15 : 14; // EF / ET
-  const desert = 250 + 8 * Math.max(temperature, 0);
-  const steppe = 500 + 12 * Math.max(temperature, 0);
-  if (precMm < desert) return temperature >= 18 ? 3 : 4; // BWh / BWk
-  if (precMm < steppe) return temperature >= 18 ? 5 : 6; // BSh / BSk
-  if (cold >= 18) return precMm > 1500 ? 0 : precMm > 800 ? 1 : 2; // Af / Am / Aw
-  if (cold <= -3) return hot > 22 ? 11 : hot > 15 ? 12 : 13; // Dfa / Dfb / Dfc
-  /* C: сухое лето — там, где западный перенос летом уходит (30…45°). */
-  const drySummer = Math.abs(lat) > 28 && Math.abs(lat) < 46;
-  if (drySummer) return hot > 22 ? 7 : 8; // Csa / Csb
-  return hot > 22 ? 9 : 10; // Cfa / Cfb
+/**
+ * Класс Кёппена по критериям Кёппена — с сезонностью, а не по одной годовой
+ * сумме (Beck et al., 2018; пороги сухости зависят от температуры и от того,
+ * в какой сезон выпадает больше осадков).
+ *
+ * @param {{tMean: number, tWarm: number, tCold: number, precMm: number,
+ *   precWet: number, precDry: number, lat: number}} c
+ */
+export const koppenId = ({ tMean, tWarm, tCold, precMm, precWet, precDry, lat }) => {
+  const find = (id) => KOPPEN.findIndex((entry) => entry.id === id);
+  /* Порог сухости Кёппена: 2·T в умеренном поясе, 2·T + 14 при сухом лете,
+     2·T + 28 при сухой зиме (и 2·T при равномерных осадках). */
+  const summer = precWet >= precDry;
+  const summerShare = precWet / Math.max(precMm, 1e-6);
+  const dryThreshold = precMm * summerShare > 0.7
+    ? 2 * tMean + 28
+    : precMm * summerShare < 0.3
+      ? 2 * tMean + 14
+      : 2 * tMean;
+  if (precMm < 10 * dryThreshold) {
+    if (precMm < 5 * dryThreshold) return tMean >= 18 ? find('BWh') : find('BWk');
+    return tMean >= 18 ? find('BSh') : find('BSk');
+  }
+  if (tCold >= 18) {
+    if (precDry >= 60) return find('Af');
+    if (precDry >= 1000 - 100 * precMm / 25) return find('Am');
+    return find('Aw');
+  }
+  if (tCold > 0 && tCold < 18) {
+    const drySummer = precDry < precWet / 3 && precDry < 40;
+    const dryWinter = precWet < precDry / 10;
+    const third = tWarm >= 22 ? 'a' : tWarm >= 10 ? 'b' : 'c';
+    if (drySummer) return find(`Cs${third}`);
+    if (dryWinter) return find(`Cw${third}`);
+    return find(`Cf${third}`);
+  }
+  /* D: холодная зима. Четвёртая буква — суровость зимы. */
+  const coldLetter = tCold < -38 ? 'd' : tWarm >= 22 ? 'a' : tWarm >= 10 ? 'b' : 'c';
+  const drySummer = precDry < precWet / 3 && precDry < 40;
+  const dryWinter = precWet < precDry / 10;
+  if (drySummer) return find(`Ds${coldLetter}`);
+  if (dryWinter) return find(`Dw${coldLetter}`);
+  return find(`Df${coldLetter}`);
+};
+
+/**
+ * Биом по классу Кёппена — соответствие из классической схемы Уиттекера:
+ * климат описывает Кёппен, а растительность — биом, и связь между ними
+ * однозначна (тропический дождевой лес при Af, тайга при Dfc, тундра при ET).
+ *
+ * Зачем это вместо матрицы «влажность × температура». Матрица Азгаара
+ * различает биомы по **годовой сумме осадков**, а тайга от степи отличается не
+ * суммой (у обеих 300–500 мм), а тем, что зима в тайге холодная настолько, что
+ * испарение мало и вода остаётся. Именно это различие и содержит Кёппен —
+ * поэтому класс первичен, а матрица остаётся для совместимости и слоя «Климат
+ * Азгаара».
+ *
+ * @param {number} koppen — индекс класса в KOPPEN
+ * @param {{temperature: number, prec: number, height: number, hasRiver: boolean}} at
+ */
+export const biomeFromKoppen = (koppen, { temperature, prec, height, hasRiver = false }) => {
+  const id = KOPPEN[koppen]?.id ?? 'Cfb';
+  if (height < SEA_LEVEL) return 0;
+  if (id === 'EF') return 11;
+  if (id === 'ET') return 10;
+  /* Болото — не климат, а место: плоско и мокро. */
+  if (temperature > -2 && prec > 900 && height < 60 && !hasRiver) return 12;
+  if (id === 'Af' || id === 'Am') return 7;
+  if (id === 'Aw' || id === 'BSh') return prec > 900 ? 5 : 3;
+  if (id === 'BWh') return 1;
+  if (id === 'BWk') return 2;
+  if (id === 'BSk') return 4;
+  if (id[0] === 'D') {
+    /* Тайга — там, где лето ещё тёплое, а зима уже долгая; дальше к полюсу
+       тундра и ледник. */
+    if (id[2] === 'c' || id[2] === 'd') return 9;
+    if (prec > 1100) return 8;
+    return 6;
+  }
+  /* C: умеренный пояс. Влажный субтропический и морской — леса, сухое лето —
+     средиземноморская растительность, которая по структуре ближе к саванне. */
+  if (id[0] === 'C') {
+    if (id[2] === 's' && prec < 700) return 5;
+    if (prec > 1400) return 8;
+    return 6;
+  }
+  return 6;
 };
 
 /* ---------- производные показатели (для слоёв) ---------- */
@@ -171,15 +254,18 @@ export const koppenId = (temperature, precMm, lat, oceanity) => {
 export const snowLine = (temperature) => clamp((temperature + 6) * 480, 0, 6000);
 
 /** Морской лёд: доля покрытия 0…1 по температуре воды. */
-export const seaIce = (temperature) => clamp((-2 - temperature) / 8, 0, 1);
+export const seaIce = (temperature) => clamp((-1.8 - temperature) / 6, 0, 1);
 
-/** Продуктивность растительности 0…1: тепло × влага, минус мороз и засуха. */
-export const floraIndex = (temperature, precMm) => {
-  const warmth = clamp((temperature + 8) / 30, 0, 1);
-  const wet = clamp(precMm / 1400, 0, 1);
-  const cold = clamp((temperature + 12) / 10, 0, 1);
-  return clamp(warmth ** 0.8 * (0.35 + 0.65 * wet) * cold, 0, 1);
+/* Продуктивность по модели Майами (Lieth, 1975): минимум из тепловой и водной
+   кривых. Г/м² в год — так её и приводят в учебниках. */
+export const nppMiami = (temperature, precMm) => {
+  const thermal = 3000 / (1 + Math.exp(1.315 - 0.119 * temperature));
+  const water = 3000 * (1 - Math.exp(-0.000664 * precMm));
+  return Math.min(thermal, water);
 };
+
+/** Продуктивность растительности 0…1: из неё делается слой «Флора». */
+export const floraIndex = (temperature, precMm) => clamp(nppMiami(temperature, precMm) / 1800, 0, 1);
 
 /** Пригодность для жизни 0…100: пригодность биома, поправки на берег и реку. */
 export const habitabilityIndex = (biome, temperature, nearWater) => {
@@ -240,170 +326,350 @@ export const rockId = (belt, volcanic, craton, height) => {
   return 0;
 };
 
-/* ---------- поле климата по тайлам ---------- */
+/* ---------- сборка климата мира ---------- */
 
-/** Осадки считаются на сетке в 4 раза грубее тайла: влага меняется плавно. */
-const CLIMATE_SUB = 64;
-const SUB_STEP = TILE / CLIMATE_SUB;
-/** Океаничность меняется на тысячах километров — ей хватает сетки в 16 раз
-    грубее тайла. Пять масштабов выборки на каждый пиксель осадков стоили бы
-    дороже всего остального климата, а разницы не видно. */
-const OCEAN_SUB = 16;
-const OCEAN_STEP = TILE / OCEAN_SUB;
+const CLIMATE_CHANNEL = {
+  height: 0,
+  tempWarm: 1,
+  tempCold: 2,
+  petWarm: 3,
+  petCold: 4,
+  precWarm: 5,
+  precCold: 6,
+  sstWarm: 7,
+  sstCold: 8,
+  continentality: 9,
+  land: 10,
+  seaShare: 11,
+  windU: 12,
+  windV: 13,
+  currentU: 14,
+  currentV: 15,
+  upwelling: 16,
+  ice: 17,
+  snow: 18,
+  koppen: 19,
+  holdridge: 20,
+  npp: 21,
+  aridity: 22,
+  nutrient: 23,
+  column: 24,
+};
+const CLIMATE_CHANNELS = 25;
 
 /**
- * Климат планеты. Считает по тайлу: высоты, температуру, осадки, влажность,
- * биом. Всё, кроме осадков, — по пикселю; осадки — на сетке 64 × 64 и растягиваются.
+ * Все поля климата мира на грубой решётке.
+ *
+ * Считается лениво: пока никто не спросил погоду, ни атмосфера, ни океан не
+ * строятся. Порядок обязателен — рельеф → расстояние до моря → атмосфера →
+ * океан → осадки → классификации: осадкам нужен океан, а океану — ветер.
+ */
+const buildClimateFields = (planet, elevation) => {
+  const base = elevation.terrain();
+  const source = base.grid;
+  const { w, h } = source;
+  const count = w * h;
+  const grid = createGrid(planet, { cells: source.w, channels: CLIMATE_CHANNELS });
+  const stepX = grid.stepX;
+  const stepY = grid.stepY;
+
+  /* Высоты берём из **собственной пирамиды мира**, а не из решётки эрозии: у
+     мира с картой Azgaar берег задаёт карта, и климат обязан стоять на том же
+     рельефе, что и раскраска. Уровень выбирается так, чтобы пиксель был
+     примерно равен клетке климата, — тогда выборка и дешёвая, и осмысленная. */
+  const level = clamp(levelForMpp(planet, stepX), 0, planet.maxLevel);
+  const mpp = mppAt(planet, level);
+  const heightM = new Float32Array(count);
+  const land = new Uint8Array(count);
+  for (let gy = 0; gy < h; gy += 1) {
+    for (let gx = 0; gx < w; gx += 1) {
+      const index = gy * w + gx;
+      const mx = (gx + 0.5) * stepX;
+      const my = (gy + 0.5) * stepY;
+      const px = clamp(Math.round(mx / mpp - 0.5), 0, Math.max(0, Math.round(planet.widthM / mpp) - 1));
+      const py = clamp(Math.round(my / mpp - 0.5), 0, Math.max(0, Math.round(planet.heightM / mpp) - 1));
+      const metres = heightMeters(heightFromRaw(elevation.rawPixel(level, px, py)));
+      heightM[index] = metres;
+      land[index] = metres > 0 ? 1 : 0;
+    }
+  }
+
+  /* Доля моря в окрестности: размытая маска суши. По ней считается
+     континентальность и то, «морской» ли климат у точки. */
+  const seaShare = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) seaShare[i] = land[i] ? 0 : 1;
+  for (let pass = 0; pass < 6; pass += 1) {
+    const copy = seaShare.slice();
+    for (let gy = 0; gy < h; gy += 1) {
+      for (let gx = 0; gx < w; gx += 1) {
+        const index = gy * w + gx;
+        let sum = copy[index] * 2;
+        let weight = 2;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = gx + dx;
+          const ny = gy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          sum += copy[ny * w + nx];
+          weight += 1;
+        }
+        seaShare[index] = sum / weight;
+      }
+    }
+  }
+  /* Расстояние до берега — чамфером по маске суши: оно и есть мера
+     континентальности (в метрах, переводим в километры). */
+  const distance = new Float32Array(count).fill(1e9);
+  for (let i = 0; i < count; i += 1) if (land[i]) distance[i] = 0;
+  const a = stepX;
+  const b = stepX * Math.SQRT2;
+  const relax = (i, j, weight) => {
+    const candidate = distance[j] + weight;
+    if (candidate < distance[i]) distance[i] = candidate;
+  };
+  for (let gy = 0; gy < h; gy += 1) {
+    for (let gx = 0; gx < w; gx += 1) {
+      const i = gy * w + gx;
+      if (gx > 0) relax(i, i - 1, a);
+      if (gy > 0) relax(i, i - w, a);
+      if (gx > 0 && gy > 0) relax(i, i - w - 1, b);
+      if (gx < w - 1 && gy > 0) relax(i, i - w + 1, b);
+    }
+  }
+  for (let gy = h - 1; gy >= 0; gy -= 1) {
+    for (let gx = w - 1; gx >= 0; gx -= 1) {
+      const i = gy * w + gx;
+      if (gx < w - 1) relax(i, i + 1, a);
+      if (gy < h - 1) relax(i, i + w, a);
+      if (gx < w - 1 && gy < h - 1) relax(i, i + w + 1, b);
+      if (gx > 0 && gy < h - 1) relax(i, i + w - 1, b);
+    }
+  }
+  const continentality = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    /* Континентальность выходит на единицу в 2000 км от берега: глубже этого
+       океан уже не смягчает климат (Восточная Сибирь, Центральная Азия). */
+    continentality[i] = clamp(distance[i] / 2_000_000, 0, 1);
+  }
+
+  const rowLat = new Float64Array(h);
+  for (let gy = 0; gy < h; gy += 1) rowLat[gy] = metersToGeo(planet, 0, (gy + 0.5) * stepY).lat;
+  const masks = { land, heightM, rowLat, continentality, seaShare };
+
+  const seasons = {};
+  for (const season of SEASONS) {
+    const atmosphere = createSeasonAtmosphere(planet, grid, masks, season);
+    const ocean = createOcean(planet, grid, masks, atmosphere);
+    seasons[season.id] = { season, atmosphere, ocean };
+  }
+  const warm = seasons.july;
+  const cold = seasons.january;
+  const precip = createPrecipitation(planet, grid, masks, {
+    july: { atmosphere: warm.atmosphere, ocean: warm.ocean },
+    january: { atmosphere: cold.atmosphere, ocean: cold.ocean },
+  });
+
+  /* Испаряемость за год: два полугодия по Харгривзу. */
+  const pet = new Float32Array(count);
+  const aridity = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    pet[i] = warm.atmosphere.pet[i] + cold.atmosphere.pet[i];
+    /* Индекс засушливости ЮНЕП — отношение осадков к испаряемости P/PET.
+       Пороги общепринятые: ниже 0,03 — гиперзасушливо, 0,03–0,2 — засушливо,
+       0,2–0,5 — полузасушливо, 0,5–0,65 — сухо-субгумидно, выше — влажно.
+       В пустыне дождь бывает раз в год, поэтому знаменатель не даём уйти в
+       ноль: пять миллиметров — это уже не «сухо», а «дождя не было». */
+    aridity[i] = clamp(precip.annual[i] / Math.max(pet[i], 1), 0, 12);
+  }
+
+  /* Снег и лёд: по сезонам, а не по годовой средней. Ледник там, где и в
+     тёплый сезон выше снеговой линии; снежный покров — где зимой холодно. */
+  const snow = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    if (!land[i]) continue;
+    const winter = cold.atmosphere.temperature[i];
+    const summer = warm.atmosphere.temperature[i];
+    if (winter < 0) {
+      /* Доля года со снежным покровом — грубо по зимней температуре. */
+      snow[i] = clamp(-winter / 12, 0, 1);
+    }
+    if (summer < 1 && summer > -30) snow[i] = Math.max(snow[i], clamp(1 - summer / 1.5, 0.6, 1));
+  }
+
+  /* Пишем прямо в поле решётки: отдельный массив пришлось бы копировать, а
+     лишний проход по 300 тысячам клеток тут ни к чему. */
+  const put = (index, channel, value) => {
+    grid.data[index * CLIMATE_CHANNELS + channel] = value;
+  };
+  for (let i = 0; i < count; i += 1) {
+    const lat = rowLat[(i / w) | 0];
+    const tWarm = warm.atmosphere.temperature[i];
+    const tCold = cold.atmosphere.temperature[i];
+    const tMean = (tWarm + tCold) / 2;
+    const pWarm = precip.warm[i];
+    const pCold = precip.cold[i];
+    const pAnnual = precip.annual[i];
+    const precWet = Math.max(pWarm, pCold);
+    const precDry = Math.min(pWarm, pCold);
+    put(i, CLIMATE_CHANNEL.height, heightM[i]);
+    put(i, CLIMATE_CHANNEL.tempWarm, tWarm);
+    put(i, CLIMATE_CHANNEL.tempCold, tCold);
+    put(i, CLIMATE_CHANNEL.petWarm, warm.atmosphere.pet[i]);
+    put(i, CLIMATE_CHANNEL.petCold, cold.atmosphere.pet[i]);
+    put(i, CLIMATE_CHANNEL.precWarm, pWarm);
+    put(i, CLIMATE_CHANNEL.precCold, pCold);
+    put(i, CLIMATE_CHANNEL.sstWarm, warm.ocean.sst[i]);
+    put(i, CLIMATE_CHANNEL.sstCold, cold.ocean.sst[i]);
+    put(i, CLIMATE_CHANNEL.continentality, continentality[i]);
+    put(i, CLIMATE_CHANNEL.land, land[i]);
+    put(i, CLIMATE_CHANNEL.seaShare, seaShare[i]);
+    put(i, CLIMATE_CHANNEL.windU, warm.atmosphere.windU[i]);
+    put(i, CLIMATE_CHANNEL.windV, warm.atmosphere.windV[i]);
+    put(i, CLIMATE_CHANNEL.currentU, land[i] ? 0 : warm.ocean.u[i] * 0.12);
+    put(i, CLIMATE_CHANNEL.currentV, land[i] ? 0 : warm.ocean.v[i] * 0.12);
+    put(i, CLIMATE_CHANNEL.upwelling, warm.ocean.upwelling[i]);
+    put(i, CLIMATE_CHANNEL.ice, Math.max(warm.ocean.ice[i], cold.ocean.ice[i]));
+    put(i, CLIMATE_CHANNEL.snow, snow[i]);
+    put(i, CLIMATE_CHANNEL.koppen, koppenId({ tMean, tWarm, tCold, precMm: pAnnual, precWet, precDry, lat }));
+    /* Холдридж: биотемпература (ниже нуля и выше 30 °C считается как 0 —
+       растение в это время не растёт) и коэффициент PET. */
+    /* Биотемпература Холдриджа — среднее по месяцам с оговоркой: месяцы ниже
+       нуля и выше 30 °C считаются нулём. Растение в это время не растёт, и
+       именно эта оговорка отделяет тропики от пустынь и тундр. */
+    const dormant = (t) => (t < 0 || t > 30 ? 0 : t);
+    const biotemperature = (dormant(tWarm) + dormant(tCold)) / 2;
+    const petRatio = (biotemperature * 58.93) / Math.max(pAnnual, 1e-3);
+    const belt = biotemperature > 24 ? 6 : biotemperature > 18 ? 5 : biotemperature > 12 ? 4 : biotemperature > 6 ? 3 : biotemperature > 3 ? 2 : biotemperature > 1.5 ? 1 : 0;
+    const humidity = petRatio < 0.25 ? 2 : petRatio < 0.5 ? 1 : petRatio < 1 ? 0 : petRatio < 2 ? 4 : petRatio < 4 ? 5 : petRatio < 8 ? 6 : 7;
+    put(i, CLIMATE_CHANNEL.holdridge, belt * 8 + humidity);
+    put(i, CLIMATE_CHANNEL.npp, nppMiami(tMean, pAnnual));
+    put(i, CLIMATE_CHANNEL.aridity, aridity[i]);
+    /* Питательность почв: холод и сушь её снижают, вулканизм и реки повышают. */
+    put(i, CLIMATE_CHANNEL.column, precip.column[i]);
+    put(i, CLIMATE_CHANNEL.nutrient, clamp((0.2 + 0.5 * clamp(pAnnual / 1200, 0, 1)) * clamp((tMean + 5) / 25, 0, 1) + 0.25 * (base.tectonics.grid.sample1((i % w + 0.5) * stepX, (((i / w) | 0) + 0.5) * stepY, 8)), 0, 1));
+  }
+
+  return { grid, channels: CLIMATE_CHANNEL, count, masks, seasons, precip, pet, aridity, snow, seaShare, continentality, heightM, rowLat, level, base };
+};
+
+/**
+ * Климат планеты. Климатические поля считаются один раз на грубой решётке и
+ * опрашиваются билинейно; на тайл строится только сетка для раскраски, где
+ * высота берётся из пирамиды (она мелкая), а всё остальное — из полей (оно
+ * крупное и от уровня не зависит).
  */
 export const createClimate = (planet, elevation, { tiles: tileLimit = 96 } = {}) => {
   const cache = new Map();
-  const scales = OCEANITY_SCALES.map((meters) => meters * planet.size);
+  let fields = null;
+  const world = () => {
+    if (!fields) fields = buildClimateFields(planet, elevation);
+    return fields;
+  };
+
+  /** Выборка поля климата в метрах карты. */
+  const at = (channel, mx, my) => world().grid.sample1(mx, my, channel);
 
   /**
-   * Доля воды в окрестности: выборка пирамиды на пяти масштабах.
-   *
-   * Масштаб грубее собственного разрешения тайла не берётся: на обзорном уровне
-   * трёхкилометровых деталей всё равно не видно, а ради них пришлось бы строить
-   * сотни тайлов. Поэтому уровень выборки ограничен уровнем тайла — для глубоких
-   * уровней это предки, уже лежащие в кэше.
+   * Осадки в точке, мм в год: настоящие, посчитанные переносом влаги. Служат
+   * гидрологии: сток обязан отвечать тому дождю, который выпал, а не оценке.
    */
-  const oceanityAt = (mx, my, limitLevel = planet.maxLevel) => {
-    let wet = 0;
-    for (let i = 0; i < scales.length; i += 1) {
-      const coarse = Math.min(levelForMpp(planet, scales[i] / 4), limitLevel);
-      const mpp = mppAt(planet, coarse);
-      const px = Math.floor(mx / mpp);
-      const py = Math.floor(my / mpp);
-      const h = heightFromRaw(elevation.sampleRaw(coarse, px, py));
-      wet += OCEANITY_WEIGHTS[i] * clamp((SEA_LEVEL + 0.5 - h) / 3, 0, 1);
-    }
-    return clamp(wet, 0, 1);
-  };
-
-  /** Координата узла сетки (шаг `step` пикселей) в узлах сетки океаничности. */
-  const oceanCoord = (pixel, step) => ((pixel + 0.5) * step) / OCEAN_STEP - 0.5;
-
-  /** Выборка сетки океаничности в её собственных узлах (дробные координаты). */
-  const sampleOcean = (grid, gx, gy) => {
-    const fx = clamp(gx, 0, OCEAN_SUB - 1);
-    const fy = clamp(gy, 0, OCEAN_SUB - 1);
-    const x0 = Math.floor(fx);
-    const y0 = Math.floor(fy);
-    const x1 = Math.min(x0 + 1, OCEAN_SUB - 1);
-    const y1 = Math.min(y0 + 1, OCEAN_SUB - 1);
-    const wx = fx - x0;
-    const wy = fy - y0;
-    const top = grid[y0 * OCEAN_SUB + x0] + (grid[y0 * OCEAN_SUB + x1] - grid[y0 * OCEAN_SUB + x0]) * wx;
-    const bottom = grid[y1 * OCEAN_SUB + x0] + (grid[y1 * OCEAN_SUB + x1] - grid[y1 * OCEAN_SUB + x0]) * wx;
-    return top + (bottom - top) * wy;
-  };
+  const approximatePrec = (mx, my) => at(CLIMATE_CHANNEL.precWarm, mx, my) / 2 + at(CLIMATE_CHANNEL.precCold, mx, my) / 2;
 
   const build = (level, tx, ty) => {
     const mpp = mppAt(planet, level);
     const originX = tx * TILE * mpp;
     const originY = ty * TILE * mpp;
-    const raw = elevation.rawTile(level, tx, ty);
     const height = new Float32Array(TILE * TILE);
     const temp = new Int8Array(TILE * TILE);
     const prec = new Uint8Array(TILE * TILE);
     const moisture = new Uint8Array(TILE * TILE);
     const biome = new Uint8Array(TILE * TILE);
     const ocean = new Uint8Array(TILE * TILE);
+    /* Новые поля — для новых слоёв: тепло, вода, жизнь, лёд и течения. */
+    const pet = new Uint16Array(TILE * TILE);
+    const aridity = new Uint8Array(TILE * TILE);
+    const koppen = new Uint8Array(TILE * TILE);
+    const holdridge = new Uint8Array(TILE * TILE);
+    const npp = new Uint16Array(TILE * TILE);
+    const snow = new Uint8Array(TILE * TILE);
+    const ice = new Uint8Array(TILE * TILE);
+    const sst = new Int8Array(TILE * TILE);
+    const wind = new Uint8Array(TILE * TILE);
+    const current = new Uint8Array(TILE * TILE);
+    const upwelling = new Uint8Array(TILE * TILE);
+    const seasonal = new Uint8Array(TILE * TILE);
 
-    /* 1. Океаничность на грубой сетке: пять масштабов выборки пирамиды. */
-    const oceanGrid = new Float32Array(OCEAN_SUB * OCEAN_SUB);
-    for (let oy = 0; oy < OCEAN_SUB; oy += 1) {
-      const my = originY + (oy + 0.5) * mpp * OCEAN_STEP;
-      for (let ox = 0; ox < OCEAN_SUB; ox += 1) {
-        const mx = originX + (ox + 0.5) * mpp * OCEAN_STEP;
-        oceanGrid[oy * OCEAN_SUB + ox] = oceanityAt(mx, my, level);
-      }
-    }
-
-    /* 2. Осадки на сетке в 4 раза грубее тайла: широтный пояс, океаничность,
-          орографический подъём на наветренном склоне и дождевая тень. */
-    const sub = new Float32Array(CLIMATE_SUB * CLIMATE_SUB);
-    for (let sy = 0; sy < CLIMATE_SUB; sy += 1) {
-      const my = originY + (sy + 0.5) * mpp * SUB_STEP;
-      const { lat } = metersToGeo(planet, 0, my);
-      const latMod = latitudeModifier(lat);
-      const wind = prevailingWind(lat);
-      const stepX = wind.x * ORO_STEP_M * planet.size;
-      const stepY = wind.y * ORO_STEP_M * planet.size;
-      for (let sx = 0; sx < CLIMATE_SUB; sx += 1) {
-        const mx = originX + (sx + 0.5) * mpp * SUB_STEP;
-        const oceanityValue = sampleOcean(oceanGrid, oceanCoord(sx, SUB_STEP), oceanCoord(sy, SUB_STEP));
-        /* Наветренный перепад: воздух поднимается — проливается, опускается — сушь. */
-        const here = elevation.heightMetersAt(level, mx, my);
-        const upwind = elevation.heightMetersAt(level, mx - stepX, my - stepY);
-        const lift = clamp((here - upwind) / 250, -3, 6);
-        const oro = lift * 6 * (0.3 + 0.7 * oceanityValue);
-        const base = PREC_BASE * latMod * (0.35 + 0.65 * oceanityValue ** 0.8);
-        sub[sy * CLIMATE_SUB + sx] = clamp(base + oro, 0, 255);
-      }
-    }
-
-    /* 3. По пикселю: высота, широта → температура; осадки — выборкой с сетки. */
     for (let py = 0; py < TILE; py += 1) {
       const my = originY + (py + 0.5) * mpp;
-      const { lat } = metersToGeo(planet, 0, my);
-      const seaTemp = seaLevelTemperature(lat);
-      const fy = clamp(py / SUB_STEP - 0.5, 0, CLIMATE_SUB - 1);
-      const y0 = Math.floor(fy);
-      const y1 = Math.min(y0 + 1, CLIMATE_SUB - 1);
-      const wy = fy - y0;
       for (let px = 0; px < TILE; px += 1) {
         const index = py * TILE + px;
-        const heightValue = heightFromRaw(raw[index]);
-        height[index] = heightValue;
-        const temperature = seaTemp - altitudeDrop(heightValue);
+        const mx = originX + (px + 0.5) * mpp;
+        /* Высота — из пирамиды: она единственная, что меняется на километрах.
+           Координаты пикселя глобальные, а не внутри тайла: тайл с локальными
+           координатами рисовал бы один и тот же угол мира во всех тайлах. */
+        const h = heightFromRaw(elevation.sampleRaw(level, tx * TILE + px, ty * TILE + py));
+        height[index] = h;
+        const metres = heightMeters(h);
+        const fieldHeight = at(CLIMATE_CHANNEL.height, mx, my);
+        const tWarm = at(CLIMATE_CHANNEL.tempWarm, mx, my);
+        const tCold = at(CLIMATE_CHANNEL.tempCold, mx, my);
+        const tMean = (tWarm + tCold) / 2;
+        const pAnnual = at(CLIMATE_CHANNEL.precWarm, mx, my) / 2 + at(CLIMATE_CHANNEL.precCold, mx, my) / 2;
+        /* Локальная поправка высоты: поле стоит на грубой решётке, а пиксель
+           может быть выше или ниже её клетки — разницу снимаем градиентом. */
+        const lapse = clamp((fieldHeight - metres) * 0.0065, -20, 20);
+        const temperature = tMean + lapse;
         temp[index] = clamp(Math.round(temperature), -127, 127);
-        const fx = clamp(px / SUB_STEP - 0.5, 0, CLIMATE_SUB - 1);
-        const x0 = Math.floor(fx);
-        const x1 = Math.min(x0 + 1, CLIMATE_SUB - 1);
-        const wx = fx - x0;
-        const top = sub[y0 * CLIMATE_SUB + x0] + (sub[y0 * CLIMATE_SUB + x1] - sub[y0 * CLIMATE_SUB + x0]) * wx;
-        const bottom = sub[y1 * CLIMATE_SUB + x0] + (sub[y1 * CLIMATE_SUB + x1] - sub[y1 * CLIMATE_SUB + x0]) * wx;
-        let precipitation = top + (bottom - top) * wy;
-        /* Холодный воздух влагу не держит: за полярным кругом осадков мало. */
-        if (temperature < -5) precipitation *= 0.4;
-        else if (temperature < 2) precipitation *= 0.75;
-        prec[index] = clamp(Math.round(precipitation), 0, 255);
-        ocean[index] = clamp(Math.round(sampleOcean(oceanGrid, oceanCoord(px, 1), oceanCoord(py, 1)) * 255), 0, 255);
+        const precMm = Math.max(pAnnual, 0);
+        prec[index] = clamp(Math.round(precMm / PREC_TO_MM), 0, 255);
+        moisture[index] = clamp(Math.round(precMm / MM_PER_MOISTURE), 0, 255);
+        /* Биом — из класса Кёппена того же поля: климат и растительность
+           обязаны описывать одно и то же место, а не считаться независимо. */
+        biome[index] = biomeFromKoppen(
+          clamp(Math.round(at(CLIMATE_CHANNEL.koppen, mx, my)), 0, KOPPEN.length - 1),
+          { temperature, prec: precMm, height: h, hasRiver: false },
+        );
+        ocean[index] = clamp(Math.round((1 - at(CLIMATE_CHANNEL.seaShare, mx, my)) * 255), 0, 255);
+        pet[index] = clamp(Math.round(at(CLIMATE_CHANNEL.petWarm, mx, my) + at(CLIMATE_CHANNEL.petCold, mx, my)), 0, 65535);
+        /* В канал едет сам индекс P/PET, растянутый так, чтобы влажная
+           граница 0,65 приходилась на 166. */
+        aridity[index] = clamp(Math.round(at(CLIMATE_CHANNEL.aridity, mx, my) * 255), 0, 255);
+        koppen[index] = clamp(Math.round(at(CLIMATE_CHANNEL.koppen, mx, my)), 0, KOPPEN.length - 1);
+        holdridge[index] = clamp(Math.round(at(CLIMATE_CHANNEL.holdridge, mx, my)), 0, 255);
+        npp[index] = clamp(Math.round(at(CLIMATE_CHANNEL.npp, mx, my)), 0, 65535);
+        snow[index] = clamp(Math.round(at(CLIMATE_CHANNEL.snow, mx, my) * 255), 0, 255);
+        ice[index] = clamp(Math.round(at(CLIMATE_CHANNEL.ice, mx, my) * 255), 0, 255);
+        const water = 1 - at(CLIMATE_CHANNEL.land, mx, my);
+        sst[index] = water > 0.5 ? clamp(Math.round(at(CLIMATE_CHANNEL.sstWarm, mx, my)), -127, 127) : 0;
+        const wu = at(CLIMATE_CHANNEL.windU, mx, my);
+        const wv = at(CLIMATE_CHANNEL.windV, mx, my);
+        wind[index] = (Math.atan2(wv, wu) + Math.PI) / (2 * Math.PI) * 255 | 0;
+        const cu = at(CLIMATE_CHANNEL.currentU, mx, my);
+        const cv = at(CLIMATE_CHANNEL.currentV, mx, my);
+        current[index] = (Math.atan2(cv, cu) + Math.PI) / (2 * Math.PI) * 255 | 0;
+        upwelling[index] = clamp(Math.round(at(CLIMATE_CHANNEL.upwelling, mx, my) * 255), 0, 255);
+        seasonal[index] = clamp(Math.round((Math.abs(at(CLIMATE_CHANNEL.precWarm, mx, my) - at(CLIMATE_CHANNEL.precCold, mx, my)) / Math.max(pAnnual, 1)) * 255), 0, 255);
       }
     }
 
-    /* 4. Влажность и биом: правила Azgaar; реку добавит раскраска.
-          Влажность в тех же «единицах Azgaar», что и матрица: 0…50, то есть
-          осадки 0…255 делённые на пять. Границы полос матрицы (шаг 5) тогда
-          отвечают 400 миллиметрам осадков: полоса 0 — пустыня и сухая степь,
-          полоса 4 — лес, который уже не просыхает. */
-    for (let i = 0; i < height.length; i += 1) {
-      moisture[i] = clamp(Math.round(prec[i] / 5), 0, 255);
-      biome[i] = biomeId(moisture[i], temp[i], height[i], false);
-    }
-
-    return { level, tx, ty, height, temp, prec, moisture, biome, ocean };
-  };
-
-  /**
-   * Приблизительные осадки в точке карты (метры) без построения климатических
-   * сеток: та же формула, но без орографической поправки, и только из пирамиды
-   * высот. Такой оценкой питается гидрология: она вызывается из раскраски, а
-   * раскраска сама ждёт климат — полная сетка осадков внутри себя создала бы
-   * рекурсию «климат → сток → климат».
-   */
-  const approximatePrec = (mx, my, limitLevel = planet.maxLevel) => {
-    const { lat } = metersToGeo(planet, 0, my);
-    const latMod = latitudeModifier(lat);
-    const oceanity = oceanityAt(mx, my, limitLevel);
-    return clamp(PREC_BASE * latMod * (0.35 + 0.65 * oceanity ** 0.8), 0, 255);
+    return {
+      level, tx, ty, height, temp, prec, moisture, biome, ocean,
+      pet, aridity, koppen, holdridge, npp, snow, ice, sst, wind, current, upwelling, seasonal,
+    };
   };
 
   return {
     planet,
     approximatePrec,
-    /** Климат тайла: считается один раз и живёт в кэше рядом с тайлом высот. */
+    /** Осадки, мм в год, и испаряемость — наружу для гидрологии и проверок. */
+    precAt: (mx, my) => at(CLIMATE_CHANNEL.precWarm, mx, my) / 2 + at(CLIMATE_CHANNEL.precCold, mx, my) / 2,
+    petAt: (mx, my) => at(CLIMATE_CHANNEL.petWarm, mx, my) + at(CLIMATE_CHANNEL.petCold, mx, my),
+    temperatureAt: (mx, my) => (at(CLIMATE_CHANNEL.tempWarm, mx, my) + at(CLIMATE_CHANNEL.tempCold, mx, my)) / 2,
+    sstAt: (mx, my) => at(CLIMATE_CHANNEL.sstWarm, mx, my),
+    landAt: (mx, my) => at(CLIMATE_CHANNEL.land, mx, my),
+    aridityAt: (mx, my) => at(CLIMATE_CHANNEL.aridity, mx, my),
+    /** Поля мира целиком — для слоёв и проверок. */
+    fields: () => world(),
+    channel: (name) => CLIMATE_CHANNEL[name],
     gridFor(level, tx, ty) {
       const name = `${level}:${tx}:${ty}`;
       let grid = cache.get(name);
@@ -419,6 +685,8 @@ export const createClimate = (planet, elevation, { tiles: tileLimit = 96 } = {})
     },
     drop: (level, tx, ty) => cache.delete(`${level}:${tx}:${ty}`),
     clear: () => cache.clear(),
-    stats: () => ({ tiles: cache.size, limit: tileLimit }),
+    stats: () => ({ tiles: cache.size, limit: tileLimit, fields: fields ? fields.grid.w * fields.grid.h : 0 }),
   };
 };
+
+export { extraterrestrial, smoothGrid };
