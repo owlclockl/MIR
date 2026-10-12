@@ -276,39 +276,43 @@ const field = buildField(island(), { profile: 2, detail: 1 });
 
 const fieldMs = performance.now() - t0;
 
-add(field.width === WIDTH && field.height === HEIGHT, 'поле по размеру тайла', `${WIDTH} × ${HEIGHT} px`);
 
 add(field.seed > 0, 'затравка поля собрана из размера и соли');
 
-/* ---------- 1. замощение ---------- */
-
-let seams = 0;
-
-for (let z = -3; z < HEIGHT + 3; z += 7) {
-  for (const [x, ref] of [
-    [WIDTH - 1, WIDTH],
-
-    [0, -1],
-  ]) {
-    const a = sampleColumn(field, x, z);
-
-    const b = sampleColumn(field, ref, z);
-
-    if (a.y !== b.y || a.flags !== b.flags) seams += 1;
-  }
-}
+/* ---------- 1. одна полная карта, без замощения ---------- */
 
 add(
-  seams === 0,
-  'зеркальное замощение: сосед за краем = та же колонка',
-  seams ? `${seams} расхождений` : 'границы тайлов непрерывны',
+  field.width === WIDTH * field.scale && field.height === HEIGHT * field.scale,
+  'поле = карта Azgaar × масштаб по пикселям',
+  `${field.width} × ${field.height} блоков при scale ${field.scale}`,
 );
 
-const left = surfaceY(field, 0, 100);
+{
+  const outX = fold(field, field.width + 5, 100);
+  const outNegX = fold(field, -3, 100);
+  const outZ = fold(field, 100, field.height + 9);
 
-const right = surfaceY(field, field.width * 2, 100);
+  add(
+    outX.u === field.width - 1 && outNegX.u === 0 && outZ.v === field.height - 1 && !outX.inside,
+    'край карты — край мира: колонка за краем не отражается и не повторяется',
+    `u ${outX.u} и ${outNegX.u}, v ${outZ.v}`,
+  );
 
-add(left === right, 'период по X = двум тайлам (через одно отражение)', `y ${left} = y ${right}`);
+  const inside = fold(field, 10, 10);
+
+  add(inside.u === 10 && inside.v === 10 && inside.inside, 'внутри карты координаты не меняются');
+}
+
+/* Край карты — не шов: соседние колонки у края не совпадают с зеркальными,
+   а последняя колонка и её «продолжение за край» совпадают по значениям. */
+{
+  const edge = sampleColumn(field, field.width - 1, 100);
+
+  const beyond = sampleColumn(field, field.width + 40, 100);
+
+  add(edge.y === beyond.y && edge.flags === beyond.flags, 'за краем карты остаётся край, а не повтор тайла');
+}
+
 
 /* ---------- 2. река и течение ---------- */
 
@@ -625,25 +629,6 @@ for (let i = 0; i < top.data.length; i += 1) if (top.data[i] !== again.data[i]) 
 
 add(sameBytes === 0, 'кадр детерминирован: два прогона побайтно равны', `${sameBytes} расхождений`);
 
-/* Зеркальное замощение: кадр, сдвинутый на период тайла, обязан совпасть —
-
-иначе на швах повторяющегося мира слой рисовал бы другой мир. */
-
-const wrapView = makeView([Math.round(field.width / 2) + field.width * 2, Math.round(field.height / 2)], 96, 64);
-
-const wrapped = buildSlice(field, colors, null, wrapView, {
-  level: field.worldHeight - 1,
-  shade: false,
-  coast: false,
-  arrows: false,
-  labels: false,
-});
-
-let wrapDiff = 0;
-
-for (let i = 0; i < top.data.length; i += 1) if (top.data[i] !== wrapped.data[i]) wrapDiff += 1;
-
-add(wrapDiff === 0, 'срез через период тайла побайтно тот же', `${wrapDiff} расхождений`);
 
 /* Правило «срезаем до кожи»: над вершиной показываем вершину, под водой —
 
@@ -695,7 +680,8 @@ add(
 
 const wetLevel = wetCell >= 0 ? field.waterY[wetCell] : field.seaY;
 
-const wetView = makeView([wetCell % field.width, Math.floor(wetCell / field.width)], 132, 96);
+/* Вид растёт вместе с полем: тот же кусок карты Azgaar в блоках — в field.scale раз больше. */
+const wetView = makeView([wetCell % field.width, Math.floor(wetCell / field.width)], 132 * field.scale, 96 * field.scale);
 
 /* То же правило, по которому срез решает «в клетке вода»: плоскость в толще
 
@@ -860,9 +846,18 @@ if (arrowCell) {
 
 /* Отметки высот: подписываем локальные вершины, и только над водой. */
 
-const labelOff = top;
+/* Своя вьюха под отметки: та же область карты, что и у среза, но в масштабе поля. */
+const labelView = makeView([Math.round(field.width / 2), Math.round(field.height / 2)], 96 * field.scale, 64 * field.scale);
 
-const labelOn = buildSlice(field, colors, null, sliceView, {
+const labelOff = buildSlice(field, colors, null, labelView, {
+  level: field.worldHeight - 1,
+  shade: false,
+  coast: false,
+  arrows: false,
+  labels: false,
+});
+
+const labelOn = buildSlice(field, colors, null, labelView, {
   level: field.worldHeight - 1,
   shade: false,
   coast: false,

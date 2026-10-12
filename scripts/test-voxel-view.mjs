@@ -161,9 +161,9 @@ add(view.element?.dataset.role === 'world-voxel', 'вид смонтирован
 add(!view.error, 'снимок карт прочитан без ошибки', view.error ?? '');
 
 add(
-  view.field?.width === FAKE_MAP.size && view.field?.height === FAKE_MAP.size,
+  view.field?.width === FAKE_MAP.size * view.field?.scale && view.field?.height === FAKE_MAP.size * view.field?.scale,
 
-  'поле взято из окна редактора',
+  'поле = карта из окна редактора × масштаб',
   `${view.field?.width}×${view.field?.height}`,
 );
 
@@ -244,7 +244,9 @@ add(
   `${view.world?.stats().queued} в очереди`,
 );
 
-add(view.world?.radius === 3, 'радиус обзора ограничен размером тайла', `радиус ${view.world?.radius} чанка`);
+const expectedRadius = Math.min(Math.max(Math.floor(Math.min(view.field.width, view.field.height) / 32), 2), 7);
+
+add(view.world?.radius === expectedRadius, 'радиус обзора растёт с картой, не больше 7 чанков', `радиус ${view.world?.radius} чанка`);
 
 add(
   view.sliceInfo === null,
