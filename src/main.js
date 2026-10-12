@@ -1955,7 +1955,7 @@ const createWorldSession = () => ({
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  voxel: false, // надстройка «воксельный мир» над экраном карты
+  voxel: false, // надстройка «карта блоками» (плоские ярусы) над экраном карты
   voxelView: null, // смонтированный вид: dispose при выходе из режима
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // остановка синхронизации лобби для текущего iframe
@@ -2171,7 +2171,7 @@ const worldPageHtml = () => {
   /* Кнопка режима не зависит от session.voxel: перерисовка страницы убила бы
      iframe с документом Azgaar, а режим переключается классом (syncWorldVoxel). */
   const voxelAction = screen === 'map'
-    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Блочная карта" title="Блочная карта: тот же мир по ярусам, 1 блок = 1 пиксель">${icon('layers', 'icon--xs')}<span>Блочная карта</span></button>`
+    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Карта блоками: тот же мир ярус за ярусом, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -2266,7 +2266,7 @@ const mountWorldEditor = () => {
   }
 };
 
-/* Воксельный режим — надстройка над экраном карты: тот же iframe, тот же
+/* Блочная карта — надстройка над экраном карты: тот же iframe, тот же
    документ Azgaar. Страницу при переключении не перерисовываем: это создало бы
    новый iframe и запустило генерацию заново. Поэтому только класс на .world-app
    и монтирование/снятие вида. */
@@ -2287,8 +2287,8 @@ const syncWorldVoxel = () => {
     session.voxelView = null;
     return;
   }
-  /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы камеру и
-     перестроило бы все чанки. */
+  /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы ярус,
+     масштаб и центр, и все чанки построились бы заново. */
   if (session.voxelView && session.voxelView.element?.isConnected) return;
   const host = root.querySelector('[data-role="world-editor-host"]');
   if (!host) return;
@@ -2324,10 +2324,10 @@ const dropWorldVoxel = () => {
   session.voxel = false;
 };
 
-/* Живой предпросмотр правок мастера — это снимки поверх iframe, а воксельный вид
+/* Живой предпросмотр правок мастера — это снимки поверх iframe, а карта блоками
    читает документ самого игрока. Держать их вместе нельзя: игрок видел бы чужую
-   плоскую карту поверх своей объёмной. Накладка появляется без перерисовки
-   страницы, поэтому за ней следит наблюдатель и гасит режим. */
+   карту поверх своей. Накладка появляется без перерисовки страницы, поэтому
+   за ней следит наблюдатель и гасит режим. */
 let worldVoxelWatch = null;
 const watchWorldLive = (host) => {
   worldVoxelWatch?.disconnect();
@@ -2336,7 +2336,7 @@ const watchWorldLive = (host) => {
   worldVoxelWatch = new MutationObserver(() => {
     if (!ui.world?.voxel || !host.querySelector('.world-live.is-on')) return;
     setWorldVoxel(false);
-    toast('Мастер вносит правки: воксельный мир показывает вашу копию карты, режим выключен.');
+    toast('Мастер вносит правки: карта блоками показывает вашу копию карты, режим выключен.');
   });
   worldVoxelWatch.observe(host, {
     childList: true,
@@ -3847,8 +3847,8 @@ const actions = {
     renderWorldPage();
   },
 
-  /* Режим строится из живого документа карты: если генерация ещё идёт, вид
-     сам скажет, чего не хватает (bridge.readSource). */
+  /* Блочная карта строится из живого документа карты: если генерация ещё идёт,
+     вид сам скажет, чего не хватает (bridge.readSource). */
   'world-voxel': () => {
     const session = ui.world;
     if (!session?.open || session.screen !== 'map') return;
@@ -3859,7 +3859,7 @@ const actions = {
       session.voxelView = null;
       syncWorldVoxel();
       const error = session.voxelView?.error;
-      toast(error ?? 'Блочная карта готова.', error ? 'error' : 'ok');
+      toast(error ?? 'Карта блоками построена.', error ? 'error' : 'ok');
       return;
     }
     setWorldVoxel(!session.voxel);
@@ -4464,7 +4464,7 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: воксельный мир → карта → страница игры. */
+    /* Ступеньки: карта блоками → карта → страница игры. */
     if (ui.world.screen === 'map' && ui.world.voxel) {
       event.preventDefault();
       setWorldVoxel(false);

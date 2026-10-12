@@ -42,6 +42,10 @@
     "test:build": "node scripts/test-build.mjs",
     "test:spacing": "node scripts/test-spacing.mjs",
     "test:voxel": "node scripts/test-voxel.mjs",
+    "test:voxel-view": "node scripts/test-voxel-view.mjs",
+    "test:voxel": "node scripts/test-voxel.mjs",
+    "test:planet": "node scripts/test-planet.mjs",
+    "test:planet-view": "node scripts/test-planet-view.mjs",
     "test:voxel-view": "node scripts/test-voxel-view.mjs"
   },
   "devDependencies": {

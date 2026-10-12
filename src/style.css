@@ -32,6 +32,7 @@
   /* Связь через хаб — не ошибка, но и не идеал: тёплый оттенок. */
   --warn: #d9c08a;
   --warn-glow: rgba(217, 192, 138, 0.4);
+  --voxel-frame: rgba(8, 13, 14, 0.72); /* плашки над картой блоками: HUD, панель ярусов, пояснение */
   --accent-glow: rgba(176, 208, 186, 0.45);
 
   /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
@@ -4613,8 +4614,9 @@ button.admin-row:hover {
 /* ---------- карта: воксельный вид того же мира ---------------- */
 
 /* Режим — надстройка над редактором, а не новый экран: документ Azgaar живёт
-   под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
-   просто скрывается visibility, а не вынимается из DOM. */
+под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
+просто скрывается visibility, а не вынимается из DOM. */
+
 .world-app.is-voxel .world-editor-frame {
   visibility: hidden;
 }
@@ -4635,8 +4637,12 @@ button.admin-row:hover {
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: #0c1114;
+  background: linear-gradient(#16202a 0%, #101720 100%);
 }
+
+/* Полотно размером с окно и с разрешением в один блок на пиксель: растягивает
+его CSS, и только pixelated держит сетку чанков ровной (сглаживание превратило
+бы карту в кашу из полутонов). */
 
 .world-voxel-canvas {
   flex: 1 1 auto;
@@ -4646,9 +4652,8 @@ button.admin-row:hover {
   border: 0;
   outline: none;
   cursor: grab;
-  /* Пиксель карты — блок: растягивать его сглаживанием нельзя. */
   image-rendering: pixelated;
-  /* Без этого жест на телефоне прокручивал бы страницу вместо панорамы. */
+  /* Без этого жест на телефоне прокручивал бы страницу вместо сдвига карты. */
   touch-action: none;
 }
 
@@ -4660,20 +4665,16 @@ button.admin-row:hover {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-/* Строка состояния: координаты, блок под курсором, цена кадра. Лежит поверх
-   холста и мыши не перехватывает — всем управляет canvas. */
+/* Строка состояния: ярус, чанки, цена кадра, блок под курсором. Она внутри
+панели ярусов, а не поверх полотна: абсолютная плашка с фиксированным
+отступом неизбежно легла бы на ползунок при трёх строках. */
+
 .world-voxel-hud {
-  position: absolute;
-  left: var(--sp-12);
-  bottom: var(--sp-12);
-  max-width: calc(100% - var(--sp-32));
-  padding: var(--sp-6) var(--sp-10);
-  border: 1px solid var(--world-line);
-  background: rgba(8, 13, 14, 0.72);
+  padding: var(--sp-6) var(--sp-6) 0;
+  border-top: 1px solid var(--world-line);
   color: var(--text-soft);
   font: 500 11px/1.45 var(--font-ui);
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
 }
 
 .world-voxel-toolbar {
@@ -4691,7 +4692,7 @@ button.admin-row:hover {
   height: var(--control-h-sm);
   padding: 0 var(--sp-12);
   border: 1px solid var(--world-line);
-  background: rgba(8, 13, 14, 0.72);
+  background: var(--voxel-frame);
   color: var(--text-soft);
   font: 600 12px/1 var(--font-ui);
   white-space: nowrap;
@@ -4700,6 +4701,7 @@ button.admin-row:hover {
 }
 
 .world-voxel-button:hover,
+
 .world-voxel-button:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
@@ -4707,68 +4709,90 @@ button.admin-row:hover {
   outline: none;
 }
 
-.world-voxel-button.is-on {
-  color: var(--world-bg);
-  border-color: var(--warn);
-  background: var(--warn);
-}
+/* Панель ярусов: ползунок, пресеты, масштаб и наложения. Это единственный
+слой интерфейса режима, который ловит мышь, поэтому он прижат к низу и не
+тянется на всю ширину — карту можно таскать и под ним. */
 
-/* Пояснение режима: чем засеян мир, чего не хватает. Тонкая тёплая плашка —
-   это не ошибка, это состояние. */
-.world-voxel-note {
-  position: absolute;
-  top: var(--sp-12);
-  left: 50%;
-  margin: 0;
-  padding: var(--sp-6) var(--sp-14);
-  border: 1px solid var(--warn-glow);
-  background: rgba(8, 13, 14, 0.82);
-  color: var(--warn);
-  font: 500 11px/1.45 var(--font-ui);
-  text-align: center;
-  transform: translateX(-50%);
-  max-width: calc(100% - var(--sp-32));
-}
-
-/* Группа масштаба в верхней панели: три кнопки стоят впритык. */
-.world-voxel-group {
-  display: inline-flex;
-  gap: var(--sp-4);
-}
-
-/* Панель слоёв: пресеты и ползунок яруса — слева сверху, не перекрывают кнопки. */
 .world-voxel-layers {
   position: absolute;
-  top: var(--sp-12);
   left: var(--sp-12);
+  bottom: var(--sp-12);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-8);
-  max-width: calc(100% - var(--sp-32));
+  gap: var(--sp-6);
+  max-width: calc(100% - var(--sp-24));
   padding: var(--sp-8) var(--sp-10);
   border: 1px solid var(--world-line);
-  background: rgba(8, 13, 14, 0.72);
+  background: var(--voxel-frame);
 }
 
-.world-voxel-presets {
+.world-voxel-row {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-6);
 }
 
-.world-voxel-chip {
-  height: var(--control-h-sm);
-  padding: 0 var(--sp-10);
+.world-voxel-label {
+  color: var(--text-dim);
+  font: 600 10px/1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.world-voxel-label--right {
+  margin-left: var(--sp-8);
+}
+
+.world-voxel-step {
+  width: var(--control-h-mini);
+  height: var(--control-h-mini);
+  padding: 0;
   border: 1px solid var(--world-line);
   background: transparent;
   color: var(--text-soft);
-  font: 600 12px/1 var(--font-ui);
-  white-space: nowrap;
+  font: 600 13px/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.world-voxel-step:hover,
+
+.world-voxel-step:focus-visible {
+  color: var(--text);
+  border-color: var(--world-line-strong);
+  background: var(--fill-hover);
+  outline: none;
+}
+
+.world-voxel-value {
+  color: var(--text-soft);
+  font: 500 11px/1.3 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ползунок яруса шире прочих: по нему водят мышью, ищут нужный срез. */
+
+.world-voxel-slider {
+  width: clamp(140px, 34vw, 420px);
+  height: var(--control-h-mini);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+
+.world-voxel-chip {
+  height: var(--control-h-mini);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--world-line);
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 11px/1 var(--font-ui);
   cursor: pointer;
   transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 .world-voxel-chip:hover,
+
 .world-voxel-chip:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
@@ -4776,29 +4800,28 @@ button.admin-row:hover {
   outline: none;
 }
 
-.world-voxel-chip[aria-pressed="true"] {
+.world-voxel-chip.is-on {
   color: var(--world-bg);
   border-color: var(--accent);
   background: var(--accent);
 }
 
-.world-voxel-slider {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-10);
-  color: var(--text-soft);
-  font: 500 11px/1.4 var(--font-ui);
-  font-variant-numeric: tabular-nums;
-}
+/* Пояснение режима: чем засеян мир, чего не хватает. Тонкая тёплая плашка —
+это не ошибка, это состояние. */
 
-.world-voxel-slider-label {
-  min-width: 190px;
-}
-
-.world-voxel-slider input {
-  width: 220px;
-  accent-color: var(--accent);
-  cursor: pointer;
+.world-voxel-note {
+  position: absolute;
+  top: var(--sp-12);
+  left: 50%;
+  margin: 0;
+  padding: var(--sp-6) var(--sp-14);
+  border: 1px solid var(--warn-glow);
+  background: var(--voxel-frame);
+  color: var(--warn);
+  font: 500 11px/1.45 var(--font-ui);
+  text-align: center;
+  transform: translateX(-50%);
+  max-width: calc(100% - var(--sp-32));
 }
 
 /* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.
@@ -5205,5 +5228,294 @@ button.admin-row:hover {
   .world-slot-tab,
   .world-size {
     transition-duration: 0.01ms;
+  }
+}
+
+/* ---------- карта планеты: плоская карта вместо воксельного мира ---------- */
+
+/* Тот же хост, что у редактора (.world-editor), но вместо iframe — холст:
+   карта планеты считается сама, документ Azgaar ей не нужен. Панель
+   управления висит над холстом, поэтому клики по ней не должны уезжать
+   в перетаскивание — у панели стоит pointer-events: auto. */
+
+.planet-view {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  background: #0a1622;
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+.planet-view__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.planet-view__canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.planet-view__veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 13, 14, 0.72);
+  color: var(--text-soft);
+  font: 500 13px/1.4 var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+.planet-panel {
+  position: absolute;
+  top: var(--sp-12);
+  left: var(--sp-12);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-10);
+  width: 268px;
+  max-width: calc(100% - var(--sp-24));
+  padding: var(--sp-12);
+  border: 1px solid var(--world-line-strong);
+  border-radius: 14px;
+  background: rgba(8, 13, 14, 0.86);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.planet-panel__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-8);
+}
+
+.planet-panel__row--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Строка «География»: чем засеян мир — картой Azgaar или шумом, и кнопка
+   пересъёма. Подпись длинная и мелкая, поэтому переносится, а не режется. */
+.planet-panel__row--source {
+  align-items: center;
+}
+
+.planet-source {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-soft);
+  font: 500 10px/1.35 var(--font-ui);
+  overflow-wrap: anywhere;
+}
+
+.planet-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.planet-field__label {
+  color: var(--world-muted);
+  font: 600 10px/1.2 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planet-field__input {
+  width: 100%;
+  padding: var(--sp-6) var(--sp-8);
+  border: 1px solid var(--world-line);
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text);
+  font: 500 12px/1.3 var(--font-ui);
+}
+
+.planet-field__input:focus-visible {
+  outline: none;
+  border-color: var(--world-accent);
+}
+
+.planet-layer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.planet-layer__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.planet-layer__head strong {
+  color: var(--world-accent);
+  font: 600 12px/1.3 var(--font-ui);
+}
+
+.planet-layer__range {
+  width: 100%;
+  accent-color: var(--world-accent);
+}
+
+.planet-layer__hint {
+  color: var(--text-dim);
+  font: 400 11px/1.45 var(--font-ui);
+}
+
+.planet-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+
+.planet-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--world-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: 500 11px/1.2 var(--font-ui);
+  cursor: pointer;
+}
+
+.planet-toggle.is-on {
+  border-color: var(--world-accent);
+  background: var(--world-accent-soft);
+  color: var(--world-accent);
+}
+
+.planet-sizes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  flex: 1;
+}
+
+.planet-size {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4);
+  border: 1px solid var(--world-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font: 600 11px/1.2 var(--font-ui);
+  cursor: pointer;
+  text-align: center;
+}
+
+.planet-size span {
+  color: var(--text-faint);
+  font: 400 10px/1.2 var(--font-ui);
+}
+
+.planet-size.is-active {
+  border-color: var(--world-accent);
+  background: var(--world-accent-soft);
+  color: var(--world-accent);
+}
+
+.planet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--sp-10);
+  border: 1px solid var(--world-line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  font: 500 11px/1.2 var(--font-ui);
+  cursor: pointer;
+}
+
+.planet-button:hover,
+.planet-button:focus-visible {
+  border-color: var(--world-accent);
+  color: var(--world-accent);
+}
+
+.planet-button--exit {
+  margin-top: var(--sp-2);
+}
+
+.planet-status {
+  position: absolute;
+  top: var(--sp-12);
+  right: var(--sp-12);
+  z-index: 2;
+  padding: var(--sp-6) var(--sp-10);
+  border: 1px solid var(--world-line);
+  border-radius: 999px;
+  background: rgba(8, 13, 14, 0.78);
+  color: var(--text-soft);
+  font: 500 11px/1.3 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.planet-readout {
+  position: absolute;
+  bottom: var(--sp-40);
+  left: var(--sp-12);
+  z-index: 2;
+  max-width: calc(100% - var(--sp-24));
+  padding: var(--sp-6) var(--sp-10);
+  border: 1px solid var(--world-line);
+  border-radius: 10px;
+  background: rgba(8, 13, 14, 0.78);
+  color: var(--text-soft);
+  font: 500 11px/1.4 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.planet-scale {
+  position: absolute;
+  bottom: var(--sp-12);
+  left: var(--sp-12);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--text-soft);
+  font: 500 11px/1.2 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.planet-scale i {
+  display: block;
+  height: 6px;
+  border: 1px solid var(--world-line-strong);
+  border-top: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 720px) {
+  .planet-panel {
+    width: calc(100% - var(--sp-24));
+    max-height: 52%;
+    overflow: auto;
+  }
+
+  .planet-status {
+    top: auto;
+    bottom: var(--sp-12);
+    right: var(--sp-12);
   }
 }

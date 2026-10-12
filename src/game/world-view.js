@@ -1,410 +1,894 @@
-/* Блочная карта мира: 2D-вид поверх документа Azgaar.
+/* Плоская карта мира блок за блоком: один пиксель — один блок, ярус — ползунок.
 
-   Экран карты уже держит iframe с генератором, и именно из его окна вид берёт
-   карты (src/world/bridge.js). Поэтому режим переключается классом на .world-app,
-   а не перерисовкой страницы: пересоздание iframe заново запустило бы генерацию
-   Azgaar (секунды).
+Экран карты уже держит iframe с генератором, и именно из его окна вид берёт
 
-   Что здесь есть:
-     • плоская карта: 1 блок = 1 пиксель, вид сверху, без камеры и без GL;
-     • ползунок яруса: 20 слоёв по высоте, на карте только выбранный ярус;
-     • пресеты: все слои, кроны, поверхность, вода, дно, пещеры, руды, основание;
-     • зум 1× / 2× / 4×, перетаскивание мышью, стрелки для панорамы;
-     • подсказка под курсором: координаты, ярус, блок;
-     • очередь генерации: чанки считаются с бюджетом кадра, видимое появляется
-       постепенно, а не замораживает страницу.
+карты (src/world/bridge.js). Поэтому режим переключается классом на .world-app,
 
-   Логика срезов — в src/world/layers.js, кэш чанков — в src/world/world.js. */
+а не перерисовкой страницы: пересоздание iframe заново запустило бы генерацию
 
-import { blockName, AIR } from '../world/blocks.js';
-import { buildField } from '../world/field.js';
+Azgaar (секунды), и мир пришлось бы строить с нуля.
+
+Что здесь есть:
+
+• ползунок яруса (1…worldHeight) с пресетами — кроны, поверхность, вода,
+
+дно, пещеры, руды, основание: «разрезать мир плоскостью на высоте Y»;
+
+• перетаскивание — сдвиг, колесо — масштаб (1…8 px на блок), стрелки —
+
+сдвиг, PageUp/PageDown — ярус (Shift — на десять), +/− — масштаб;
+
+• наложения: стрелки течения (живые), береговая линия, отметки высот,
+
+тени рельефа — каждое выключается, потому что на маленьком экране они
+
+мешают друг другу;
+
+• очередь чанков с бюджетом кадра (src/world/world.js): первые кадры
+
+показывают ближние чанки, дальние догоняют;
+
+• HUD: что под курсором (тот же блок, что нарисован в пикселе), сколько
+
+чанков построено и сколько стоит кадр.
+
+Полотно рисуется в разрешении блоков (1 px = 1 блок) и растягивается CSS-ом с
+
+image-rendering: pixelated — так картинка идёт ровно по сетке чанков, а цена
+
+кадра зависит от размера окна, поделённого на масштаб, и не зависит от DPI. */
+
+import { blockName } from '../world/blocks.js';
+
+import { CHUNK_SX, CHUNK_SZ, blockAt } from '../world/chunk.js';
+
+import { buildField, fold, spawnPoint, surfaceY } from '../world/field.js';
+
 import { VoxelSourceError, describeSource, readSource } from '../world/bridge.js';
-import { CHUNK_SX, CHUNK_SZ } from '../world/chunk.js';
-import { blockColors } from '../world/atlas.js';
-import { LAYER_COUNT, PRESETS, layerBand, layerOf, pickAt, presetById, sliceChunk } from '../world/layers.js';
-import { createChunkCache, worldExtent } from '../world/world.js';
+
+import { createVoxelWorld } from '../world/world.js';
+
+import { buildAtlas, buildTileColors } from '../world/atlas.js';
+
+import {
+  LAYER_PRESETS,
+  ZOOM_DEFAULT,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  buildSlice,
+  cutY,
+  makeView,
+  presetLevel,
+  zoneName,
+} from '../world/layers.js';
+
 import { icon } from '../ui/icons.js';
 
-const BUDGET_MS = 10;
-const ZOOMS = [1, 2, 4];
-const PAN_STEP = 16;
+const BUDGET_MS = 6;
+
+/** Кадры с течением дороже статичных, а пульс воды медленный: 14 FPS для
+
+анимации достаточно и вчетверо дешевле, чем перекрашивать каждый кадр. */
+
+const PAINT_MS = 70;
+
+const LEVEL_BIG = 10;
+
+const PAN_STEP = 24;
+
+/** Потолок стоимости кадра: перекрасить 260 000 блоков — десятки миллисекунд,
+
+больше нельзя даже на 4K-мониторе при мелком блоке. */
+
+const MAX_CELLS = 260_000;
 
 const clamp = (value, min, max) => (value < min ? min : value > max ? max : value);
 
 /**
- * Положение окна по одной оси. Карта шире окна — окно держится в её пределах
- * (с запасом PAN_STEP). Карта уже окна — окно центрируется, иначе край карты
- * прижался бы к стороне и панорама не работала бы вовсе.
- */
-const fitAxis = (value, span, viewSize) =>
-  viewSize >= span + PAN_STEP * 2 ? (span - viewSize) / 2 : clamp(value, -PAN_STEP, span + PAN_STEP - viewSize);
 
-/**
- * Номер яруса, в который попадает высота: при отсутствии поля — середина.
- * Используется для подписи и для начального положения ползунка.
- */
-const startLayer = (field) => layerOf(field.worldHeight, field.seaY ?? 64);
+* @param {HTMLElement} host элемент .world-editor: в нём лежит iframe с картой
 
-const layerLabel = (worldHeight, layer) => {
-  const band = layerBand(worldHeight, layer);
-  return `Ярус ${band.index + 1} из ${LAYER_COUNT} · y ${band.lo}–${band.hi}`;
-};
+* @param {{ frame?: HTMLIFrameElement, config?: object, onExit?: () => void }} [options]
 
-/**
- * @param {HTMLElement} host
- * @param {{frame?: HTMLElement, config?: object, onExit?: () => void}} options
- */
+* @returns {object} view — element, level, zoom, overlays, dispose
+
+*/
+
 export const mountWorldView = (host, { frame, config, onExit } = {}) => {
   const cleanups = [];
-  /* Объявлен до всего: dispose обязан работать и на отказе чтения карт, когда
-     до цикла кадров дело не дошло. */
+
   let raf = 0;
+
   const root = document.createElement('div');
+
   root.className = 'world-voxel';
+
   root.dataset.role = 'world-voxel';
+
   root.innerHTML = `
-    <canvas class="world-voxel-canvas" data-role="voxel-canvas" tabindex="0" aria-label="Блочная карта: блоки одного яруса, 1 пиксель — 1 блок"></canvas>
-    <div class="world-voxel-hud" data-role="voxel-hud" role="status" aria-live="off"></div>
-    <div class="world-voxel-toolbar">
-      <div class="world-voxel-group" role="group" aria-label="Масштаб">
-        ${ZOOMS.map((z) => `<button class="world-voxel-button" type="button" data-voxel-zoom="${z}" aria-pressed="${z === 1}" title="Масштаб ${z}×">${z}×</button>`).join('')}
-      </div>
-      <button class="world-voxel-button" type="button" data-voxel-action="exit" aria-label="К карте" title="К карте (Esc)">${icon('map', 'icon--xs')}<span>К карте</span></button>
-    </div>
-    <div class="world-voxel-layers">
-      <div class="world-voxel-presets" role="group" aria-label="Пресет слоя">
-        ${PRESETS.map((p) => `<button class="world-voxel-chip" type="button" data-voxel-preset="${p.id}" aria-pressed="${p.id === 'all'}">${p.label}</button>`).join('')}
-      </div>
-      <label class="world-voxel-slider">
-        <span class="world-voxel-slider-label" data-role="voxel-layer-label">—</span>
-        <input type="range" min="0" max="${LAYER_COUNT - 1}" step="1" value="0" data-role="voxel-layer" aria-label="Ярус" />
-      </label>
-    </div>
-    <p class="world-voxel-note" data-role="voxel-note"></p>`;
+
+<canvas class="world-voxel-canvas" data-role="voxel-canvas" tabindex="0" aria-label="Карта мира блок за блоком"></canvas>
+
+<div class="world-voxel-toolbar">
+
+<button class="world-voxel-button" type="button" data-voxel-action="reset" aria-label="К точке появления" title="К точке появления (R)">${icon('crosshair', 'icon--xs')}<span>Появление</span></button>
+
+<button class="world-voxel-button" type="button" data-voxel-action="exit" aria-label="К карте" title="К карте (Esc)">${icon('map', 'icon--xs')}<span>К карте</span></button>
+
+</div>
+
+<div class="world-voxel-layers" data-role="voxel-layers">
+
+<div class="world-voxel-row">
+
+<span class="world-voxel-label">ярус</span>
+
+<button class="world-voxel-step" type="button" data-voxel-action="level-down" aria-label="Ярус ниже">−</button>
+
+<input class="world-voxel-slider" type="range" data-role="voxel-level" min="1" max="2" step="1" value="1" aria-label="Ярус среза">
+
+<button class="world-voxel-step" type="button" data-voxel-action="level-up" aria-label="Ярус выше">+</button>
+
+<output class="world-voxel-value" data-role="voxel-level-value"></output>
+
+</div>
+
+<div class="world-voxel-row world-voxel-row--presets" data-role="voxel-presets"></div>
+
+<div class="world-voxel-row">
+
+<span class="world-voxel-label">блок</span>
+
+<button class="world-voxel-step" type="button" data-voxel-action="zoom-out" aria-label="Крупнее блок" title="Крупнее блок (−)">−</button>
+
+<output class="world-voxel-value" data-role="voxel-zoom-value"></output>
+
+<button class="world-voxel-step" type="button" data-voxel-action="zoom-in" aria-label="Мельче блок" title="Мельче блок (+)">+</button>
+
+<span class="world-voxel-label world-voxel-label--right">наложения</span>
+
+<span data-role="voxel-overlays"></span>
+
+</div>
+
+<p class="world-voxel-hud" data-role="voxel-hud" role="status" aria-live="off"></p>
+
+</div>
+
+<p class="world-voxel-note" data-role="voxel-note"></p>`;
+
   host.append(root);
 
   const canvas = root.querySelector('[data-role="voxel-canvas"]');
+
   const hud = root.querySelector('[data-role="voxel-hud"]');
+
   const note = root.querySelector('[data-role="voxel-note"]');
-  const slider = root.querySelector('[data-role="voxel-layer"]');
-  const layerText = root.querySelector('[data-role="voxel-layer-label"]');
+
+  const slider = root.querySelector('[data-role="voxel-level"]');
+
+  const levelValue = root.querySelector('[data-role="voxel-level-value"]');
+
+  const zoomValue = root.querySelector('[data-role="voxel-zoom-value"]');
+
+  const presetHost = root.querySelector('[data-role="voxel-presets"]');
+
+  const overlayHost = root.querySelector('[data-role="voxel-overlays"]');
+
   const setNote = (text) => {
     note.textContent = text || '';
+
     note.hidden = !text;
   };
+
   const listen = (target, type, handler, options) => {
     target.addEventListener(type, handler, options);
+
     cleanups.push(() => target.removeEventListener(type, handler, options));
   };
 
+  const OVERLAYS = [
+    { key: 'arrows', name: 'течение' },
+
+    { key: 'coast', name: 'вода' },
+
+    { key: 'labels', name: 'отметки' },
+
+    { key: 'shade', name: 'рельеф' },
+  ];
+
+  presetHost.innerHTML = LAYER_PRESETS.map(
+    (preset) =>
+      `<button class="world-voxel-chip" type="button" data-layer="${preset.id}" title="${preset.hint}">${preset.name}</button>`,
+  ).join('');
+
+  overlayHost.innerHTML = OVERLAYS.map(
+    (item) =>
+      `<button class="world-voxel-chip is-on" type="button" data-overlay="${item.key}" aria-pressed="true">${item.name}</button>`,
+  ).join('');
+
   const view = {
     element: root,
+
     error: '',
+
+    /* Ярус и масштаб — состояние вида, а не полотна: их читают тесты, и они
+
+должны жить независимо от того, есть ли у браузера 2D-канвас. */
+
+    level: 0,
+
+    zoom: ZOOM_DEFAULT,
+
+    preset: null,
+
+    center: [0, 0],
+
+    overlays: { arrows: true, coast: true, labels: true, shade: true },
+
+    cells: { x: 0, z: 0 },
+
+    cursor: null,
+
+    frameMs: 0,
+
+    sliceInfo: null,
+
     field: null,
-    cache: null,
-    layer: 0,
-    preset: 'all',
-    zoom: 1,
-    x: 0,
-    z: 0,
+
+    source: null,
+
+    world: null,
+
+    spawn: null,
+
+    running: false,
+
     dirty: true,
-    hover: null,
-    drag: null,
-    dispose: null,
   };
 
   view.dispose = () => {
     view.running = false;
+
     if (raf) cancelAnimationFrame(raf);
+
     raf = 0;
+
     for (const cleanup of cleanups.splice(0)) cleanup();
-    view.cache?.clear();
-    view.cache = null;
+
+    view.world?.dispose();
+
     root.remove();
   };
 
-  /* Отказ до построения вида: показываем причину и оставляем рабочий dispose. */
+  /* Отказ до построения мира: показываем причину и оставляем рабочий dispose. */
+
   const stop = (message) => {
     view.error = message;
+
     setNote(message);
-    hud.textContent = 'Карта не построена — данные недоступны.';
+
+    hud.textContent = 'Мир не построен — данные карты недоступны.';
+
     return view;
   };
 
   /* ---------- снимок карт → поле ---------- */
+
   let source;
+
   try {
     source = readSource(frame?.contentWindow, { seed: config?.seed, width: config?.width, height: config?.height });
   } catch (error) {
-    const message = error instanceof VoxelSourceError ? error.message : error?.message ?? String(error);
-    return stop(`Блочная карта: ${message}`);
+    const message = error instanceof VoxelSourceError ? error.message : (error?.message ?? String(error));
+
+    return stop(`Карта блоками: ${message}`);
   }
+
   setNote(`Снимаю карты: ${describeSource(source)}…`);
+
   const field = buildField(source, { profile: 2, detail: 1 });
+
   view.field = field;
+
   view.source = source;
-  const extent = worldExtent(field);
-  view.cache = createChunkCache(field, { limit: 256 });
 
-  /* Цвета блоков — из процедурного атласа, один раз на вид. */
-  const colors = blockColors();
+  const spawn = spawnPoint(field);
 
-  /* Срезы чанков на текущие ярус и пресет. Сбрасываются при смене того и другого. */
-  let slices = new Map();
-  const invalidate = () => {
-    slices = new Map();
+  view.spawn = spawn;
+
+  /* Палитра берётся из того же атласа, что и текстуры: средний цвет тайла той
+
+грани, которую видно сверху. Отдельная палитра разъехалась бы с атласом при
+
+первой же правке тонов. */
+
+  const colors = buildTileColors(buildAtlas(field.seed));
+
+  const blockAtWorld = (x, y, z) => {
+    const record = world.get(Math.floor(x / CHUNK_SX), Math.floor(z / CHUNK_SZ));
+
+    const chunk = record?.chunk;
+
+    if (!chunk) return null;
+
+    const lx = x - chunk.x0;
+
+    const lz = z - chunk.z0;
+
+    if (lx < 0 || lx >= chunk.sx || lz < 0 || lz >= chunk.sz) return null;
+
+    return blockAt(chunk, lx, y, lz);
+  };
+
+  /* Радиус обзора не должен превышать размер тайла: чанки за тайлом — те же
+
+самые чанки в зеркальном замощении, и просить их означало бы вчетверо
+
+больше памяти при той же картинке (на маленьких картах это видно). */
+
+  const reviewRadius = clamp(Math.floor(Math.min(field.width, field.height) / (CHUNK_SX * 2)), 2, 7);
+
+  const world = createVoxelWorld(field, { radius: reviewRadius });
+
+  view.world = world;
+
+  world.focus(spawn.x, spawn.z);
+
+  view.center = [spawn.x, spawn.z];
+
+  /* ---------- ярус, масштаб, кадрирование ---------- */
+
+  const currentView = () => makeView(view.center, view.cells.x, view.cells.z);
+
+  view.makeView = currentView;
+
+  /* Медиана рельефа в кадре — нужна подписи под ползунком, чтобы отличить
+
+«срез выше вершин» от «срез в толще». Считаем по редкой решётке: кадр
+
+перестраивается на каждое движение, а точность здесь — десятки блоков. */
+
+  let median = { key: '', value: NaN };
+
+  const medianGround = () => {
+    const cells = currentView();
+
+    const signature = `${cells.x0},${cells.z0},${cells.cellsX},${cells.cellsZ}`;
+
+    if (median.key === signature) return median.value;
+
+    let sum = 0;
+
+    let count = 0;
+
+    const stepX = Math.max(1, Math.round(cells.cellsX / 48));
+
+    const stepZ = Math.max(1, Math.round(cells.cellsZ / 32));
+
+    for (let z = 0; z < cells.cellsZ; z += stepZ) {
+      for (let x = 0; x < cells.cellsX; x += stepX) {
+        const { u, v } = fold(field, cells.x0 + x, cells.z0 + z);
+
+        sum += field.ground[v * field.width + u];
+
+        count += 1;
+      }
+    }
+
+    median = { key: signature, value: count ? Math.round(sum / count) : NaN };
+
+    return median.value;
+  };
+
+  const syncChips = () => {
+    for (const chip of presetHost.querySelectorAll('[data-layer]')) {
+      const on = chip.dataset.layer === view.preset;
+
+      chip.classList.toggle('is-on', on);
+
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+
+    for (const chip of overlayHost.querySelectorAll('[data-overlay]')) {
+      const on = view.overlays[chip.dataset.overlay] === true;
+
+      chip.classList.toggle('is-on', on);
+
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  };
+
+  const levelText = () => {
+    const preset = view.preset ? LAYER_PRESETS.find((item) => item.id === view.preset) : null;
+
+    return `ярус ${view.level} · ${zoneName(field, view.level, medianGround())}${preset ? ` · ${preset.name}` : ''}`;
+  };
+
+  const syncLabel = () => {
+    slider.value = String(view.level);
+
+    levelValue.textContent = levelText();
+
+    zoomValue.textContent = `${view.zoom} px/блок`;
+  };
+
+  const applyLevel = (next, preset = null) => {
+    view.level = clamp(Math.round(next), 1, field.worldHeight - 1);
+
+    view.preset = preset;
+
+    syncChips();
+
+    syncLabel();
+
     view.dirty = true;
   };
 
-  view.layer = startLayer(field);
-  slider.max = String(LAYER_COUNT - 1);
-  slider.value = String(view.layer);
+  const applyZoom = (next, anchor = null) => {
+    const before = view.zoom;
 
-  /* Холст и буферы: 1 css px = 1 блок × зум × dpr. */
-  const offscreen = document.createElement('canvas');
-  const offctx = offscreen.getContext('2d');
-  const ctx = canvas.getContext('2d');
-  if (!ctx || !offctx) {
-    return stop('Блочная карта: двумерный холст недоступен в этом браузере.');
-  }
-  let buffer = null;
+    const after = clamp(Math.round(next), ZOOM_MIN, ZOOM_MAX);
 
-  const sizeCanvas = () => {
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-      view.dirty = true;
+    if (after === before) return;
+
+    if (anchor) {
+      /* Точка под курсором должна остаться на месте: сдвиг центра равен
+
+разнице «сколько блоков было под курсором» и «сколько стало». */
+
+      view.center[0] += anchor[0] * (1 / before - 1 / after);
+
+      view.center[1] += anchor[1] * (1 / before - 1 / after);
     }
-    return { w, h, dpr };
+
+    view.zoom = after;
+
+    view.dirty = true;
   };
 
-  const centerOn = (bx, bz) => {
-    const { w, h, dpr } = sizeCanvas();
-    const scale = view.zoom * dpr;
-    view.x = fitAxis(bx - w / scale / 2, extent.width, w / scale);
-    view.z = fitAxis(bz - h / scale / 2, extent.height, h / scale);
+  const context = canvas.getContext('2d');
+
+  let image = null;
+
+  let boxKey = '';
+
+  /** Размер полотна в блоках: сколько помещается в окно при выбранном
+
+масштабе, но не дороже MAX_CELLS перекрасок на кадр. */
+
+  const fitCanvas = () => {
+    const width = Math.max(64, Math.round(canvas.clientWidth || canvas.getBoundingClientRect?.().width || 64));
+
+    const height = Math.max(64, Math.round(canvas.clientHeight || canvas.getBoundingClientRect?.().height || 64));
+
+    let cellsX = Math.max(8, Math.ceil(width / view.zoom));
+
+    let cellsZ = Math.max(8, Math.ceil(height / view.zoom));
+
+    const over = (cellsX * cellsZ) / MAX_CELLS;
+
+    if (over > 1) {
+      /* Окно велико, а масштаб уже на максимуме: берём чуть меньше блоков, чем
+
+просит экран, и растягиваем их CSS-ом. Пиксели станут на долю блока
+
+шире — иначе кадр стоил бы десятки миллисекунд. */
+
+      const k = Math.sqrt(over);
+
+      cellsX = Math.max(8, Math.floor(cellsX / k));
+
+      cellsZ = Math.max(8, Math.floor(cellsZ / k));
+    }
+
+    const key = `${width}×${height}×${view.zoom}×${cellsX}×${cellsZ}`;
+
+    if (key === boxKey) return false;
+
+    boxKey = key;
+
+    view.cells = { x: cellsX, z: cellsZ };
+
+    canvas.width = cellsX;
+
+    canvas.height = cellsZ;
+
+    image = context ? context.createImageData(cellsX, cellsZ) : null;
+
+    view.dirty = true;
+
+    return true;
   };
 
-  /* Начальный вид — центр карты. Центрируем в первом кадре: до layout холст
-     ещё не имеет размера. */
-  let centered = false;
-  layerText.textContent = layerLabel(field.worldHeight, view.layer);
-  setNote(`Карта готова: ${describeSource(source)}. 1 пиксель — 1 блок.`);
+  let paintAt = 0;
 
-  /* ---------- срез одного чанка ---------- */
-  const sliceFor = (cx, cz, budget) => {
-    const id = `${cx},${cz}`;
-    const hit = slices.get(id);
-    if (hit) return hit;
-    if (!view.cache.has(cx, cz) && budget.spent() >= BUDGET_MS && budget.made > 0) return null;
-    const chunk = view.cache.get(cx, cz);
-    budget.made += 1;
-    const band = layerBand(field.worldHeight, view.layer);
-    const px = sliceChunk(chunk, band, view.preset, colors);
-    slices.set(id, px);
-    return px;
+  const paint = (now) => {
+    if (!context || !image) {
+      view.dirty = false;
+
+      return;
+    }
+
+    const t0 = performance.now();
+
+    const slice = buildSlice(field, colors, world, currentView(), {
+      level: view.level,
+
+      time: now / 1000,
+
+      arrows: view.overlays.arrows,
+
+      coast: view.overlays.coast,
+
+      labels: view.overlays.labels,
+
+      shade: view.overlays.shade,
+    });
+
+    image.data.set(slice.data);
+
+    context.putImageData(image, 0, 0);
+
+    view.frameMs = performance.now() - t0;
+
+    view.sliceInfo = { fromChunks: slice.fromChunks, fromField: slice.fromField, water: slice.water };
+
+    paintAt = now;
+
+    view.dirty = false;
   };
 
-  /* ---------- рисование ---------- */
-  const draw = () => {
-    const { w: cw, h: ch, dpr } = sizeCanvas();
-    if (!centered && cw > 1 && ch > 1) {
-      centered = true;
-      centerOn(extent.width / 2, extent.height / 2);
-    }
-    const scale = view.zoom * dpr;
-    view.x = fitAxis(view.x, extent.width, cw / scale);
-    view.z = fitAxis(view.z, extent.height, ch / scale);
-    const x0 = Math.floor(view.x);
-    const z0 = Math.floor(view.z);
-    const bw = Math.ceil(cw / scale) + 1;
-    const bh = Math.ceil(ch / scale) + 1;
-    if (!buffer || buffer.width !== bw || buffer.height !== bh) {
-      buffer = offctx.createImageData(bw, bh);
-      offscreen.width = bw;
-      offscreen.height = bh;
-    }
-    buffer.data.fill(0);
+  const focusSpawn = () => {
+    view.center = [spawn.x, spawn.z];
 
-    const budget = { made: 0, start: performance.now(), spent: () => performance.now() - budget.start };
-    let pending = 0;
-    const cx0 = Math.max(0, Math.floor(x0 / CHUNK_SX));
-    const cz0 = Math.max(0, Math.floor(z0 / CHUNK_SZ));
-    const cx1 = Math.min(extent.chunksX - 1, Math.floor((x0 + bw - 1) / CHUNK_SX));
-    const cz1 = Math.min(extent.chunksZ - 1, Math.floor((z0 + bh - 1) / CHUNK_SZ));
-    for (let cz = cz0; cz <= cz1; cz += 1) {
-      for (let cx = cx0; cx <= cx1; cx += 1) {
-        const px = sliceFor(cx, cz, budget);
-        if (!px) {
-          pending += 1;
-          continue;
-        }
-        for (let lz = 0; lz < CHUNK_SZ; lz += 1) {
-          const gz = cz * CHUNK_SZ + lz;
-          const by = gz - z0;
-          if (by < 0 || by >= bh || gz >= extent.height) continue;
-          for (let lx = 0; lx < CHUNK_SX; lx += 1) {
-            const gx = cx * CHUNK_SX + lx;
-            const bx = gx - x0;
-            if (bx < 0 || bx >= bw || gx >= extent.width) continue;
-            const from = (lz * CHUNK_SX + lx) * 4;
-            if (px[from + 3] === 0) continue;
-            const to = (by * bw + bx) * 4;
-            buffer.data[to] = px[from];
-            buffer.data[to + 1] = px[from + 1];
-            buffer.data[to + 2] = px[from + 2];
-            buffer.data[to + 3] = 255;
-          }
-        }
-      }
-    }
-    offctx.putImageData(buffer, 0, 0);
+    view.zoom = ZOOM_DEFAULT;
 
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#0c1114';
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(offscreen, 0, 0, bw, bh, -(view.x - x0) * scale, -(view.z - z0) * scale, bw * scale, bh * scale);
-    view.dirty = pending > 0;
-    if (pending === 0 && !view.building) setNote('');
-    return { pending, made: budget.made };
+    fitCanvas();
+
+    world.focus(spawn.x, spawn.z);
+
+    applyLevel(field.worldHeight - 1, 'surface');
   };
 
   /* ---------- управление ---------- */
-  const pointerAt = (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const px = (event.clientX - rect.left) * dpr;
-    const py = (event.clientY - rect.top) * dpr;
-    const scale = view.zoom * dpr;
-    return { gx: Math.floor(view.x + px / scale), gz: Math.floor(view.z + py / scale) };
-  };
+
+  let drag = null;
 
   listen(canvas, 'pointerdown', (event) => {
-    view.drag = { id: event.pointerId, x: event.clientX, z: event.clientY, vx: view.x, vz: view.z };
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
     canvas.setPointerCapture?.(event.pointerId);
+
+    drag = { x: event.clientX, y: event.clientY };
+
+    canvas.focus({ preventScroll: true });
   });
+
   listen(canvas, 'pointermove', (event) => {
-    if (view.drag && view.drag.id === event.pointerId) {
-      const dpr = window.devicePixelRatio || 1;
-      const scale = view.zoom * dpr;
-      const { w, h } = sizeCanvas();
-      view.x = fitAxis(view.drag.vx - (event.clientX - view.drag.x) * dpr / scale, extent.width, w / scale);
-      view.z = fitAxis(view.drag.vz - (event.clientY - view.drag.z) * dpr / scale, extent.height, h / scale);
+    if (drag) {
+      view.center[0] -= (event.clientX - drag.x) / view.zoom;
+
+      view.center[1] -= (event.clientY - drag.y) / view.zoom;
+
+      drag.x = event.clientX;
+
+      drag.y = event.clientY;
+
+      syncLabel();
+
       view.dirty = true;
     }
-    view.hover = pointerAt(event);
+
+    readCursor(event);
   });
+
   const endDrag = (event) => {
-    if (view.drag && view.drag.id === event.pointerId) view.drag = null;
+    drag = null;
+
+    if (event?.pointerId !== undefined) canvas.releasePointerCapture?.(event.pointerId);
   };
+
   listen(canvas, 'pointerup', endDrag);
+
   listen(canvas, 'pointercancel', endDrag);
+
   listen(canvas, 'pointerleave', () => {
-    view.hover = null;
+    view.cursor = null;
   });
 
-  const setZoom = (zoom) => {
-    const { w, h, dpr } = sizeCanvas();
-    const scale = view.zoom * dpr;
-    const cx = view.x + w / scale / 2;
-    const cz = view.z + h / scale / 2;
-    view.zoom = zoom;
-    centerOn(cx, cz);
-    for (const button of root.querySelectorAll('[data-voxel-zoom]')) {
-      button.setAttribute('aria-pressed', String(Number(button.dataset.voxelZoom) === zoom));
+  listen(
+    canvas,
+    'wheel',
+    (event) => {
+      event.preventDefault();
+
+      const rect = canvas.getBoundingClientRect();
+
+      applyZoom(view.zoom * (event.deltaY > 0 ? 1 / 1.25 : 1.25), [
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+      ]);
+
+      fitCanvas();
+
+      syncLabel();
+    },
+    { passive: false },
+  );
+
+  /** Блок под курсором — тот же, что нарисован в этом пикселе: ярус с поправкой
+
+на вершину колонки (cutY), а не «level» вообще. */
+
+  const readCursor = (event) => {
+    const rect = canvas.getBoundingClientRect();
+
+    if (!rect.width || !rect.height) return;
+
+    const cells = currentView();
+
+    const cx = Math.floor(((event.clientX - rect.left) / rect.width) * cells.cellsX);
+
+    const cz = Math.floor(((event.clientY - rect.top) / rect.height) * cells.cellsZ);
+
+    if (cx < 0 || cz < 0 || cx >= cells.cellsX || cz >= cells.cellsZ) {
+      view.cursor = null;
+
+      return;
     }
-    view.dirty = true;
-  };
 
-  const setLayer = (layer) => {
-    const next = clamp(Math.round(layer), 0, LAYER_COUNT - 1);
-    if (next === view.layer) return;
-    view.layer = next;
-    slider.value = String(next);
-    layerText.textContent = layerLabel(field.worldHeight, next);
-    invalidate();
-  };
+    const x = cells.x0 + cx;
 
-  const setPreset = (id) => {
-    if (view.preset === id) return;
-    view.preset = id;
-    for (const button of root.querySelectorAll('[data-voxel-preset]')) {
-      button.setAttribute('aria-pressed', String(button.dataset.voxelPreset === id));
-    }
-    invalidate();
-  };
+    const z = cells.z0 + cz;
 
-  listen(slider, 'input', () => setLayer(Number(slider.value)));
+    const { u, v } = fold(field, x, z);
+
+    const y = cutY(field, v * field.width + u, view.level);
+
+    view.cursor = { x, y, z, id: blockAtWorld(x, y, z), surface: surfaceY(field, x, z) };
+  };
 
   listen(root, 'click', (event) => {
-    const zoomButton = event.target.closest?.('[data-voxel-zoom]');
-    if (zoomButton) return setZoom(Number(zoomButton.dataset.voxelZoom));
-    const presetButton = event.target.closest?.('[data-voxel-preset]');
-    if (presetButton) return setPreset(presetButton.dataset.voxelPreset);
-    const action = event.target.closest?.('[data-voxel-action]');
-    if (action?.dataset.voxelAction === 'exit') onExit?.();
-  });
+    const presetButton = event.target.closest?.('[data-layer]');
 
-  listen(canvas, 'keydown', (event) => {
-    const step = PAN_STEP / view.zoom;
-    const keys = {
-      ArrowLeft: () => { view.x -= step; },
-      ArrowRight: () => { view.x += step; },
-      ArrowUp: () => { view.z -= step; },
-      ArrowDown: () => { view.z += step; },
-      PageUp: () => setLayer(view.layer + 1),
-      PageDown: () => setLayer(view.layer - 1),
-      '+': () => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(view.zoom) + 1)]),
-      '-': () => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(view.zoom) - 1)]),
-    };
-    const act = keys[event.key];
-    if (!act) return;
-    event.preventDefault();
-    act();
-    view.dirty = true;
-  });
+    if (presetButton) {
+      const level = presetLevel(field, blockAtWorld, currentView(), presetButton.dataset.layer);
 
-  listen(window, 'resize', () => {
-    view.dirty = true;
-  });
+      applyLevel(level ?? field.worldHeight - 1, presetButton.dataset.layer);
 
-  /* ---------- кадр ---------- */
-  let hudText = '';
-  const tick = () => {
-    raf = requestAnimationFrame(tick);
-    if (view.dirty) {
-      const result = draw();
-      view.building = result.pending > 0;
-      if (view.building) setNote(`Строю слой: ${result.pending} участков ждут очереди…`);
+      return;
     }
-    if (!view.hover) {
-      const idle = `Карта ${extent.width}×${extent.height} · ${layerLabel(field.worldHeight, view.layer)} · ${presetById(view.preset).label}`;
-      if (idle !== hudText) {
-        hudText = idle;
-        hud.textContent = idle;
+
+    const overlay = event.target.closest?.('[data-overlay]');
+
+    if (overlay) {
+      const key = overlay.dataset.overlay;
+
+      view.overlays[key] = view.overlays[key] !== true;
+
+      syncChips();
+
+      view.dirty = true;
+
+      return;
+    }
+
+    const button = event.target.closest?.('[data-voxel-action]');
+
+    if (!button) return;
+
+    const { voxelAction } = button.dataset;
+
+    if (voxelAction === 'reset') focusSpawn();
+    else if (voxelAction === 'exit') onExit?.();
+    else if (voxelAction === 'level-down') applyLevel(view.level - (event.shiftKey ? LEVEL_BIG : 1));
+    else if (voxelAction === 'level-up') applyLevel(view.level + (event.shiftKey ? LEVEL_BIG : 1));
+    else if (voxelAction === 'zoom-out') {
+      applyZoom(view.zoom - 1);
+
+      fitCanvas();
+
+      syncLabel();
+    } else if (voxelAction === 'zoom-in') {
+      applyZoom(view.zoom + 1);
+
+      fitCanvas();
+
+      syncLabel();
+    }
+  });
+
+  listen(slider, 'input', () => applyLevel(Number(slider.value)));
+
+  const editable = (node) => /^(INPUT|TEXTAREA|SELECT)$/.test(node?.tagName || '') || node?.isContentEditable;
+
+  listen(window, 'keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    /* На ползунке стрелки и PageUp/PageDown работают сами — и ровно с той же
+
+семантикой (±1, Shift — крупный шаг). Дублировать их здесь означало бы
+
+двигать ещё и карту. Esc обрабатывает main.js: ступеньки выхода его. */
+
+    if (event.target === slider || editable(event.target)) return;
+
+    if (event.code === 'KeyR') {
+      focusSpawn();
+
+      return;
+    }
+
+    const big = event.shiftKey;
+
+    const step = big ? LEVEL_BIG : 1;
+
+    let handled = true;
+
+    switch (event.code) {
+      case 'PageUp':
+        applyLevel(view.level + step);
+
+        break;
+
+      case 'PageDown':
+        applyLevel(view.level - step);
+
+        break;
+
+      case 'Equal':
+
+      case 'NumpadAdd':
+        applyZoom(view.zoom + 1);
+
+        fitCanvas();
+
+        syncLabel();
+
+        break;
+
+      case 'Minus':
+
+      case 'NumpadSubtract':
+        applyZoom(view.zoom - 1);
+
+        fitCanvas();
+
+        syncLabel();
+
+        break;
+
+      case 'ArrowLeft':
+        view.center[0] -= PAN_STEP * (big ? 4 : 1);
+
+        break;
+
+      case 'ArrowRight':
+        view.center[0] += PAN_STEP * (big ? 4 : 1);
+
+        break;
+
+      case 'ArrowUp':
+        view.center[1] -= PAN_STEP * (big ? 4 : 1);
+
+        break;
+
+      case 'ArrowDown':
+        view.center[1] += PAN_STEP * (big ? 4 : 1);
+
+        break;
+
+      default:
+        handled = false;
+    }
+
+    if (handled) {
+      event.preventDefault();
+
+      syncLabel();
+
+      view.dirty = true;
+    }
+  });
+
+  /* ---------- цикл ---------- */
+
+  let hudAt = 0;
+
+  let hudText = '';
+
+  let noteCleared = false;
+
+  let lastFocus = [view.center[0], view.center[1]];
+
+  const tick = (now) => {
+    if (!view.running) return;
+
+    raf = requestAnimationFrame(tick);
+
+    fitCanvas();
+
+    const gen = world.step(BUDGET_MS);
+
+    if (
+      Math.abs(view.center[0] - lastFocus[0]) >= CHUNK_SX / 2 ||
+      Math.abs(view.center[1] - lastFocus[1]) >= CHUNK_SZ / 2
+    ) {
+      lastFocus = [view.center[0], view.center[1]];
+
+      world.focus(view.center[0], view.center[1]);
+    }
+
+    if (now - hudAt > 240) {
+      hudAt = now;
+
+      const stats = world.stats();
+
+      const bits = [`чанков ${stats.ready}${stats.queued ? ` + ${stats.queued} в очереди` : ''}`];
+
+      if (view.sliceInfo) {
+        bits.push(
+          `по блокам ${view.sliceInfo.fromChunks.toLocaleString('ru-RU')}, по схеме поля ${view.sliceInfo.fromField.toLocaleString('ru-RU')}`,
+        );
       }
-    } else if (view.cache) {
-      const { gx, gz } = view.hover;
-      const cx = Math.floor(gx / CHUNK_SX);
-      const cz = Math.floor(gz / CHUNK_SZ);
-      let text = `X ${gx} · Z ${gz} · ${layerLabel(field.worldHeight, view.layer)}`;
-      if (gx >= 0 && gz >= 0 && gx < extent.width && gz < extent.height && view.cache.has(cx, cz)) {
-        const chunk = view.cache.get(cx, cz);
-        const id = pickAt(chunk, gx - cx * CHUNK_SX, gz - cz * CHUNK_SZ, layerBand(field.worldHeight, view.layer), view.preset);
-        text += ` · ${id === AIR ? 'пусто в ярусе' : blockName(id)}`;
+
+      bits.push(`${view.frameMs.toFixed(1)} мс/кадр`);
+
+      if (view.cursor) {
+        bits.push(
+          view.cursor.id === null
+            ? 'чанк под курсором ещё не построен'
+            : `под курсором: ${blockName(view.cursor.id)} ${view.cursor.x}/${view.cursor.y}/${view.cursor.z}`,
+        );
       }
-      text += ` · ${presetById(view.preset).label}`;
+
+      const text = bits.join(' · ');
+
       if (text !== hudText) {
         hudText = text;
+
         hud.textContent = text;
       }
+
+      if (stats.ready > 0 && gen.done && !noteCleared) {
+        noteCleared = true;
+
+        setNote('');
+      }
     }
+
+    /* Перекрашиваем, только если что-то изменилось либо живёт течение: кадр
+
+стоит десятки миллисекунд на полном экране, и греть их впустую нельзя. */
+
+    const animate = view.overlays.arrows && (view.sliceInfo?.water ?? 0) > 0;
+
+    if (!view.dirty && gen.generated === 0 && !(animate && now - paintAt >= PAINT_MS)) return;
+
+    paint(now);
   };
 
+  /* Ползунок ходит по индексам блоков: верхний ярус = верхний блок мира,
+
+«выше всех вершин» при этом остаётся первым пресетом. */
+
+  slider.max = String(field.worldHeight - 1);
+
+  fitCanvas();
+
+  syncChips();
+
+  applyLevel(field.worldHeight - 1, 'surface');
+
+  setNote(
+    `Мир ${field.width} × ${field.height} колонок, ярусов ${field.worldHeight}. ` +
+      'Перетаскивание — сдвиг, колесо — масштаб, PageUp/PageDown — ярус.',
+  );
+
   view.running = true;
+
   raf = requestAnimationFrame(tick);
+
   return view;
 };
