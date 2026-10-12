@@ -54,6 +54,11 @@ const add = (ok, what, detail = '') => checks.push({ ok: Boolean(ok), what, deta
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/* Шаг опроса в мире (world-view.js) — четверть секунды; ждём вдвое больше,
+   прежде чем утверждать, что таймер остановлен. */
+
+const WAIT_PROBE = 600;
+
 /* Холст в jsdom отсутствует по определению: считаем это ожидаемым шумом. */
 
 const isCanvasNoise = (text) => /HTMLCanvasElement|getContext|Not implemented/i.test(text);
@@ -120,8 +125,16 @@ const host = window.document.querySelector('[data-role="world-editor-host"]');
 
 let exited = 0;
 
+/* Кадр редактора: настоящий iframe в тестах заменён парой «окно + документ».
+
+   Вид запоминает сам объект кадра — по нему экран карты понимает, что iframe
+
+   пересоздали (новый seed, другой размер) и мир надо строить заново. */
+
+const frame = { contentWindow: fakeEditorWindow() };
+
 const view = mountWorldView(host, {
-  frame: { contentWindow: fakeEditorWindow() },
+  frame,
 
   config: { seed: 'вид', width: FAKE_MAP.size, height: FAKE_MAP.size },
 
@@ -483,9 +496,101 @@ view.element.querySelector('[data-voxel-action="exit"]').click();
 
 add(exited === 1, 'кнопка «К карте» зовёт onExit — за закрытие режима отвечает вызывающий');
 
+/* ---------- ожидание генератора ----------
+
+   Карта блоков берётся из живого документа Azgaar, а тот считает мир
+   секундами. Проверяется то, что было сломано: если открыть карту раньше,
+   чем генератор договорил, вид должен дождаться и появиться сам, а не
+   остаться пустой сценой до второго нажатия кнопки. */
+
+const slowHost = window.document.createElement('div');
+
+window.document.body.append(slowHost);
+
+const slowWindow = fakeEditorWindow();
+
+const slowFrame = { contentWindow: slowWindow };
+
+/* Окно редактора, у которого карты появляются не сразу: без высот сетки
+   мост честно отказывается строить мир. */
+
+const notReadyWindow = { options: slowWindow.options };
+
+slowFrame.contentWindow = notReadyWindow;
+
+const waiting = mountWorldView(slowHost, {
+
+  frame: slowFrame,
+
+  config: { seed: 'ожидание', width: FAKE_MAP.size, height: FAKE_MAP.size },
+
+});
+
+add(waiting.waiting === true, 'неготовый генератор — это ожидание, а не отказ', waiting.error ?? '');
+
+add(waiting.error === '', 'в ожидании ошибки нет: человеку показывают, чего ждут', waiting.error ?? '');
+
+add(/Считаю карту генератора/.test(waiting.element.textContent ?? ''), 'на сцене сказано, что идёт счёт',
+
+  (waiting.element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60));
+
+/* Генератор договорил: высоты, упаковка и связь pack → grid появились. */
+
+Object.assign(notReadyWindow, slowWindow);
+
+/* Настоящий iframe в браузере остаётся тем же объектом: у него появляется
+   содержимое, а не новый кадр. Здесь так же — окно наполняется. */
+
+await wait(600);
+
+add(waiting.waiting === false, 'вид дождался генератора сам, без второго нажатия');
+
+add(waiting.element?.dataset.role === 'world-voxel' && waiting.element.querySelector('canvas') !== null,
+
+  'на месте ожидания появилась настоящая сцена');
+
+add(waiting.element.isConnected && slowHost.childElementCount === 1, 'сцена одна: ожидание убрало свою разметку');
+
+add(Boolean(waiting.error) === false, 'построенный мир ошибок не оставил', waiting.error ?? '');
+
+add(waiting.element.querySelector('[data-voxel-action="exit"]') !== null, 'из построенной сцены есть выход к карте');
+
+/* Построенный вид помнит кадр, из которого взят снимок: по нему экран карты
+
+   понимает, что iframe пересоздали (новый seed, другой размер) и мир надо
+
+   строить заново, а не показывать прежний. */
+
+add(waiting.frame === slowFrame && view.frame === frame, 'вид помнит свой кадр редактора',
+
+  `${waiting.frame === slowFrame ? 'ожидание' : '—'} / ${view.frame === frame ? 'сцена' : '—'}`);
+
+waiting.dispose();
+
+add(slowHost.childElementCount === 0, 'dispose снимает построенную сцену с хоста');
+
+/* Отказ до генератора: если карту так и не построили, ручка обязана звать
+   dispose у того, что успела создать, и не оставлять таймеров. */
+
+const goneHost = window.document.createElement('div');
+
+window.document.body.append(goneHost);
+
+const gone = mountWorldView(goneHost, { frame: slowFrame, config: null });
+
+gone.dispose();
+
+await wait(WAIT_PROBE);
+
+add(goneHost.childElementCount === 0, 'ожидание снимается до появления карты');
+
 const orphanHost = window.document.createElement('div');
 
 const empty = mountWorldView(orphanHost, { frame: null, config: null });
+
+/* Кадра нет вовсе — это не ожидание: ждать нечего, и вид говорит причину
+
+   сразу, как и раньше. */
 
 add(/Карта блоками:/.test(empty.error ?? ''), 'без документа вид честно сообщает причину', empty.error ?? '');
 

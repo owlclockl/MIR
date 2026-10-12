@@ -2287,15 +2287,23 @@ const syncWorldVoxel = () => {
     session.voxelView = null;
     return;
   }
+  const host = root.querySelector('[data-role="world-editor-host"]');
+  if (!host) return;
+  /* Кадр редактора пересоздаётся на новый seed, смену размера и карту лобби —
+     это уже другой документ Azgaar. Вид, построенный по прежнему, показывал бы
+     в блоковой карте прошлый мир, поэтому такой вид снимаем и строим заново. */
+  const frame = host.querySelector('[data-role="world-editor"]');
+  if (session.voxelView && session.voxelView.frame !== frame) {
+    session.voxelView.dispose();
+    session.voxelView = null;
+  }
   /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы ярус,
      масштаб и центр, и все чанки построились бы заново. */
   if (session.voxelView && session.voxelView.element?.isConnected) return;
-  const host = root.querySelector('[data-role="world-editor-host"]');
-  if (!host) return;
   session.voxelView?.dispose();
   watchWorldLive(host);
   session.voxelView = mountWorldView(host, {
-    frame: host.querySelector('[data-role="world-editor"]'),
+    frame,
     config: session.config,
     onExit: () => setWorldVoxel(false),
   });
@@ -3852,13 +3860,15 @@ const actions = {
     renderWorldPage();
   },
 
-  /* Блочная карта строится из живого документа карты: если генерация ещё идёт,
-     вид сам скажет, чего не хватает (bridge.readSource). */
+  /* Блочная карта строится из живого документа карты. Пока генератор считает,
+     вид ждёт его сам (mountWaitingView), поэтому кнопка отвечает только за
+     режим — кроме одного случая ниже: если мир и правда не построился, второе
+     нажатие пробует снова, а не выключает режим. */
   'world-voxel': () => {
     const session = ui.world;
     if (!session?.open || session.screen !== 'map') return;
-    /* Режим включён, но мир не построился (генерация карты ещё шла) —
-       повторное нажатие пробует снова, а не выключает режим. */
+    /* Режим включён, но мир не построился — повторное нажатие пробует снова,
+       а не выключает режим. */
     if (session.voxel && session.voxelView?.error) {
       session.voxelView.dispose();
       session.voxelView = null;

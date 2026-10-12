@@ -44,7 +44,7 @@ import { CHUNK_SX, CHUNK_SZ, blockAt } from '../world/chunk.js';
 
 import { buildField, fold, spawnPoint, surfaceY } from '../world/field.js';
 
-import { VoxelSourceError, describeSource, readSource } from '../world/bridge.js';
+import { VoxelSourceError, describeSource, mapsReady, missingMapsPart, readSource } from '../world/bridge.js';
 
 import { createVoxelWorld } from '../world/world.js';
 
@@ -94,7 +94,117 @@ const clamp = (value, min, max) => (value < min ? min : value > max ? max : valu
 
 */
 
-export const mountWorldView = (host, { frame, config, onExit } = {}) => {
+/* Что с окном редактора: `ready` — карты построены, `wait` — генератор ещё
+   считает, `denied` — до окна не дотянуться (другой источник или закрытый
+   документ). Проверка стоит перед чтением снимка: `readSource` на неготовом
+   документе отказал бы ошибкой, а ошибка — это не ожидание. */
+const frameState = (frame) => {
+  try {
+    return mapsReady(frame?.contentWindow) ? 'ready' : 'wait';
+  } catch {
+    return 'denied';
+  }
+};
+
+/* Карта генератора появляется не сразу: iframe с Azgaar считает мир несколько
+   секунд, и до этого в его окне нет ни высот, ни упаковки. Раньше вид в этом
+   случае сдавался — а так как режим уже включён и кадр редактора под холстом
+   скрыт, человек видел пустую сцену с надписью «мир не построен» и вызывал
+   карту блоками второй раз вручную. Теперь вид ждёт генератор сам и строится,
+   как только карта появится: ожидание — это состояние вида, а не отказ.
+   Ждать имеет смысл только того, кто может появиться: без самого кадра
+   редактора дело не в генерации, и причину называет вид, а не надпись. */
+export const mountWorldView = (host, options = {}) => {
+  if (!options.frame || frameState(options.frame) !== 'wait') return buildWorldView(host, options);
+  return mountWaitingView(host, options);
+};
+
+/* ---------- ожидание генератора ---------- */
+
+/* Как часто спрашиваем окно редактора. Раз в четверть секунды: генерация идёт
+   секундами, а чаще спрашивать незачем — только зазря будить поток. */
+const WAIT_STEP_MS = 250;
+/* Сколько ждём, прежде чем сдаться. Дольше двух минут молчащий генератор —
+   это уже не «считает», а отказ, и о нём должен сказать сам вид. */
+const WAIT_LIMIT_MS = 120_000;
+
+/**
+ * Ждёт, пока в документе редактора появятся карты, и отдаёт место настоящему
+ * виду. Наружу отдаёт ту же ручку, что и он: `element`, `error`, `dispose` —
+ * этого достаточно и экрану карты (main.js), и человеку, который смотрит на
+ * сцену: в ожидании видно, чего именно не хватает.
+ */
+const mountWaitingView = (host, options) => {
+  const { frame } = options;
+  const root = document.createElement('div');
+  root.className = 'world-voxel';
+  root.dataset.role = 'world-voxel';
+  root.innerHTML = `
+<div class="world-voxel-wait" data-role="voxel-wait" role="status">
+<span class="world-voxel-wait__pulse" aria-hidden="true"></span>
+<p class="world-voxel-wait__text">Считаю карту генератора…</p>
+</div>
+<div class="world-voxel-toolbar">
+<button class="world-voxel-button" type="button" data-voxel-action="exit" aria-label="К карте" title="К карте (Esc)">${icon('map', 'icon--xs')}<span>К карте</span></button>
+</div>
+<p class="world-voxel-note" data-role="voxel-note"></p>`;
+  host.append(root);
+  const note = root.querySelector('[data-role="voxel-note"]');
+  const waitText = root.querySelector('.world-voxel-wait__text');
+  let timer = 0;
+  let inner = null;
+  let disposed = false;
+  const startedAt = Date.now();
+  const leave = () => {
+    if (!disposed) options.onExit?.();
+  };
+  root.querySelector('[data-voxel-action="exit"]')?.addEventListener('click', leave);
+  const stop = () => {
+    disposed = true;
+    clearTimeout(timer);
+    timer = 0;
+    inner?.dispose();
+    inner = null;
+    root.remove();
+  };
+  const handover = () => {
+    clearTimeout(timer);
+    timer = 0;
+    /* Свою сцену убираем до сборки: настоящий вид занимает тот же хост, и две
+       разметки поверх друг друга — это два «К карте» и две заметки. */
+    root.remove();
+    inner = buildWorldView(host, options);
+    waiting.element = inner.element;
+    waiting.waiting = false;
+  };
+  const poll = () => {
+    timer = 0;
+    if (disposed) return;
+    const state = frameState(frame);
+    if (state !== 'wait' || Date.now() - startedAt > WAIT_LIMIT_MS) {
+      handover();
+      return;
+    }
+    waitText.textContent = `Считаю карту генератора: ${missingMapsPart(frame?.contentWindow)}…`;
+    note.textContent = 'Карта блоками появится сама, как только мир будет готов.';
+    timer = setTimeout(poll, WAIT_STEP_MS);
+  };
+  const waiting = {
+    element: root,
+    waiting: true,
+    /* По какому кадру строится вид: экран карты сверяет его с живым — кадр
+       редактора пересоздаётся на новый seed и на смену размера. */
+    frame,
+    get error() {
+      return inner?.error ?? '';
+    },
+    dispose: stop,
+  };
+  poll();
+  return waiting;
+};
+
+const buildWorldView = (host, { frame, config, onExit } = {}) => {
   const cleanups = [];
 
   let raf = 0;
@@ -303,6 +413,12 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
   view.field = field;
 
   view.source = source;
+
+  /* Кадр, из которого взят снимок: если экран карты пересоздаст iframe (новый
+     seed, другой размер, карта лобби), вид обязан построиться заново — иначе
+     на экране останется прежний мир. */
+
+  view.frame = frame;
 
   const spawn = spawnPoint(field);
 
