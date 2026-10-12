@@ -8,6 +8,3 @@ logs/
 .DS_Store
 *.log
 .wrangler/
-
-# Картинка-черновик генератора планеты (scripts/planet-preview.mjs)
-planet-preview.png

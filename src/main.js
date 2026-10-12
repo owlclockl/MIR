@@ -13,7 +13,7 @@ import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
-import { mountPlanetView } from './planet/view.js';
+import { mountWorldView } from './game/world-view.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
 import { seedArtOrIcon, seedArtSvg } from './ui/seed-art.js';
@@ -1955,8 +1955,8 @@ const createWorldSession = () => ({
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  planet: false, // надстройка «карта планеты» над экраном карты
-  planetView: null, // смонтированный вид: dispose при выходе из режима
+  voxel: false, // надстройка «воксельный мир» над экраном карты
+  voxelView: null, // смонтированный вид: dispose при выходе из режима
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // остановка синхронизации лобби для текущего iframe
   leaveArmed: false, // первый клик «Выйти» ждёт подтверждения
@@ -2168,10 +2168,10 @@ const worldPageHtml = () => {
     : screen === 'map' && session.lobby
       ? `<button class="world-topbar-button" type="button" data-action="world-lobby-back" aria-label="К лобби" title="К лобби">${icon('chevronLeft', 'icon--xs')}<span>К лобби</span></button>`
       : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
-  /* Кнопка режима не зависит от session.planet: перерисовка страницы убила бы
-     iframe с документом Azgaar, а режим переключается классом (syncPlanetMap). */
-  const planetAction = screen === 'map'
-    ? `<button class="world-topbar-button" type="button" data-action="world-planet" aria-label="Карта планеты" title="Карта планеты: свой мир в масштабе до метра в пикселе, 20 слоёв">${icon('globe', 'icon--xs')}<span>Карта планеты</span></button>`
+  /* Кнопка режима не зависит от session.voxel: перерисовка страницы убила бы
+     iframe с документом Azgaar, а режим переключается классом (syncWorldVoxel). */
+  const voxelAction = screen === 'map'
+    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Воксельный мир" title="Воксельный мир: та же карта блок за блоком">${icon('mountain', 'icon--xs')}<span>Воксельный мир</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -2200,7 +2200,7 @@ const worldPageHtml = () => {
           ${screen === 'map' && session.lobby ? '<span class="world-lobby-chip" data-role="lobby-chip"></span>' : ''}
         </div>
         <div class="world-topbar__actions">
-          ${backToSlots}${planetAction}${masterMapActions}
+          ${backToSlots}${voxelAction}${masterMapActions}
           <button class="world-exit-button" type="button" data-action="world-exit" aria-label="В меню" title="В меню">${icon('logOut', 'icon--xs')}<span>В меню</span></button>
         </div>
       </header>
@@ -2234,7 +2234,7 @@ const renderWorldPage = ({ focus = false } = {}) => {
     if (focus) root.querySelector('[data-role="world-seed"]')?.focus();
   }
   mountWorldEditor();
-  syncPlanetMap();
+  syncWorldVoxel();
   paintLobbyChip();
 };
 
@@ -2266,64 +2266,86 @@ const mountWorldEditor = () => {
   }
 };
 
-/* Карта планеты — надстройка над экраном карты: тот же хост, что у редактора,
-   но вместоiframe документ Azgaar скрыт, а поверх лежит холст со своим миром.
-   Страницу при переключении не перерисовываем: это создало бы новый iframe и
-   запустило генерацию Azgaar заново. Поэтому только класс на .world-app и
-   монтирование/снятие вида. */
-const syncPlanetMap = () => {
+/* Воксельный режим — надстройка над экраном карты: тот же iframe, тот же
+   документ Azgaar. Страницу при переключении не перерисовываем: это создало бы
+   новый iframe и запустило генерацию заново. Поэтому только класс на .world-app
+   и монтирование/снятие вида. */
+const syncWorldVoxel = () => {
   const session = ui.world;
   const root = worldRoot();
   const app = root?.querySelector('.world-app');
   if (!session?.open || !app) return;
-  const wanted = session.screen === 'map' && session.planet === true;
-  app.classList.toggle('is-planet', wanted);
-  const button = app.querySelector('[data-action="world-planet"]');
+  const wanted = session.screen === 'map' && session.voxel === true;
+  app.classList.toggle('is-voxel', wanted);
+  const button = app.querySelector('[data-action="world-voxel"]');
   button?.classList.toggle('is-on', wanted);
   button?.setAttribute('aria-pressed', wanted ? 'true' : 'false');
   if (!wanted) {
-    session.planetView?.dispose();
-    session.planetView = null;
+    worldVoxelWatch?.disconnect();
+    worldVoxelWatch = null;
+    session.voxelView?.dispose();
+    session.voxelView = null;
     return;
   }
-  /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы камеру
-     и выбросило кэш тайлов. */
-  if (session.planetView && session.planetView.element?.isConnected) return;
+  /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы камеру и
+     перестроило бы все чанки. */
+  if (session.voxelView && session.voxelView.element?.isConnected) return;
   const host = root.querySelector('[data-role="world-editor-host"]');
   if (!host) return;
-  session.planetView?.dispose();
-  session.planetView = mountPlanetView(host, {
-    seed: session.config?.seed || 'mir-2026',
-    size: 1,
-    onExit: () => setPlanetMap(false),
+  session.voxelView?.dispose();
+  watchWorldLive(host);
+  session.voxelView = mountWorldView(host, {
+    frame: host.querySelector('[data-role="world-editor"]'),
+    config: session.config,
+    onExit: () => setWorldVoxel(false),
   });
 };
 
-const setPlanetMap = (on) => {
+const setWorldVoxel = (on) => {
   const session = ui.world;
   if (!session?.open || session.screen !== 'map') return;
   const wanted = Boolean(on);
-  if (session.planet === wanted) return;
-  session.planet = wanted;
+  if (session.voxel === wanted) return;
+  session.voxel = wanted;
   playSound(wanted ? 'open' : 'close');
-  syncPlanetMap();
-  if (wanted && session.planetView?.error) toast(session.planetView.error, 'error');
+  syncWorldVoxel();
+  if (wanted && session.voxelView?.error) toast(session.voxelView.error, 'error');
 };
 
 /* Выход с экрана карты: режим гасим сразу, чтобы возврат в слоты не оставил
-   работающий кадровый цикл и кэш тайлов. */
-const dropPlanetMap = () => {
+   висящий GL-контекст и очередь чанков. */
+const dropWorldVoxel = () => {
   const session = ui.world;
   if (!session) return;
-  session.planetView?.dispose();
-  session.planetView = null;
-  session.planet = false;
+  worldVoxelWatch?.disconnect();
+  worldVoxelWatch = null;
+  session.voxelView?.dispose();
+  session.voxelView = null;
+  session.voxel = false;
 };
 
 /* Живой предпросмотр правок мастера — это снимки поверх iframe, а воксельный вид
    читает документ самого игрока. Держать их вместе нельзя: игрок видел бы чужую
    плоскую карту поверх своей объёмной. Накладка появляется без перерисовки
    страницы, поэтому за ней следит наблюдатель и гасит режим. */
+let worldVoxelWatch = null;
+const watchWorldLive = (host) => {
+  worldVoxelWatch?.disconnect();
+  worldVoxelWatch = null;
+  if (!host || typeof MutationObserver !== 'function') return;
+  worldVoxelWatch = new MutationObserver(() => {
+    if (!ui.world?.voxel || !host.querySelector('.world-live.is-on')) return;
+    setWorldVoxel(false);
+    toast('Мастер вносит правки: воксельный мир показывает вашу копию карты, режим выключен.');
+  });
+  worldVoxelWatch.observe(host, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+};
+
 /* Слот получает параметры и открывается картой. Общий путь для «Создать»,
    «Войти», загрузки файла и «Новый мир». */
 const enterWorldMap = (slot, config) => {
@@ -2335,7 +2357,7 @@ const enterWorldMap = (slot, config) => {
   session.slot = { role: slot.role, index: slot.index };
   session.importToSlot = null;
   session.screen = 'map';
-  dropPlanetMap();
+  dropWorldVoxel();
   renderWorldPage();
 };
 
@@ -2419,7 +2441,7 @@ const closeWorldPage = ({ history = true } = {}) => {
   if (!ui.world?.open) return;
   ui.world.open = false;
   ui.world.frameKey = '';
-  dropPlanetMap();
+  dropWorldVoxel();
   ui.world.syncStop?.();
   ui.world.syncStop = null;
   ui.world.leaveArmed = false;
@@ -3818,19 +3840,29 @@ const actions = {
 
   'world-slots': () => {
     if (!ui.world?.open) return;
-    dropPlanetMap();
+    dropWorldVoxel();
     ui.world.screen = 'slots';
     ui.world.slot = null;
     ui.world.importToSlot = null;
     renderWorldPage();
   },
 
-  /* Карта планеты считается сама: документ Azgaar ей не нужен, поэтому режим
-     доступен и пока генератор карты ещё работает. */
-  'world-planet': () => {
+  /* Режим строится из живого документа карты: если генерация ещё идёт, вид
+     сам скажет, чего не хватает (bridge.readSource). */
+  'world-voxel': () => {
     const session = ui.world;
     if (!session?.open || session.screen !== 'map') return;
-    setPlanetMap(!session.planet);
+    /* Режим включён, но мир не построился (генерация карты ещё шла) —
+       повторное нажатие пробует снова, а не выключает режим. */
+    if (session.voxel && session.voxelView?.error) {
+      session.voxelView.dispose();
+      session.voxelView = null;
+      syncWorldVoxel();
+      const error = session.voxelView?.error;
+      toast(error ?? 'Воксельный мир построен.', error ? 'error' : 'ok');
+      return;
+    }
+    setWorldVoxel(!session.voxel);
   },
 
   'world-slot-tab': (el) => {
@@ -4432,10 +4464,10 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: карта планеты → карта → страница игры. */
-    if (ui.world.screen === 'map' && ui.world.planet) {
+    /* Ступеньки: воксельный мир → карта → страница игры. */
+    if (ui.world.screen === 'map' && ui.world.voxel) {
       event.preventDefault();
-      setPlanetMap(false);
+      setWorldVoxel(false);
       return;
     }
     event.preventDefault();
