@@ -8,11 +8,14 @@
 
    Запуск:
      npm run build && npm run single
-     npm run host:dev                 (или web preview с API и dist/)
+     npm run serve                    (или npm run host:dev — тогда адрес
+                                       другой: сервер подскажет свой порт)
      npm i --no-save jsdom            (разово: jsdom нужен только здесь)
-     npm run test:ui -- http://127.0.0.1:4173
+     npm run test:ui
 
-   Адрес сервера можно задать аргументом: `npm run test:ui -- http://127.0.0.1:4173`. */
+   Адрес сервера: аргументом (`npm run test:ui -- http://127.0.0.1:4173`) или
+   переменной MIR_HUB — так его передаёт `npm test -- --live`, который сам
+   находит поднятый сервер. По умолчанию 4173: столько у `npm run serve`. */
 
 import { readFileSync } from 'node:fs';
 import { fromRoot } from './lib/root.mjs';
@@ -25,7 +28,7 @@ try {
   process.exit(1);
 }
 
-const HUB = (process.argv[2] || 'http://127.0.0.1:8787').replace(/\/+$/, '');
+const HUB = (process.argv[2] || process.env.MIR_HUB || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 
 /* Подставные «новости о сборке»: страница обязана решить, что на сервере
    вышла новая версия, и сказать об этом — не перезагружая игру сама. */

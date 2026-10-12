@@ -20,6 +20,23 @@ const DATE_FORMAT = new Intl.DateTimeFormat('ru-RU', {
 
 export const formatDate = (ts) => DATE_FORMAT.format(new Date(ts));
 
+/* Время суток без даты: «14:32». Тот же смысл, что у DATE_FORMAT:
+   формат собирается один раз, потому что журнал и списки рисуют сотни
+   отметок подряд. */
+const TIME_FORMAT = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+export const formatTime = (ts) => TIME_FORMAT.format(new Date(ts));
+
+/* Словарь присутствия: как состояние игрока называется в интерфейсе и
+   каким классом красится точка. Живёт здесь, а не в меню: панель админа
+   показывает те же состояния, что и панель друзей, и слова должны
+   совпадать. */
+export const PRESENCE = {
+  playing: { label: 'В игре', modifier: 'live' },
+  idle: { label: 'В меню', modifier: 'live' },
+  offline: { label: 'Не в сети', modifier: 'off' },
+};
+
 export const copyText = async (text) => {
   if (navigator.clipboard?.writeText) {
     try {

@@ -11,16 +11,16 @@
    переключатели, подключение и скрытый вход администратора.
 
    Скрипт не зависит ни от чего, кроме Node: сам скачивает tgz-архив пакета
-   с registry.npmjs.org, сам его разжимает (tar разбирается вручную — в
-   системе не должно быть ни tar, ни архиватора) и раскладывает тринадцать
-   файлов в src/assets/sounds/.
+   с registry.npmjs.org (разбор архива — общий с scripts/fonts.mjs модуль
+   scripts/lib/tar.mjs: ни tar, ни архиватора в системе быть не должно) и
+   раскладывает тринадцать файлов в src/assets/sounds/.
 
    Лицензия звуков — CC0 1.0 (общественное достояние): можно менять и
    использовать как угодно, без указания автора. Подробности, происхождение
    каждого файла и команда замены — в src/assets/sounds/LICENSE.txt. */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
+import { fetchPackage } from './lib/tar.mjs';
 import { fromRoot } from './lib/root.mjs';
 
 /* Откуда берём. Версию пакета и состав файлов менять только здесь:
@@ -66,35 +66,6 @@ const CUES = [
 const OUT_DIR = fromRoot('src', 'assets', 'sounds');
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} КБ`;
 
-/* ---------- tar ---------------------------------------------------- */
-
-/* Архив npm — это gzip поверх tar. tar устроен просто: 512-байтовый
-   заголовок, затем данные, выровненные по 512 байт. Нам нужны только
-   обычные файлы (тип '0' или пустой — старый формат), поэтому никаких
-   ссылок, каталогов и длинных имён не разбираем. */
-function untar(buffer) {
-  const files = new Map();
-  let offset = 0;
-
-  while (offset + 512 <= buffer.length) {
-    const header = buffer.subarray(offset, offset + 512);
-    const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/, '');
-    if (!name) break; // конец архива: два пустых блока подряд
-
-    const rawSize = header.subarray(124, 136).toString('utf8').replace(/\0.*$/, '').trim();
-    const size = rawSize ? parseInt(rawSize, 8) : 0;
-    const type = String.fromCharCode(header[156]);
-    const start = offset + 512;
-
-    if (type === '0' || type === '\u0000') {
-      files.set(name, buffer.subarray(start, start + size));
-    }
-    offset = start + Math.ceil(size / 512) * 512;
-  }
-
-  return files;
-}
-
 /* ---------- работа -------------------------------------------------- */
 
 const pack = (process.argv[2] || PACKS[0]).trim().toLowerCase();
@@ -105,15 +76,11 @@ if (!PACKS.includes(pack)) {
   process.exit(1);
 }
 
-const url = `https://registry.npmjs.org/${PACKAGE}/-/${PACKAGE}-${VERSION}.tgz`;
 console.log(`Звуки игрового меню: ${PACKAGE} ${VERSION}, набор «${pack}»`);
-console.log(`  скачиваю ${url}`);
 
 let files;
 try {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`сервер ответил ${response.status}`);
-  files = untar(gunzipSync(Buffer.from(await response.arrayBuffer())));
+  files = await fetchPackage(PACKAGE, VERSION);
 } catch (error) {
   console.error(`Не удалось скачать архив: ${error.message}.`);
   console.error('Проверьте интернет — звуки берутся из сети один раз, дальше они лежат в репозитории.');

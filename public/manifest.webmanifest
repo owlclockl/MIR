@@ -8,6 +8,22 @@
   "scope": ".",
   "display": "standalone",
   "orientation": "any",
+  "categories": ["games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Играть — слоты карт",
+      "short_name": "Играть",
+      "description": "Открыть слоты карт и редактор Azgaar",
+      "url": "./#play",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "background_color": "#080d0e",
   "theme_color": "#080d0e",
   "icons": [

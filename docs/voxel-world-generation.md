@@ -246,7 +246,7 @@
 
 `h` по знаковому биту. На диск — gzip через `CompressionStream`, готовые
 
-`gzip`/`gunzip` есть в `src/game/map-frame.js`; хранение — IndexedDB (локальное
+`gzip`/`gunzip` есть в `src/data/map-frame.js`; хранение — IndexedDB (локальное
 
 хранилище на мегабайты не рассчитано), ключ — `seed|width|height` плюс 64-битный
 
@@ -698,7 +698,7 @@ return { ux, uz, mx, my } // флаги идут в шум, декор и UV
 
 нет и кэша.
 
-Формат чанка для сети (лобби) — `encodeFrame` из `src/game/map-frame.js` как
+Формат чанка для сети (лобби) — `encodeFrame` из `src/data/map-frame.js` как
 
 есть: заголовок `{t:'voxel-chunk', v:1, key, palette:[…]}` + gzip индексов.
 
@@ -1197,7 +1197,7 @@ Minecraft, мир 256 в высоту, дороже)? По умолчанию п
 | шкала: 1 px = 3 км, `(h−18)^exponent` м | `src/components/options-model.ts:74, 76`, `src/utils/unitUtils.ts:59-70` |
 | что можно пинить извне (в т. ч. `points`, `prec`, `heightExponent`) и почему `options=default` это гасит | `src/components/options-schema.ts:281-316`, `src/components/pins.ts:13-15, 43-47` |
 | расхождение высот после save/load `.map` | `vendor/azgaar-fantasy-map-generator/MIR-INTEGRATION.md` (последний абзац) |
-| кадры/gzip/отпечаток для снимка | `src/game/map-frame.js` |
+| кадры/gzip/отпечаток для снимка | `src/data/map-frame.js` |
 | паттерн моста с окном Azgaar | `src/game/generation-stage.js:188-280` |
 | удалённый собственный генератор и «не сливать» | `CHANGELOG.md` (2026-10-08, две записи) |
 

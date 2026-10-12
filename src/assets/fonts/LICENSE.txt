@@ -1,0 +1,46 @@
+The civilization of the sages — interface fonts
+
+Source: @fontsource-variable/* — self-hosting builds of Google Fonts,
+        https://fontsource.org · npm registry
+          @fontsource-variable/inter    5.3.0  (семейство Inter)
+          @fontsource-variable/manrope  5.3.0  (семейство Manrope)
+
+Files in this folder are copies of files from these packages:
+
+  inter-cyrillic-wght-normal.woff2    ← files/inter-cyrillic-wght-normal.woff2
+  inter-latin-wght-normal.woff2       ← files/inter-latin-wght-normal.woff2
+  manrope-cyrillic-wght-normal.woff2  ← files/manrope-cyrillic-wght-normal.woff2
+  manrope-latin-wght-normal.woff2     ← files/manrope-latin-wght-normal.woff2
+
+Both families are variable fonts: one file per Unicode subset covers the whole
+weight range (Inter 100…900, Manrope 200…800), so the four files above are all
+the weights the interface uses (400…700). Subsets are chosen by unicode-range
+in fonts.css; extended subsets (latin-ext, cyrillic-ext) are deliberately not
+shipped — see the comment there.
+
+Licenses of the fonts: SIL Open Font License 1.1 (OFL-1.1). Full texts and
+copyright notices are next to this file, copied from the same packages:
+
+  inter-OFL.txt     Inter — Copyright 2016 The Inter Project Authors
+                    https://github.com/rsms/inter
+  manrope-OFL.txt   Manrope — Copyright 2018 The Manrope Project Authors
+                    https://github.com/sharanda/manrope
+
+The OFL allows use, modification and redistribution — including inside a
+commercial product — as long as the fonts are not sold by themselves and the
+license travels with them. Renaming a modified font is required by the OFL;
+these files are unmodified copies, so the names stay.
+
+To refresh the files (or move to another version of the packages), run:
+
+  npm run fonts
+
+The script `scripts/fonts.mjs` downloads the same versions from
+registry.npmjs.org, takes these four subsets, refreshes this folder — licenses
+included — and checks that fonts.css still describes the same Unicode ranges.
+The package versions and the list of subsets are in that script. The same tar
+reader is shared with the sound-effect script (`scripts/lib/tar.mjs`).
+
+Interface fonts are not the map fonts: the Azgaar editor inside the game loads
+its own fonts from Google Fonts when there is a network (see README, «Генератор
+мира»), and those files are not part of the project.

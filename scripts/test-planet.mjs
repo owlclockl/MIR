@@ -97,7 +97,8 @@ for (let i = 0; i < 20_000; i += 1) {
 }
 add(finite, 'шум не отдаёт NaN и бесконечность');
 add(min > -1.5 && max < 1.5, 'шум лежит в пределах ±1,5', `${min.toFixed(2)}…${max.toFixed(2)}`);
-add(noise3(10.5, 3.25, -7.75, 5) === noise3(10.5, 3.25, -7.75, 5), 'шум детерминирован');
+const samePoint = [noise3(10.5, 3.25, -7.75, 5), noise3(10.5, 3.25, -7.75, 5)];
+add(samePoint[0] === samePoint[1], 'шум детерминирован', `два вызова в одной точке: ${samePoint[0] === samePoint[1] ? 'совпали' : 'разошлись'}`);
 let hashSum = 0;
 let lowHalf = 0;
 for (let i = 0; i < 40_000; i += 1) {

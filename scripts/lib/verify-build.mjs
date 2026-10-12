@@ -42,9 +42,18 @@ const ROOT_FILES = ['dist', 'mir.html'];
 */
 export const BUDGETS = {
   js: 288 * 1024,
-  css: 84 * 1024,
+  /* Стили приложения выросли на 4 КБ вместе со шрифтами: интерфейс больше не
+     берёт Inter и Manrope со стороннего CDN, а описывает их сам — четыре
+     @font-face с диапазонами Unicode лежат в CSS (сами woff2 — отдельные
+     хешированные файлы). Прежние 84 КБ были впритык: 82.6 КБ против 84. */
+  css: 88 * 1024,
   fmgCss: 280 * 1024,
   single: 30 * 1024 * 1024,
+  /* Установка service worker — то, что игрок скачивает на первом экране,
+     ничего не нажимая. Вместе с оболочкой когда-то ехали и двадцать три
+     мегабайта редактора карт: отсюда и бюджет. Редактор теперь грузится
+     отдельным проходом (PRECACHE_WARM), поэтому в установке ему не место. */
+  shell: 1536 * 1024,
 };
 
 const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -55,6 +64,13 @@ const version = () => JSON.parse(readFileSync('package.json', 'utf8')).version;
    подхватить новый состав сама. */
 const SOUND_FILES = existsSync('src/assets/sounds')
   ? readdirSync('src/assets/sounds').filter((name) => name.endsWith('.mp3'))
+  : [];
+
+/* Шрифты интерфейса: woff2 из src/assets/fonts/ (см. scripts/fonts.mjs).
+   Та же причина читать список с диска: состав подмножеств меняется командой
+   `npm run fonts`, и проверка обязана увидеть новый набор сама. */
+const FONT_FILES = existsSync('src/assets/fonts')
+  ? readdirSync('src/assets/fonts').filter((name) => name.endsWith('.woff2'))
   : [];
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} КБ`;
@@ -112,6 +128,13 @@ export function checkWeb() {
       && manifest?.theme_color === '#080d0e',
     'манифест PWA содержит полное имя и короткий системный ярлык',
     `name: ${manifest?.name ?? '—'}, short_name: ${manifest?.short_name ?? '—'}`,
+  );
+  add(
+    Array.isArray(manifest?.shortcuts)
+      && manifest.shortcuts.length > 0
+      && manifest.shortcuts.every((item) => typeof item?.url === 'string' && item.url.length > 0),
+    'манифест даёт ярлыки запуска на длинное нажатие значка',
+    (manifest?.shortcuts ?? []).map((item) => item.short_name ?? item.name).join(', ') || 'нет ярлыков',
   );
   add(
     fmgHtml.includes('<title>The civilization of the sages — редактор карт</title>')
@@ -175,6 +198,31 @@ export function checkWeb() {
     `${webSoundAssets.length} файлов; base64 в JS: ${inlineAudio ? 'да' : 'нет'}`,
   );
 
+  /* Шрифты интерфейса: свои файлы, своя раздача, предзагрузка в разметке.
+     Проверка двойная — файлы на месте и ни одна строка разметки не тянет
+     Inter и Manrope с чужого домена (иначе офлайн-версия получит системное
+     начертание вместо фирменного). */
+  const webFontAssets = files.filter((name) => name.startsWith('assets/') && name.endsWith('.woff2'));
+  const fontPreloads = [...html.matchAll(/<link rel="preload" as="font"[^>]*href="\/(assets\/[^"]+\.woff2)"/g)].map((m) => m[1]);
+  const googleFonts = /fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html);
+  add(
+    FONT_FILES.length > 0
+      && webFontAssets.length >= FONT_FILES.length
+      && fontPreloads.length === webFontAssets.length
+      && !googleFonts,
+    'шрифты интерфейса раздаются со своего адреса и предзагружаются',
+    `${webFontAssets.length} файлов, предзагрузок ${fontPreloads.length}; чужой CDN: ${googleFonts ? 'да' : 'нет'}`,
+  );
+  const appCssFile = files.find((name) => /^assets\/.*\.css$/.test(name));
+  const fontFaceRules = appCssFile
+    ? (readFileSync(join('dist', appCssFile), 'utf8').match(/@font-face/g) ?? []).length
+    : 0;
+  add(
+    fontFaceRules >= FONT_FILES.length,
+    'стили описывают все начертания шрифтов',
+    `@font-face: ${fontFaceRules}, файлов: ${FONT_FILES.length}`,
+  );
+
   const assetFiles = files.filter((name) => name.startsWith('assets/'));
   const unhashedAssets = assetFiles.filter((name) => !/^assets\/[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$/.test(name));
   const headersFile = existsSync('dist/_headers') ? readFileSync('dist/_headers', 'utf8') : '';
@@ -210,32 +258,64 @@ export function checkWeb() {
       cache?.[1] ?? 'не найдено',
     );
 
-    const listMatch = sw.match(/const PRECACHE = (\[[\s\S]*?\]);/);
-    let precache = [];
-    try {
-      precache = JSON.parse(listMatch?.[1] ?? '[]');
-    } catch {
-      precache = [];
-    }
-    const broken = precache.filter((url) => url !== '/' && !existsSync(join('dist', url)));
+    /* Списков два: оболочка (её worker кладёт при установке) и редактор
+       карт (его догружает отдельный проход по просьбе страницы). Проверяем
+       и полноту каждого, и то, что тяжёлый редактор не уехал обратно в
+       установку: именно из-за этого первый экран когда-то качал 23 МБ. */
+    const readList = (name) => {
+      const match = sw.match(new RegExp(`const ${name} = (\\[[\\s\\S]*?\\]);`));
+      try {
+        return JSON.parse(match?.[1] ?? '[]');
+      } catch {
+        return [];
+      }
+    };
+    const precache = readList('PRECACHE');
+    const warm = readList('PRECACHE_WARM');
+    const shell = [...precache, ...warm];
+    const broken = shell.filter((url) => url !== '/' && !existsSync(join('dist', url)));
     add(
-      precache.length > 2 && broken.length === 0,
-      'список оболочки service worker существует целиком',
-      broken.length ? `нет: ${broken.join(', ')}` : `${precache.length} файлов`,
+      precache.length > 2 && warm.length > 0 && broken.length === 0,
+      'оба списка офлайн-кэша существуют целиком',
+      broken.length
+        ? `нет: ${broken.join(', ')}`
+        : `оболочка: ${precache.length}, редактор: ${warm.length} файлов`,
     );
-    const missingFmgPrecache = fmgFiles.filter((name) => !precache.includes(`/${name}`));
+    const shellBytes = precache.reduce((sum, url) => {
+      if (url === '/') return sum;
+      try {
+        return sum + statSync(join('dist', url)).size;
+      } catch {
+        return sum;
+      }
+    }, 0);
     add(
-      fmgFiles.length > 100 && precache.includes('/fmg/index.html') && missingFmgPrecache.length === 0,
-      'весь редактор Azgaar включён в офлайн-кэш приложения',
-      missingFmgPrecache.length ? `вне precache: ${missingFmgPrecache.slice(0, 6).join(', ')}` : `${fmgFiles.length} файлов`,
+      shellBytes <= BUDGETS.shell,
+      'установка service worker укладывается в бюджет',
+      `${(shellBytes / 1024).toFixed(0)} КБ из ${(BUDGETS.shell / 1024).toFixed(0)} КБ`,
     );
     add(
-      new Set(precache).size === precache.length,
-      'в списке оболочки нет повторов',
-      `${precache.length - new Set(precache).size} лишних`,
+      !precache.some((url) => url.startsWith('/fmg/')),
+      'редактор Azgaar не тянется при установке service worker',
+      precache.some((url) => url.startsWith('/fmg/'))
+        ? 'часть /fmg/ вернулась в список установки'
+        : `установка: ${precache.length} файлов вместо ${shell.length}`,
+    );
+    const missingFmgPrecache = fmgFiles.filter((name) => !warm.includes(`/${name}`));
+    add(
+      fmgFiles.length > 100 && warm.includes('/fmg/index.html') && missingFmgPrecache.length === 0,
+      'весь редактор Azgaar доступен офлайн после прогрева',
+      missingFmgPrecache.length
+        ? `вне прогрева: ${missingFmgPrecache.slice(0, 6).join(', ')}`
+        : `${fmgFiles.length} файлов`,
     );
     add(
-      !precache.includes('/_headers') && !precache.includes('/_redirects'),
+      new Set(shell).size === shell.length,
+      'в списках офлайн-кэша нет повторов',
+      `${shell.length - new Set(shell).size} лишних`,
+    );
+    add(
+      !shell.includes('/_headers') && !shell.includes('/_redirects'),
       'метаданные Workers Assets не попали в офлайн-кэш',
       '/_headers и /_redirects исключены',
     );
@@ -243,13 +323,17 @@ export function checkWeb() {
     /* Новости о версии из кэша не отдаются: иначе приложение сравнивало бы
        старую сборку со старой же и никогда не увидело новую. */
     add(
-      !precache.includes(`/${BUILD_INFO_FILE}`),
+      !shell.includes(`/${BUILD_INFO_FILE}`),
       `/${BUILD_INFO_FILE} не попал в офлайн-кэш`,
-      `файлов оболочки: ${precache.length}`,
+      `файлов оболочки: ${precache.length}, всего: ${shell.length}`,
     );
     add(
       /mir:skip-waiting/.test(sw) && /\bskipWaiting\b/.test(sw),
       'service worker принимает просьбу «обновить сейчас»',
+    );
+    add(
+      /mir:warm-editor/.test(sw) && /PRECACHE_WARM\.map|PRECACHE_WARM\.length/.test(sw),
+      'service worker принимает просьбу «догрузить карту»',
     );
   }
 
@@ -346,13 +430,24 @@ export function checkSingle() {
   for (const [pattern, what] of forbidden)
     add(!new RegExp(pattern).test(html), `в mir.html нет: ${what}`);
 
-  const fontHost = (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com');
+  /* Ни одной ссылки наружу: шрифты интерфейса теперь лежат внутри файла, и
+     единственный документ, который что-то догружает, — встроенный редактор
+     Azgaar (его собственные шрифты карты проверяются ниже отдельно). */
   const external = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
-  const allowed = external.every(fontHost);
+  /* Шрифты карты внутри редактора Azgaar по-прежнему приходят из Google:
+     это его собственная загрузка шрифтов карты, к интерфейсу отношения не
+     имеет (см. README, «Генератор мира»). */
+  const fontHost = (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com');
   add(
-    allowed,
-    'из внешнего в mir.html только шрифты',
-    external.filter((url) => !allowed || !/fonts\.g/.test(url)).join(', ') || `${external.length} ссылок`,
+    external.length === 0,
+    'mir.html не тянет ничего из внешнего',
+    external.join(', ') || 'ссылок наружу нет',
+  );
+  const embeddedFonts = (html.match(/data:font\/woff2;base64/g) ?? []).length;
+  add(
+    FONT_FILES.length > 0 && embeddedFonts >= FONT_FILES.length,
+    'шрифты интерфейса вшиты в mir.html',
+    `${embeddedFonts} из ${FONT_FILES.length}`,
   );
 
   /* Шаблон Azgaar лежит в JSON-строке, поэтому его атрибуты экранированы

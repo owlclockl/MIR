@@ -428,5 +428,54 @@ await sleep(40);
 const watched = late.inbox.find((m) => m?.t === 'watched');
 ok('поздний вход получает кадр из памяти объекта', watched?.hasMap === true && watched.seq === 1, JSON.stringify(watched ?? null));
 
+/* ---------- перебор пароля по аккаунту ------------------------------ */
+
+/* Лимит по IP такой перебор пропускает мимо (он и рассчитан на шумный
+   сигналинг), а вход с готовым хешем дёшев — поэтому у аккаунта свой
+   счётчик промахов. Проверяем три вещи: пауза наступает, пауза не пускает
+   и с верным паролем, а удачный вход счётчик снимает. */
+const bruteStorage = makeStorage();
+const brute = await boot(bruteStorage);
+const victim = 'bruteforce';
+await brute('POST', '/api/register', {
+  name: victim,
+  salt: hex(16),
+  passHash: await sha256('верный-пароль'),
+});
+
+let lastWrong = 0;
+for (let i = 0; i < 5; i += 1) {
+  const attempt = await brute('POST', '/api/login', { name: victim, passHash: await sha256(`мимо-${i}`) });
+  lastWrong = attempt.status;
+}
+ok('пять промахов подряд вход не закрывают', lastWrong === 401, `ответ ${lastWrong}`);
+
+const rightAfterFive = await brute('POST', '/api/login', { name: victim, passHash: await sha256('верный-пароль') });
+ok('удачный вход снимает счётчик промахов', rightAfterFive.status === 200, `ответ ${rightAfterFive.status}`);
+
+let lastOfSix = 0;
+for (let i = 0; i < 6; i += 1) {
+  const attempt = await brute('POST', '/api/login', { name: victim, passHash: await sha256(`снова-мимо-${i}`) });
+  lastOfSix = attempt.status;
+}
+ok('шесть промахов подряд считаются, но ещё пускают', lastOfSix === 401, `ответ ${lastOfSix}`);
+
+/* Пауза начинается со следующей попытки: закрывать вход тем же ответом, в
+   котором пароль не совпал, значило бы мешать игроку, который промахнулся
+   ровно на шестой раз и тут же ввёл верный пароль. */
+const afterSix = await brute('POST', '/api/login', { name: victim, passHash: await sha256('седьмая-мимо') });
+ok('следующая попытка упирается в паузу', afterSix.status === 429, afterSix.data?.error ?? `ответ ${afterSix.status}`);
+
+const correctWhileBlocked = await brute('POST', '/api/login', { name: victim, passHash: await sha256('верный-пароль') });
+ok(
+  'закрытый вход не пускает и с верным паролем',
+  correctWhileBlocked.status === 429,
+  correctWhileBlocked.data?.error ?? `ответ ${correctWhileBlocked.status}`,
+);
+
+const harmless = await boot(bruteStorage);
+const other = await harmless('POST', '/api/login', { name: victim, passHash: await sha256('верный-пароль') });
+ok('после перезапуска объекта счётчик промахов не мешает входу', other.status === 200, `ответ ${other.status}`);
+
 console.log(failures === 0 ? '\nВСЁ ХОРОШО' : `\nПЛОХО: провалов ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

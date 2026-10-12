@@ -83,6 +83,16 @@ export const DEFAULT_LIMITS = {
 };
 const RATE_WINDOW_MS = 60_000;
 
+/* Перебор пароля по одному аккаунту. Лимита по IP мало: за одним адресом
+   может стоять вся школа, а за сотней адресов — один переборщик; сама же
+   проверка пароля дешёвая (приложение присылает готовый хеш), поэтому
+   сдерживать перебор нужно по аккаунту. После FAILS_LIMIT промахов вход в
+   этот аккаунт закрывается на остаток окна, удачный вход счётчик снимает.
+   Счётчики живут в памяти: перезапуск хаба их обнуляет — это защита от
+   перебора «сейчас», а не учёт истории. */
+const LOGIN_FAILS_LIMIT = 6;
+const LOGIN_FAILS_WINDOW_MS = 10 * 60_000;
+
 const NAME_RE = /^[A-Za-zА-Яа-яЁё0-9_-]{3,16}$/;
 const RESERVED_NAMES = new Set(['гость', 'guest', 'игрок', 'player']);
 const NAME_RULE =
@@ -359,6 +369,38 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     return user;
   };
 
+  /* ---------- перебор пароля по аккаунту ----------------------- */
+
+  const loginFails = new Map(); // id аккаунта → { count, firstAt }
+
+  /* Сколько ещё ждать. 0 — вход открыт. */
+  const loginBlockLeft = (user) => {
+    const record = loginFails.get(user.id);
+    if (!record) return 0;
+    const left = record.firstAt + LOGIN_FAILS_WINDOW_MS - Date.now();
+    if (left <= 0) {
+      loginFails.delete(user.id);
+      return 0;
+    }
+    return record.count >= LOGIN_FAILS_LIMIT ? left : 0;
+  };
+
+  const noteLoginFail = (user) => {
+    const now = Date.now();
+    const record = loginFails.get(user.id);
+    let count;
+    if (!record || now - record.firstAt > LOGIN_FAILS_WINDOW_MS) {
+      count = 1;
+      loginFails.set(user.id, { count, firstAt: now });
+    } else {
+      record.count += 1;
+      count = record.count;
+    }
+    /* В журнал — только момент закрытия входа: писать каждую неудачную
+       попытку значит залить владельцу журнал чужим перебором. */
+    if (count === LOGIN_FAILS_LIMIT) logEvent('login-blocked', { userId: user.id, name: user.name });
+  };
+
   /* ---------- панель админа ----------------------------------
      Служебные маршруты для владельца игры: список аккаунтов и правки.
      Вход — по ключу администратора в заголовке X-Mir-Admin.
@@ -502,7 +544,19 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
          блокировку, иначе он будет думать, что «пароль слетел». */
       const ban = banOf(user);
       if (ban) throw httpError(403, banMessage(ban));
-      if (body.passHash !== user.passHash) throw httpError(401, 'Неверный пароль.');
+      /* Закрытый на время вход проверяем до сравнения пароля: иначе перебор
+         продолжается, а игрок не понимает, почему верный пароль «не тот». */
+      const blockLeft = loginBlockLeft(user);
+      if (blockLeft)
+        throw httpError(
+          429,
+          `Слишком много неудачных попыток входа. Подождите ${Math.max(1, Math.ceil(blockLeft / 60_000))} мин.`,
+        );
+      if (body.passHash !== user.passHash) {
+        noteLoginFail(user);
+        throw httpError(401, 'Неверный пароль.');
+      }
+      loginFails.delete(user.id);
       const token = hex(16);
       user.tokens = [...(user.tokens ?? []), token].slice(-TOKEN_TOKENS_PER_USER);
       user.online = true;

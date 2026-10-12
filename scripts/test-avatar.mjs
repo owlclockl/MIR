@@ -27,7 +27,7 @@ const { pickAvatarFile } = await import('../src/ui/avatar.js');
 const picture = () =>
   new window.File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'foto.png', { type: 'image/png' });
 
-const fieldInDocument = () => document.body.querySelector('input[type="file"]');
+const fieldInDocument = () => window.document.body.querySelector('input[type="file"]');
 
 let passed = 0;
 let failed = 0;

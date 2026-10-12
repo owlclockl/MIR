@@ -16,6 +16,8 @@ import { defineConfig } from 'vite';
 import {
   appVersion,
   mirBuildInfo,
+  mirFontPreload,
+  mirSecurityPolicy,
   mirServiceWorker,
   mirSingleFile,
 } from './scripts/lib/vite-mir.mjs';
@@ -39,7 +41,12 @@ export default defineConfig(({ mode }) => {
 
     plugins: single
       ? [mirBuildInfo({ version }), mirSingleFile()]
-      : [mirBuildInfo({ version }), mirServiceWorker({ version })],
+      : [
+          mirBuildInfo({ version }),
+          mirFontPreload(),
+          mirSecurityPolicy(),
+          mirServiceWorker({ version }),
+        ],
 
     build: {
       /* Однофайловая сборка пишется в память (write: false), каталог нужен

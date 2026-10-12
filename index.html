@@ -37,12 +37,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Sages" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
-    />
+    <!-- Шрифты интерфейса лежат в репозитории рядом с исходниками и грузятся
+         со своего адреса: офлайн-PWA, mir.html двойным кликом, APK и .exe
+         не имеют сети, а первый экран не должен ждать чужой домен. Сборка
+         добавляет к ним <link rel="preload"> (scripts/lib/vite-mir.mjs). -->
   </head>
   <body>
     <a class="skip-link" href="#main">К главному экрану</a>

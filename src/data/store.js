@@ -744,6 +744,18 @@ const queryHub = () => {
 /** Текущий адрес хаба: '' — тот же, что у страницы; null — хаба нет. */
 export const hubUrl = () => (backend.mode === 'hub' ? remote.getBase() : null);
 
+/* Хаб может пропасть, а страница — остаться: игрок закроет ноутбук, уедет
+   из-за города, хостинг ляжет. Отличить «хаб молчит» от «одна проверка не
+   прошла» можно только по серии: считаем сбои подряд, и после третьего
+   (это пятнадцать секунд опроса) интерфейс говорит, что данные больше не
+   синхронизируются. Один удачный опрос возвращает всё назад. */
+const HUB_FAILS_BEFORE_NOTICE = 3;
+let hubFails = 0;
+let hubUp = true;
+
+/** Отвечает ли хаб на опросы (null — хаб не используется, локальный режим). */
+export const hubReachable = () => (backend.mode === 'hub' ? hubUp : null);
+
 /** Короткое имя хаба для интерфейса. */
 export const hubHost = () => {
   if (backend.mode !== 'hub') return '';
@@ -956,6 +968,9 @@ export const connectHub = async (raw) => {
   remote.applyState({ users: [], requests: [] });
   backend = hubBackend;
   backendInitialized = true;
+  /* Подключились заново — счёт сбоев прошлого соединения к делу не идёт. */
+  hubFails = 0;
+  hubUp = true;
   notify();
   return { url, users: info.users ?? 0 };
 };
@@ -968,6 +983,8 @@ export const disconnectHub = () => {
   remote.applyState({ users: [], requests: [] });
   backend = localBackend;
   backendInitialized = true;
+  hubFails = 0;
+  hubUp = true;
   notify();
   return 'local';
 };
@@ -984,8 +1001,12 @@ export const refreshRemote = async () => {
     const before = remoteSnapshot();
     await remote.fetchState();
     const after = remoteSnapshot();
+    hubFails = 0;
     /* Игнорируем меняющийся heartbeat, но отлавливаем смену idle/offline. */
-    if (before !== after) notify();
+    if (before !== after || !hubUp) {
+      hubUp = true;
+      notify();
+    }
   } catch (error) {
     /* 403 приходит заблокированному аккаунту: сессию убираем, и вход
        объяснит причину. */
@@ -993,7 +1014,15 @@ export const refreshRemote = async () => {
       storage.removeItem(KEYS.session);
       notify();
     }
-    /* Сетевые сбои молча пропускаем — следующий опрос подтянет. */
+    /* Ответ хаба — это его дело, а не сеть: считаем сбоями только те
+       запросы, которые до хаба не дошли или не дождались ответа. */
+    if (!error?.status) {
+      hubFails += 1;
+      if (hubFails >= HUB_FAILS_BEFORE_NOTICE && hubUp) {
+        hubUp = false;
+        notify();
+      }
+    }
   }
 };
 

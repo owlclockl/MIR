@@ -18,7 +18,10 @@
 
    Плюс структурные проверки: одно правило — один раз (иначе поздняя правка
    молча перекрывает раннюю, и «поле 18» неожиданно становится «полем 15»),
-   и :root не переопределяет токены дважды. */
+   :root не переопределяет токены дважды, а точки перелома берутся только из
+   шкалы экранов, описанной в начале src/style.css. Последнее — про порядок:
+   «своё число для одного блока» (813px, 941px) появляется незаметно, а потом
+   никто не может сказать, какие ширины вообще поддерживаются. */
 
 import { readFileSync } from 'node:fs';
 import './lib/root.mjs';
@@ -265,6 +268,32 @@ add(
   tokenDupes.length === 0,
   'токены отступов объявлены по одному разу',
   tokenDupes.length ? `повтор: ${tokenDupes.join(', ')}` : `${tokenSeen.size} токенов`,
+);
+
+/* Точки перелома: те же значения, что в списке в начале src/style.css.
+   Ширины и высота — разные оси: телефон держат по ширине, низкое окно
+   ноутбука — по высоте. */
+const WIDTH_STEPS = [430, 460, 560, 640, 680, 720, 860, 980, 1000, 1180];
+const HEIGHT_STEPS = [620];
+
+const raw = readFileSync('src/style.css', 'utf8');
+const widthHits = [...raw.matchAll(/@media\s*\(\s*max-width:\s*(\d+)px\s*\)/g)].map((m) => Number(m[1]));
+const heightHits = [...raw.matchAll(/@media\s*\(\s*max-height:\s*(\d+)px\s*\)/g)].map((m) => Number(m[1]));
+const minWidthHits = [...raw.matchAll(/@media\s*\(\s*min-width:/g)].length;
+
+const strangeWidths = [...new Set(widthHits.filter((w) => !WIDTH_STEPS.includes(w)))].sort((a, b) => a - b);
+const strangeHeights = [...new Set(heightHits.filter((h) => !HEIGHT_STEPS.includes(h)))].sort((a, b) => a - b);
+add(
+  strangeWidths.length === 0 && strangeHeights.length === 0,
+  'точки перелома — из шкалы экранов',
+  strangeWidths.length || strangeHeights.length
+    ? `вне шкалы: ${[...strangeWidths.map((w) => `${w}px`), ...strangeHeights.map((h) => `${h}px по высоте`)].join(', ')}`
+    : `${widthHits.length} блоков по ширине, ${heightHits.length} по высоте, ступеней: ${WIDTH_STEPS.length}`,
+);
+add(
+  minWidthHits === 0,
+  'адаптив только «сверху вниз» (max-width), без смешанных осей',
+  minWidthHits ? `min-width встречается ${minWidthHits} раз` : 'min-width не используется',
 );
 
 /* ---------- итог ---------------------------------------------------- */
