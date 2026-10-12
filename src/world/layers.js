@@ -52,7 +52,7 @@ import {
 
 import { CHUNK_SX, CHUNK_SZ, blockAt } from './chunk.js';
 
-import { F_BEACH, F_ICE, F_WATER, flowVector, fold } from './field.js';
+import { F_BEACH, F_ICE, F_RIVER, F_WATER, flowVector, fold } from './field.js';
 
 /** Пикселей экрана на блок. Ниже 1 — блоки всё равно не разобрать. */
 
@@ -65,6 +65,12 @@ export const ZOOM_DEFAULT = 3;
 /** Шаг шевронов течения: на каждом блоке стрелки слились бы в кашу. */
 
 const ARROW_STRIDE = 4;
+
+/* Течение рек: световые гребни идут по направлению русла. Период — в блоках,
+   скорость — блоков в секунду; амплитуда мала, чтобы вода не мерцала. */
+const FLOW_PERIOD = 6;
+const FLOW_SPEED = 3.2;
+const FLOW_AMPLITUDE = 0.1;
 
 /** Вершины ищем на этой решётке: чаще — цифры шумят, реже — теряются. */
 
@@ -655,7 +661,7 @@ const tileOfField = (field, i, level) => {
 
 * @param {object} view кадр в блоках
 
-* @param {{level?:number, time?:number, coast?:boolean, arrows?:boolean, labels?:boolean, shade?:boolean}} options
+* @param {{level?:number, time?:number, coast?:boolean, arrows?:boolean, labels?:boolean, shade?:boolean, flow?:boolean}} options
 
 * @returns {{width:number,height:number,data:Uint8ClampedArray,level:number,fromChunks:number,fromField:number,water:number}}
 
@@ -672,7 +678,7 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
 
   const time = options.time ?? 0;
 
-  const show = { coast: true, arrows: true, labels: true, shade: true, ...options };
+  const show = { coast: true, arrows: true, labels: true, shade: true, flow: true, ...options };
 
   const flowPhase = time * 1.7;
 
@@ -823,6 +829,22 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
       }
 
       if (show.shade) rgb = mix(rgb, reliefFactor(field, i, cut, ground));
+
+      /* Вода в русле течёт: гребень проходит по направлению D8 и возвращается,
+         так что русло «дышит» на месте, а не просто мигает. */
+      if (show.flow && isLiquid && (field.flags[i] & F_RIVER) !== 0) {
+        const dir = field.flow[i] & 15;
+
+        if (dir) {
+          const [fx, fz] = flowVector(dir);
+
+          const along = (wx * fx + wz * fz) / FLOW_PERIOD - time * (FLOW_SPEED / FLOW_PERIOD);
+
+          const crest = 0.5 + 0.5 * Math.sin(along * Math.PI * 2);
+
+          rgb = mix(rgb, 1 + FLOW_AMPLITUDE * (crest - 0.5) * 2);
+        }
+      }
 
       /* То, что ушло под плоскость, темнее: тень по глубине среза читается как
 

@@ -166,7 +166,7 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
   let revealTimer = 0;
   if (!reduceMotion) {
     root.classList.add('is-reveal');
-    revealTimer = setTimeout(() => root.classList.remove('is-reveal'), 2600);
+    revealTimer = setTimeout(() => root.classList.remove('is-reveal'), 1900);
   }
 
   const canvas = root.querySelector('[data-role="voxel-canvas"]');
@@ -810,6 +810,11 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
 
   let lastFocus = [view.center[0], view.center[1]];
 
+  const reducedMotion =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+
   const tick = (now) => {
     if (!view.running) return;
 
@@ -870,7 +875,8 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
 
 стоит десятки миллисекунд на полном экране, и греть их впустую нельзя. */
 
-    const animate = view.overlays.arrows && (view.sliceInfo?.water ?? 0) > 0;
+    /* Течение рек идёт всегда, когда в кадре есть вода; при reduce-motion — статичная картинка. */
+    const animate = !reducedMotion && (view.sliceInfo?.water ?? 0) > 0;
 
     if (!view.dirty && gen.generated === 0 && !(animate && now - paintAt >= PAINT_MS)) return;
 

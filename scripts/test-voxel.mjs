@@ -842,6 +842,48 @@ if (arrowCell) {
   for (let i = 0; i < pulse.data.length; i += 1) if (pulse.data[i] !== arrowOn.data[i]) pulseDiff += 1;
 
   add(pulseDiff > 0, 'течение анимировано: кадр с другой фазой отличается', `${pulseDiff} байт`);
+
+/* Течение рек: вода в русле дышит по времени, суша и без течения — нет. */
+const riverBase = { level: wetLevel, shade: false, coast: false, arrows: false, labels: false };
+
+const riverA = buildSlice(field, colors, null, wetView, { ...riverBase, time: 0 });
+
+const riverB = buildSlice(field, colors, null, wetView, { ...riverBase, time: 1.3 });
+
+const riverOff = { ...riverBase, flow: false };
+
+const offA = buildSlice(field, colors, null, wetView, { ...riverOff, time: 0 });
+
+const offB = buildSlice(field, colors, null, wetView, { ...riverOff, time: 1.3 });
+
+let riverDiff = 0;
+
+let landDiff = 0;
+
+for (let z = 0; z < wetView.cellsZ; z += 1) {
+  for (let x = 0; x < wetView.cellsX; x += 1) {
+    const i = (z * wetView.cellsX + x) * 4;
+
+    const changed = riverA.data[i] !== riverB.data[i] || riverA.data[i + 1] !== riverB.data[i + 1] || riverA.data[i + 2] !== riverB.data[i + 2];
+
+    if (!changed) continue;
+
+    const { u, v } = fold(field, wetView.x0 + x, wetView.z0 + z);
+
+    if (coveredAt(v * field.width + u, wetLevel) || (field.flags[v * field.width + u] & F_WATER) !== 0) riverDiff += 1;
+    else landDiff += 1;
+  }
+}
+
+let offDiff = 0;
+
+for (let i = 0; i < offA.data.length; i += 1) if (offA.data[i] !== offB.data[i]) offDiff += 1;
+
+add(riverDiff > 0, 'реки текут: кадры разного времени отличаются на воде', `${riverDiff} пикселей воды`);
+
+add(landDiff === 0, 'течение не трогает сушу', `${landDiff} пикселей суши`);
+
+add(offDiff === 0, 'без течения кадры одинаковы', `${offDiff} байт`);
 }
 
 /* Отметки высот: подписываем локальные вершины, и только над водой. */
