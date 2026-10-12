@@ -61,7 +61,7 @@ const restrictEditor = (frame) => {
  * @param {{ restricted?: boolean }} [options]
  *   restricted — панели правки скрыты (игрок). События хода генерации —
  *   через attachGenerationStage (generation-stage.js), см. синхронизацию лобби.
- * Сцена создания карты подключается всегда — и в одиночной игре, и в лобби.
+ * Анимация создания карты подключается всегда — и в одиночной игре, и в лобби.
  */
 export const createEditorFrame = ({ seed, width, height }, { restricted = false } = {}) => {
   const query = editorQuery({ seed, width, height });
@@ -82,7 +82,6 @@ export const createEditorFrame = ({ seed, width, height }, { restricted = false 
   frame.addEventListener('load', () => {
     if (restricted) restrictEditor(frame);
   });
-  /* Основной визуал генерации — сцена над iframe; документ Azgaar свою вуаль не показывает. */
-  attachGenerationStage(frame, { scene: true });
+  attachGenerationStage(frame);
   return frame;
 };

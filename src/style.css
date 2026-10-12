@@ -4916,234 +4916,15 @@ button.admin-row:hover {
   margin-left: var(--sp-12);
 }
 
-/* ---------- создание карты: сцена поверх редактора ---------------- */
-
-/* Основной визуал генерации (generation-scene.js). Накладка закрывает документ
-   Azgaar, пока он строит мир: холст рисует рельеф, реки, государства и города
-   по мере готовности данных, а панель внизу называет главу и шаг конвейера.
-   Фон и палитра — из брендбука: лесная ночь, шалфей, старинное золото. */
-.world-gen-scene {
+.world-editor-cover {
   position: absolute;
   inset: 0;
-  /* Выше вида планеты (z-index 3): пока карта считается, главный визуал — сцена. */
-  z-index: 4;
-  overflow: hidden;
-  background: radial-gradient(ellipse at 50% 42%, #14201e 0%, #0d1415 55%, var(--bg) 100%);
-  color: var(--text);
-  transition: opacity 0.7s ease;
-  user-select: none;
-}
-
-.world-gen-scene.is-leaving {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.world-gen-scene__canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.world-gen-scene__shade {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(to bottom, rgba(8, 13, 14, 0.78), transparent 22%, transparent 58%, rgba(8, 13, 14, 0.94)),
-    radial-gradient(ellipse at 50% 42%, transparent 46%, rgba(8, 13, 14, 0.7) 100%);
-}
-
-.world-gen-scene__top {
-  position: absolute;
-  top: var(--sp-24);
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-8);
-  pointer-events: none;
-}
-
-/* Печать появляется один раз и замирает: постоянные анимации на время
-   расчёта отнимали бы процессор у самой генерации. */
-.world-gen-scene__sigil svg {
-  width: 46px;
-  height: 46px;
-  color: var(--accent);
-  animation: world-gen-sigil-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-.world-gen-scene__sigil.is-done svg {
-  color: var(--gold, #d8c184);
-  filter: drop-shadow(0 0 10px rgba(216, 193, 132, 0.45));
-  transition: color 0.6s ease, filter 0.6s ease;
-}
-
-.world-gen-scene__brand {
-  font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-  opacity: 0.8;
-}
-
-@keyframes world-gen-sigil-in {
-  from {
-    opacity: 0;
-    transform: scale(0.82) rotate(-45deg);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.world-gen-scene__panel {
-  position: absolute;
-  left: 50%;
-  bottom: 9%;
-  width: min(460px, 86%);
-  transform: translateX(-50%);
+  z-index: 2;
   display: grid;
-  justify-items: center;
-  gap: var(--sp-8);
-  text-align: center;
-}
-
-.world-gen-scene__eyebrow {
-  margin: 0;
-  font-size: 11px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: #91a39b;
-}
-
-.world-gen-scene__chapter {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(24px, 3.4vw, 34px);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text);
-}
-
-.world-gen-scene__chapter.is-entering {
-  animation: world-gen-chapter-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-@keyframes world-gen-chapter-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-    letter-spacing: 0.12em;
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.world-gen-scene__step {
-  margin: 0;
-  min-height: 1.4em;
-  font-size: 13px;
-  color: var(--accent);
-}
-
-.world-gen-scene__chapters {
-  margin: var(--sp-8) 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--sp-8) var(--sp-16);
-}
-
-.world-gen-scene__chapters li {
-  position: relative;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: rgba(139, 139, 148, 0.7);
-  transition: color 0.4s ease;
-}
-
-.world-gen-scene__chapters li::before {
-  content: '';
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  transform: translateY(-1px);
-}
-
-.world-gen-scene__chapters li.is-done {
+  place-items: center;
+  background: radial-gradient(ellipse at center, #16221f 0%, var(--bg) 72%);
   color: var(--text-soft);
-}
-
-.world-gen-scene__chapters li.is-done::before {
-  background: currentColor;
-}
-
-.world-gen-scene__chapters li.is-current {
-  color: var(--gold, #d8c184);
-}
-
-.world-gen-scene__chapters li.is-current::before {
-  background: var(--gold, #d8c184);
-  box-shadow: 0 0 8px rgba(216, 193, 132, 0.7);
-}
-
-.world-gen-scene__track {
-  width: 100%;
-  height: 2px;
-  margin-top: var(--sp-8);
-  background: rgba(194, 217, 201, 0.14);
-  overflow: hidden;
-}
-
-.world-gen-scene__fill {
-  display: block;
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(90deg, rgba(216, 193, 132, 0.25), rgba(216, 193, 132, 0.95));
-  transform-origin: 0 50%;
-  transform: scaleX(0);
-  transition: transform 0.2s ease-out;
-}
-
-.world-gen-scene__count {
-  margin: 0;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: rgba(194, 217, 201, 0.6);
-  font-variant-numeric: tabular-nums;
-}
-
-.world-gen-scene.is-finished .world-gen-scene__chapter {
-  color: var(--gold, #d8c184);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .world-gen-scene,
-  .world-gen-scene__fill,
-  .world-gen-scene__chapters li,
-  .world-gen-scene__sigil.is-done svg {
-    transition: none;
-  }
-
-  .world-gen-scene__sigil svg,
-  .world-gen-scene__chapter.is-entering {
-    animation: none;
-  }
+  pointer-events: auto;
 }
 
 /* ---------- карта: живой предпросмотр правок мастера ---------- */
@@ -5236,6 +5017,24 @@ button.admin-row:hover {
   }
 }
 
+
+.world-editor-cover svg {
+  width: 44px;
+  height: 44px;
+  animation: world-editor-cover-spin 7s linear infinite;
+}
+
+@keyframes world-editor-cover-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-editor-cover svg {
+    animation: none;
+  }
+}
 
 .world-attribution {
   flex: none;
@@ -5363,12 +5162,6 @@ button.admin-row:hover {
 
 .planet-view__canvas.is-dragging {
   cursor: grabbing;
-}
-
-/* display: grid ниже перебивал бы атрибут hidden (UA-правило display: none),
-   и вуаль «Считаю мир…» висела бы поверх холста всегда. */
-.planet-view__veil[hidden] {
-  display: none;
 }
 
 .planet-view__veil {

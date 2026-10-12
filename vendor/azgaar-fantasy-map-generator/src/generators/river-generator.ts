@@ -1,5 +1,5 @@
 import Alea from "alea";
-import { curveBasis, curveCatmullRom, line, mean, sum } from "d3";
+import { curveBasis, curveCatmullRom, line, mean, min, sum } from "d3";
 import { replaceWholeWord } from "@/utils/languageUtils";
 import { requireName } from "@/utils/validationUtils";
 import { each, rn, round, rw } from "../utils";
@@ -9,18 +9,6 @@ import type { Point } from "./voronoi";
 
 export const MIN_FLUX_TO_FORM_RIVER = 30;
 export const MIN_NAVIGABLE_FLUX = 100;
-
-/* Minimum over a list of cell ids, exactly like d3.min(ids.map(value)): null/undefined and NaN
-   are skipped and an empty list gives undefined. No intermediate array: resolveDepressions calls
-   this hundreds of thousands of times, and map + min on every call was a large share of its cost. */
-const minWith = (ids: ArrayLike<number>, value: (id: number) => number | undefined): number | undefined => {
-  let min: number | undefined;
-  for (let k = 0; k < ids.length; k++) {
-    const v = value(ids[k]);
-    if (v != null && (min! > v || (min === undefined && v >= v))) min = v;
-  }
-  return min;
-};
 
 export interface River {
   i: number; // river id
@@ -468,32 +456,6 @@ class RiverModule {
     const land = cells.i.filter((i: number) => h[i] >= 20 && !cells.b[i]); // exclude near-border cells
     land.sort((a: number, b: number) => h[a] - h[b]); // lowest cells go first
 
-    /* A land cell's check reads only its own height and the heights of its neighbours (lake
-       cells report the lake's height). Once a pass has found nothing to raise for a cell, that
-       cell stays idle until something it reads changes. So each pass visits only the cells
-       marked dirty, which gives exactly the same result as visiting all land every time, in the
-       same order, while most of the 250 passes now touch a small fraction of the land. */
-    const dirty = new Uint8Array(cells.c.length);
-    const reverse: number[][] = Array.from(cells.c, () => []); // who reads a given cell
-    cells.c.forEach((neighbours: number[], cell: number) => {
-      for (const n of neighbours) reverse[n].push(cell);
-    });
-    const markReaders = (cell: number) => {
-      dirty[cell] = 1;
-      for (const reader of reverse[cell]) dirty[reader] = 1;
-    };
-    const lakeCells = new Map<object, number[]>(); // cells whose height is their lake's height
-    for (const lake of lakes) lakeCells.set(lake, []);
-    cells.i.forEach((cell: number) => {
-      const feature = features[cells.f[cell]];
-      if (feature?.type === "lake") lakeCells.get(feature)?.push(cell);
-    });
-    const setLakeHeight = (lake: { height: number }, value: number) => {
-      lake.height = value;
-      for (const cell of lakeCells.get(lake) ?? []) markReaders(cell);
-    };
-    for (const i of land) dirty[i] = 1;
-
     const progress = [];
     let depressions = Infinity;
     let prevDepressions = null;
@@ -510,34 +472,29 @@ class RiverModule {
       if (iteration < checkLakeMaxIteration) {
         for (const l of lakes) {
           if (l.closed) continue;
-          const minHeight = minWith(l.shoreline, s => h[s]) as number;
+          const minHeight = min(l.shoreline.map((s: number) => h[s])) as number;
           if (minHeight >= 100 || l.height > minHeight) continue;
 
           if (iteration > elevateLakeMaxIteration) {
             l.shoreline.forEach((i: number) => {
               h[i] = cells.h[i];
-              markReaders(i);
             });
-            setLakeHeight(l, (minWith(l.shoreline, s => h[s]) as number) - 1);
+            l.height = (min(l.shoreline.map((s: number) => h[s])) as number) - 1;
             l.closed = true;
             continue;
           }
 
           depressions++;
-          setLakeHeight(l, (minHeight as number) + 0.2);
+          l.height = (minHeight as number) + 0.2;
         }
       }
 
       for (const i of land) {
-        if (!dirty[i]) continue; // nothing it reads has changed since its last check
-        dirty[i] = 0;
-
-        const minHeight = minWith(cells.c[i], c => height(c)) as number;
+        const minHeight = min(cells.c[i].map((c: number) => height(c))) as number;
         if (minHeight >= 100 || h[i] > minHeight) continue;
 
         depressions++;
         h[i] = minHeight + 0.1;
-        markReaders(i);
       }
 
       prevDepressions !== null && progress.push(depressions - prevDepressions);

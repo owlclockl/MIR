@@ -177,11 +177,6 @@ class GridModule {
     const h = Uint8Array.from(cells.h); // lakes form in turn: an earlier one is the water a later check can reach
     const lakes: number[][] = [];
 
-    // "checked" for each flood fill: a cell is visited when its stamp equals the fill's number.
-    // One typed array shared by all fills replaces a fresh sparse array per candidate cell.
-    const visitedStamp = new Uint32Array(c.length);
-    let fill = 0;
-
     for (const i of cells.i) {
       if (b[i] || h[i] < SEA_LEVEL) continue;
       if (h[i] > (min(c[i].map(neibId => h[neibId])) as number)) continue;
@@ -189,22 +184,22 @@ class GridModule {
       let deep = true;
       const threshold = h[i] + elevationLimit;
       const queue = [i];
-      fill++;
-      visitedStamp[i] = fill;
+      const checked: boolean[] = [];
+      checked[i] = true;
 
       // check if elevated cell can potentially pour to water
       while (deep && queue.length) {
         const q = queue.pop() as number;
 
         for (const n of c[q]) {
-          if (visitedStamp[n] === fill) continue;
+          if (checked[n]) continue;
           if (h[n] >= threshold) continue;
           if (h[n] < SEA_LEVEL) {
             deep = false;
             break;
           }
 
-          visitedStamp[n] = fill;
+          checked[n] = true;
           queue.push(n);
         }
       }

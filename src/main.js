@@ -2267,7 +2267,7 @@ const mountWorldEditor = () => {
 };
 
 /* Карта планеты — надстройка над экраном карты: тот же хост, что у редактора,
-   но вместо iframe документ Azgaar скрыт, а поверх лежит холст со своим миром.
+   но вместоiframe документ Azgaar скрыт, а поверх лежит холст со своим миром.
    Страницу при переключении не перерисовываем: это создало бы новый iframe и
    запустило генерацию Azgaar заново. Поэтому только класс на .world-app и
    монтирование/снятие вида. */
@@ -2336,7 +2336,6 @@ const enterWorldMap = (slot, config) => {
   session.importToSlot = null;
   session.screen = 'map';
   dropPlanetMap();
-  session.planet = true;
   renderWorldPage();
 };
 
@@ -2365,7 +2364,6 @@ const openWorldSlot = (role, index) => {
   session.importToSlot = null;
   session.config = store.normalizeWorldConfig(entry);
   session.screen = 'map';
-  session.planet = true;
   renderWorldPage();
 };
 
@@ -3615,7 +3613,6 @@ const openLobbyMap = (summary, config, { fresh }) => {
   session.config = config;
   session.leaveArmed = false;
   session.screen = 'map';
-  session.planet = true;
   renderWorldPage();
 };
 
@@ -4435,10 +4432,10 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: редактор Azgaar → карта планеты (основной вид) → страница игры. */
-    if (ui.world.screen === 'map' && !ui.world.planet) {
+    /* Ступеньки: карта планеты → карта → страница игры. */
+    if (ui.world.screen === 'map' && ui.world.planet) {
       event.preventDefault();
-      setPlanetMap(true);
+      setPlanetMap(false);
       return;
     }
     event.preventDefault();

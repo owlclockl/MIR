@@ -9,14 +9,6 @@ import type { Label } from "./labels-generator";
 import type { River } from "./river-generator";
 import type { Point } from "./voronoi";
 
-/* Key of a directed cell pair in `connections`. Route search asks about every edge it relaxes,
-   and building and hashing an "a-b" string there was a large share of the routes step, so cell
-   pairs of numbers get a numeric key instead (cell ids are small non-negative integers, so it is
-   unique). Anything else, such as the undefined id after the last cell of a path, keeps the string
-   key, which is what the map has always stored for it. */
-const edgeKey = (from: number, to: number): number | string =>
-  typeof from === "number" && typeof to === "number" ? from * 4294967296 + to : `${from}-${to}`;
-
 const ROUTES_SHARP_ANGLE = 135;
 const ROUTES_VERY_SHARP_ANGLE = 115;
 
@@ -205,7 +197,7 @@ type RiverRun = {
 };
 
 class RoutesModule {
-  private connections: Map<number | string, boolean> = new Map();
+  private connections: Map<string, boolean> = new Map();
   private riverEdges: Map<number, Map<number, RiverEdge>> = new Map();
   private riversById: Map<number, River> = new Map();
   private riverGeometryCache: Map<number, { points: Point[]; anchorIndices: number[] }> = new Map();
@@ -310,7 +302,7 @@ class RoutesModule {
     const distanceCost = distanceSquared(pack.cells.p[current], pack.cells.p[next]);
     const habitabilityModifier = 1 + Math.max(100 - habitability, 0) / 1000; // [1, 1.1];
     const heightModifier = 1 + Math.max(pack.cells.h[next] - 25, 25) / 25; // [1, 3];
-    const connectionModifier = this.connections.has(edgeKey(current, next)) ? 0.5 : 1;
+    const connectionModifier = this.connections.has(`${current}-${next}`) ? 0.5 : 1;
     const burgModifier = pack.cells.burg[next] ? 1 : 3;
 
     const pathCost = distanceCost * habitabilityModifier * heightModifier * connectionModifier * burgModifier;
@@ -319,7 +311,7 @@ class RoutesModule {
 
   getWaterPathCost(current: number, next: number) {
     const { h, r, p, t, g } = pack.cells;
-    const connectionModifier = this.connections.has(edgeKey(current, next)) ? 0.5 : 1;
+    const connectionModifier = this.connections.has(`${current}-${next}`) ? 0.5 : 1;
 
     if (h[next] >= 20) {
       // land cell: only navigable via a river, and only along the actual river course
@@ -359,7 +351,7 @@ class RoutesModule {
       const cellId = pathCells[i];
       const nextCellId = pathCells[i + 1];
       const isConnected =
-        this.connections.has(edgeKey(cellId, nextCellId)) || this.connections.has(edgeKey(nextCellId, cellId));
+        this.connections.has(`${cellId}-${nextCellId}`) || this.connections.has(`${nextCellId}-${cellId}`);
 
       if (isConnected) {
         if (segment.length) {
@@ -449,8 +441,8 @@ class RoutesModule {
       const cellId = segment[i];
       const nextCellId = segment[i + 1];
       if (nextCellId) {
-        this.connections.set(edgeKey(cellId, nextCellId), true);
-        this.connections.set(edgeKey(nextCellId, cellId), true);
+        this.connections.set(`${cellId}-${nextCellId}`, true);
+        this.connections.set(`${nextCellId}-${cellId}`, true);
       }
     }
   }
@@ -1062,8 +1054,8 @@ class RoutesModule {
       for (let i = 0; i < route.points.length - 1; i++) {
         const cellId = route.points[i][2];
         const nextCellId = route.points[i + 1][2];
-        this.connections.set(edgeKey(cellId, nextCellId), true);
-        this.connections.set(edgeKey(nextCellId, cellId), true);
+        this.connections.set(`${cellId}-${nextCellId}`, true);
+        this.connections.set(`${nextCellId}-${cellId}`, true);
       }
     }
   }

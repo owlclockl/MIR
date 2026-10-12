@@ -1,0 +1,35 @@
+import{H as e,P as t,U as n,nr as r,r as i}from"./utils-BXzQ0Tym.js";import{Z as a}from"./layers-Cld3ceTu.js";import{i as o}from"./emblems-generator-BdUAGZhv.js";import{i as s}from"./tooltips-P6FAPAdd.js";import{t as c}from"./state-B2hBYDzv.js";import{i as l,l as u}from"./dialog-helpers-CJ5pbzaw.js";import{i as d,r as f}from"./index-C_h8P6M7.js";import{a as p,i as m,n as h,r as g}from"./table-XWt9IQic.js";var _=0,v,y=`marketDeals`,b={my:`right top`,at:`right bottom+10`,of:`#marketOverview`,collision:`fit`},x=[{key:`icon`,width:`2em`,permanent:!0},{key:`good`,label:`Товар`,width:`6.8em`,permanent:!0,sortBy:e=>Goods.get(e.good)?.name??``,sortType:`alpha`},{key:`direction`,label:`Тип`,width:`5em`,sortBy:e=>A(e,_),sortType:`alpha`},{key:`counterparty`,label:`Контрагент`,width:`8em`,sortBy:e=>N(e)?.name??``,sortType:`alpha`},{key:`units`,label:`Единицы`,width:`5em`,sortBy:e=>e.units},{key:`income`,label:`Доход`,width:`5em`,permanent:!0,sortBy:e=>P(e,_)}],S=g({getData:E,onUpdate:D});function C(e){o.retry(`goods`);let n=Markets.get(e);if(!n){s(`Некорректный рынок. Выбранного рынка нет`,!0,`error`,5e3);return}v=c.get(y,`filters`,()=>({scope:`all`})),[`all`,`local`,`global`].includes(v.scope)||(v.scope=`all`),c.set(y,`filters`,v),_=e,w(),t(`marketDealsFilter`).value=v.scope,S.reset(),$(`#${y}`).dialog({title:`${Markets.getName(n)} Market Deals`,position:b,close:T})}function w(){l(y);let e=`<div id="${y}" class="dialog stable editorDialog">
+      <div>
+        ${m({dialogId:y,columns:x})}
+        <div id="marketDealsBody" class="table" style="max-height:30em"></div>
+
+        <div id="marketDealsFooter" class="totalLine">
+          <div style="margin-left: 5px" data-tip="Число сделок">Deals: <span id="marketDealsFooterDeals">0</span></div>
+          <div data-col="income" style="margin-left: 12px" data-tip="Чистый поток этого рынка">Чистый поток: <span id="marketDealsFooterNet">🟡 0</span></div>
+        </div>
+
+        <div id="marketDealsBottom">
+          <button id="marketDealsRefresh" data-tip="Обновить экран сделок" class="icon-cw"></button>
+          <button id="marketDealsExport" data-tip="Скачать данные торговых сделок в текстовый файл (.csv)" class="icon-download"></button>
+          <select id="marketDealsFilter" data-tip="Фильтр сделок по области" style="margin-left: 8px">
+            <option value="all">Все</option>
+            <option value="local">Местный</option>
+            <option value="global">Весь мир</option>
+          </select>
+        </div>
+      </div>
+  </div>`;t(`dialogs`).insertAdjacentHTML(`beforeend`,e),f(y,S.reset),h({dialogId:y,columns:x,onUpdate:()=>u(y,{width:`fit-content`,position:b})}),t(`marketDealsRefresh`).addEventListener(`click`,S.refresh),t(`marketDealsExport`).addEventListener(`click`,F),t(`marketDealsBody`).addEventListener(`click`,e=>{let t=e.target.closest(`.marketDealParty`)?.closest(`.marketDeal`)?.dataset.id,n=pack.deals.find(e=>e.i===Number(t));if(!n)return;let r=N(n);r&&zoomTo(r.x,r.y,8,2e3)}),t(`marketDealsFilter`).addEventListener(`change`,e=>{v.scope=e.target.value,c.set(y,`filters`,v),S.reset()})}function T(){$(`#${y}`).dialog(`destroy`),t(y).remove()}function E(){return Markets.get(_)?d(y,O(pack.deals,_).filter(e=>{if(v.scope===`all`)return!0;let t=j(e,_);return v.scope===`local`?t.type===`burg`:t.type===`market`}),x):(s(`Некорректный рынок. Выбранного рынка нет`,!0,`error`,5e3),[])}function D(e){let n=e.rows.map(M).join(``),r=e.all.reduce((e,t)=>e+P(t,_),0);t(`marketDealsBody`).innerHTML=n||`No market deals recorded`,t(`marketDealsFooterDeals`).innerHTML=String(e.all.length),t(`marketDealsFooterNet`).innerHTML=i(r),p(t(`marketDealsFooter`),e,S.goto),u(y,{width:`fit-content`,position:b})}function O(e,t){return e.filter(e=>e.sellerType===`market`&&e.seller===t||e.buyerType===`market`&&e.buyer===t)}function k(e,t){return e.sellerType===`market`&&e.seller===t}function A(e,t){return k(e,t)?`вывоз`:`in`}function j(e,t){return k(e,t)?{id:e.buyer,type:e.buyerType}:{id:e.seller,type:e.sellerType}}function M(e){let t=Goods.get(e.good);if(!t)return``;let n=P(e,_),o=N(e),s=j(e,_),c=A(e,_),l=n>=0?`#2a6`:`#c44`,u=n>=0?`#dff0d8`:`#f2dede`;return`<div class="states marketDeal" data-id="${e.i}" data-good="${t.name}" data-direction="${c}" data-units="${r(e.units,2)}" data-counterparty="${s.type}_${o?.name}" data-income="${n}">
+      <svg data-col="icon" data-tip="Иконка товара" width="1.3em" height="1.3em" class="goodIcon">
+        ${a(t)}
+      </svg>
+      <div data-col="good" data-tip="Название товара" class="goodName">${t.name}</div>
+      <div data-col="direction"><span class="marketBadge" style="background:${u}; color:${l}">${c.toUpperCase()}</span></div>
+      <div data-col="counterparty" class="marketDealParty pointer" data-tip="Кликните, чтобы приблизить">
+        <div class="${s.type===`burg`?`icon-dot-circled`:`icon-store`}" style="display:inline-block; width: 0.8em; ${s.type===`market`?`font-size: 0.85em;`:``}"></div>
+        <div style="display:inline-block; width: 6.8em;">${o?.name}</div>
+      </div>
+      <div data-col="units" class="marketDealUnits">${r(e.units,2)}</div>
+      <div data-col="income" class="marketDealIncome" style="color:${l}">${i(n)}</div>
+    </div>`}function N(e){let t=j(e,_),n=t.type===`burg`?t.id:Markets.get(t.id)?.centerBurgId;return n&&pack.burgs[n]||null}function P(e,t){let n=r(e.units*e.price,2);return k(e,t)?n:-n}function F(){if(!Markets.get(_))return;let t=O(pack.deals,_),i=`Id,Good,Type,Client,Units,Price,Net
+`;for(let e of t){let t=Goods.get(e.good);t&&(i+=[e.i,t.name,A(e,_),N(e)?.name??``,r(e.units,2),r(e.price,2),r(P(e,_),2)].join(`,`),i+=`
+`)}e(i,`${n(`Market_${_}_Deals`)}.csv`)}var I={open:C};export{I as MarketDealsOverview};

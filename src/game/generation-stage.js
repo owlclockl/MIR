@@ -12,16 +12,10 @@
      подписи не успели бы отрисоваться: шаги синхронные;
    • по завершении проигрываем появление карты.
 
-   Основной визуал — сцена generation-scene.js в хосте iframe (над ним): она
-   рисует мир по мере шагов. Внутренняя вуаль документа Azgaar в этом случае
-   не показывается, остаётся только появление карты.
-
    Мы не меняем сами шаги и результат: только наблюдаем за ними.
    Событие с номером шага уходит в onEvent — его берёт синхронизация
    лобби, чтобы показать игрокам прогресс мастера.
    =========================================================== */
-
-import { mountGenerationScene } from './generation-scene.js';
 
 const PATCHED = '__mirStage';
 const VEIL_ID = 'mir-gen-veil';
@@ -142,10 +136,8 @@ const hideVeil = (doc, { reveal }) => {
   map.addEventListener('animationend', () => map.classList.remove('mir-reveal'), { once: true });
 };
 
-/* Подмена конвейера в окне iframe. Возвращает true, если подмена прошла.
-   `useVeil` — нужна ли внутренняя вуаль на время генерации (нет, если поверх
-   iframe показана сцена). */
-const patchPipeline = (win, onEvent, useVeil) => {
+/* Подмена конвейера в окне iframe. Возвращает true, если подмена прошла. */
+const patchPipeline = (win, onEvent) => {
   const pipeline = win.GenerationPipeline;
   if (!pipeline || typeof pipeline.run !== 'function' || pipeline[PATCHED]) return false;
   pipeline[PATCHED] = true;
@@ -161,7 +153,7 @@ const patchPipeline = (win, onEvent, useVeil) => {
     const original = step.run;
     step.run = async (context) => {
       const label = generationStepLabel(step.id);
-      if (useVeil()) showVeil(doc, { stage: label, count: `${index + 1} / ${total}`, ratio: index / total });
+      showVeil(doc, { stage: label, count: `${index + 1} / ${total}`, ratio: index / total });
       onEvent({ type: 'step', index, total, id: step.id, label });
       await pause();
       return original(context);
@@ -171,7 +163,7 @@ const patchPipeline = (win, onEvent, useVeil) => {
   const originalRun = pipeline.run;
   pipeline.run = function runWithStage(...args) {
     onEvent({ type: 'start', total });
-    if (useVeil()) showVeil(doc, { stage: 'Подготовка', count: `0 / ${total}`, ratio: 0 });
+    showVeil(doc, { stage: 'Подготовка', count: `0 / ${total}`, ratio: 0 });
     return originalRun.apply(this, args).then(
       (value) => {
         /* Карта в редакторе появляется после конвейера (registerMap и
@@ -207,41 +199,36 @@ export const injectGenerationHook = (html) => {
   return html.slice(0, at) + GENERATION_HOOK + html.slice(at);
 };
 
-/* Сцена создания карты ждёт первого события, но не дольше этого срока: если
-   конвейер так и не начался, сцена уходит и открывается документ Azgaar. */
-const SCENE_DEADLINE_MS = 30_000;
+const COVER_CLASS = 'world-editor-cover';
+/* Накладка на хосте iframe: закрывает документ Azgaar, пока он поднимается
+   и до первого шага генерации. Снимается, как только пришло первое событие. */
+const COVER_DEADLINE_MS = 30_000;
+
+const showCover = (frame) => {
+  const host = frame.parentElement;
+  if (!host) return null;
+  const cover = document.createElement('div');
+  cover.className = COVER_CLASS;
+  cover.setAttribute('role', 'status');
+  cover.setAttribute('aria-label', 'Подготовка карты');
+  cover.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/></svg>';
+  host.append(cover);
+  return cover;
+};
 
 /* Состояние подключения на каждый iframe. Слушателей может быть несколько:
    анимация в createEditorFrame и синхронизация лобби подписываются
    независимо, а конвейер подменяется один раз. */
 const STAGE = new WeakMap();
 
-const ensureScene = (state, frame) => {
-  if (state.scene || !state.wantScene) return state.scene;
-  state.scene = mountGenerationScene(frame);
-  return state.scene;
+const removeCover = (state) => {
+  if (!state.cover) return;
+  state.cover.remove();
+  state.cover = null;
 };
 
-const disposeScene = (state) => {
-  state.scene?.dispose();
-  state.scene = null;
-};
-
-const emitStage = (state, frame, event) => {
-  if (state.wantScene) {
-    if (event.type === 'start') {
-      ensureScene(state, frame)?.start(event);
-      state.started = true;
-    } else if (event.type === 'step') {
-      ensureScene(state, frame)?.step(event);
-    } else if (event.type === 'done') {
-      // Сцена сама проигрывает финал и удаляет себя; следующий запуск создаст новую.
-      state.scene?.finish();
-      state.scene = null;
-    } else if (event.type === 'error') {
-      disposeScene(state);
-    }
-  }
+const emitStage = (state, event) => {
+  if (event.type === 'start' || event.type === 'step' || event.type === 'error') removeCover(state);
   for (const listener of [...state.listeners]) {
     try {
       listener(event);
@@ -251,14 +238,13 @@ const emitStage = (state, frame, event) => {
   }
 };
 
-const startStage = (frame, { scene }) => {
-  const state = { listeners: new Set(), watching: null, timer: 0, scene: null, wantScene: scene, started: false };
+const startStage = (frame) => {
+  const state = { listeners: new Set(), watching: null, timer: 0, cover: null, coverTimer: 0 };
   const deadline = Date.now() + ATTACH_DEADLINE_MS;
 
   const tryWindow = (win) => {
     if (!win || win === state.watching || !win.GenerationPipeline) return false;
-    const useVeil = () => !state.wantScene;
-    if (patchPipeline(win, (event) => emitStage(state, frame, event), useVeil)) {
+    if (patchPipeline(win, (event) => emitStage(state, event))) {
       state.watching = win;
       return true;
     }
@@ -277,15 +263,11 @@ const startStage = (frame, { scene }) => {
   /* Документ могли заменить (srcdoc → загрузка): подключаемся к новому окну. */
   frame.addEventListener('load', () => tryWindow(frame.contentWindow));
 
-  /* Сцена появляется, когда iframe уже вставлен в страницу. */
-  if (scene) {
-    setTimeout(() => {
-      ensureScene(state, frame);
-      setTimeout(() => {
-        if (!state.started) disposeScene(state);
-      }, SCENE_DEADLINE_MS);
-    }, 0);
-  }
+  /* Накладка появляется, когда iframe уже вставлен в страницу. */
+  state.coverTimer = setTimeout(() => {
+    state.cover = showCover(frame);
+    setTimeout(() => removeCover(state), COVER_DEADLINE_MS);
+  }, 0);
 
   poll();
   return state;
@@ -300,19 +282,15 @@ const startStage = (frame, { scene }) => {
  * только появляется конвейер) и опрос окна — для документа по адресу /fmg/.
  *
  * @param {HTMLIFrameElement} frame
- * @param {{ onEvent?: (event: object) => void, scene?: boolean }} [options]
- *   scene — показывать поверх iframe сцену создания карты (основной визуал).
+ * @param {{ onEvent?: (event: object) => void }} [options]
  *   Событие: { type: 'start', total } | { type: 'step', index, total, id, label }
  *          | { type: 'done' } | { type: 'error', message }
  */
-export const attachGenerationStage = (frame, { onEvent, scene = false } = {}) => {
+export const attachGenerationStage = (frame, { onEvent } = {}) => {
   let state = STAGE.get(frame);
   if (!state) {
-    state = startStage(frame, { scene });
+    state = startStage(frame);
     STAGE.set(frame, state);
-  } else if (scene && !state.wantScene) {
-    state.wantScene = true;
-    ensureScene(state, frame);
   }
   if (!onEvent) return () => {};
   state.listeners.add(onEvent);
