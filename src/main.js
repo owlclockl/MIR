@@ -2356,8 +2356,9 @@ const enterWorldMap = (slot, config) => {
   session.tab = slot.role;
   session.slot = { role: slot.role, index: slot.index };
   session.importToSlot = null;
-  session.screen = 'map';
   dropWorldVoxel();
+  session.screen = 'map';
+  session.voxel = true; // карта блоков — основной вид карты
   renderWorldPage();
 };
 
@@ -2385,7 +2386,9 @@ const openWorldSlot = (role, index) => {
   session.slot = { role, index };
   session.importToSlot = null;
   session.config = store.normalizeWorldConfig(entry);
+  dropWorldVoxel();
   session.screen = 'map';
+  session.voxel = true; // карта блоков — основной вид карты
   renderWorldPage();
 };
 
@@ -3634,7 +3637,9 @@ const openLobbyMap = (summary, config, { fresh }) => {
   session.importToSlot = null;
   session.config = config;
   session.leaveArmed = false;
+  dropWorldVoxel();
   session.screen = 'map';
+  session.voxel = true; // карта блоков — основной вид карты
   renderWorldPage();
 };
 

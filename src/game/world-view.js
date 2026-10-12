@@ -158,6 +158,16 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
 <p class="world-voxel-note" data-role="voxel-note"></p>`;
 
   host.append(root);
+  /* Появление: карта проявляется из размытия и растёт из центра (CSS, класс
+     is-reveal). Класс снимаем по таймеру: анимация не должна висеть на
+     фоновой вкладке или при reduce-motion. */
+  const reduceMotion =
+    typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let revealTimer = 0;
+  if (!reduceMotion) {
+    root.classList.add('is-reveal');
+    revealTimer = setTimeout(() => root.classList.remove('is-reveal'), 2600);
+  }
 
   const canvas = root.querySelector('[data-role="voxel-canvas"]');
 
@@ -248,6 +258,7 @@ export const mountWorldView = (host, { frame, config, onExit } = {}) => {
   };
 
   view.dispose = () => {
+    clearTimeout(revealTimer);
     view.running = false;
 
     if (raf) cancelAnimationFrame(raf);
