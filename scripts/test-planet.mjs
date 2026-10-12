@@ -211,9 +211,14 @@ for (let py = 0; py < srcPixels.h; py += 4) {
 add(srcCoast === 0, 'берег планеты совпадает с берегом карты Azgaar', `${srcCoast} расхождений на ${(srcTotal / 1000).toFixed(0)} тыс. выборок`);
 add(Math.abs(srcLand / srcTotal - sourceLandShare(azgaar)) < 0.02,
   'доля суши — как у генератора', `${((srcLand / srcTotal) * 100).toFixed(1)} % против ${(sourceLandShare(azgaar) * 100).toFixed(1)} %`);
-add(maxDetail <= (GUARD_SIGMAS + 1) * sourced.stats().sigma,
+/* σ здесь мира, а не клетки: множитель шероховатости меняется по карте, и в
+   горах деталь крупнее средней. Поэтому допуск домножен на отношение пика
+   шероховатости к среднему — иначе проверка ловила бы не поломку guard, а
+   саму неоднородность рельефа. */
+const guardSigma = sourced.stats().sigma * sourced.stats().roughRatio;
+add(maxDetail <= (GUARD_SIGMAS + 1) * guardSigma,
   'деталь не вылезает за guard: |raw − база| ≤ (GUARD_SIGMAS + 1)σ',
-  `${maxDetail.toFixed(2)} против ${(GUARD_SIGMAS * sourced.stats().sigma).toFixed(2)}`);
+  `${maxDetail.toFixed(2)} против ${(GUARD_SIGMAS * guardSigma).toFixed(2)}`);
 heightErrors.sort((a, b) => a - b);
 const medianError = heightErrors[Math.floor(heightErrors.length / 2)] ?? Infinity;
 const p95Error = heightErrors[Math.floor(heightErrors.length * 0.95)] ?? Infinity;
@@ -318,6 +323,151 @@ for (let i = 0; i < grid0.height.length; i += 1) {
   if (!Number.isFinite(grid0.height[i]) || !Number.isFinite(grid0.temp[i])) notFinite += 1;
 }
 add(notFinite === 0, 'в климате нет NaN', `${notFinite} пикселей`);
+
+/* ---------- 6б. физика климата ----------
+
+   Тем же полям, что рисуются на карте, задаются вопросы из учебника. Каждый
+   вопрос — про механизм, а не про число: если осадки снова станут формулой по
+   точке, эти проверки упадут, даже когда картинка останется красивой. */
+
+const world = climate.fields();
+const CH = world.channels;
+const at = (i, name) => world.grid.at(i, CH[name]);
+const latOf = (i) => world.rowLat[(i / world.grid.w) | 0];
+const oceanMean = (name, lo, hi) => {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < world.count; i += 1) {
+    const lat = Math.abs(latOf(i));
+    if (lat < lo || lat >= hi || at(i, 'land') > 0.5) continue;
+    sum += at(i, name);
+    n += 1;
+  }
+  return n ? sum / n : 0;
+};
+const landMean = (name, lo, hi) => {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < world.count; i += 1) {
+    const lat = Math.abs(latOf(i));
+    if (lat < lo || lat >= hi || at(i, 'land') < 0.5) continue;
+    sum += at(i, name);
+    n += 1;
+  }
+  return n ? sum / n : 0;
+};
+const annualPrec = (i) => (at(i, 'precWarm') + at(i, 'precCold')) / 2;
+
+/* Механизм 1: влага сходится к тропической зоне сходимости и выпадает там,
+   а в субтропиках оседает и сохнет. */
+const itczOcean = oceanMean('precWarm', 0, 10) / 2 + oceanMean('precCold', 0, 10) / 2;
+const subtropicsOcean = oceanMean('precWarm', 20, 35) / 2 + oceanMean('precCold', 20, 35) / 2;
+add(itczOcean > subtropicsOcean * 1.5,
+  'дожди идут у экватора, а не в субтропиках: восходящая ячейка Гадлея',
+  `${itczOcean.toFixed(0)} против ${subtropicsOcean.toFixed(0)} мм`);
+
+/* Механизм 2: океан испаряет столько, сколько на Земле — порядок величины. */
+const oceanAll = oceanMean('precWarm', 0, 90) / 2 + oceanMean('precCold', 0, 90) / 2;
+add(oceanAll > 600 && oceanAll < 2500, 'океан отдаёт влагу как земной: 0,6–2,5 м в год',
+  `${(oceanAll / 1000).toFixed(2)} м`);
+
+/* Механизм 3: на суше есть и настоящие дождевые леса, и настоящие пустыни —
+   это свойство переноса влаги, а не широтной таблицы. */
+let landMax = 0;
+let landWet = 0;
+let landDry = 0;
+let landN = 0;
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'land') < 0.5) continue;
+  const p = annualPrec(i);
+  landN += 1;
+  landMax = Math.max(landMax, p);
+  if (p > 1500) landWet += 1;
+  if (p < 300) landDry += 1;
+}
+add(landMax > 1500, 'на суше есть дождевые леса: больше 1,5 м в год', `${landMax.toFixed(0)} мм`);
+add(landWet > landN * 0.02 && landDry > landN * 0.1,
+  'суша и мокрая, и сухая: пустыни рядом с лесами',
+  `${(landWet / landN * 100).toFixed(1)} % влажных, ${(landDry / landN * 100).toFixed(0)} % сухих`);
+
+/* Механизм 4: пустыня — это не «мало дождя», а «дождя меньше испаряемости».
+   Сравниваем два биома по индексу P/PET: у пустыни он обязан быть ниже. */
+let aridSum = 0;
+let aridN = 0;
+let dampSum = 0;
+let dampN = 0;
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'land') < 0.5) continue;
+  const k = Math.round(at(i, 'koppen'));
+  if (k === 3 || k === 4 || k === 5 || k === 6) { aridSum += at(i, 'aridity'); aridN += 1; }
+  if (k === 0 || k === 1 || k === 2 || k === 7 || k === 10 || k === 11) { dampSum += at(i, 'aridity'); dampN += 1; }
+}
+add(aridN > 0 && dampN > 0 && aridSum / aridN < (dampSum / dampN) * 0.5,
+  'индекс засушливости ЮНЕП разделяет пустыни и влажные климаты',
+  `пустыни ${(aridSum / aridN).toFixed(2)} против ${(dampSum / dampN).toFixed(2)}`);
+
+/* Механизм 5: климат классифицирован, а не раскрашен. Классов Кёппена должно
+   быть много, и среди них — не только пустыни. */
+const koppenSeen = new Set();
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'land') > 0.5) koppenSeen.add(Math.round(at(i, 'koppen')));
+}
+const humidClasses = [...koppenSeen].filter((k) => k < 3 || k > 6).length;
+add(koppenSeen.size >= 8 && humidClasses >= 4,
+  'классов Кёппена много, и не все они засушливые',
+  `${koppenSeen.size} классов, ${humidClasses} влажных`);
+
+/* Механизм 6: у холодной воды лёд, у холодной суши снег — и то и другое
+   считается по-настоящему, а не по одной годовой температуре. */
+let iceCells = 0;
+let snowCells = 0;
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'ice') > 0.3) iceCells += 1;
+  if (at(i, 'land') > 0.5 && at(i, 'snow') > 0.5) snowCells += 1;
+}
+add(iceCells > 0 && snowCells > 0, 'на карте есть морской лёд и снежный покров',
+  `лёд ${iceCells} клеток, снег ${snowCells}`);
+
+/* Механизм 7: у западных берегов материков вода холоднее, чем на той же
+   широте в открытом океане — это апвеллинг, причина береговых пустынь.
+   Сравнивать надо не со средним по всему океану (в нём есть полюса), а с
+   широтной полосой: подъём холодной воды — местная аномалия. */
+const sstByBand = new Map();
+const bandOf = (lat) => Math.floor(Math.abs(lat) / 10);
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'land') > 0.5) continue;
+  const band = bandOf(latOf(i));
+  const entry = sstByBand.get(band) ?? { sum: 0, n: 0 };
+  entry.sum += world.seasons.july.ocean.sst[i];
+  entry.n += 1;
+  sstByBand.set(band, entry);
+}
+let upwellingN = 0;
+let upwellingDelta = 0;
+for (let i = 0; i < world.count; i += 1) {
+  if (at(i, 'upwelling') < 0.3 || at(i, 'land') > 0.5) continue;
+  const entry = sstByBand.get(bandOf(latOf(i)));
+  if (!entry) continue;
+  upwellingN += 1;
+  upwellingDelta += world.seasons.july.ocean.sst[i] - entry.sum / entry.n;
+}
+add(upwellingN > 0 && upwellingDelta / upwellingN < 0,
+  'апвеллинг холоднее своей широтной полосы: береговые пустыни не выдуманы',
+  `${upwellingN} клеток, холоднее на ${(-upwellingDelta / upwellingN).toFixed(1)} °C`);
+
+/* Механизм 8: у моря зима и лето мягче, чем в глубине материка — теплоёмкость. */
+let oceanAmp = 0;
+let oceanCnt = 0;
+let landAmp = 0;
+let landCnt = 0;
+for (let i = 0; i < world.count; i += 1) {
+  if (Math.abs(latOf(i)) < 30 || Math.abs(latOf(i)) > 70) continue;
+  const amp = Math.abs(at(i, 'tempWarm') - at(i, 'tempCold'));
+  if (at(i, 'land') > 0.5) { landAmp += amp; landCnt += 1; } else { oceanAmp += amp; oceanCnt += 1; }
+}
+add(landCnt > 0 && oceanCnt > 0 && landAmp / landCnt > (oceanAmp / oceanCnt) * 1.6,
+  'у моря климат мягче, чем у материка: годовая амплитуда',
+  `суша ${(landAmp / landCnt).toFixed(0)} °C против ${(oceanAmp / oceanCnt).toFixed(0)} °C`);
 
 /* ---------- 7. сток и реки ---------- */
 

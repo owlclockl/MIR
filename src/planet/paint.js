@@ -11,6 +11,7 @@
 
 import { clamp, metersToGeo, mppAt, TILE } from './scale.js';
 import { heightMeters, SEA_LEVEL } from './elevation.js';
+import { heightFromRaw } from './zscale.js';
 import { noise3 } from './noise.js';
 import { visibleWidth } from './hydro.js';
 import {
@@ -135,6 +136,19 @@ const HEAT_RAMP = ramp([
 
 const BIOME_RGB = BIOMES.map((biome) => hex(biome.color));
 const KOPPEN_RGB = KOPPEN.map((entry) => hex(entry.color));
+/** Засушливость: от песка пустыни через степь к зелени дождевого леса. */
+const ARID_RAMP = ramp([
+  [0, '#c8a165'],
+  [0.12, '#d8c07a'],
+  [0.3, '#c9d68f'],
+  [0.5, '#7dcb35'],
+  [1, '#1f7a4a'],
+]);
+/** Пояса Холдриджа: от полярного к тропическому. */
+const BELT_RGB = [
+  [176, 196, 208], [150, 186, 176], [86, 138, 102], [70, 150, 96],
+  [120, 180, 90], [200, 190, 100], [230, 150, 70],
+];
 const SOIL_RGB = SOILS.map((entry) => hex(entry.color));
 const ROCK_RGB = ROCKS.map((entry) => hex(entry.color));
 
@@ -150,9 +164,12 @@ export const LAYERS = [
   { id: 'slope', name: 'Уклоны', hint: 'Крутизна склона: где можно пройти, а где нет' },
   { id: 'temperature', name: 'Температура', hint: 'Среднегодовая температура воздуха' },
   { id: 'precipitation', name: 'Осадки', hint: 'Осадки в год, мм' },
+  { id: 'aridity', name: 'Засушливость', hint: 'Отношение осадков к испаряемости, P/PET' },
+  { id: 'seasonality', name: 'Сезонность', hint: 'Насколько осадки привязаны к сезону' },
   { id: 'moisture', name: 'Влажность', hint: 'Влажность почвы: осадки плюс реки' },
   { id: 'biomes', name: 'Биомы', hint: 'Биомы Azgaar: от пустыни до тайги' },
   { id: 'koppen', name: 'Климат Кёппена', hint: 'Классификация климатов Кёппена' },
+  { id: 'holdridge', name: 'Зоны жизни', hint: 'Зоны жизни Холдриджа: тепло и влага' },
   { id: 'rivers', name: 'Реки и вода', hint: 'Русла, озёра и сток' },
   { id: 'watershed', name: 'Водосбор', hint: 'Сколько воды проходит через точку' },
   { id: 'ice', name: 'Лёд и снег', hint: 'Морской лёд, ледники, снеговая линия' },
@@ -240,6 +257,21 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
   const moisture = grid.moisture;
   const biome = grid.biome;
   const ocean = grid.ocean;
+  /* Поля новой климатической модели: класс Кёппена, зоны Холдриджа,
+     продуктивность, засушливость, лёд, снег, ветер и течения. Считаются они в
+     climate.js один раз на грубой решётке, здесь только читаются — иначе
+     раскраска начнёт «дорисовывать» климат по-своему, и слой разойдётся с
+     классификацией. */
+  const koppenClass = grid.koppen;
+  const holdridgeZone = grid.holdridge;
+  const nppField = grid.npp;
+  const aridityField = grid.aridity;
+  const iceField = grid.ice;
+  const snowField = grid.snow;
+  const currentField = grid.current;
+  const upwellingField = grid.upwelling;
+  const seasonalField = grid.seasonal;
+  const windField = grid.wind;
   const meters = scratch.meters;
   const shade = scratch.shade;
   const slope = scratch.slope;
@@ -252,15 +284,26 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
      преувеличения рельеф выглядит плоским блином. */
   const exag = clamp((mpp / 1000) ** 0.7, 1, 40);
   if (shading || layer.id === 'slope') {
+    /* На краю тайла соседний пиксель берём из соседнего тайла. Односторонняя
+       разность на краю давала бы вдвое меньший уклон и рисовала бы по стыкам
+       светлую сетку плиток — её было видно на общей карте, хотя сами высоты по
+       границе сходятся. Платим за это четырьмя сотнями выборок высоты на тайл
+       и только по его краю. */
+    const metresAt = (px, py) => {
+      if (px >= 0 && py >= 0 && px < TILE && py < TILE) return meters[py * TILE + px];
+      const gx = tx * TILE + px;
+      const gy = ty * TILE + py;
+      return heightMeters(heightFromRaw(tile.elevation.sampleRaw(level, gx, gy)));
+    };
     for (let py = 0; py < TILE; py += 1) {
-      const y0 = Math.max(py - 1, 0);
-      const y1 = Math.min(py + 1, TILE - 1);
+      const y0 = py - 1;
+      const y1 = py + 1;
       for (let px = 0; px < TILE; px += 1) {
-        const x0 = Math.max(px - 1, 0);
-        const x1 = Math.min(px + 1, TILE - 1);
+        const x0 = px - 1;
+        const x1 = px + 1;
         const index = py * TILE + px;
-        const dx = (meters[py * TILE + x1] - meters[py * TILE + x0]) / ((x1 - x0) * mpp);
-        const dy = (meters[y1 * TILE + px] - meters[y0 * TILE + px]) / ((y1 - y0) * mpp);
+        const dx = (metresAt(x1, py) - metresAt(x0, py)) / (2 * mpp);
+        const dy = (metresAt(px, y1) - metresAt(px, y0)) / (2 * mpp);
         const steep = Math.hypot(dx, dy);
         slope[index] = steep;
         if (!shading) continue;
@@ -395,11 +438,60 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
           break;
         }
         case 'koppen': {
-          const id = koppenId(t, precMm, lat, oceanity);
-          const color = KOPPEN_RGB[id] ?? KOPPEN_RGB[0];
+          /* Класс посчитан по критериям Кёппена на грубой решётке — здесь он
+             только раскрашивается. Прежняя версия слоя классифицировала заново
+             по годовым суммам, и карта могла показывать не то, что записано в
+             данных. */
+          const id = clamp(koppenClass[index] | 0, 0, KOPPEN.length - 1);
+          const color = KOPPEN_RGB[id];
           r = color[0];
           g = color[1];
           b = color[2];
+          break;
+        }
+        case 'aridity': {
+          /* Индекс засушливости ЮНЕП: P/PET. Пороги — по классификации
+             засушливости: 0,03 гиперзасушливо, 0,2 засушливо, 0,5
+             полузасушливо, выше — влажно. Цвет от белого песка к зелени. */
+          const value = aridityField[index] / 255;
+          const at = clamp(value * 255, 0, 255) | 0;
+          r = ARID_RAMP[at * 3];
+          g = ARID_RAMP[at * 3 + 1];
+          b = ARID_RAMP[at * 3 + 2];
+          if (h < SEA_LEVEL) {
+            r *= 0.7;
+            g *= 0.8;
+            b *= 0.9;
+          }
+          break;
+        }
+        case 'holdridge': {
+          /* Зоны жизни Холдриджа: пояс по биотемпературе, влажность по
+             отношению испаряемости к осадкам. Два цвета: пояс задаёт оттенок,
+             влажность — насыщенность. */
+          const zone = clamp(holdridgeZone[index] | 0, 0, 55);
+          const belt = (zone / 8) | 0;
+          const humidity = zone % 8;
+          const warm = BELT_RGB[Math.min(belt, BELT_RGB.length - 1)];
+          const dry = humidity / 7;
+          r = clamp(warm[0] * (1.05 - 0.55 * dry) + 190 * dry, 0, 255);
+          g = clamp(warm[1] * (1.05 - 0.35 * dry) + 170 * dry, 0, 255);
+          b = clamp(warm[2] * (1.05 - 0.15 * dry) + 120 * dry, 0, 255);
+          if (h < SEA_LEVEL) {
+            r *= 0.7;
+            g *= 0.8;
+            b *= 0.9;
+          }
+          break;
+        }
+        case 'seasonality': {
+          /* Насколько осадки привязаны к сезону: у муссонного климата лето
+             мокрое, зима сухая, а у морского дожди идут круглый год. Рампа
+             перевёрнута: ровный год — синева, резкий сезон — охра. */
+          const at = clamp(255 - seasonalField[index], 0, 255) | 0;
+          r = PREC_RAMP[at * 3];
+          g = PREC_RAMP[at * 3 + 1];
+          b = PREC_RAMP[at * 3 + 2];
           break;
         }
         case 'rivers': {
@@ -431,7 +523,13 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
           break;
         }
         case 'ice': {
-          const ice = h < SEA_LEVEL ? seaIce(t) : clamp((m - snowLine(t)) / 600, 0, 1) * clamp(1 - steep, 0, 1);
+          /* Морской лёд — из температуры воды, снежный покров и ледники — из
+             зимней и летней температуры (climate.js). Считалось это и раньше
+             от годовой температуры, но тогда теплое лето не спасало от
+             «ледника» там, где зимой просто холодно. */
+          const ice = h < SEA_LEVEL
+            ? iceField[index] / 255
+            : clamp(snowField[index] / 255, 0, 1) * clamp(1 - steep, 0, 1);
           const at = clamp(ice * 255, 0, 255) | 0;
           r = 90 + at * 0.6;
           g = 120 + at * 0.5;
@@ -444,8 +542,9 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
           break;
         }
         case 'winds': {
-          /* Цвет — направление, яркость — сила пояса. */
-          const angle = Math.atan2(wind.y, wind.x);
+          /* Цвет — направление местного ветра из поля (там, где муссон
+             разворачивает поток, это видно), яркость — широтный пояс. */
+          const angle = (windField[index] / 255) * Math.PI * 2 - Math.PI;
           const at = clamp(((angle + Math.PI) / (Math.PI * 2)) * 255, 0, 255) | 0;
           const strength = 0.45 + 0.55 * clamp(latMod / 4, 0, 1);
           r = clamp(TEMP_RAMP[at * 3] * strength + 20, 0, 255);
@@ -460,15 +559,16 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
           break;
         }
         case 'currents': {
-          /* Течение — ветер, довёрнутый Кориолисом: вправо в северном
-             полушарии, влево в южном. */
-          const spin = lat >= 0 ? 1 : -1;
-          const angle = Math.atan2(wind.y + 0.6 * spin, wind.x - 0.6 * spin);
+          /* Направление течения — из поля, посчитанного релаксацией с условием
+             непротекания (ocean.js): круговороты получаются замкнутыми, а не
+             «ветер минус Кориолис». Апвеллинг подсвечивается синим. */
+          const angle = (currentField[index] / 255) * Math.PI * 2 - Math.PI;
           const at = clamp(((angle + Math.PI) / (Math.PI * 2)) * 255, 0, 255) | 0;
           if (h < SEA_LEVEL) {
-            r = TEMP_RAMP[at * 3];
-            g = TEMP_RAMP[at * 3 + 1];
-            b = TEMP_RAMP[at * 3 + 2];
+            const cold = upwellingField[index] / 255;
+            r = clamp(TEMP_RAMP[at * 3] * (1 - 0.5 * cold), 0, 255);
+            g = clamp(TEMP_RAMP[at * 3 + 1] * (1 - 0.25 * cold) + 40 * cold, 0, 255);
+            b = clamp(TEMP_RAMP[at * 3 + 2] * (1 - 0.1 * cold) + 70 * cold, 0, 255);
           } else {
             const warm = clamp(t / 30, 0, 1);
             r = 96 + 70 * warm;
@@ -507,7 +607,10 @@ export const paintTile = (image, frameW, frameH, ox, oy, tile, layer, options = 
           break;
         }
         case 'flora': {
-          const value = h < SEA_LEVEL ? clamp(0.35 + wet / 400, 0, 0.9) : floraIndex(t, precMm);
+          /* Продуктивность Майами (Lieth, 1975) считается из годовых осадков и
+             тепла и лежит в поле климата: это она, а не «влажность вообще»,
+             задаёт, сколько углерода связывает место. */
+          const value = h < SEA_LEVEL ? clamp(0.35 + wet / 400, 0, 0.9) : clamp(nppField[index] / 1800, 0, 1);
           const at = clamp(value * 255, 0, 255) | 0;
           r = LIFE_RAMP[at * 3];
           g = LIFE_RAMP[at * 3 + 1];

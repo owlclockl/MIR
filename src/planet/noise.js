@@ -86,6 +86,91 @@ export const noise3 = (x, y, z, seed) => {
   return (ny0 + w * (ny1 - ny0)) * 1.35;
 };
 
+/* ---------- плоский шум: там, где третья координата не нужна ---------- */
+
+/** Хеш двух целых координат и seed → [0, 1). */
+export const hash2 = (x, y, seed) => {
+  let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ (seed | 0);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 13;
+  return (h >>> 0) * 2.3283064365386963e-10;
+};
+
+/** Восемь направлений градиента в плоскости: угол 45°, без осей. */
+const GRAD2 = new Float32Array([0.7071, 0.7071, -0.7071, 0.7071, 0.7071, -0.7071, -0.7071, -0.7071]);
+
+/**
+ * Градиентный шум 2D, диапазон примерно [−1, 1].
+ *
+ * Зачем отдельный 2D, если есть 3D и можно взять `noise3(x, y, 0)`. Две причины,
+ * обе измеряемые:
+ *
+ *   1. **Цена.** У 3D на точку приходится восемь углов решётки, у 2D — четыре.
+ *      Шум — почти всё время сборки тайла, поэтому на максимальном приближении
+ *      это ровно двукратная экономия.
+ *   2. **Качество.** Срез трёхмерного шума плоскостью z = 0 — известное слабое
+ *      место: в нём остаётся меньше направлений градиента, и на рельефе
+ *      проступает «решётка» по осям. Настоящий 2D берёт градиенты в самой
+ *      плоскости, и вместе с доворотом решётки на каждой октаве (та же мысль,
+ *      что в simplex-шуме) осей не видно.
+ *
+ * Доворот решётки: координаты каждой октавы поворачиваются на свой угол, поэтому
+ * «квадраты» соседних октав не складываются в одну сетку. Угол берётся из seed,
+ * значит детерминированность не страдает.
+ */
+export const noise2 = (x, y, seed) => {
+  const angle = (seed % 1021) * 0.0031;
+  const ca = Math.cos(angle);
+  const sa = Math.sin(angle);
+  const rx = x * ca - y * sa;
+  const ry = x * sa + y * ca;
+  const xi = Math.floor(rx);
+  const yi = Math.floor(ry);
+  const xf = rx - xi;
+  const yf = ry - yi;
+  const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
+  const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
+  const g00 = (hash2(xi, yi, seed) * 4) | 0;
+  const g10 = (hash2(xi + 1, yi, seed) * 4) | 0;
+  const g01 = (hash2(xi, yi + 1, seed) * 4) | 0;
+  const g11 = (hash2(xi + 1, yi + 1, seed) * 4) | 0;
+  const n00 = GRAD2[g00 * 2] * xf + GRAD2[g00 * 2 + 1] * yf;
+  const n10 = GRAD2[g10 * 2] * (xf - 1) + GRAD2[g10 * 2 + 1] * yf;
+  const n01 = GRAD2[g01 * 2] * xf + GRAD2[g01 * 2 + 1] * (yf - 1);
+  const n11 = GRAD2[g11 * 2] * (xf - 1) + GRAD2[g11 * 2 + 1] * (yf - 1);
+  const nx0 = n00 + u * (n10 - n00);
+  const nx1 = n01 + u * (n11 - n01);
+  return (nx0 + v * (nx1 - nx0)) * 1.4142;
+};
+
+/** Одно слагаемое fbm в плоскости: amplitude · noise(частота). */
+export const octaveValue2 = (x, y, frequency, seed, amplitude) =>
+  amplitude * noise2(x * frequency, y * frequency, seed);
+
+/** Хребтовое слагаемое в плоскости: 1 − |noise| даёт горные цепи, а не пятна. */
+export const octaveRidged2 = (x, y, frequency, seed, amplitude) =>
+  amplitude * (1 - Math.abs(noise2(x * frequency, y * frequency, seed)));
+
+/**
+ * fbm в плоскости (сумма октав с нормировкой): для грубых полей, где пирамида
+ * не помогает — доменное искажение, пояса, вулканизм, климат.
+ */
+export const fbm2 = (x, y, { seed, octaves = 4, frequency = 1, gain = 0.5, lacunarity = 2, ridged = false }) => {
+  let sum = 0;
+  let amplitude = 1;
+  let total = 0;
+  let freq = frequency;
+  for (let i = 0; i < octaves; i += 1) {
+    const n = noise2(x * freq, y * freq, seed + i * 1013);
+    sum += amplitude * (ridged ? 1 - Math.abs(n) : n);
+    total += amplitude;
+    amplitude *= gain;
+    freq *= lacunarity;
+  }
+  return total > 0 ? sum / total : 0;
+};
+
 /** Одно слагаемое fbm: amplitude · noise(частота). */
 export const octaveValue = (cx, cy, cz, frequency, seed, amplitude) =>
   amplitude * noise3(cx * frequency, cy * frequency, cz * frequency, seed);

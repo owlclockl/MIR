@@ -42,7 +42,9 @@
 import { clamp, levelPixels, mppAt, TILE } from './scale.js';
 import { fbm3, noise3 } from './noise.js';
 import { GUARD_SIGMAS, createSourceField, detailFirstOctave } from './source.js';
-import { heightFromRaw, heightMeters } from './zscale.js';
+import { SEA_LEVEL, heightFromRaw, heightMeters, rawFromHeight, rawFromMeters } from './zscale.js';
+import { TECT, createTectonics } from './tectonics.js';
+import { ERO, createErosion } from './erosion.js';
 
 /* Шкалу переэкспортируем: heightFromRaw и компания — часть публичного лица
    рельефа, а климату, стоку и виду безразлично, в каком файле лежит формула. */
@@ -72,6 +74,10 @@ const RIDGE_MAX_OCTAVE = 12;
    одинаковы у всех миров; приводить поле к z-шкале и сравнивать пороги в σ
    нужно именно поэтому (RAW_MEAN, RAW_SIGMA — в zscale.js). */
 const WARP_M = 420_000; // амплитуда доменного искажения, метры
+/* Насколько близко к урезу воды деталь обязана гаснуть. Три σ: у самой кромки
+   воды мелкий рельеф пропадает, но уже через несколько километров возвращается.
+   Так берег остаётся берегом, а не полосой случайных островов. */
+const PROC_GUARD_SIGMAS = 3;
 const COARSE_CELL_M = 128_000; // шаг грубых глобальных полей (масштабируется планетой)
 /** Точек на оценку среднего и разброса детали: 768 × 21 октава — это ~4 мс. */
 const DETAIL_SAMPLES = 768;
@@ -102,15 +108,23 @@ const createCoarseField = (planet, channels, fill) => {
   const stepX = planet.widthM / w;
   const stepY = planet.heightM / (h - 1);
   const out = new Float32Array(channels);
-  for (let gy = 0; gy < h; gy += 1) {
-    for (let gx = 0; gx < w; gx += 1) {
-      /* Мир плоский: узел решётки стоит в тех же метрах, что и пиксель карты.
-         Перевод в цилиндр был нужен только замыканию по долготе. */
-      fill(out, (gx + 0.5) * stepX, (gy + 0.5) * stepY);
-      const base = (gy * w + gx) * channels;
-      for (let c = 0; c < channels; c += 1) data[base + c] = out[c];
+  /* Поле заполняется при первом обращении: под ним лежит тектоника с эрозией,
+     и платить полсекунды при создании планеты, которую могут и не спросить,
+     незачем. Планета маленькая, а мир большой. */
+  let ready = false;
+  const prepare = () => {
+    if (ready) return;
+    ready = true;
+    for (let gy = 0; gy < h; gy += 1) {
+      for (let gx = 0; gx < w; gx += 1) {
+        /* Мир плоский: узел решётки стоит в тех же метрах, что и пиксель карты.
+           Перевод в цилиндр был нужен только замыканию по долготе. */
+        fill(out, (gx + 0.5) * stepX, (gy + 0.5) * stepY);
+        const base = (gy * w + gx) * channels;
+        for (let c = 0; c < channels; c += 1) data[base + c] = out[c];
+      }
     }
-  }
+  };
   /* Обратные шаги: умножение вместо деления. Поля опрашиваются за каждый
      пиксель каждого тайла, и здесь экономия заметнее, чем где-либо ещё. */
   const invX = w / planet.widthM;
@@ -122,6 +136,7 @@ const createCoarseField = (planet, channels, fill) => {
     /** Выборка в метрах карты; и по долготе, и по широте прижата к краю —
         за рамкой карты земли нет, а зеркалить её нечем. */
     sample(mx, my, target) {
+      prepare();
       let fx = mx * invX;
       let fy = my * invY;
       if (fx < 0) fx = 0;
@@ -160,17 +175,71 @@ const TILE_BYTES = TILE * TILE * 4;
  *   бюджет памяти на кэш тайлов; `source` — снимок карт Azgaar из `readSource`
  *   (тогда география берётся из карты генератора, а не из шума)
  */
+/**
+ * Основа рельефа: тектоника и эрозия.
+ *
+ * Строится **лениво**: мир из шума и мира из карты Azgaar обходятся по-разному,
+ * а сама тектоника стоит полсекунды — платить за неё при каждом создании
+ * планеты незачем. Поля считаются один раз на грубой решётке (52 км) и
+ * опрашиваются билинейно: значение в точке не зависит от уровня пирамиды,
+ * поэтому родитель и ребёнок видят ровно одну и ту же высоту, а тайл уровня
+ * L+1 остаётся честным продолжением тайла уровня L.
+ */
+const createTerrainBase = (planet) => {
+  let cache = null;
+  const build = () => {
+    if (cache) return cache;
+    /* Плиты и океанское дно — тектоника; долины — эрозия. Порядок обязателен:
+       эрозия течёт по тому, что подняла тектоника. */
+    const tectonics = createTectonics(planet, { landTarget: 0.3 });
+    const erosion = createErosion(planet, tectonics, {});
+    const grid = erosion.grid;
+    /* Сырая шкала считается один раз: в ней спрашивается высота на каждом
+       пикселе тайла, и функция с возведением в степень там стоила бы дороже
+       всей выборки поля. */
+    const raw = new Float32Array(grid.w * grid.h);
+    for (let i = 0; i < raw.length; i += 1) raw[i] = rawFromMeters(grid.at(i, ERO.elevation));
+    cache = { tectonics, erosion, grid, raw };
+    return cache;
+  };
+  return build;
+};
+
 export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = null } = {}) => {
   const seed = planet.seedNumber;
-  const quad = new Float32Array(4);
+  const quad = new Float32Array(5);
   const scalarTarget = new Float32Array(1);
+  const terrainBase = createTerrainBase(planet);
+  let tileForBaseCell = null;
 
-  /* Все четыре величины, меняющиеся на тысячах километров, живут в одном поле
-     из четырёх каналов: выборка поля — это вычисление индексов и весов
-     интерполяции, и платить за него четырежды за каждый пиксель каждого тайла
-     было бы самой дорогой операцией генерации (11 мс из 28 на тайл). */
-  const shape = createCoarseField(planet, 4, (out, mx, my) => {
-    /* 0, 1 — доменное искажение: материки перестают быть «блинами» от fbm.
+  /* Основа: она есть только у процедурного мира. У мира из карты Azgaar высоту
+     задаёт сама карта (source.js), а тектонические поля идут в модуляцию
+     детали — подменять высоты генератора своими нельзя, иначе поедут берега. */
+  const baseRawAt = (mx, my) => {
+    const base = terrainBase();
+    const gx = clamp(Math.floor(mx / base.grid.stepX), 0, base.grid.w - 1);
+    const gy = clamp(Math.floor(my / base.grid.stepY), 0, base.grid.h - 1);
+    const index = gy * base.grid.w + gx;
+    const fx = clamp(mx / base.grid.stepX - gx, 0, 1);
+    const fy = clamp(my / base.grid.stepY - gy, 0, 1);
+    const x1 = gx + 1 < base.grid.w ? gx + 1 : gx;
+    const y1 = gy + 1 < base.grid.h ? gy + 1 : gy;
+    const a = base.raw[index];
+    const b = base.raw[gy * base.grid.w + x1];
+    const c = base.raw[y1 * base.grid.w + gx];
+    const d = base.raw[y1 * base.grid.w + x1];
+    const top = a + (b - a) * fx;
+    const bottom = c + (d - c) * fx;
+    return top + (bottom - top) * fy;
+  };
+
+  /* Пять величин, меняющихся на тысячах километров, живут в одном поле: выборка
+     поля — вычисление индексов и весов интерполяции, и платить за него
+     отдельно за каждую было бы самой дорогой операцией генерации. Искажение
+     берётся из шума, а пояс гор, щиты и шероховатость — из тектоники и эрозии:
+     хребты стоят там, где сходятся плиты, а не там, где совпал шум. */
+  const shape = createCoarseField(planet, 5, (out, mx, my) => {
+    /* 0, 1 — доменное искажение: деталь не выстраивается по осям решётки.
        К краям не гасим: цилиндр, который вырождается в линию на полюсах,
        остался в прошлой версии мира. */
     const f = 3 / planet.widthM;
@@ -179,21 +248,25 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     out[0] = wx * WARP_M * planet.size;
     out[1] = wy * WARP_M * planet.size * 0.5;
 
-    /* 2 — пояс гор: хребтовый шум в степени даёт длинные цепи, а не пятна. */
-    const ridge = 1 - Math.abs(fbm3(mx, my, 0, { seed: seed + 71, octaves: 3, frequency: 2.2 / planet.widthM, gain: 0.55 }));
-    const region = fbm3(mx + 5551, my + 331, 0, { seed: seed + 97, octaves: 2, frequency: 1.1 / planet.widthM, gain: 0.5 });
-    const mask = clamp((region + 0.25) / 0.7, 0, 1);
-    out[2] = clamp(ridge ** 2.6 * 2.6, 0, 1) * mask;
-
-    /* 3 — древние щиты: плоские платформы, на которых горы не растут. */
-    out[3] = clamp(fbm3(mx + 7717, my - 1543, 0, { seed: seed + 173, octaves: 2, frequency: 1.4 / planet.widthM, gain: 0.5 }) * 2 + 0.5, 0, 1);
+    /* Тектонические каналы лежат в поле тектоники, каналы эрозии — в поле
+       эрозии: у эрозии своя, более короткая шкала каналов. */
+    const tek = terrainBase().tectonics.grid;
+    /* 2 — пояс гор и вулканических дуг: где хребты, там деталь крупная. */
+    out[2] = clamp(tek.sample1(mx, my, TECT.belt) * 1.35, 0, 1);
+    /* 3 — щиты: плоские платформы, на которых горы не растут. */
+    out[3] = tek.sample1(mx, my, TECT.craton);
+    /* 4 — шероховатость: множитель мелкой детали. В орогенах и на лавовых
+       плато рельеф рубленый, на щитах и абиссали — почти гладкий. */
+    out[4] = tek.sample1(mx, my, TECT.roughness);
   });
 
-  /* Вулканизм: для слоёв «породы», «сейсмика» и «ресурсы». */
+  /* Вулканизм: дуги, плюмы и рифты — для слоёв «породы», «сейсмика», «ресурсы». */
   const volcanic = createCoarseField(planet, 1, (out, mx, my) => {
-    const ridge = 1 - Math.abs(fbm3(mx - 2003, my + 6607, 0, { seed: seed + 131, octaves: 2, frequency: 2.6 / planet.widthM, gain: 0.5 }));
-    out[0] = clamp(ridge ** 4 * 3.4, 0, 1);
+    out[0] = clamp(terrainBase().tectonics.grid.sample1(mx, my, TECT.volcanic), 0, 1);
   });
+
+  /** Канал тектонического поля в точке: у эрозии своя шкала каналов. */
+  const tekAt = (mx, my, channel) => terrainBase().tectonics.grid.sample1(mx, my, channel);
 
   /* ---------- география из карты Azgaar ---------- */
 
@@ -217,40 +290,41 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
    * «на глаз», а тут — честное число ровно того мира, который строится.
    */
   const detailMean = new Float64Array(MAX_OCTAVE + 1);
-  let sigmaFull = 0;
-  if (geography) {
-    const sums = new Float64Array(MAX_OCTAVE + 1);
-    const squares = new Float64Array(MAX_OCTAVE + 1);
-    const ridgeTo = Math.min(MAX_OCTAVE, RIDGE_MAX_OCTAVE);
-    for (let s = 0; s < DETAIL_SAMPLES; s += 1) {
-      /* Точки — регулярная решётка по всей планете со взаимно простым шагом:
-         несмещённости хватает, а разброс от порядка выборок не зависит. */
-      const mx = (((s * 61) % 97) + 0.5) / 97 * planet.widthM;
-      const my = (((s * 37) % 89) + 0.5) / 89 * planet.heightM;
-      shape.sample(mx, my, quad);
-      const x = mx + quad[0];
-      const y = my + quad[1];
-      const mask = quad[2] * (1 - 0.55 * quad[3]);
-      for (let i = detailFrom; i <= MAX_OCTAVE; i += 1) {
-        const frequency = 2 ** i / baseWavelength;
-        let value = CONT_AMPLITUDE * CONT_GAIN ** i * noise3(x * frequency, y * frequency, 0, seed + i * 71);
-        if (i <= ridgeTo) {
-          const n = noise3(x * frequency, y * frequency, 0, seed + 3001 + i * 131);
-          value += RIDGE_AMPLITUDE * RIDGE_GAIN ** i * (1 - Math.abs(n)) * mask;
-        }
-        sums[i] += value;
-        squares[i] += value * value;
-      }
-    }
-    let variance = 0;
+  const detailVariance = new Float64Array(MAX_OCTAVE + 1);
+  const sums = new Float64Array(MAX_OCTAVE + 1);
+  const squares = new Float64Array(MAX_OCTAVE + 1);
+  const ridgeTo = Math.min(MAX_OCTAVE, RIDGE_MAX_OCTAVE);
+  let roughSum = 0;
+  for (let s = 0; s < DETAIL_SAMPLES; s += 1) {
+    /* Точки — регулярная решётка по всей планете со взаимно простым шагом:
+       несмещённости хватает, а разброс от порядка выборок не зависит. */
+    const mx = (((s * 61) % 97) + 0.5) / 97 * planet.widthM;
+    const my = (((s * 37) % 89) + 0.5) / 89 * planet.heightM;
+    shape.sample(mx, my, quad);
+    const x = mx + quad[0];
+    const y = my + quad[1];
+    const rough = 0.35 + 0.65 * clamp(quad[4], 0, 1.6);
+    roughSum += rough;
+    const mask = quad[2] * (1 - 0.55 * quad[3]);
     for (let i = detailFrom; i <= MAX_OCTAVE; i += 1) {
-      const mean = sums[i] / DETAIL_SAMPLES;
-      detailMean[i] = mean;
-      /* Октавы независимы (разные зерно и частота), поэтому дисперсии суммы —
-         сумма дисперсий: так среднее для любого диапазона берётся без перебора. */
-      variance += Math.max(squares[i] / DETAIL_SAMPLES - mean * mean, 0);
+      const frequency = 2 ** i / baseWavelength;
+      let value = CONT_AMPLITUDE * CONT_GAIN ** i * noise3(x * frequency, y * frequency, 0, seed + i * 71) * rough;
+      if (i <= ridgeTo) {
+        const n = noise3(x * frequency, y * frequency, 0, seed + 3001 + i * 131);
+        value += RIDGE_AMPLITUDE * RIDGE_GAIN ** i * (1 - Math.abs(n)) * mask;
+      }
+      sums[i] += value;
+      squares[i] += value * value;
     }
-    sigmaFull = Math.sqrt(variance);
+  }
+  for (let i = detailFrom; i <= MAX_OCTAVE; i += 1) {
+    const mean = sums[i] / DETAIL_SAMPLES;
+    detailMean[i] = mean;
+    /* Октавы независимы (разные зерно и частота), поэтому дисперсии суммы —
+       сумма дисперсий: так среднее и разброс для любого диапазона берутся без
+       перебора. Среднее важно не меньше разброса: хребтовое слагаемое имеет
+       положительное среднее, и неснятое среднее подняло бы весь мир над водой. */
+    detailVariance[i] = Math.max(squares[i] / DETAIL_SAMPLES - mean * mean, 0);
   }
   /** Среднее суммы октав с `from` по `to` включительно. */
   const centerOf = (from, to) => {
@@ -258,8 +332,20 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     for (let i = from; i <= to; i += 1) sum += detailMean[i];
     return sum;
   };
+  /** Разброс суммы октав с `from` по `to` включительно. */
+  const sigmaOf = (from, to) => {
+    let variance = 0;
+    for (let i = from; i <= to; i += 1) variance += detailVariance[i];
+    return Math.sqrt(variance);
+  };
+  const sigmaFull = sigmaOf(detailFrom, MAX_OCTAVE);
+  /* Множитель шероховатости меняется по карте (в орогенах до 1,4, на щитах 0,4),
+     поэтому σ по миру — средняя величина, а не худший случай. Охрана берега
+     обязана держать **худший** случай: там, где деталь самая крупная, клетка
+     дальше всего уходит от своей высоты. Отсюда отношение пика к среднему. */
+  const roughRatio = Math.max(1, (0.35 + 0.65 * 1.6) / Math.max(roughSum / DETAIL_SAMPLES, 1e-6));
   /** Сколько raw-единиц детали допустимо на единицу запаса до берега. */
-  const guardScale = geography && sigmaFull > 0 ? 1 / (GUARD_SIGMAS * sigmaFull) : 0;
+  const guardScale = geography && sigmaFull > 0 ? 1 / (GUARD_SIGMAS * sigmaFull * roughRatio) : 0;
 
   const tiles = new Map();
   let used = 0;
@@ -305,10 +391,16 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     geography ? geography.baseAt(originX + (px + 0.5) * pitch, originY + (py + 0.5) * pitch) : 0;
 
   /** Заполнить тайл суммой октав. `parent` — родитель уровня L−1 или null. */
+  const seaRaw = rawFromHeight(SEA_LEVEL);
   const fillTile = (level, tx, ty, parent) => {
     const mpp = mppAt(planet, level);
     const total = octaveCount(planet, mpp);
     const from = Math.max(detailFrom, parent ? octaveCount(planet, mpp * 2) + 1 : 0);
+    /* Запас до воды режется по **полному** разбросу детали, а не по октавам
+       этого уровня: множитель обязан быть одной и той же функцией места для
+       родителя и ребёнка, иначе растянутый родитель и добавленная деталь
+       разойдутся и пирамида перестанет быть продолжением. */
+    const guardLocal = PROC_GUARD_SIGMAS * Math.max(sigmaFull, 1e-6) * roughRatio;
     const out = new Float32Array(TILE * TILE);
     const origin = { x: tx * TILE * mpp, y: ty * TILE * mpp };
     const center = geography ? centerOf(from, total) : 0;
@@ -346,10 +438,14 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
           } else {
             const gy = parentY + y0;
             const gx = parentX + x0;
-            const a = rawPixel(level - 1, gx, gy);
-            const b = rawPixel(level - 1, gx + 1, gy);
-            const c = rawPixel(level - 1, gx, gy + 1);
-            const d = rawPixel(level - 1, gx + 1, gy + 1);
+            /* У соседнего тайла спрашиваем **только октавы**: основа в тайлы не
+               входит (она прибавляется при выборке высоты), и если подмешать её
+               здесь, растянутый родитель получит добавку на краю тайла — тайл
+               разойдётся с соседом изнутри. */
+            const a = tilePixel(level - 1, gx, gy);
+            const b = tilePixel(level - 1, gx + 1, gy);
+            const c = tilePixel(level - 1, gx, gy + 1);
+            const d = tilePixel(level - 1, gx + 1, gy + 1);
             top = a + (b - a) * fx;
             bottom = c + (d - c) * fx;
           }
@@ -373,9 +469,23 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
         acc.value = 0;
         acc.ridge = 0;
         addOctaves(acc, x, y, from, total);
-        /* На древних щитах хребты придавлены: платформа остаётся плоской. */
-        const detail = acc.value + acc.ridge * quad[2] * (1 - 0.55 * quad[3]);
+        /* Модуляция детали: где поднимаются горы, там и мелкий рельеф крупный,
+           на щитах он придавлен. Даже на щите деталь не исчезает совсем —
+           полностью гладких равнин в природе не бывает. */
+        const rough = 0.35 + 0.65 * clamp(quad[4], 0, 1.6);
+        const detail = acc.value * rough + acc.ridge * quad[2] * (1 - 0.55 * quad[3]);
         const index = py * TILE + px;
+        if (!geography && parent) {
+          /* У береговой линии деталь гаснет по запасу высоты основы — ровно
+             так же, как у мира из карты Azgaar. Иначе на пологом шельфе (там
+             перепад меньше сотни метров на сотни километров) шум переносил бы
+             клетки через урез воды и берег рассыпался бы на острова. */
+          const base = baseRawAt(mx, my);
+          const reserve = Math.abs(base - seaRaw);
+          const fade = reserve < guardLocal ? reserve / guardLocal : 1;
+          out[index] += (detail - centerOf(from, total)) * fade;
+          continue;
+        }
         if (geography) {
           geography.sample(mx, my, geo);
           /* Множитель детали: гладкий рост от берега, но не больше запаса,
@@ -405,8 +515,16 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
             /* У корня пирамиды тащить нечего: база и есть тайл. */
             out[index] = geo[0] + fade * (detail - center);
           }
+        } else if (parent) {
+          out[index] += detail - centerOf(from, total);
         } else {
-          out[index] += detail;
+          /* У корня пирамиды деталь центрируется: её среднее снимается, а
+             макрорельеф задаёт тектоническая основа, которая прибавляется при
+             выборке высоты. */
+          const base = baseRawAt(mx, my);
+          const reserve = Math.abs(base - seaRaw);
+          const fade = reserve < guardLocal ? reserve / guardLocal : 1;
+          out[index] = (detail - centerOf(from, total)) * fade;
         }
       }
     }
@@ -429,9 +547,16 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     return touch(name, tile);
   };
 
-  /** Одно значение суммы октав на уровне level в пиксельных координатах.
-      Координаты за краем карты допустимы: они прижимаются к краю. */
-  const rawPixel = (level, px, py) => {
+  /**
+   * Высота рельефа в пикселе уровня — **вместе с тектонической основой**.
+   *
+   * Основа прибавляется именно здесь, а не при сборке тайла, по двум причинам.
+   * Во-первых, тайл остаётся чистой суммой октав и общего кэша не портит: поле
+   * основы одно на весь мир и опрашивается по пикселю. Во-вторых, основа — поле
+   * на грубой решётке, и в точке она одна и та же для родителя и ребёнка,
+   * поэтому пирамида остаётся точной без «вычитания вклада родителя».
+   */
+  const tilePixel = (level, px, py) => {
     const { w, h } = levelPixels(planet, level);
     const x = Math.min(Math.max(px, 0), w - 1);
     const y = Math.min(Math.max(py, 0), h - 1);
@@ -439,6 +564,16 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     const ty = Math.floor(y / TILE);
     const tile = rawTile(level, tx, ty);
     return tile[(y - ty * TILE) * TILE + (x - tx * TILE)];
+  };
+
+  const rawPixel = (level, px, py) => {
+    const { w, h } = levelPixels(planet, level);
+    const x = Math.min(Math.max(px, 0), w - 1);
+    const y = Math.min(Math.max(py, 0), h - 1);
+    const octaves = tilePixel(level, x, y);
+    if (geography) return octaves;
+    const mpp = mppAt(planet, level);
+    return octaves + baseRawAt((x + 0.5) * mpp, (y + 0.5) * mpp);
   };
 
   /** Bilinear-выборка суммы октав: у краёв карты — с прижатием. */
@@ -489,24 +624,54 @@ export const createElevation = (planet, { bytes = 72 * 1024 * 1024, source = nul
     belt: (mx, my) => fieldAtN(shape, mx, my, 2),
     volcanic: (mx, my) => fieldAt(volcanic, mx, my),
     craton: (mx, my) => fieldAtN(shape, mx, my, 3),
-    /* Поля отдаются наружу затем же, чем и высоты: слоям «породы» и «сейсмика»
-       нужны пояс гор и вулканизм, а проверкам — возможность посмотреть на них
+    roughness: (mx, my) => fieldAtN(shape, mx, my, 4),
+    /* Поля тектоники и эрозии наружу: слоям нужны границы плит, возраст коры,
+       сейсмика и врезанные долины, а проверкам — возможность посмотреть на них
        отдельно от генератора. */
+    plate: (mx, my) => tekAt(mx, my, TECT.plate),
+    crust: (mx, my) => tekAt(mx, my, TECT.crust),
+    boundary: (mx, my) => tekAt(mx, my, TECT.boundaryType),
+    boundaryDistance: (mx, my) => tekAt(mx, my, TECT.boundaryDist),
+    crustAge: (mx, my) => tekAt(mx, my, TECT.age),
+    crustThickness: (mx, my) => tekAt(mx, my, TECT.thickness),
+    spreading: (mx, my) => tekAt(mx, my, TECT.convergence),
+    seismic: (mx, my) => tekAt(mx, my, TECT.seismicity),
+    rift: (mx, my) => tekAt(mx, my, TECT.rift),
+    hotspot: (mx, my) => tekAt(mx, my, TECT.hotspot),
+    trench: (mx, my) => tekAt(mx, my, TECT.trench),
+    arc: (mx, my) => tekAt(mx, my, TECT.arc),
+    drainage: (mx, my) => terrainBase().grid.sample1(mx, my, ERO.drainage),
+    incision: (mx, my) => terrainBase().grid.sample1(mx, my, ERO.incision),
+    dissection: (mx, my) => terrainBase().grid.sample1(mx, my, ERO.dissection),
+    /** Основа: тектоника и эрозия. Строится при первом обращении. */
+    terrain: () => terrainBase(),
+    /** Все поля основы разом — для проверок и слоёв. */
+    terrainFields: () => {
+      const base = terrainBase();
+      return { tectonics: base.tectonics, erosion: base.erosion };
+    },
+    /** Поля отдаются наружу затем же, чем и высоты. */
     fields: { shape, volcanic },
     /** Базовое поле из карты Azgaar — или null, если мир процедурный. */
     geography,
     /** С какой октавы деталь: 0 у процедурного мира; у карты генератора —
         ступень, на которой длина волны вдвое короче клетки источника. */
     detailFrom,
-    stats: () => ({
-      tiles: tiles.size,
-      bytes: used,
-      budget: bytes,
-      geography: geography ? 'azgaar' : 'procedural',
-      detailFrom,
-      sigma: sigmaFull,
-      source: geography ? geography.stats() : null,
-    }),
+    stats: () => {
+      const base = terrainBase();
+      return {
+        tiles: tiles.size,
+        bytes: used,
+        budget: bytes,
+        geography: geography ? 'azgaar' : 'procedural',
+        detailFrom,
+        sigma: sigmaFull,
+        roughRatio,
+        source: geography ? geography.stats() : null,
+        tectonics: base.tectonics.stats(),
+        erosion: base.erosion.stats(),
+      };
+    },
     /** Очистить кэш: смена размера планеты или seed. */
     clear: () => {
       tiles.clear();
