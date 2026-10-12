@@ -5,11 +5,11 @@
    plain-объект, снятый bridge.js с окна Azgaar (или сшитый тестом), выход —
    растры + функции выборки.
 
-   Единица растра = один блок = один пиксель карты (docs/voxel-world-generation.md
-   §4). Мир зациклен: координаты любой колонки сворачиваются в тайл
-   отражениями (fold), поэтому растр всегда размера карты. */
+   Единица растра = один блок. Карта Azgaar увеличивается по пикселям: один
+   пиксель = scale × scale блоков (scale — опция buildField). Мир не замощён:
+   одна полная карта, координаты за её краем приводятся к краю (fold). */
 
-import { clamp, fbm2, floorMod, hash32, noise2 } from './math.js';
+import { clamp, fbm2, hash32, noise2 } from './math.js';
 
 /** Уровень моря в Azgaar: h < 20 — вода. */
 export const FMG_SEA_LEVEL = 20;
@@ -40,6 +40,10 @@ const LAKE_CODES = {
   lava: LAKE_LAVA,
   frozen: LAKE_FROZEN,
 };
+
+/** Блоков на пиксель карты Azgaar по умолчанию и предел (память растёт как scale²). */
+export const DEFAULT_SCALE = 2;
+export const MAX_SCALE = 8;
 
 /**
  * Профили мира. heightScale — сколько блоков стоит одна единица высоты
@@ -85,19 +89,15 @@ export const latticeCell = (field, u, v) => {
 };
 
 /**
- * Свёртка координат в тайл. Период — два тайла по каждой оси, то есть
- * зеркальное замощение: соседние колонки на шве имеют одинаковые значения
- * полей, поэтому берега и русла не разрываются. Флаги отражения идут в шум и
- * декор, чтобы деревья не отзеркаливались один в один.
+ * Координаты колонки внутри одной полной карты. Мир не замощается: край
+ * карты — край мира, поэтому колонка за краем приводится к ближайшей
+ * колонке края (`inside` — false). Берег у края делает сам Azgaar: края его
+ * карты почти всегда морские.
  */
 export const fold = (field, x, z) => {
-  const periodX = field.width * 2;
-  const periodZ = field.height * 2;
-  const u0 = floorMod(x, periodX);
-  const v0 = floorMod(z, periodZ);
-  const mx = u0 >= field.width ? 1 : 0;
-  const my = v0 >= field.height ? 1 : 0;
-  return { u: mx ? periodX - 1 - u0 : u0, v: my ? periodZ - 1 - v0 : v0, mx, my };
+  const u = clamp(x, 0, field.width - 1);
+  const v = clamp(z, 0, field.height - 1);
+  return { u, v, mx: 0, my: 0, inside: u === x && v === z };
 };
 
 /** D8: вектор движения → направление 1…8 (0 — стоячая вода). */
@@ -145,11 +145,18 @@ export const flowVector = (dir) => {
  */
 export const buildField = (source, options = {}) => {
   const profile = WORLD_PROFILES[options.profile ?? 2] ?? WORLD_PROFILES[2];
-  const width = Math.max(64, Math.round(source.width));
-  const height = Math.max(64, Math.round(source.height));
-  const cellsX = Math.max(2, Math.round(source.cellsX) || Math.ceil(width / (source.spacing || 12)));
-  const cellsY = Math.max(2, Math.round(source.cellsY) || Math.ceil(height / (source.spacing || 12)));
-  const spacing = source.spacing || Math.sqrt((width * height) / (cellsX * cellsY));
+  /* Увеличение по пикселям: один пиксель карты Azgaar = scale × scale блоков.
+     Клетки и их шкала растягиваются вместе с картой, шум — пропорционально,
+     поэтому рельеф выглядит тем же, но крупнее и с мелкой деталью между
+     клетками. Сама карта Azgaar не меняется. */
+  const scale = clamp(Math.round(options.scale ?? DEFAULT_SCALE), 1, MAX_SCALE);
+  const sourceWidth = Math.max(64, Math.round(source.width));
+  const sourceHeight = Math.max(64, Math.round(source.height));
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  const cellsX = Math.max(2, Math.round(source.cellsX) || Math.ceil(sourceWidth / (source.spacing || 12)));
+  const cellsY = Math.max(2, Math.round(source.cellsY) || Math.ceil(sourceHeight / (source.spacing || 12)));
+  const spacing = (source.spacing || Math.sqrt((sourceWidth * sourceHeight) / (cellsX * cellsY))) * scale;
   const seaLevel = source.seaLevel ?? FMG_SEA_LEVEL;
   const cellCount = cellsX * cellsY;
   const fill = (array, Type, fallback) => {
@@ -162,6 +169,7 @@ export const buildField = (source, options = {}) => {
   const field = {
     width,
     height,
+    scale,
     area: width * height,
     spacing,
     cellsX,
@@ -194,9 +202,9 @@ export const buildField = (source, options = {}) => {
     for (let u = 0; u < width; u += 1) {
       let h = latticeBilinear(field.cellH, u, v, field);
       if (h >= seaLevel) {
-        h = Math.max(seaLevel, h + fbm2(field.seed, u, v, 3.5, 3) * 0.85 * field.detail);
+        h = Math.max(seaLevel, h + fbm2(field.seed, u, v, 3.5 * scale, 3) * 0.85 * field.detail);
       } else {
-        h = Math.min(seaLevel - 0.05, h + fbm2(field.seed, u, v, 2.6, 2) * 0.35 * field.detail);
+        h = Math.min(seaLevel - 0.05, h + fbm2(field.seed, u, v, 2.6 * scale, 2) * 0.35 * field.detail);
       }
       const i = v * width + u;
       base[i] = h;
@@ -379,7 +387,10 @@ const applyShore = (field) => {
       for (let dv = -1; dv <= 1; dv += 1) {
         for (let du = -1; du <= 1; du += 1) {
           if (!du && !dv) continue;
-          const n = cell(floorMod(u + du, width), floorMod(v + dv, height));
+          const nu = u + du;
+          const nv = v + dv;
+          if (nu < 0 || nv < 0 || nu >= width || nv >= height) continue;
+          const n = cell(nu, nv);
           if ((flags[n] & F_WATER) === 0) continue;
           const y = waterY[n];
           if (y - ground[i] > 3) continue;

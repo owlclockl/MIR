@@ -225,8 +225,11 @@ try {
       && webUrl.searchParams.get('options') === 'default',
     webSrc,
   );
-  webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-  await wait(30);
+  /* Карта блоков открывается сразу, и Esc идёт по ступенькам: карта блоков → карта → мир. */
+  for (let press = 0; press < 2; press += 1) {
+    webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await wait(30);
+  }
   ok('веб-сборка: Escape закрывает мир', !webWindow.document.querySelector('#world-page-root .world-app'));
 } finally {
   webWindow.close();
@@ -325,8 +328,11 @@ click('[data-action="world-exit"]');
 await wait(50);
 ok('«В меню» закрывает игровую страницу и показывает меню', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open') && !!$('.shell'));
 click('.play-button');
-window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-await wait(30);
+/* Карта блоков открывается сразу: первый Esc гасит её, второй закрывает мир. */
+for (let press = 0; press < 2; press += 1) {
+  window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await wait(30);
+}
 ok('Escape закрывает мир', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open'));
 ok('ошибок отрисовки мира нет', errors.length === 0, errors.join(' | '));
 

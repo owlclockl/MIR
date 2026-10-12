@@ -32,6 +32,7 @@
   /* Связь через хаб — не ошибка, но и не идеал: тёплый оттенок. */
   --warn: #d9c08a;
   --warn-glow: rgba(217, 192, 138, 0.4);
+  --voxel-frame: rgba(8, 13, 14, 0.72); /* плашки над картой блоками: HUD, панель ярусов, пояснение */
   --accent-glow: rgba(176, 208, 186, 0.45);
 
   /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
@@ -4613,13 +4614,14 @@ button.admin-row:hover {
 /* ---------- карта: воксельный вид того же мира ---------------- */
 
 /* Режим — надстройка над редактором, а не новый экран: документ Azgaar живёт
-   под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
-   просто скрывается visibility, а не вынимается из DOM. */
-.world-app.is-planet .world-editor-frame {
+под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
+просто скрывается visibility, а не вынимается из DOM. */
+
+.world-app.is-voxel .world-editor-frame {
   visibility: hidden;
 }
 
-.world-app.is-planet .world-attribution {
+.world-app.is-voxel .world-attribution {
   display: none;
 }
 
@@ -4629,14 +4631,98 @@ button.admin-row:hover {
   background: var(--accent);
 }
 
+/* Появление карты блоков: вся карта проявляется разом — из размытия и
+   лёгкого приближения к резкой картинке за один проход, без поэтапного
+   открытия. Кольцо света проходит по контуру, панели входят сразу после.
+   Включается классом is-reveal, который ставит world-view при монтировании. */
+@keyframes voxel-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(1.07);
+    filter: blur(14px) brightness(1.35) saturate(0.6);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0) brightness(1.06) saturate(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes voxel-ring {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
+}
+
+@keyframes voxel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.world-voxel.is-reveal .world-voxel-canvas {
+  animation: voxel-reveal 1.5s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+  will-change: transform, filter, opacity;
+}
+
+.world-voxel.is-reveal::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(92vmin, 900px);
+  height: min(92vmin, 900px);
+  border-radius: 50%;
+  border: 2px solid rgba(190, 236, 255, 0.85);
+  box-shadow: 0 0 40px 8px rgba(120, 200, 255, 0.45);
+  pointer-events: none;
+  z-index: 4;
+  transform: translate(-50%, -50%) scale(0.05);
+  animation: voxel-ring 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) 0.05s both;
+}
+
+.world-voxel.is-reveal .world-voxel-layers,
+.world-voxel.is-reveal .world-voxel-toolbar,
+.world-voxel.is-reveal .world-voxel-note {
+  animation: voxel-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-voxel.is-reveal .world-voxel-canvas,
+  .world-voxel.is-reveal::before,
+  .world-voxel.is-reveal .world-voxel-layers,
+  .world-voxel.is-reveal .world-voxel-toolbar,
+  .world-voxel.is-reveal .world-voxel-note {
+    animation: none;
+  }
+}
+
 .world-voxel {
   position: absolute;
   inset: 0;
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(#8fb6d4 0%, #cfe0ea 62%, #a9c1cf 100%);
+  background: linear-gradient(#16202a 0%, #101720 100%);
 }
+
+/* Полотно размером с окно и с разрешением в один блок на пиксель: растягивает
+его CSS, и только pixelated держит сетку чанков ровной (сглаживание превратило
+бы карту в кашу из полутонов). */
 
 .world-voxel-canvas {
   flex: 1 1 auto;
@@ -4646,7 +4732,8 @@ button.admin-row:hover {
   border: 0;
   outline: none;
   cursor: grab;
-  /* Без этого жест на телефоне прокручивал бы страницу вместо поворота камеры. */
+  image-rendering: pixelated;
+  /* Без этого жест на телефоне прокручивал бы страницу вместо сдвига карты. */
   touch-action: none;
 }
 
@@ -4658,20 +4745,16 @@ button.admin-row:hover {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-/* Строка состояния: координаты, блок под курсором, цена кадра. Лежит поверх
-   холста и мыши не перехватывает — всем управляет canvas. */
+/* Строка состояния: ярус, чанки, цена кадра, блок под курсором. Она внутри
+панели ярусов, а не поверх полотна: абсолютная плашка с фиксированным
+отступом неизбежно легла бы на ползунок при трёх строках. */
+
 .world-voxel-hud {
-  position: absolute;
-  left: var(--sp-12);
-  bottom: var(--sp-12);
-  max-width: calc(100% - var(--sp-32));
-  padding: var(--sp-6) var(--sp-10);
-  border: 1px solid var(--world-line);
-  background: rgba(8, 13, 14, 0.72);
+  padding: var(--sp-6) var(--sp-6) 0;
+  border-top: 1px solid var(--world-line);
   color: var(--text-soft);
   font: 500 11px/1.45 var(--font-ui);
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
 }
 
 .world-voxel-toolbar {
@@ -4689,7 +4772,7 @@ button.admin-row:hover {
   height: var(--control-h-sm);
   padding: 0 var(--sp-12);
   border: 1px solid var(--world-line);
-  background: rgba(8, 13, 14, 0.72);
+  background: var(--voxel-frame);
   color: var(--text-soft);
   font: 600 12px/1 var(--font-ui);
   white-space: nowrap;
@@ -4698,6 +4781,7 @@ button.admin-row:hover {
 }
 
 .world-voxel-button:hover,
+
 .world-voxel-button:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
@@ -4705,14 +4789,106 @@ button.admin-row:hover {
   outline: none;
 }
 
-.world-voxel-button.is-on {
+/* Панель ярусов: ползунок, пресеты, масштаб и наложения. Это единственный
+слой интерфейса режима, который ловит мышь, поэтому он прижат к низу и не
+тянется на всю ширину — карту можно таскать и под ним. */
+
+.world-voxel-layers {
+  position: absolute;
+  left: var(--sp-12);
+  bottom: var(--sp-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: calc(100% - var(--sp-24));
+  padding: var(--sp-8) var(--sp-10);
+  border: 1px solid var(--world-line);
+  background: var(--voxel-frame);
+}
+
+.world-voxel-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+
+.world-voxel-label {
+  color: var(--text-dim);
+  font: 600 10px/1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.world-voxel-label--right {
+  margin-left: var(--sp-8);
+}
+
+.world-voxel-step {
+  width: var(--control-h-mini);
+  height: var(--control-h-mini);
+  padding: 0;
+  border: 1px solid var(--world-line);
+  background: transparent;
+  color: var(--text-soft);
+  font: 600 13px/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.world-voxel-step:hover,
+
+.world-voxel-step:focus-visible {
+  color: var(--text);
+  border-color: var(--world-line-strong);
+  background: var(--fill-hover);
+  outline: none;
+}
+
+.world-voxel-value {
+  color: var(--text-soft);
+  font: 500 11px/1.3 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ползунок яруса шире прочих: по нему водят мышью, ищут нужный срез. */
+
+.world-voxel-slider {
+  width: clamp(140px, 34vw, 420px);
+  height: var(--control-h-mini);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+
+.world-voxel-chip {
+  height: var(--control-h-mini);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--world-line);
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 11px/1 var(--font-ui);
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.world-voxel-chip:hover,
+
+.world-voxel-chip:focus-visible {
+  color: var(--text);
+  border-color: var(--world-line-strong);
+  background: var(--fill-hover);
+  outline: none;
+}
+
+.world-voxel-chip.is-on {
   color: var(--world-bg);
-  border-color: var(--warn);
-  background: var(--warn);
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 /* Пояснение режима: чем засеян мир, чего не хватает. Тонкая тёплая плашка —
-   это не ошибка, это состояние. */
+это не ошибка, это состояние. */
+
 .world-voxel-note {
   position: absolute;
   top: var(--sp-12);
@@ -4720,7 +4896,7 @@ button.admin-row:hover {
   margin: 0;
   padding: var(--sp-6) var(--sp-14);
   border: 1px solid var(--warn-glow);
-  background: rgba(8, 13, 14, 0.82);
+  background: var(--voxel-frame);
   color: var(--warn);
   font: 500 11px/1.45 var(--font-ui);
   text-align: center;
