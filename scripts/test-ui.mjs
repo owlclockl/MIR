@@ -42,6 +42,12 @@ const testCanvasContext = () => ({
   clearRect() {}, fillRect() {}, drawImage() {}, putImageData() {},
   save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
   stroke() {}, strokeRect() {}, strokeText() {}, arc() {}, fill() {}, fillText() {},
+  /* Вид планеты рисует по пикселям и переставляет систему координат: без этих методов
+     заглушка падала на первом кадре. */
+  setTransform() {}, resetTransform() {}, rotate() {}, clip() {}, rect() {}, setLineDash() {},
+  quadraticCurveTo() {}, bezierCurveTo() {}, arcTo() {}, ellipse() {},
+  getImageData: (x, y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+  measureText: (text) => ({ width: String(text).length * 6 }),
 });
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
@@ -52,6 +58,15 @@ const dom = new JSDOM(html, {
     w.fetch = fetchStub(w);
     w.HTMLCanvasElement.prototype.getContext = function () {
       return this.__testCanvasContext ??= testCanvasContext();
+    };
+    w.ImageData ??= class ImageData {
+      // Как в браузере: new ImageData(width, height) или new ImageData(data, width, height).
+      constructor(a, b, c) {
+        const hasData = typeof a !== 'number';
+        this.width = hasData ? b : a;
+        this.height = hasData ? c : b;
+        this.data = hasData ? a : new Uint8ClampedArray(this.width * this.height * 4);
+      }
     };
   },
 });
@@ -184,6 +199,15 @@ const webDom = new JSDOM(webMarkup, {
     w.fetch = (input, init) => fetchStub(w)(new URL(String(input), w.location.href).href, init);
     w.HTMLCanvasElement.prototype.getContext = function () {
       return this.__testCanvasContext ??= testCanvasContext();
+    };
+    w.ImageData ??= class ImageData {
+      // Как в браузере: new ImageData(width, height) или new ImageData(data, width, height).
+      constructor(a, b, c) {
+        const hasData = typeof a !== 'number';
+        this.width = hasData ? b : a;
+        this.height = hasData ? c : b;
+        this.data = hasData ? a : new Uint8ClampedArray(this.width * this.height * 4);
+      }
     };
     w.AbortSignal = globalThis.AbortSignal;
     w.crypto.subtle = globalThis.crypto.subtle;

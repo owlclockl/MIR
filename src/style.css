@@ -4925,7 +4925,8 @@ button.admin-row:hover {
 .world-gen-scene {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  /* Выше вида планеты (z-index 3): пока карта считается, главный визуал — сцена. */
+  z-index: 4;
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 42%, #14201e 0%, #0d1415 55%, var(--bg) 100%);
   color: var(--text);

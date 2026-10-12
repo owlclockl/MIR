@@ -592,8 +592,10 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     pointer = null;
   });
   window.addEventListener('keydown', onKeyDown);
-  const observer = new ResizeObserver(() => resize());
-  observer.observe(element);
+  /* ResizeObserver есть во всех поддерживаемых браузерах; без него — событие окна. */
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => resize()) : null;
+  if (observer) observer.observe(element);
+  else window.addEventListener('resize', resize);
 
   /* Хост не очищаем: в нём живёт iframe с документом Azgaar. Его удаление
      заставило бы генератор карты строиться заново (секунды), поэтому вид
@@ -613,7 +615,8 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (sourceTimer) clearTimeout(sourceTimer);
     sourceTimer = 0;
     cancelAnimationFrame(frameHandle);
-    observer.disconnect();
+    observer?.disconnect();
+    window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKeyDown);
     element.remove();
   };

@@ -2341,6 +2341,7 @@ const enterWorldMap = (slot, config) => {
   session.importToSlot = null;
   session.screen = 'map';
   dropPlanetMap();
+  session.planet = true;
   renderWorldPage();
 };
 
@@ -2369,6 +2370,7 @@ const openWorldSlot = (role, index) => {
   session.importToSlot = null;
   session.config = store.normalizeWorldConfig(entry);
   session.screen = 'map';
+  session.planet = true;
   renderWorldPage();
 };
 
@@ -3618,6 +3620,7 @@ const openLobbyMap = (summary, config, { fresh }) => {
   session.config = config;
   session.leaveArmed = false;
   session.screen = 'map';
+  session.planet = true;
   renderWorldPage();
 };
 
@@ -4437,10 +4440,10 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: карта планеты → карта → страница игры. */
-    if (ui.world.screen === 'map' && ui.world.planet) {
+    /* Ступеньки: редактор Azgaar → карта планеты (основной вид) → страница игры. */
+    if (ui.world.screen === 'map' && !ui.world.planet) {
       event.preventDefault();
-      setPlanetMap(false);
+      setPlanetMap(true);
       return;
     }
     event.preventDefault();
