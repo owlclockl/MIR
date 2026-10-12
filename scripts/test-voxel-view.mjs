@@ -572,6 +572,48 @@ add(slowHost.childElementCount === 0, 'dispose снимает построенн
 /* Отказ до генератора: если карту так и не построили, ручка обязана звать
    dispose у того, что успела создать, и не оставлять таймеров. */
 
+/* Пустое окно на месте редактора — ровно тот случай, о котором пришла
+
+   жалоба: документ открыт (окно есть), а карт в нём ещё нет, потому что
+
+   генератор до них не дошёл. Это ожидание, а не «воксельный мир строить
+
+   рано: документ редактора не открыт». */
+
+const bareHost = window.document.createElement('div');
+
+window.document.body.append(bareHost);
+
+const bareWindow = {};
+
+const bare = mountWorldView(bareHost, { frame: { contentWindow: bareWindow }, config: null });
+
+add(bare.waiting === true && /Считаю карту генератора/.test(bare.element.textContent ?? ''),
+
+  'пустое окно редактора — это ожидание, а не ошибка', bare.error ?? '');
+
+add(bare.error === '', 'в ожидании на пустом окне ошибки нет', bare.error ?? '');
+
+/* Генератор договорил: карты появились в том же окне — вид обязан построиться
+
+   сам, заменив сцену ожидания. */
+
+Object.assign(bareWindow, fakeEditorWindow());
+
+await wait(600);
+
+add(bare.waiting === false && bare.element.querySelector('canvas') !== null,
+
+  'пустое окно дождалось карт и построило мир');
+
+add(bareHost.childElementCount === 1, 'сцена ожидания уступила место, а не осталась рядом');
+
+bare.dispose();
+
+await wait(WAIT_PROBE);
+
+add(bareHost.childElementCount === 0, 'ожидание на пустом окне снимается по dispose');
+
 const goneHost = window.document.createElement('div');
 
 window.document.body.append(goneHost);

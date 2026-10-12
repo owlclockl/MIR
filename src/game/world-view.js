@@ -114,9 +114,49 @@ const frameState = (frame) => {
    как только карта появится: ожидание — это состояние вида, а не отказ.
    Ждать имеет смысл только того, кто может появиться: без самого кадра
    редактора дело не в генерации, и причину называет вид, а не надпись. */
+/* Признаки «карт в документе ещё нет»: так отвечает мост, когда окно есть, а
+   генератор до карт не дошёл. Это не отказ — это ожидание. */
+const TOO_EARLY = /строить рано|документ редактора не открыт/;
+
+/* Что видно про кадр редактора — для сообщения о неудаче: без этого «не
+   открыт» не отличить от «открыт, но пустой», и разбираться приходится
+   догадками. */
+const describeFrame = (frame) => {
+  if (!frame) return 'кадра редактора нет вовсе';
+  let src = 'без адреса';
+  try {
+    src = typeof frame.getAttribute === 'function' ? frame.getAttribute('src') || 'srcdoc' : 'без адреса';
+  } catch {
+    src = 'адрес недоступен';
+  }
+  try {
+    const win = frame.contentWindow;
+    if (!win) return `кадр ${src}, окна нет`;
+    const grid = win.grid?.cells?.h?.length ?? 0;
+    const pack = win.pack?.cells?.h?.length ?? 0;
+    return `кадр ${src}, окно есть, сетка ${grid ? `${grid} клеток` : 'не построена'}, упаковка ${pack ? 'есть' : 'нет'}`;
+  } catch {
+    return `кадр ${src}, к документу нет доступа`;
+  }
+};
+
+/* Собрать вид или, если карты ещё не готовы, вернуться к ожиданию: «рано» —
+   не отказ. Так закрывается и гонка (проверили готовность — а документ как раз
+   перезагрузился), и пересозданный кадр, и ожидание, которое затянулось. */
+const mountOrWait = (host, options) => {
+  const view = buildWorldView(host, options);
+  const early = view.error && options.frame && TOO_EARLY.test(view.error);
+  /* Зерно ожидания живёт в options: сколько ждать — считаем один раз на весь
+     сеанс, а не заново после каждой попытки. */
+  const deadline = options.deadline ?? Date.now() + WAIT_LIMIT_MS;
+  if (!early || Date.now() >= deadline) return view;
+  view.dispose();
+  return mountWaitingView(host, { ...options, deadline });
+};
+
 export const mountWorldView = (host, options = {}) => {
-  if (!options.frame || frameState(options.frame) !== 'wait') return buildWorldView(host, options);
-  return mountWaitingView(host, options);
+  if (options.frame && frameState(options.frame) === 'wait') return mountWaitingView(host, options);
+  return mountOrWait(host, options);
 };
 
 /* ---------- ожидание генератора ---------- */
@@ -124,6 +164,10 @@ export const mountWorldView = (host, options = {}) => {
 /* Как часто спрашиваем окно редактора. Раз в четверть секунды: генерация идёт
    секундами, а чаще спрашивать незачем — только зазря будить поток. */
 const WAIT_STEP_MS = 250;
+/* Мост говорит «документ редактора не открыт» и про загружающийся, и про
+   закрытый документ. В ожидании это грозно звучит зря: там понятно, что
+   документ просто ещё едет. */
+const waitReason = (reason) => (reason === 'документ редактора не открыт' ? 'документ ещё загружается' : reason);
 /* Сколько ждём, прежде чем сдаться. Дольше двух минут молчащий генератор —
    это уже не «считает», а отказ, и о нём должен сказать сам вид. */
 const WAIT_LIMIT_MS = 120_000;
@@ -136,6 +180,7 @@ const WAIT_LIMIT_MS = 120_000;
  */
 const mountWaitingView = (host, options) => {
   const { frame } = options;
+  const deadline = options.deadline ?? Date.now() + WAIT_LIMIT_MS;
   const root = document.createElement('div');
   root.className = 'world-voxel';
   root.dataset.role = 'world-voxel';
@@ -154,7 +199,7 @@ const mountWaitingView = (host, options) => {
   let timer = 0;
   let inner = null;
   let disposed = false;
-  const startedAt = Date.now();
+  let gaveUp = '';
   const leave = () => {
     if (!disposed) options.onExit?.();
   };
@@ -173,19 +218,42 @@ const mountWaitingView = (host, options) => {
     /* Свою сцену убираем до сборки: настоящий вид занимает тот же хост, и две
        разметки поверх друг друга — это два «К карте» и две заметки. */
     root.remove();
-    inner = buildWorldView(host, options);
+    const view = buildWorldView(host, options);
+    /* Снимок снова сказал «рано» (кадр успел перезагрузиться или окно ещё не
+       до конца живо) — это не тупик, а продолжение ожидания: сцену возвращаем
+       на место и ждём дальше, пока есть срок. */
+    if (view.error && TOO_EARLY.test(view.error) && Date.now() < deadline) {
+      view.dispose();
+      host.append(root);
+      waitText.textContent = `Считаю карту генератора: ${waitReason(missingMapsPart(frame?.contentWindow))}…`;
+      note.textContent = 'Карта блоками появится сама, как только мир будет готов.';
+      timer = setTimeout(poll, WAIT_STEP_MS);
+      return;
+    }
+    inner = view;
     waiting.element = inner.element;
     waiting.waiting = false;
+  };
+  const giveUp = () => {
+    clearTimeout(timer);
+    timer = 0;
+    gaveUp = `Генератор не ответил за две минуты: ${waitReason(missingMapsPart(frame?.contentWindow))}.`;
+    waitText.textContent = 'Карта так и не построилась.';
+    note.textContent = `${gaveUp} ${describeFrame(frame)}. Кнопка «Карта блоками» попробует снова.`;
   };
   const poll = () => {
     timer = 0;
     if (disposed) return;
     const state = frameState(frame);
-    if (state !== 'wait' || Date.now() - startedAt > WAIT_LIMIT_MS) {
+    if (state !== 'wait') {
       handover();
       return;
     }
-    waitText.textContent = `Считаю карту генератора: ${missingMapsPart(frame?.contentWindow)}…`;
+    if (Date.now() >= deadline) {
+      giveUp();
+      return;
+    }
+    waitText.textContent = `Считаю карту генератора: ${waitReason(missingMapsPart(frame?.contentWindow))}…`;
     note.textContent = 'Карта блоками появится сама, как только мир будет готов.';
     timer = setTimeout(poll, WAIT_STEP_MS);
   };
@@ -196,7 +264,7 @@ const mountWaitingView = (host, options) => {
        редактора пересоздаётся на новый seed и на смену размера. */
     frame,
     get error() {
-      return inner?.error ?? '';
+      return inner?.error || gaveUp;
     },
     dispose: stop,
   };
@@ -387,7 +455,9 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
   const stop = (message) => {
     view.error = message;
 
-    setNote(message);
+    /* К «почему не построился» добавляем, что видно про сам кадр: иначе
+       «документ не открыт» не отличить от «открыт, но пустой». */
+    setNote(`${message} (${describeFrame(frame)})`);
 
     hud.textContent = 'Мир не построен — данные карты недоступны.';
 
