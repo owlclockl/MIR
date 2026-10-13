@@ -53,6 +53,8 @@ import {
   F_WATER,
   LAKE_LAVA,
   LAKE_SALT,
+  biomeAt,
+  latticeCell,
   sampleColumn,
   surfaceY as surfaceOf,
 } from './field.js';
@@ -153,6 +155,133 @@ const isReplaceable = (id) => id === AIR || BLOCKS[id]?.replaceable === true;
 /** Опции прохода по области влияния: только деревья и кактусы. */
 const RING_OPTIONS = { treesOnly: true };
 
+/** Сколько слоёв воды сковывает лёд при такой температуре. */
+const iceThickness = (temp) => (temp <= -12 ? 3 : 1);
+
+/* Дно океана выбирается по высоте рельефа, а высота — Float32 с точностью до
+   сотых: линейный поиск по полосам на каждом пикселе кадра стоит дороже самой
+   отрисовки. Диапазон высот один на все поля (0…255 блоков), поэтому таблица
+   строится один раз и на весь мир: 256 записей вместо поиска. */
+const OCEAN_BANDS = new Array(256);
+const oceanBand = (h) => {
+  const key = clamp(Math.round(h), 0, 255);
+  const known = OCEAN_BANDS[key];
+  if (known) return known;
+  const band = OCEAN_FLOOR.find((b) => key >= Math.floor(b.from) && key <= Math.ceil(b.to)) ?? OCEAN_FLOOR[2];
+  OCEAN_BANDS[key] = band;
+  return band;
+};
+
+/** Кэш палитр по клеткам решётки: один на кадр, палитра клетки не меняется. */
+export const paletteCache = (field) => new Array(field.cellsX * field.cellsY);
+
+/**
+ * Чем покрыта поверхность колонки и чем она подпирается. Одно правило на всех:
+ * генератор чанка и кадр обязаны видеть один и тот же блок, иначе граница
+ * построенных чанков читается в кадре прямоугольником.
+ *
+ * Значения передаются по одному, а не объектом: кадр зовёт это на каждом
+ * пикселе, и литерал на пиксель стоит дороже всей остальной отрисовки.
+ */
+const surfaceLayers = (field, out, water, flags, surfaceY, h, lakeType, palette) => {
+  const riverOrLake = (flags & (F_RIVER | F_LAKE)) !== 0;
+  let top = palette.top;
+  let filler = palette.filler;
+  let soil = water ? 2 : 3;
+  if (water && !riverOrLake) {
+    const band = oceanBand(h);
+    top = band.top;
+    filler = band.filler;
+  } else if ((flags & F_BEACH) !== 0 && surfaceY <= field.seaY + 2) {
+    top = SAND;
+    filler = [SAND, SAND, SANDSTONE];
+    soil = 3;
+  } else if (lakeType === LAKE_SALT) {
+    top = SALT;
+    filler = [SALT, CLAY, CLAY];
+  }
+  if ((flags & F_SNOW) !== 0 && !water && (top === GRASS || top === SAND || top === DIRT || top === PODZOL || top === MOSS)) {
+    top = SNOW;
+  }
+  out.top = top;
+  out.filler = filler;
+  out.soil = soil;
+  out.stone = palette.subsoil ?? STONE;
+  return out;
+};
+
+/**
+ * Верх колонки: где он, чем покрыт и чем подпирается. `column` — что угодно с
+ * полями `sampleColumn` (y, waterY, flags, biome, prec, temp, h, lakeType, dir).
+ */
+export const columnProfile = (field, column, out = {}) => {
+  const water = (column.flags & F_WATER) !== 0;
+  const surfaceY = clamp(column.y, 0, field.worldHeight - 1);
+  const palette = paletteFor(column.biome, column.prec, column.temp, Math.round(column.h));
+  out.water = water;
+  out.surfaceY = surfaceY;
+  out.waterY = water ? clamp(column.waterY, 0, field.worldHeight - 1) : 0;
+  out.lava = column.lakeType === LAKE_LAVA;
+  out.ice = (column.flags & F_ICE) !== 0;
+  out.thickness = iceThickness(column.temp);
+  out.flowing = (column.dir ?? 0) !== 0;
+  return surfaceLayers(field, out, water, column.flags, surfaceY, column.h, column.lakeType, palette);
+};
+
+/**
+ * Тот же профиль, но собранный прямо из полей кадра по пикселю (u, v, i):
+ * `sampleColumn` создаёт объект, а кадру нужен блок на каждом пикселе. `cells` —
+ * кэш палитр из `paletteCache(field)`, `out` — переиспользуемый объект профиля.
+ */
+export const fieldProfile = (field, u, v, i, out, cells) => {
+  const flags = field.flags[i];
+  const c = latticeCell(field, u, v);
+  const own = field.cellBiome[c];
+  const biome = biomeAt(field, u, v, c, own);
+  const water = (flags & F_WATER) !== 0;
+  const surfaceY = clamp(field.ground[i], 0, field.worldHeight - 1);
+  const h = field.base[i];
+  /* Палитру кэшируем по клетке: у клетки биом один на сотни пикселей. На
+     размытой границе биом соседний — там палитра считается как есть, таких
+     пикселей единицы процентов. */
+  let palette = null;
+  if (biome === own) {
+    palette = cells ? cells[c] : null;
+    if (!palette) {
+      palette = paletteFor(own, field.cellPrec[c], field.cellTemp[c], Math.round(h));
+      if (cells) cells[c] = palette;
+    }
+  } else {
+    palette = paletteFor(biome, field.cellPrec[c], field.cellTemp[c], Math.round(h));
+  }
+  out.water = water;
+  out.surfaceY = surfaceY;
+  out.waterY = water ? clamp(field.waterY[i], 0, field.worldHeight - 1) : 0;
+  out.lava = field.lakeType[i] === LAKE_LAVA;
+  out.ice = (flags & F_ICE) !== 0;
+  out.thickness = iceThickness(field.cellTemp[c]);
+  out.flowing = (field.flow[i] & 15) !== 0;
+  return surfaceLayers(field, out, water, flags, surfaceY, h, field.lakeType[i], palette);
+};
+
+/**
+ * Блок колонки на высоте `y` по её профилю — без руды, пещер и декора: они
+ * живут только в построенных чанках.
+ */
+export const columnBlock = (y, profile) => {
+  if (y < 0) return AIR;
+  if (y > profile.surfaceY) {
+    if (!profile.water || profile.waterY <= profile.surfaceY || y > profile.waterY) return AIR;
+    if (profile.lava) return LAVA;
+    if (profile.ice && y > profile.waterY - profile.thickness) return ICE;
+    return profile.flowing ? WATER : WATER_SOURCE;
+  }
+  if (y === 0) return BEDROCK;
+  if (y === profile.surfaceY) return profile.top;
+  if (y > profile.surfaceY - profile.soil) return profile.filler[Math.min(profile.filler.length - 1, profile.surfaceY - y - 1)] ?? DIRT;
+  return profile.stone;
+};
+
 /**
  * Одна колонка: от y = 0 до вершины мира. `out` пишется на месте по offset —
  * временный буфер и копирование в чанке не нужны, там массив уже обнулён.
@@ -163,59 +292,27 @@ export const generateColumn = (field, x, z, out, options = {}) => {
   const offset = options.offset ?? 0;
   const height = field.worldHeight;
   const column = sampleColumn(field, x, z);
-  const water = (column.flags & F_WATER) !== 0;
-  const surfaceY = clamp(column.y, 0, height - 1);
-  const waterY = water ? clamp(column.waterY, 0, height - 1) : 0;
-  const palette = paletteFor(column.biome, column.prec, column.temp, Math.round(column.h));
-  const riverOrLake = (column.flags & (F_RIVER | F_LAKE)) !== 0;
+  const profile = columnProfile(field, column);
+  const { surfaceY, waterY, stone } = profile;
   if (options.clear !== false) out.fill(AIR, offset, offset + height);
 
-  let top = palette.top;
-  let filler = palette.filler;
-  let soil = water ? 2 : 3;
-  if (water && !riverOrLake) {
-    const band = OCEAN_FLOOR.find((b) => column.h >= b.from && column.h <= b.to) ?? OCEAN_FLOOR[2];
-    top = band.top;
-    filler = band.filler;
-  } else if ((column.flags & F_BEACH) !== 0 && surfaceY <= field.seaY + 2) {
-    top = SAND;
-    filler = [SAND, SAND, SANDSTONE];
-    soil = 3;
-  } else if (column.lakeType === LAKE_SALT) {
-    top = SALT;
-    filler = [SALT, CLAY, CLAY];
-  }
-  if ((column.flags & F_SNOW) !== 0 && !water && (top === GRASS || top === SAND || top === DIRT || top === PODZOL || top === MOSS)) {
-    top = SNOW;
-  }
 
-  const stone = palette.subsoil ?? STONE;
   const vein = options.ores === false ? null : oreVein(field.seed, x, z, height);
   const caves = options.caves === false ? null : options.caveGrid ?? null;
   const lx = options.lx ?? 0;
   const lz = options.lz ?? 0;
 
   for (let y = 0; y <= surfaceY; y += 1) {
-    let id;
-    if (y === 0) id = BEDROCK;
-    else if (y === surfaceY) id = top;
-    else if (y > surfaceY - soil) id = filler[Math.min(filler.length - 1, surfaceY - y - 1)] ?? DIRT;
-    else id = stone;
+    let id = columnBlock(y, profile);
     if (id === stone && y > 1 && vein && y >= vein.from && y <= vein.to) id = vein.id;
     if (y > 1 && y < surfaceY && caves && caveAtNode(caves, x, y, z)) continue;
     out[offset + y] = id;
   }
 
-  /* Вода, лёд, лава. Направление течения уже посчитано в поле: dir = 0 значит
-     стоячая вода (море, озеро), остальное течёт. */
-  if (water && waterY > surfaceY) {
-    const still = column.dir === 0;
-    const lava = column.lakeType === LAKE_LAVA;
-    for (let y = surfaceY + 1; y <= waterY; y += 1) out[offset + y] = lava ? LAVA : still ? WATER_SOURCE : WATER;
-    if (!lava && (column.flags & F_ICE) !== 0) {
-      const thickness = column.temp <= -12 ? 3 : 1;
-      for (let y = waterY, k = 0; k < thickness && y > surfaceY; y -= 1, k += 1) out[offset + y] = ICE;
-    }
+  /* Вода, лёд, лава — тем же правилом, что увидит кадр: ярус среза обязан
+     попадать в тот же блок, что стоит в чанке. */
+  if (profile.water && waterY > surfaceY) {
+    for (let y = surfaceY + 1; y <= waterY; y += 1) out[offset + y] = columnBlock(y, profile);
   }
   return { y: surfaceY, waterY, biome: column.biome, flags: column.flags, column };
 };

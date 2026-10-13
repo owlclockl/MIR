@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Генератор планеты — мастерская</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      /* Страница-мастерская: только сцена во весь экран, без меню игры.
+         Стили панели и холста берутся из src/style.css — те же, что в игре,
+         чтобы вид нельзя было «улучшить» отдельно от продукта. */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #0a1622;
+      }
+
+      .workshop {
+        position: relative;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="workshop" data-role="world-editor-host"></div>
+    <script type="module">
+      import { mountPlanetView } from '/src/planet/view.js';
+
+      /* Мастерская генератора: сюда смотрят, как мир живёт. Ничего игрового
+         на странице нет — только вид планеты с часами, погодой и слоями
+         анимации. Зерно можно задать ссылкой: ?seed=живой-мир&size=1 */
+      const params = new URLSearchParams(location.search);
+      const host = document.querySelector('[data-role="world-editor-host"]');
+      const view = mountPlanetView(host, {
+        seed: params.get('seed') || 'живой-мир',
+        size: Number(params.get('size') || 1),
+        onExit: () => {},
+      });
+
+      /* Ошибку видно на странице, а не только в консоли: мастерская для того и
+         нужна, чтобы в неё смотреть. */
+      window.addEventListener('error', (event) => {
+        const note = document.createElement('div');
+        note.style.cssText = 'position:fixed;inset:auto 0 0 0;padding:8px 12px;background:#3a1212;color:#ffd9d9;font:500 12px/1.4 system-ui;z-index:9';
+        note.textContent = `Ошибка: ${event.message}`;
+        document.body.append(note);
+      });
+      window.planetWorkshop = view;
+    </script>
+  </body>
+</html>

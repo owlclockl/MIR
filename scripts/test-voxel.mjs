@@ -39,11 +39,14 @@ import {
   fold,
   sampleColumn,
   surfaceY,
+  F_ICE,
   F_RIVER,
+  biomeAt,
   F_WATER,
   F_FALL,
   flowVector,
   direction8,
+  latticeCell,
 } from '../src/world/field.js';
 
 import {
@@ -66,7 +69,7 @@ import {
   TILES,
 } from '../src/world/blocks.js';
 
-import { CHUNK_SX, CHUNK_SZ, generateChunk, blockAt } from '../src/world/chunk.js';
+import { CHUNK_SX, CHUNK_SZ, blockAt, columnBlock, fieldProfile, generateChunk, paletteCache } from '../src/world/chunk.js';
 
 import { encodePalette, decodePalette } from '../src/world/chunk.js';
 
@@ -687,8 +690,18 @@ const wetView = makeView([wetCell % field.width, Math.floor(wetCell / field.widt
 
 воды или выше вершины — в обоих случаях видно воду. */
 
-const coveredAt = (i, level) =>
-  (field.flags[i] & F_WATER) !== 0 && field.waterY[i] > field.ground[i] && level > field.ground[i];
+const coveredAt = (i, level, cell) => {
+  if ((field.flags[i] & F_WATER) === 0) return false;
+
+  if (field.waterY[i] <= field.ground[i] || level <= field.ground[i]) return false;
+
+  /* Вода подо льдом — не вода: лёд это блок, а не жидкость, и в кадре он не
+     считается ни водой, ни течением. Правило сверяется со блоком колонки. */
+
+  if ((field.flags[i] & F_ICE) === 0) return true;
+
+  return level <= field.waterY[i] - (field.cellTemp[cell] <= -12 ? 3 : 1);
+};
 
 const wetSlice = buildSlice(field, colors, null, wetView, {
   level: wetLevel,
@@ -704,7 +717,7 @@ for (let z = 0; z < wetView.cellsZ; z += 1) {
   for (let x = 0; x < wetView.cellsX; x += 1) {
     const { u, v } = fold(field, wetView.x0 + x, wetView.z0 + z);
 
-    if (coveredAt(v * field.width + u, wetLevel)) flagged += 1;
+    if (coveredAt(v * field.width + u, wetLevel, latticeCell(field, u, v))) flagged += 1;
   }
 }
 
@@ -734,7 +747,7 @@ for (let z = 0; z < wetView.cellsZ; z += 1) {
   for (let x = 0; x < wetView.cellsX; x += 1) {
     const { u, v } = fold(field, wetView.x0 + x, wetView.z0 + z);
 
-    const here = coveredAt(v * field.width + u, wetLevel);
+    const here = coveredAt(v * field.width + u, wetLevel, latticeCell(field, u, v));
 
     for (const [dx, dz] of [
       [1, 0],
@@ -742,7 +755,7 @@ for (let z = 0; z < wetView.cellsZ; z += 1) {
     ]) {
       const { u: nu, v: nv } = fold(field, wetView.x0 + x + dx, wetView.z0 + z + dz);
 
-      if (coveredAt(nv * field.width + nu, wetLevel) !== here) flips += 1;
+      if (coveredAt(nv * field.width + nu, wetLevel, latticeCell(field, nu, nv)) !== here) flips += 1;
     }
   }
 }
@@ -1107,6 +1120,34 @@ try {
 
 add(partial instanceof VoxelSourceError && /рано/.test(partial.message), 'мост: генерация не дошла — мир не строим');
 
+/* Биомы появляются позже упаковки — между этими шагами окно уже отдаёт сетку и
+   pack, но ещё не отдаёт `pack.cells.biome`. Мост считал такой мир готовым и
+   падал в переносе биомов («Cannot read properties of undefined»), поэтому
+   проверка готовности обязана спрашивать и про биомы. */
+const noBiomes = fakeEditorWindow({ biomes: false });
+
+add(mapsReady(noBiomes) === false, 'мост: без биомов мир ещё не готов');
+
+add(/биом/.test(missingMapsPart(noBiomes)), 'мост: подсказка называет биомы', missingMapsPart(noBiomes));
+
+let biomeEarly = null;
+
+try {
+  readSource(noBiomes);
+} catch (error) {
+  biomeEarly = error;
+}
+
+add(
+  biomeEarly instanceof VoxelSourceError && /рано/.test(biomeEarly.message),
+  'мост: окно без биомов — ожидание, а не падение',
+  biomeEarly?.message ?? '',
+);
+
+noBiomes.pack.cells.biome = [1, 7, 7];
+
+add(mapsReady(noBiomes) === true && readSource(noBiomes).stats.rivers === 1, 'мост: биомы доехали — снимок берётся');
+
 /* ---------- 8. хранилище чанков и пиксель по блоку ---------- */
 
 /* Хост не передаём: без DOM мир считается ровно так же. Проверяем то, что в
@@ -1168,6 +1209,101 @@ add(
   built.ready > 0 && built.bytes > 0,
   'очередь строит чанки в бюджете кадра',
   `${built.ready} готово, ${(built.bytes / 1024).toFixed(0)} КиБ блоков`,
+);
+
+/* Край биома: у клетки решётки биом один на всю клетку, и без размытия его
+   граница читается в кадре квадратом в тридцать блоков. Проверяем, что в
+   глубине клетки биом свой, а у границы — рваный и всё равно из двух соседей:
+   ничего третьего шум выбрать не может. */
+let ditch = 0;
+
+let deep = 0;
+
+let deepWrong = 0;
+
+let borderEscape = 0;
+
+for (let cy = 1; cy < field.cellsY - 1; cy += 1) {
+  for (let cx = 1; cx < field.cellsX - 1; cx += 1) {
+    const own = field.cellBiome[cy * field.cellsX + cx];
+
+    const west = field.cellBiome[cy * field.cellsX + cx - 1];
+
+    const north = field.cellBiome[(cy - 1) * field.cellsX + cx];
+
+    const centerU = Math.round((cx + 0.5) * field.spacing);
+
+    const centerV = Math.round((cy + 0.5) * field.spacing);
+
+    if (biomeAt(field, centerU, centerV, cy * field.cellsX + cx, own) !== own) deepWrong += 1;
+
+    else deep += 1;
+
+    /* Полоса у западной границы клетки: там биом обязан иногда уступать соседу. */
+    const u = Math.round(cx * field.spacing) + 1;
+
+    for (let k = 0; k < 8; k += 1) {
+      const v = Math.round(((cy + 0.3 + k * 0.05) * field.spacing)) % field.height;
+
+      const cell = latticeCell(field, u, v);
+
+      const mine = field.cellBiome[cell];
+
+      const picked = biomeAt(field, u, v, cell, mine);
+
+      if (picked !== mine) {
+        ditch += 1;
+
+        if (picked !== west && picked !== north) borderEscape += 1;
+      }
+    }
+  }
+}
+
+add(deepWrong === 0 && deep > 100, 'биом: в глубине клетки биом свой', `${deep} проб, промахов ${deepWrong}`);
+
+add(ditch > 0 && borderEscape === 0, 'биом: у границы клетки биом рваный и только из соседей', `размыто ${ditch} проб`);
+
+/* Кадр и чанк обязаны видеть один и тот же блок на одном ярусе. Это и есть
+   тот баг «ужасного отображения»: поле рисовалось приблизительно и приглушённо,
+   а блоки из чанков — точно, поэтому граница построенных чанков читалась в
+   кадре прямоугольником на всю загруженную область. Сверяем поверхность: там
+   кадр показывает то же, что лежит в чанке (руда и пещеры до вершины не
+   доходят, поэтому совпадение обязано быть точным). */
+const readyChunk = pickWorld.get(Math.floor(pickX / CHUNK_SX), Math.floor(pickZ / CHUNK_SZ)).chunk;
+
+const pixelProfile = {};
+
+const pixelPalettes = paletteCache(field);
+
+let matched = 0;
+
+let mismatched = 0;
+
+for (let dz = 0; dz < CHUNK_SZ; dz += 1) {
+  for (let dx = 0; dx < CHUNK_SX; dx += 1) {
+    const u = readyChunk.x0 + readyChunk.ox + dx;
+
+    const v = readyChunk.z0 + readyChunk.oz + dz;
+
+    const i = v * field.width + u;
+
+    const level = cutY(field, i, field.worldHeight - 1);
+
+    const inChunk = blockAt(readyChunk, readyChunk.ox + dx, level, readyChunk.oz + dz);
+
+    const fromField = columnBlock(level, fieldProfile(field, u, v, i, pixelProfile, pixelPalettes));
+
+    if (inChunk === fromField) matched += 1;
+
+    else mismatched += 1;
+  }
+}
+
+add(
+  matched === CHUNK_SX * CHUNK_SZ && mismatched === 0,
+  'кадр и чанк: один блок на одном ярусе — границы чанков не видно',
+  `${matched} совпало, ${mismatched} разошлось`,
 );
 
 /* Цена чанка — средняя по очереди, а не «последний измеренный»: один замер

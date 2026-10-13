@@ -21,6 +21,8 @@ import { blobsSource } from './lib/planet-source.mjs';
 import { createClimate, BIOMES } from '../src/planet/climate.js';
 import { LAYERS, paintTile } from '../src/planet/paint.js';
 import { createHydro } from '../src/planet/hydro.js';
+import { createClock, createLivingWorld, createSeasonFields, dateLabel, hourLabel } from '../src/planet/alive.js';
+import { composeAlive } from './lib/alive-raster.mjs';
 
 /* ---------- PNG ---------- */
 
@@ -66,9 +68,13 @@ export const encodePng = (width, height, rgba) => {
 /* ---------- аргументы ---------- */
 
 const args = process.argv.slice(2);
+/* Аргумент можно писать и через пробел (--level 5), и через знак равенства
+   (--level=5): второй способ привычен там, где значение — слово, а не число. */
 const option = (name, fallback) => {
   const index = args.indexOf(`--${name}`);
-  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
+  if (index >= 0 && args[index + 1] && !args[index + 1].startsWith('--')) return args[index + 1];
+  const joined = args.find((arg) => arg.startsWith(`--${name}=`));
+  return joined ? joined.slice(name.length + 3) : fallback;
 };
 const flag = (name) => args.includes(`--${name}`);
 
@@ -173,6 +179,43 @@ for (let ty = ty0; ty < ty0 + th; ty += 1) {
     const tile = { level, tx, ty, elevation, climate, hydro };
     paintTile(image, w, h, tx * TILE - originX, ty * TILE - originY, tile, layer, { shading: true, rivers: true, graticule: false });
   }
+}
+
+/* --alive: поверх статичной карты ложится живой мир — облака, ночь, огни,
+   ветер, снег, вулканы и берег будущего мира. Мир при этом живёт своей
+   жизнью: часы идут, погода успевает подуть, плиты — уехать.
+
+     --alive=day|year|epoch   масштаб времени (по умолчанию сутки)
+     --hour 18 --day 355      час суток и день года
+     --ma 10                  на сколько миллионов лет уехать в эпохе
+     --warmup 12              сколько модельных часов погоды прокрутить */
+if (args.some((arg) => arg === '--alive' || arg.startsWith('--alive='))) {
+  const mode = option('alive', 'day') || 'day';
+  const liveClock = createClock({ mode, hour: Number(option('hour', '12')), day: Number(option('day', '172')) });
+  const living = createLivingWorld({ planet, elevation, climate, hydro, seed, clock: liveClock });
+  const seasonFields = createSeasonFields({ climate });
+  const warmup = Number(option('warmup', '14'));
+  for (let i = 0; i < warmup; i += 1) living.weather.step(1);
+  if (mode === 'epoch') {
+    const destination = Number(option('ma', '10'));
+    living.drift.advance(destination);
+    liveClock.setMa(destination);
+  }
+  /* Частицы ставятся по всему миру: preview показывает планету целиком, и
+     частиц должно быть столько же, сколько было бы в кадре такого размера. */
+  const mpp = mppAt(planet, level);
+  living.setView({ minX: originX * mpp, minY: originY * mpp, maxX: (originX + w) * mpp, maxY: (originY + h) * mpp, mpp });
+  for (let i = 0; i < 120; i += 1) {
+    living.advance(1 / 60);
+  }
+  composeAlive({
+    rgba: image, width: w, height: h, originX, originY, mpp, planet, living, seasonFields,
+    options: { layers: {} },
+  });
+  console.log(`живой мир: ${mode === 'epoch' ? `${liveClock.ma.toFixed(1)} млн лет` : `${dateLabel(liveClock.dayOfYear())} · ${hourLabel(liveClock.hour)}`}, ` +
+    `облачность ${living.weather.stats().cover.toFixed(2)}, вихрей ${living.weather.stats().systems}, ` +
+    `огней ${living.lights.points.length}, вулканов ${living.volcanoes.sites.length}, ` +
+    `сияние ${living.aurora.activity().toFixed(2)}, берег ${living.drift.stats().segments} отрезков`);
 }
 
 writeFileSync(out, encodePng(w, h, image));

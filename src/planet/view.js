@@ -27,6 +27,10 @@
    осадки и ширина реки, если курсор стоит на воде. */
 
 import { icon } from '../ui/icons.js';
+import {
+  CLOCK_MODES, createClock, createLivingWorld, createSeasonFields, dateLabel, hourLabel,
+} from './alive.js';
+import { ALIVE_LAYERS, createAlivePainter } from './alive-paint.js';
 import { createClimate, BIOMES } from './climate.js';
 import { createElevation, heightMeters, SEA_LEVEL } from './elevation.js';
 import { createHydro } from './hydro.js';
@@ -105,6 +109,21 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
         <button class="planet-toggle is-on" type="button" data-action="toggle" data-toggle="rivers" aria-pressed="true">${icon('mountainSnow', 'icon--xs')}<span>Реки</span></button>
         <button class="planet-toggle" type="button" data-action="toggle" data-toggle="graticule" aria-pressed="false">${icon('globe', 'icon--xs')}<span>Сетка</span></button>
       </div>
+      <div class="planet-alive">
+        <div class="planet-alive__head">
+          <span class="planet-field__label">Живой мир</span>
+          <strong class="planet-alive__clock" data-role="clock">—</strong>
+          <button class="planet-alive__play is-running" type="button" data-action="clock-toggle" aria-pressed="true" title="Пуск и остановка времени (пробел)"><span data-role="play-icon">${icon('play', 'icon--xs')}</span><span class="planet-alive__play-label" data-role="play-label">Идёт</span></button>
+        </div>
+        <div class="planet-modes" role="radiogroup" aria-label="Ход времени">
+          ${CLOCK_MODES.map((mode) => `<button class="planet-mode${mode.id === 'day' ? ' is-active' : ''}" type="button" role="radio" aria-checked="${mode.id === 'day'}" data-action="mode" data-mode="${mode.id}" title="${mode.hint}"><span>${mode.name}</span></button>`).join('')}
+        </div>
+        <input class="planet-alive__range" type="range" min="0" max="24" step="0.05" value="12" data-role="clock-range" aria-label="Время суток">
+        <span class="planet-alive__hint" data-role="clock-hint">—</span>
+        <div class="planet-alive__layers" data-role="alive-layers">
+          ${ALIVE_LAYERS.map((layer) => `<button class="planet-chip is-on" type="button" data-action="alive" data-alive="${layer.id}" aria-pressed="true" title="${layer.hint}"><span>${layer.name}</span></button>`).join('')}
+        </div>
+      </div>
       <div class="planet-panel__row planet-panel__row--split">
         <button class="planet-button" type="button" data-action="zoom-out" title="Отдалить (минус)">${icon('minus', 'icon--xs')}<span>Отдалить</span></button>
         <button class="planet-button" type="button" data-action="zoom-in" title="Приблизить (плюс)">${icon('plus', 'icon--xs')}<span>Приблизить</span></button>
@@ -126,7 +145,25 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   const range = element.querySelector('[data-role="layer-range"]');
   const layerName = element.querySelector('[data-role="layer-name"]');
   const layerHint = element.querySelector('[data-role="layer-hint"]');
+  const clockEl = element.querySelector('[data-role="clock"]');
+  const clockRange = element.querySelector('[data-role="clock-range"]');
+  const clockHint = element.querySelector('[data-role="clock-hint"]');
+  const playButton = element.querySelector('[data-action="clock-toggle"]');
+  const playLabel = element.querySelector('[data-role="play-label"]');
+  const playIcon = element.querySelector('[data-role="play-icon"]');
   const ctx = canvas.getContext('2d', { alpha: false });
+  /**
+   * Размер кадра в пикселях. `clientWidth` — истина в браузере, но в jsdom его
+   * нет вовсе, а рамку элемента всё равно знает `getBoundingClientRect`: если
+   * брать размер из разных мест, щелчок и подпись считают точку по-разному.
+   */
+  const frameSize = () => {
+    const rect = canvas.getBoundingClientRect?.();
+    return {
+      width: canvas.clientWidth || rect?.width || 960,
+      height: canvas.clientHeight || rect?.height || 600,
+    };
+  };
   const scratch = document.createElement('canvas');
   scratch.width = TILE;
   scratch.height = TILE;
@@ -142,6 +179,18 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   let drag = null; // перетаскивание: откуда тянем и какой был центр
   let layerIndex = 0;
   const toggles = { shading: true, rivers: true, graticule: false };
+  /* Часы мира одни на весь вид: их двигает кадр, а спрашивают — панель,
+     подпись под курсором и погода. */
+  const clock = createClock();
+  let painter = null;
+  const aliveToggles = Object.fromEntries(ALIVE_LAYERS.map((layer) => [layer.id, true]));
+  let zoomAccumulator = 0;
+  let zoomTarget = 0; // куда ведёт ступенчатое приближение
+  let zoomAnchor = null; // точка под курсором, которую держим при приближении
+  let zoomStepped = false; // ступень текущей цели уже сделана
+  let inertia = null; // остаточный ход после перетаскивания
+  let marker = null; // метка, поставленная щелчком: { x, y, at }
+  let lastFrameAt = 0;
 
   /* ---------- география: карта Azgaar ---------- */
 
@@ -214,7 +263,12 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     const cli = createClimate(planet, elev, { tiles: 64 });
     const water = createHydro(planet, elev, cli);
     const tileCache = createTiles({ planet, elevation: elev, climate: cli, hydro: water });
-    world = { planet, elevation: elev, climate: cli, hydro: water, tiles: tileCache };
+    /* Живой мир: часы, погода, огни, вулканы и дрейф. Он же считает климат
+       целиком — климатология нужна облакам, огням и снегу, — поэтому создаётся
+       здесь же, за той же завесой «Считаю мир…». */
+    const living = createLivingWorld({ planet, elevation: elev, climate: cli, hydro: water, seed: view.seed || 'mir-2026', clock });
+    const paint = createAlivePainter({ living, planet, seasonFields: createSeasonFields({ climate: cli }) });
+    world = { planet, elevation: elev, climate: cli, hydro: water, tiles: tileCache, living, painter: paint };
     /* География из карты генератора — а если её нет, процедурная: об этом
        говорит подпись в панели, и её же видно в stats(). */
     /* Отказ важнее общей фразы: «карта ещё строится» и «карты нет вовсе» — это
@@ -244,16 +298,28 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
       heightM: planet.heightM,
       level,
       mpp: mppAt(planet, level),
+      center: { x: centerX, y: centerY },
+      pointer: pointer ? { x: pointer.x, y: pointer.y } : null,
       elevation: elev.stats(),
       climate: cli.stats(),
       hydro: water.stats(),
+      alive: living.stats(),
+      animation: paint.stats(),
+      clock: clock.snapshot(),
+      aliveToggles: { ...aliveToggles },
+      running: clock.running,
+      marker: marker ? { x: marker.x, y: marker.y } : null,
     });
     return world;
   };
 
   /** Уровень, на котором мир целиком влезает в кадр. */
   const fitLevel = (planet) => {
-    const widthPx = canvas.clientWidth || 1200;
+    /* Размер кадра берётся тем же способом, что и везде: в jsdom у холста нет
+       ни clientWidth, ни размеров из разметки, и «своё» число здесь означало бы
+       другой кадр — а значит, другой уровень, другое поле зрения и другие
+       координаты точки под курсором. */
+    const widthPx = frameSize().width;
     for (let l = 0; l <= planet.maxLevel; l += 1) {
       if (levelPixels(planet, l).w <= widthPx) return l;
     }
@@ -264,8 +330,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
 
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = element.clientWidth || 960;
-    const height = element.clientHeight || 600;
+    const { width, height } = frameSize();
     canvas.width = Math.max(1, Math.round(width * dpr));
     canvas.height = Math.max(1, Math.round(height * dpr));
     canvas.style.width = `${width}px`;
@@ -274,6 +339,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (world) {
       minLevel = fitLevel(world.planet);
       level = clamp(level, minLevel, world.planet.maxLevel);
+      zoomTarget = clamp(zoomTarget, minLevel, world.planet.maxLevel);
     }
   };
 
@@ -281,8 +347,8 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (!world) return;
     const { planet, tiles } = world;
     const mpp = mppAt(planet, level);
-    const width = canvas.clientWidth || 960;
-    const height = canvas.clientHeight || 600;
+    const width = frameSize().width;
+    const height = frameSize().height;
     const left = centerX - (width / 2) * mpp;
     const top = centerY - (height / 2) * mpp;
     const tx0 = Math.floor(left / (TILE * mpp));
@@ -306,10 +372,17 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     const { planet, tiles } = world;
     const stats = tiles.stats();
     const mpp = mppAt(planet, level);
+    const alive = world.living.stats();
     statusEl.textContent = [
       `${(planet.widthM / 1000).toFixed(0)} × ${(planet.heightM / 1000).toFixed(0)} тыс. км`,
       `${formatDistance(mpp)}/пиксель`,
       `уровень ${level} из ${planet.maxLevel}`,
+      world.living.label(),
+      /* Вихри — самая говорящая часть погоды: по ним видно, что мир живёт,
+         а ураганы в их числе показывают, что мир ещё и тёплый. */
+      alive.weather.systems
+        ? `вихрей ${alive.weather.systems}${alive.weather.hurricanes ? ` (ураганов ${alive.weather.hurricanes})` : ''}`
+        : 'ясно',
       stats.queue || stats.rivers ? `в работе: ${stats.queue + stats.rivers}` : 'готово',
     ].join(' · ');
     const bar = scaleEl.querySelector('i');
@@ -321,16 +394,17 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   };
 
   const drawReadout = () => {
-    if (!world || !pointer) {
-      readoutEl.textContent = 'Наведите курсор на карту: покажу высоту, биом, климат и реку под ним.';
+    if (!world || (!pointer && !marker)) {
+      readoutEl.textContent = 'Наведите курсор на карту: покажу высоту, биом, климат и реку под ним. Щелчок закрепит точку.';
       return;
     }
     const { planet, elevation, climate, hydro } = world;
     const mpp = mppAt(planet, level);
-    const width = canvas.clientWidth || 960;
-    const height = canvas.clientHeight || 600;
-    const mx = centerX + (pointer.x - width / 2) * mpp;
-    const my = centerY + (pointer.y - height / 2) * mpp;
+    const width = frameSize().width;
+    const height = frameSize().height;
+    /* Метка важнее курсора: если человек щёлкнул, подпись закрепляется на ней. */
+    const mx = marker ? marker.x : centerX + (pointer.x - width / 2) * mpp;
+    const my = marker ? marker.y : centerY + (pointer.y - height / 2) * mpp;
     if (my < 0 || my > planet.heightM || mx < 0 || mx > planet.widthM) {
       readoutEl.textContent = 'За рамкой карты ничего нет: мир не замкнут, это край проекции.';
       return;
@@ -356,25 +430,118 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     } else {
       parts.push(`глубина по шкале ${h.toFixed(1)}`);
     }
-    readoutEl.textContent = parts.join(' · ');
+    /* Солнце: где оно сейчас над этой точкой и сколько тянется день. */
+    const sun = world.living.sunAt(wrapped, my);
+    parts.push(sun.altitude > -0.5
+      ? `солнце ${sun.altitude.toFixed(0)}°`
+      : `ночь, солнце ${sun.altitude.toFixed(0)}°`);
+    parts.push(`день ${sun.dayLength.toFixed(1)} ч`);
+    parts.push(`облачность ${Math.round(world.living.weather.cloudAt(wrapped, my) * 100)} %`);
+    const rain = world.living.weather.rainAt(wrapped, my);
+    if (rain > 0.15) parts.push(`дождь ${rain.toFixed(1)} мм/ч`);
+    /* Огни видны только там, где им положено: подпись говорит, сколько света
+       приходится на эту клетку, а не «есть город или нет». */
+    if (world.living.lights.at(wrapped, my) > 0.25) parts.push('огни поселения');
+    /* Будущий берег: в «эпохе» видно, что тут будет через миллионы лет. */
+    if (world.living.clock.ma > 0.05) {
+      const future = world.living.drift.heightAt(wrapped, my);
+      parts.push(`через ${world.living.clock.ma.toFixed(0)} млн лет: ${future > 0 ? `суша ${Math.round(future)} м` : `море ${Math.round(-future)} м`}`);
+    }
+    readoutEl.textContent = (marker ? `● ${parts.join(' · ')}` : parts.join(' · '));
   };
 
   let frameHandle = 0;
-  const frame = () => {
+  const frame = (stamp) => {
     if (disposed) return;
     frameHandle = requestAnimationFrame(frame);
     if (!world) return;
-    const { tiles } = world;
-    const width = canvas.clientWidth || 960;
-    const height = canvas.clientHeight || 600;
+    const { tiles, living, painter: paint } = world;
+    const width = frameSize().width;
+    const height = frameSize().height;
+    /* Время идёт от часов, а не от номера кадра: на 120 Гц сутки не должны
+       бежать вдвое быстрее, чем на 60. Всплеск больше сотни миллисекунд
+       (вкладка была свёрнута) не переносим — иначе мир прыгнет. */
+    const now = typeof stamp === 'number' ? stamp : Date.now();
+    const dtMs = lastFrameAt ? Math.min(now - lastFrameAt, 100) : 16;
+    lastFrameAt = now;
+    const dt = dtMs / 1000;
+
+    clock.tick(dt);
+    living.advance(dt);
+    /* Ход после перетаскивания: карта не останавливается как вкопанная, а
+       доезжает и мягко затухает. */
+    if (inertia) {
+      centerX -= inertia.vx * dt;
+      centerY -= inertia.vy * dt;
+      const decay = Math.exp(-dt / 0.22);
+      inertia.vx *= decay;
+      inertia.vy *= decay;
+      if (Math.hypot(inertia.vx, inertia.vy) < 40) inertia = null;
+      clampCenter();
+    }
+    /* Приближение идёт ступенями по уровню, но с паузой: колесо накапливает
+       цель, а кадр ведёт к ней — так прыжок через пять уровней не мигает. */
+    if (level !== zoomTarget) {
+      zoomAccumulator += dtMs;
+      const pace = Math.abs(zoomTarget - level) > 3 ? 22 : 52;
+      /* Первая ступень — сразу: на щелчок по кнопке карта обязана ответить в
+         тот же кадр, а дальше ступени идут в своём темпе. */
+      if (zoomAccumulator >= pace || !zoomStepped) {
+        zoomAccumulator = 0;
+        zoomStepped = true;
+        zoomAt(level + Math.sign(zoomTarget - level), zoomAnchor?.x, zoomAnchor?.y);
+      }
+    } else {
+      zoomAccumulator = 0;
+      zoomStepped = false;
+    }
+
+    const mpp = mppAt(world.planet, level);
+    paint.setView({ level, centerX, centerY, width, height, mpp });
+    paint.step(dt);
     ctx.fillStyle = '#0a1622';
     ctx.fillRect(0, 0, width, height);
     requestVisible();
     tiles.draw(ctx, { level, centerX, centerY, width, height }, scratch);
+    /* Живое — поверх тайлов: облака, день и ночь, огни, частицы, вулканы. */
+    paint.draw(ctx, aliveToggles);
+    drawMarker(now);
     /* Сначала рисуем то, что есть, потом считаем: кадр не ждёт очереди. */
-    tiles.work(10);
+    tiles.work(9);
+    living.work(5);
+    drawClock();
     drawStatus();
     drawReadout();
+  };
+
+  /**
+   * Метка на карте: щелчок ставит точку, вокруг неё расходятся круги.
+   *
+   * Круги — не украшение: они показывают, что именно эта точка закреплена в
+   * подписи снизу (подпись перестаёт бегать за курсором), и по радиусу видно
+   * время, прошедшее после щелчка.
+   */
+  const drawMarker = (now) => {
+    if (!marker) return;
+    const age = (now - marker.at) / 1000;
+    const px = (marker.x - centerX) / (world ? mppAt(world.planet, level) : 1) + (frameSize().width) / 2;
+    const py = (marker.y - centerY) / (world ? mppAt(world.planet, level) : 1) + (frameSize().height) / 2;
+    if (px < -40 || py < -40 || px > (frameSize().width) + 40 || py > (frameSize().height) + 40) return;
+    ctx.save();
+    for (let ring = 0; ring < 3; ring += 1) {
+      const phase = (age - ring * 0.55) / 1.6;
+      if (phase < 0 || phase > 1) continue;
+      ctx.beginPath();
+      ctx.arc(px, py, 6 + phase * 46, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(126,214,255,${(1 - phase) * 0.55})`;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(178,232,255,0.95)';
+    ctx.fill();
+    ctx.restore();
   };
 
   /* ---------- управление ---------- */
@@ -384,8 +551,15 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   const clampCenter = () => {
     if (!world) return;
     const { planet } = world;
-    centerX = clamp(centerX, 0, planet.widthM);
-    centerY = clamp(centerY, 0, planet.heightM);
+    const mpp = mppAt(planet, level);
+    const { width, height } = frameSize();
+    /* Если карта целиком влезает в кадр, двигать её некуда: центр — середина
+       мира. Иначе перетаскивание (и ход после него) уводило бы вид к углу, где
+       карты уже нет. */
+    if (width * mpp >= planet.widthM) centerX = planet.widthM / 2;
+    else centerX = clamp(centerX, 0, planet.widthM);
+    if (height * mpp >= planet.heightM) centerY = planet.heightM / 2;
+    else centerY = clamp(centerY, 0, planet.heightM);
   };
 
   /** Приближение с удержанием точки под курсором. */
@@ -393,8 +567,8 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (!world) return;
     const target = clamp(nextLevel, minLevel, world.planet.maxLevel);
     if (target === level) return;
-    const width = canvas.clientWidth || 960;
-    const height = canvas.clientHeight || 600;
+    const width = frameSize().width;
+    const height = frameSize().height;
     const ax = anchorX ?? width / 2;
     const ay = anchorY ?? height / 2;
     const mpp = mppAt(world.planet, level);
@@ -408,10 +582,21 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (world) world.tiles.setCenter(centerX, centerY);
   };
 
+  /**
+   * Приближение с намерением: цель ставится сразу, а кадр ведёт к ней
+   * ступенями. Так колесо, крутящееся быстро, не рисует десяток уровней за
+   * кадр — картинка едет, а не мигает.
+   */
+  const zoomGoal = (target, anchorX = null, anchorY = null) => {
+    if (!world) return;
+    zoomTarget = clamp(target, minLevel, world.planet.maxLevel);
+    if (Number.isFinite(anchorX) && Number.isFinite(anchorY)) zoomAnchor = { x: anchorX, y: anchorY };
+  };
+
   const onWheel = (event) => {
     event.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    zoomAt(level + (event.deltaY < 0 ? 1 : -1), event.clientX - rect.left, event.clientY - rect.top);
+    zoomGoal(zoomTarget + (event.deltaY < 0 ? 1 : -1), event.clientX - rect.left, event.clientY - rect.top);
   };
 
   const onPointerDown = (event) => {
@@ -421,7 +606,19 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     canvas.setPointerCapture?.(event.pointerId);
     const rect = canvas.getBoundingClientRect();
     pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    drag = { x: event.clientX, y: event.clientY, centerX, centerY };
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      centerX,
+      centerY,
+      moved: 0,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      vx: 0,
+      vy: 0,
+      at: Date.now(),
+    };
+    inertia = null;
     canvas.classList.add('is-dragging');
   };
 
@@ -430,6 +627,20 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     if (!drag || !world) return;
     const mpp = mppAt(world.planet, level);
+    const now = Date.now();
+    const elapsed = Math.max(1, now - drag.at);
+    /* Скорость в метрах карты в секунду: по ней кадр доезжает после отпускания.
+       Ограничение — не формальность: если два события пришли в одну
+       миллисекунду (быстрая мышь, разом пришедшая пачка), скорость выходит
+       астрономической и кадр улетает к краю карты за один прыжок. Больше
+       двух с половиной экранов в секунду карта не едет. */
+    const limit = 2.5 * Math.max(frameSize().width, frameSize().height) * mpp;
+    drag.vx = clamp(((event.clientX - drag.lastX) * mpp) / (elapsed / 1000), -limit, limit);
+    drag.vy = clamp(((event.clientY - drag.lastY) * mpp) / (elapsed / 1000), -limit, limit);
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    drag.at = now;
+    drag.moved += Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
     centerX = drag.centerX - (event.clientX - drag.x) * mpp;
     centerY = drag.centerY - (event.clientY - drag.y) * mpp;
     clampCenter();
@@ -437,6 +648,23 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
 
   const onPointerUp = (event) => {
     if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    if (drag && world) {
+      if (drag.moved < 6) {
+        /* Это щелчок, а не перенос: ставим метку и закрепляем подпись на ней.
+           Повторный щелчок по той же точке метку снимает — иначе её не убрать
+           ничем, кроме перезагрузки мира. */
+        const mpp = mppAt(world.planet, level);
+        const width = frameSize().width;
+        const height = frameSize().height;
+        const x = centerX + (pointer.x - width / 2) * mpp;
+        const y = centerY + (pointer.y - height / 2) * mpp;
+        const near = marker && Math.abs((marker.x - x) / mpp) < 14 && Math.abs((marker.y - y) / mpp) < 14;
+        if (near || x < 0 || y < 0 || x > world.planet.widthM || y > world.planet.heightM) marker = null;
+        else marker = { x, y, at: Date.now() };
+      } else if (Math.hypot(drag.vx, drag.vy) > 200) {
+        inertia = { vx: drag.vx, vy: drag.vy };
+      }
+    }
     drag = null;
     canvas.classList.remove('is-dragging');
   };
@@ -451,6 +679,14 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
       clampCenter();
     };
     switch (event.code) {
+      case 'Space':
+        /* Пауза — по пробелу: время в мире идёт само, и остановить его должно
+           быть проще всего. */
+        flipClock();
+        break;
+      case 'KeyT':
+        setMode(CLOCK_MODES[(CLOCK_MODES.findIndex((mode) => mode.id === clock.mode) + 1) % CLOCK_MODES.length].id);
+        break;
       case 'ArrowLeft':
       case 'KeyA':
         move(-1, 0);
@@ -469,11 +705,11 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
         break;
       case 'Equal':
       case 'NumpadAdd':
-        zoomAt(level + 1);
+        zoomGoal(zoomTarget + 1);
         break;
       case 'Minus':
       case 'NumpadSubtract':
-        zoomAt(level - 1);
+        zoomGoal(zoomTarget - 1);
         break;
       case 'Escape':
         onExit?.();
@@ -482,6 +718,82 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
         return;
     }
     event.preventDefault();
+  };
+
+  /**
+   * Панель часов: подпись времени, ползунок своего масштаба и подсказка.
+   *
+   * Ползунок у каждого режима значит своё: в «сутках» — час, в «годе» — день
+   * года, в «эпохе» — миллионы лет. Один ползунок с меняющейся шкалой честнее
+   * трёх отдельных: видно, что двигаешь время, а не «что-то ещё».
+   */
+  const drawClock = () => {
+    if (!world) return;
+    const spec = clock.spec();
+    clockEl.textContent = livingLabel();
+    clockHint.textContent = spec.hint;
+    playButton?.classList.toggle('is-running', clock.running);
+    playButton?.setAttribute('aria-pressed', String(clock.running));
+    if (playLabel) playLabel.textContent = clock.running ? 'Идёт' : 'Пауза';
+    if (playIcon) playIcon.innerHTML = icon(clock.running ? 'pause' : 'play', 'icon--xs');
+    if (clock.mode === 'day') {
+      clockRange.min = '0';
+      clockRange.max = '24';
+      clockRange.step = '0.05';
+      clockRange.value = String(clock.hour);
+      clockRange.setAttribute('aria-label', 'Время суток');
+    } else if (clock.mode === 'year') {
+      clockRange.min = '1';
+      clockRange.max = '365';
+      clockRange.step = '1';
+      clockRange.value = String(Math.round(clock.dayOfYear()));
+      clockRange.setAttribute('aria-label', 'День года');
+    } else {
+      clockRange.min = '0';
+      clockRange.max = '200';
+      clockRange.step = '0.5';
+      clockRange.value = String(Math.round(clock.ma));
+      clockRange.setAttribute('aria-label', 'Миллионы лет вперёд');
+    }
+  };
+
+  /** Подпись мира: сначала словами, потом числом. */
+  const livingLabel = () => {
+    if (clock.mode === 'epoch') return `${clock.ma.toFixed(1)} млн лет`;
+    return `${dateLabel(clock.dayOfYear())} · ${hourLabel(clock.hour)}`;
+  };
+
+  const setMode = (mode) => {
+    clock.setMode(mode);
+    element.querySelectorAll('[data-action="mode"]').forEach((button) => {
+      const active = button.dataset.mode === clock.mode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-checked', String(active));
+    });
+    if (world) materialiseDrift();
+    drawClock();
+  };
+
+  /**
+   * Ползунок «эпохи» может стоять где угодно: сколько лет проехать, столько и
+   * едем. Назад — значит начать заново: полулагранжев перенос необратим, и
+   * «отмотать» рельеф честно можно только с исходного поля.
+   */
+  const materialiseDrift = () => {
+    if (!world) return;
+    if (clock.ma <= 0) {
+      world.living.drift.reset();
+      return;
+    }
+    if (Math.abs(world.living.drift.ma() - clock.ma) > 0.5) {
+      world.living.drift.reset();
+      world.living.drift.enqueue(clock.ma);
+    }
+  };
+
+  const flipClock = () => {
+    clock.running = !clock.running;
+    drawClock();
   };
 
   const applyLayer = () => {
@@ -508,8 +820,23 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
       onExit?.();
       return;
     }
-    if (action === 'zoom-in') zoomAt(level + 1);
-    if (action === 'zoom-out') zoomAt(level - 1);
+    if (action === 'zoom-in') zoomGoal(zoomTarget + 1);
+    if (action === 'zoom-out') zoomGoal(zoomTarget - 1);
+    if (action === 'clock-toggle') {
+      flipClock();
+      return;
+    }
+    if (action === 'mode') {
+      setMode(button.dataset.mode);
+      return;
+    }
+    if (action === 'alive') {
+      const flag = button.dataset.alive;
+      aliveToggles[flag] = !aliveToggles[flag];
+      button.classList.toggle('is-on', aliveToggles[flag]);
+      button.setAttribute('aria-pressed', String(aliveToggles[flag]));
+      return;
+    }
     if (action === 'resync') {
       /* Правки высот в Azgaar попадают на карту планеты только по запросу:
          пересобирать мир на каждое движение мыши значило бы терять камеру. */
@@ -544,6 +871,19 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     applyLayer();
   };
 
+  /** Ползунок времени: час, день года или миллионы лет — смотря какой режим. */
+  const onClockRange = () => {
+    const value = Number(clockRange.value);
+    if (!Number.isFinite(value)) return;
+    if (clock.mode === 'day') clock.setHour(value);
+    else if (clock.mode === 'year') clock.day = value;
+    else {
+      clock.setMa(value);
+      materialiseDrift();
+    }
+    drawClock();
+  };
+
   const onSeedChange = () => {
     view.seed = seedInput.value.trim() || 'mir-2026';
     rebuild();
@@ -556,6 +896,9 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     const token = ++buildToken;
     veil.hidden = false;
     world = null;
+    /* Часы не сбрасываем: смена seed или размера не должна откатывать время
+       на полдень — за ней смотрит человек, а не мир. */
+    lastFrameAt = 0;
     try {
       buildWorld();
     } catch (error) {
@@ -571,7 +914,11 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (!view.source) scheduleSourcePoll();
     minLevel = fitLevel(world.planet);
     level = clamp(level || minLevel, minLevel, world.planet.maxLevel);
+    zoomTarget = level;
+    zoomAnchor = null;
+    marker = null;
     applyLayer();
+    drawClock();
     seedInput.value = view.seed;
     resize();
   };
@@ -583,6 +930,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     if (event.target === seedInput) onSeedChange();
   });
   range.addEventListener('input', onRange);
+  clockRange.addEventListener('input', onClockRange);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -601,6 +949,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   host.appendChild(element);
   seedInput.value = view.seed;
   applyLayer();
+  drawClock();
   /* Первый снимок — сразу при монтировании: если генератор уже достроил карту,
      мир с первого кадра берёт её географию, а не пересобирается через секунду. */
   takeSource();

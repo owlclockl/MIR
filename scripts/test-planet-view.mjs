@@ -66,26 +66,65 @@ globalThis.ResizeObserver ??= class ResizeObserver {
 };
 
 /* Черновой 2D-контекст: запоминает вызовы, чтобы проверять не пиксели, а то,
-   что вид вообще дошёл до рисования. */
+   что вид вообще дошёл до рисования.
+
+   Слоёв анимации много, и список их вызовов растёт от каждой правки «живого
+   мира»: держать перечень методов руками — значит ловить падение теста на
+   каждом новом path. Поэтому контекст собран на Proxy: всё неизвестное
+   считается методом, вызов запоминается в canvasCalls, а данные (createImageData,
+   getImageData) отдаются настоящими — их читает расчёт мягких слоёв. */
 const canvasCalls = { fillRect: 0, drawImage: 0, putImageData: 0 };
-window.HTMLCanvasElement.prototype.getContext = function getContext() {
-  return {
-    canvas: this,
+const stubContext = (canvas) => {
+  const makeImageData = (w, h) => new globalThis.ImageData(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
+  const gradient = () => ({ addColorStop: () => {} });
+  const store = {
+    canvas,
     fillStyle: '#000',
-    fillRect: () => {
-      canvasCalls.fillRect += 1;
-    },
-    drawImage: () => {
-      canvasCalls.drawImage += 1;
-    },
-    putImageData: () => {
-      canvasCalls.putImageData += 1;
-    },
-    setTransform: () => {},
-    save: () => {},
-    restore: () => {},
-    clearRect: () => {},
+    strokeStyle: '#000',
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    miterLimit: 10,
+    lineDashOffset: 0,
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    font: '10px sans-serif',
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    filter: 'none',
+    shadowBlur: 0,
+    shadowColor: 'transparent',
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: 'low',
   };
+  const data = {
+    createImageData: makeImageData,
+    getImageData: (x, y, w, h) => makeImageData(w, h),
+    createLinearGradient: gradient,
+    createRadialGradient: gradient,
+    createConicGradient: gradient,
+    createPattern: () => null,
+    measureText: () => ({ width: 0 }),
+    isPointInPath: () => false,
+  };
+  return new Proxy(store, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (typeof prop !== 'string') return undefined;
+      return (...args) => {
+        canvasCalls[prop] = (canvasCalls[prop] ?? 0) + 1;
+        if (prop in data) return data[prop](...args);
+        return undefined;
+      };
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    },
+  });
+};
+window.HTMLCanvasElement.prototype.getContext = function getContext() {
+  return stubContext(this);
 };
 window.HTMLCanvasElement.prototype.getBoundingClientRect = function rect() {
   return { x: 0, y: 0, left: 0, top: 0, width: 1200, height: 700, right: 1200, bottom: 700 };
@@ -183,6 +222,95 @@ if (view) {
   add(Number.isFinite(stats.mpp) && stats.mpp > 0, 'масштаб кадра известен', `${stats.mpp} м/пиксель`);
   add(Boolean(el.querySelector('[data-role="status"]')?.textContent?.includes('/пиксель')), 'строка состояния показывает масштаб',
     el.querySelector('[data-role="status"]')?.textContent ?? '—');
+
+  /* ---------- живой мир: часы, слои анимации, метка ---------- */
+  const { ALIVE_LAYERS } = await import('../src/planet/alive-paint.js');
+  const alivePanel = el.querySelector('.planet-alive');
+  add(Boolean(alivePanel), 'панель живого мира на месте');
+  const chips = alivePanel ? [...alivePanel.querySelectorAll('[data-action="alive"]')] : [];
+  add(chips.length === ALIVE_LAYERS.length,
+    `переключателей ровно столько, сколько слоёв анимации: ${ALIVE_LAYERS.length}`,
+    `кнопок ${chips.length}`);
+  add(chips.every((chip) => chip.getAttribute('aria-pressed') === 'true'),
+    'все слои анимации включены по умолчанию');
+
+  /* Время идёт само: за четверть секунды час обязан сдвинуться. */
+  const hourBefore = view.stats().clock.hour;
+  await wait(400);
+  const hourAfter = view.stats().clock.hour;
+  add(hourBefore !== hourAfter, 'время суток идёт без команд', `${hourBefore.toFixed(2)} → ${hourAfter.toFixed(2)}`);
+
+  /* Анимированные слои действительно считаются, а не только объявлены. */
+  const animation = view.stats().animation ?? {};
+  add((animation.cloudRebuilds ?? 0) > 0 && (animation.lightRebuilds ?? 0) > 0,
+    'мягкие слои пересобираются в кадре',
+    `облака ${animation.cloudRebuilds}, огни ${animation.lightRebuilds}, сезон ${animation.seasonRebuilds}`);
+  const particles = animation.particles ?? {};
+  add((particles.wind ?? 0) > 0 && (particles.currents ?? 0) > 0,
+    'частицы ветра и течений в кадре', `ветер ${particles.wind}, течения ${particles.currents}, реки ${particles.rivers}`);
+
+  /* Режим «год»: у часов меняется шкала ползунка. */
+  el.querySelector('[data-action="mode"][data-mode="year"]')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await wait(60);
+  const clockRange = el.querySelector('[data-role="clock-range"]');
+  add(view.stats().clock.mode === 'year', 'часы переключаются в год', view.stats().clock.mode);
+  add(clockRange?.max === '365', 'в году ползунок меряет дни года', `max ${clockRange?.max}`);
+  const dayBefore = view.stats().clock.dayOfYear;
+  await wait(400);
+  add(view.stats().clock.dayOfYear !== dayBefore, 'день года едет',
+    `${dayBefore.toFixed(1)} → ${view.stats().clock.dayOfYear.toFixed(1)}`);
+
+  /* Пауза по пробелу: время стоит, кадры продолжают идти. */
+  window.dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+  await wait(300);
+  const paused = view.stats();
+  const framesWhilePaused = canvasCalls.drawImage;
+  add(paused.running === false, 'пробел останавливает время');
+  add(paused.clock.dayOfYear === view.stats().clock.dayOfYear, 'на паузе день года стоит');
+  await wait(300);
+  add(canvasCalls.drawImage > framesWhilePaused, 'на паузе кадры всё равно рисуются',
+    `кадров ${canvasCalls.drawImage - framesWhilePaused}`);
+  window.dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+  await wait(60);
+  add(view.stats().running === true, 'пробел снова пускает время');
+
+  /* Слой анимации снимается кнопкой — и это видно в состоянии вида. */
+  const cloudChip = alivePanel?.querySelector('[data-action="alive"][data-alive="clouds"]');
+  cloudChip?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  add(view.stats().aliveToggles.clouds === false && cloudChip?.getAttribute('aria-pressed') === 'false',
+    'кнопка снимает слой облаков');
+  cloudChip?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  add(view.stats().aliveToggles.clouds === true, 'и возвращает его обратно');
+
+  /* Щелчок по холсту ставит метку: показания закрепляются в точке. */
+  canvas.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true, clientX: 620, clientY: 360, button: 0 }));
+  canvas.dispatchEvent(new window.MouseEvent('pointerup', { bubbles: true, clientX: 621, clientY: 360, button: 0 }));
+  await wait(60);
+  add(Boolean(view.stats().marker), 'щелчок ставит метку на карте');
+  const markerStats = view.stats();
+  add(el.querySelector('[data-role="readout"]')?.textContent?.startsWith('●') === true,
+    'показания закрепляются за меткой',
+    `${el.querySelector('[data-role="readout"]')?.textContent ?? '—'} · метка ${JSON.stringify(markerStats.marker)} из ${Math.round(markerStats.widthM / 1000)}×${Math.round(markerStats.heightM / 1000)} тыс. км`);
+  canvas.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true, clientX: 620, clientY: 360, button: 0 }));
+  canvas.dispatchEvent(new window.MouseEvent('pointerup', { bubbles: true, clientX: 620, clientY: 360, button: 0 }));
+  await wait(60);
+  add(view.stats().marker === null, 'повторный щелчок снимает метку');
+
+  /* Эпоха: миллионы лет едут, берег будущего мира перестраивается. */
+  el.querySelector('[data-action="mode"][data-mode="epoch"]')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  const epochStart = view.stats().alive.drift.ma;
+  const futureHeights = [];
+  for (let step = 0; step < 12; step += 1) {
+    await wait(120);
+    futureHeights.push(view.stats().alive.drift.ma);
+  }
+  add(view.stats().clock.mode === 'epoch', 'часы переключаются в эпоху', view.stats().clock.mode);
+  add(futureHeights[futureHeights.length - 1] > epochStart, 'материки едут вперёд',
+    `${epochStart.toFixed(2)} → ${futureHeights[futureHeights.length - 1].toFixed(2)} млн лет`);
+  add(view.stats().alive.drift.segments > 1000, 'у будущего мира есть берег',
+    `${view.stats().alive.drift.segments} отрезков`);
+  el.querySelector('[data-action="mode"][data-mode="day"]')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await wait(60);
 
   /* География: документ Azgaar в jsdom пуст (about:blank), поэтому мир
      процедурный — и вид обязан сказать об этом прямо, а не молча рисовать

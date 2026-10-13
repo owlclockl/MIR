@@ -4904,6 +4904,50 @@ button.admin-row:hover {
   max-width: calc(100% - var(--sp-32));
 }
 
+/* Ожидание генератора: карта блоков строится из живого документа Azgaar, и до
+   готовности карт показывать нечего. Это не ошибка и не пустая сцена — это
+   состояние, поэтому в центре спокойный пульс и сказано, чего ждём. */
+
+.world-voxel-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-24);
+  text-align: center;
+}
+
+.world-voxel-wait__pulse {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--world-line-strong);
+  border-top-color: var(--world-accent);
+  border-radius: 50%;
+  animation: voxel-wait-spin 1.1s linear infinite;
+}
+
+.world-voxel-wait__text {
+  margin: 0;
+  color: var(--world-muted);
+  font: 500 var(--fs-base)/1.5 var(--font-ui);
+  max-width: 46ch;
+}
+
+@keyframes voxel-wait-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-voxel-wait__pulse {
+    animation: none;
+  }
+}
+
 /* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.
    Снимается, когда пошёл первый шаг генерации (generation-stage.js). */
 /* ---------- лобби: экран, плашка статуса, вход из слотов ---------- */
@@ -5546,6 +5590,9 @@ button.admin-row:hover {
   font: 500 11px/1.3 var(--font-ui);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+  /* Счётчики в строке меняются каждый кадр; мягкий переход цвета не даёт
+     подписи дёргаться на быстрых сменах режима времени. */
+  transition: color 0.3s ease;
 }
 
 .planet-readout {
@@ -5584,6 +5631,172 @@ button.admin-row:hover {
   border: 1px solid var(--world-line-strong);
   border-top: 0;
   background: rgba(255, 255, 255, 0.06);
+}
+
+/* ---------- живой мир: часы, режимы и слои анимации ---------- */
+
+.planet-alive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-10);
+  border: 1px solid var(--world-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.planet-alive__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.planet-alive__clock {
+  flex: 1;
+  min-width: 0;
+  color: var(--world-accent);
+  font: 600 12px/1.3 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  /* Подпись времени мягко светится: она меняется каждый кадр, и взгляд должен
+     находить её без поиска. */
+  text-shadow: 0 0 10px rgba(126, 214, 255, 0.25);
+}
+
+.planet-alive__play {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  min-height: var(--control-h-mini);
+  padding: var(--sp-4) var(--sp-10);
+  border: 1px solid var(--world-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: 500 11px/1.2 var(--font-ui);
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.planet-alive__play.is-running {
+  border-color: var(--world-accent);
+  background: var(--world-accent-soft);
+  color: var(--world-accent);
+}
+
+/* Пока время идёт, рядом с подписью бьётся точка: ритм виден без чтения. */
+.planet-alive__play.is-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--world-accent);
+  animation: planet-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes planet-pulse {
+  0% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0.35; transform: scale(0.8); }
+}
+
+.planet-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+}
+
+.planet-mode {
+  padding: var(--sp-6) var(--sp-4);
+  border: 1px solid var(--world-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font: 600 11px/1.2 var(--font-ui);
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.planet-mode.is-active {
+  border-color: var(--world-accent);
+  background: var(--world-accent-soft);
+  color: var(--world-accent);
+}
+
+.planet-alive__range {
+  width: 100%;
+  accent-color: var(--world-accent);
+}
+
+.planet-alive__hint {
+  color: var(--text-dim);
+  font: 400 10px/1.45 var(--font-ui);
+}
+
+.planet-alive__layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.planet-chip {
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--world-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: 500 10px/1.2 var(--font-ui);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.planet-chip.is-on {
+  border-color: rgba(126, 214, 255, 0.45);
+  background: rgba(126, 214, 255, 0.1);
+  color: var(--world-accent);
+}
+
+.planet-chip:hover {
+  border-color: var(--world-accent);
+}
+
+/* Панель въезжает слева: вид монтируется поверх документа редактора, и без
+   этого движения непонятно, что карта сменилась, а не перерисовалась. */
+.planet-view .planet-panel {
+  animation: planet-panel-in 0.32s ease-out both;
+}
+
+@keyframes planet-panel-in {
+  from { opacity: 0; transform: translateX(calc(-1 * var(--sp-16))); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Завеса «Считаю мир…»: точка бежит по кругу, пока считается рельеф. */
+.planet-view__veil span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.planet-view__veil span::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(126, 214, 255, 0.25);
+  border-top-color: var(--world-accent);
+  border-radius: 50%;
+  animation: planet-spin 0.9s linear infinite;
+}
+
+@keyframes planet-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planet-view .planet-panel,
+  .planet-alive__play.is-running::before,
+  .planet-view__veil span::before {
+    animation: none;
+  }
 }
 
 @media (max-width: 720px) {
