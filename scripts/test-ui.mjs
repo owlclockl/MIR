@@ -264,10 +264,10 @@ ok('ошибок в консоли нет', errors.length === 0, errors.join(' |
 click('[data-action="open-test-generator"]');
 await wait(700);
 ok(
-  'тест-генератор открывается сразу картой мира: холст, восемь слоёв, шесть пресетов ярусов и строка состояния',
+  'тест-генератор открывается сразу картой мира: холст, семь слоёв, шесть пресетов ярусов и строка состояния',
   $('[data-role="world-voxel"]')?.dataset.mode === 'map'
     && !!$('[data-role="voxel-canvas"]')
-    && $$('[data-layer]').length === 8
+    && $$('[data-layer]').length === 7
     && $$('[data-tier]').length === 6
     && /[0-9]/.test($('[data-role="voxel-hud"]')?.textContent || ''),
   $('[data-role="voxel-hud"]')?.textContent?.trim(),

@@ -25,6 +25,11 @@ import { clamp, KM } from './scale.js';
 
 /** Во сколько раз шаг решётки меньше минимальной длины реки, чтобы её считать. */
 const MIN_RIVER_KM2 = 30_000;
+/* Озеро должно быть глубоким, а не всякой впадиной: глубина в блоках.
+   На ярусе это 30 м на блок, то есть порог в шесть блоков — сто восемьдесят
+   метров: мельче настоящих озёр не бывает, а впадин в рельефе сколько угодно.
+   Без этого порога «озером» становилась каждая клетка, что ниже соседей. */
+const LAKE_MIN_DEPTH = 6;
 /** Гладкость глади: добавка к заполненной высоте, чтобы сток не был «плоским». */
 const EPSILON = 1e-3;
 
@@ -256,7 +261,7 @@ const segmentDistance = (px, pz, ax, az, bx, bz) => {
   let lakeCells = 0;
   for (let index = 0; index < count; index += 1) {
     if (base[index] < seaLevel) continue;
-    if (filled[index] - base[index] > 0.75) {
+    if (filled[index] - base[index] > LAKE_MIN_DEPTH) {
       isLake[index] = 1;
       lakeCells += 1;
       continue;
@@ -400,8 +405,11 @@ const segmentDistance = (px, pz, ax, az, bx, bz) => {
       out[4] = depth[bestIndex] * (1 - bestRatio * bestRatio) + 0.4;
       return out;
     }
-    const lakeDepth = bilinear(filled, x, z) - bilinear(base, x, z);
-    if (lakeDepth > 0.6) {
+    /* Озеро — только на суше: в океане filled и base расходятся на глубину, и
+       без этой проверки весь океан отвечал «озеро». */
+    const ground = bilinear(base, x, z);
+    const lakeDepth = bilinear(filled, x, z) - ground;
+    if (ground >= seaLevel && lakeDepth > LAKE_MIN_DEPTH) {
       out[0] = 2;
       out[1] = bilinear(filled, x, z);
       out[2] = 0;

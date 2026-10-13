@@ -114,6 +114,10 @@ export const createColumns = ({ planet, terrain, seed = '', structures }) => {
     const depth = biomeDepth(biome);
     let surface = biomeSurface(biome);
     let filler = biomeFiller(biome);
+    if (water !== 0 && height >= waterY) {
+      /* Вода нулевой глубины: дно вровень с гладью. Это берег, а не море. */
+      water = 0;
+    }
     if (water !== 0) {
       /* Под водой поверхность — дно: песок или гравий, а не дёрн. */
       surface = biomeUnderwater(biome);

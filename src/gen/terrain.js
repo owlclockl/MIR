@@ -71,7 +71,7 @@ const heightByContinentalness = spline([
 ]);
 
 /** Крутизна склонов: сколько блоков даёт единица гребневого шума. */
-const MOUNTAIN_AMPLITUDE = 236;
+const MOUNTAIN_AMPLITUDE = 250;
 
 /**
  * @param {{seed?: string, width: number, height: number, continents: object, seaLevel?: number}} options
@@ -85,14 +85,24 @@ export const createTerrain = (options) => {
   const R = hashSeed(seed);
   const span = Math.min(width, height);
 
-  /* Периоды в блоках: у Земли это десятки и сотни километров. */
+  /* Периоды в блоках. Крупные слои (эрозия, пояс гор, странность) — сотни
+     километров: они решают, где вообще стоят горы и где всхолмлено. Средние
+     (гребни, холмы) — единицы и десятки километров: из них состоит пейзаж,
+     который видно, идя по земле. Мелкий слой — сотни метров: камни и бугры
+     под ногами. Без среднего масштаба мир из самолёта был бы гладким, а из-за
+     горизонта — мелким шумом; именно средний масштаб и делает рельеф. */
   const erosionPeriod = span * 0.055;
   const beltPeriod = span * 0.085;
   const ridgePeriod = span * 0.022;
+  const ridgeMidPeriod = span * 0.0045;
+  const ridgeFinePeriod = span * 0.0009;
   const weirdPeriod = span * 0.03;
   const climatePeriod = span * 0.06;
   const hillsPeriod = span * 0.007;
-  const microPeriod = span * 0.0009;
+  const hillsMidPeriod = span * 0.0016;
+  const bumpsPeriod = span * 0.0004;
+  const patchesPeriod = span * 0.00035;
+  const microPeriod = span * 0.00008;
   const trenchPeriod = span * 0.14;
 
   /* Гидрология мира; null — рек и озёр в мире ещё нет (см. setHydro). */
@@ -102,25 +112,49 @@ export const createTerrain = (options) => {
 
   /**
    * Высота без рек и озёр: по ней строится сама поверхность и по ней же
-   * считает сток гидрология. `detail` — сколько мелких октав добавлять:
-   * на грубых уровнях пирамиды мелочь не видна, а стоит столько же.
+   * считает сток гидрология.
+   *
+   * Число октав у крупных слоёв (эрозия, хребты, всхолмленность, странность)
+   * одно и то же на всех уровнях детализации — иначе высота в одной и той же
+   * точке зависела бы от того, каким «detail» её спросили, и колонка с
+   * решёткой разошлись бы по берегу и руслам. `detail` управляет только
+   * мелким слоем (сотни метров), который на грубых уровнях всё равно не виден,
+   * зато виден как шум: именно его и убирают грубые уровни пирамиды.
    */
   const baseHeightAt = (x, z, detail = 4, fields = null) => {
-    const c = fields ? fields[S.CONTINENTALNESS] : continents.continentalnessAt(x, z, detail);
-    const erosion = fields ? fields[S.EROSION] : fbm2(R ^ 0x1b873593, x, z, erosionPeriod, { octaves: detail >= 3 ? 3 : 2 });
+    const c = fields ? fields[S.CONTINENTALNESS] : continents.continentalnessAt(x, z, 4);
+    const erosion = fields ? fields[S.EROSION] : fbm2(R ^ 0x1b873593, x, z, erosionPeriod, { octaves: 3 });
     let h = heightByContinentalness(c);
 
     if (c > 0.015) {
-      /* Суша: хребты, пояс гор, плато и всхолмленность. */
+      /* Суша: хребты, пояс гор, плато и всхолмленность.
+         Рельеф собирается каскадом масштабов — хребет в сотни километров,
+         отроги в десятки, промоины в единицы, — и каждый следующий масштаб
+         меньше предыдущего по амплитуде. Иначе рельеф вырождается в один
+         масштаб: из космоса — ровное поле, из-за горизонта — шишки. */
       const inland = clamp((c - 0.05) / 0.55, 0, 1);
       const relief = clamp((0.35 - erosion) / 1.35, 0, 1) ** 1.6;
       const belt = 1 - clamp(Math.abs(fbm2(R ^ 0x9e3779b9, x, z, beltPeriod, { octaves: 2 })) * 2.4, 0, 1);
-      const ridge = fields ? fields[S.PV] : ridged2(R ^ 0x85ebca6b, x, z, ridgePeriod, { octaves: detail >= 3 ? 3 : 2 });
-      const mountains = MOUNTAIN_AMPLITUDE * belt * relief * inland * ridge ** 1.7;
+      const ridge = fields ? fields[S.PV] : ridged2(R ^ 0x85ebca6b, x, z, ridgePeriod, { octaves: 3 });
+      /* Где вообще горы: пояс, податливость пород и внутренность материка. */
+      const range = belt * relief * inland;
+      const mountains = MOUNTAIN_AMPLITUDE * range * ridge ** 1.6;
+      /* Отроги: тот же хребет, но в масштабе десятков километров. Они и
+         превращают купол в хребет с распадками. */
+      const ridgeMid = ridged2(R ^ 0x2f4f6d21, x, z, ridgeMidPeriod, { octaves: 2 });
+      const spurs = 105 * range * (0.3 + 0.7 * ridge) * ridgeMid ** 1.8;
+      /* Промоины: единицы километров, только в горах и только вдоль гребней. */
+      const ridgeFine = ridged2(R ^ 0x7f4a7c15, x, z, ridgeFinePeriod, { octaves: 2 });
+      const gullies = 90 * range * ridge ** 1.1 * ridgeFine ** 1.5;
       const plateau = c > 0.55 ? (c - 0.55) * 90 * clamp((0.8 - erosion) / 1.6, 0, 1) : 0;
-      const hills = fbm2(R ^ 0x165667b1, x, z, hillsPeriod, { octaves: detail >= 3 ? 2 : 1 })
+      const hills = fbm2(R ^ 0x165667b1, x, z, hillsPeriod, { octaves: 2 })
         * (5 + 22 * (1 - (erosion + 1) / 2)) * (0.35 + 0.65 * inland);
-      h += mountains + plateau + hills;
+      /* Всхолмленность: десятки километров, мягкая — она есть и на равнине.
+         Амплитуда такая, чтобы на глаз с земли рельеф был рельефом, а не
+         полем: у равнины перепад в единицы блоков на километр. */
+      const rolling = fbm2(R ^ 0x6a09e667, x, z, hillsMidPeriod, { octaves: 2 })
+        * (8 + 34 * (1 - (erosion + 1) / 2)) * (0.5 + 0.5 * inland);
+      h += mountains + spurs + gullies + plateau + hills + rolling;
     } else if (c < -0.2) {
       /* Океан: жёлобы и сглаженные абиссальные равнины. */
       const trench = ridged2(R ^ 0x27d4eb2f, x, z, trenchPeriod, { octaves: 2 });
@@ -128,9 +162,13 @@ export const createTerrain = (options) => {
     }
 
     if (detail >= 4) {
-      /* Мелочь уровня «несколько сотен метров»: без неё берег и русла выглядят
-         линейкой, а с ней появляются камни, бугры и заводи. */
-      h += fbm2(R ^ 0xc2b2ae35, x, z, microPeriod, { octaves: 2 }) * 2.6;
+      /* Два самых мелких слоя: бугры в сотни метров и мелочь под ногами. Без
+         них берег и русла выглядят линейкой, а с ними появляются камни и
+         заводи. На грубых уровнях они не рисуют рельеф, а сыплют шумом по
+         пикселю — там они и выключены. */
+      const mask = c > 0.015 ? 0.5 + 0.5 * clamp((c - 0.05) / 0.3, 0, 1) : 0.4;
+      h += fbm2(R ^ 0x1f83d9ab, x, z, bumpsPeriod, { octaves: 1 }) * 14 * mask;
+      h += fbm2(R ^ 0xc2b2ae35, x, z, microPeriod, { octaves: 1 }) * 5;
     }
     /* Поверхность не выходит за мир блоков: иначе крона и вода упирались бы в
        потолок, а срез выше мира был бы пустым. */
@@ -147,10 +185,10 @@ export const createTerrain = (options) => {
    */
   const sample = (x, z, detail, out) => {
     const d = detail;
-    const c = continents.continentalnessAt(x, z, d);
-    const erosion = fbm2(R ^ 0x1b873593, x, z, erosionPeriod, { octaves: d >= 3 ? 3 : 2 });
-    const weirdness = fbm2(R ^ 0x8f1bbcdc, x, z, weirdPeriod, { octaves: d >= 3 ? 2 : 1 });
-    const ridge = ridged2(R ^ 0x85ebca6b, x, z, ridgePeriod, { octaves: d >= 3 ? 3 : 2 });
+    const c = continents.continentalnessAt(x, z, d >= 4 ? 4 : 3);
+    const erosion = fbm2(R ^ 0x1b873593, x, z, erosionPeriod, { octaves: 3 });
+    const weirdness = fbm2(R ^ 0x8f1bbcdc, x, z, weirdPeriod, { octaves: 2 });
+    const ridge = ridged2(R ^ 0x85ebca6b, x, z, ridgePeriod, { octaves: 3 });
 
     out[S.CONTINENTALNESS] = c;
     out[S.EROSION] = erosion;
@@ -199,7 +237,10 @@ export const createTerrain = (options) => {
       out[S.LAKE_DEPTH] = 0;
     }
 
-    if (water === WATER_NONE && h < seaLevel) {
+    /* Океан — там, где дно ниже уровня моря. Сравниваем с округлённой
+       высотой: колонка округляет ту же высоту, и иначе на дне ровно под
+       гладью получалась бы вода нулевой глубины — «берег» без берега. */
+    if (water === WATER_NONE && Math.round(h) < seaLevel) {
       water = WATER_OCEAN;
       waterY = seaLevel;
     }
@@ -212,11 +253,15 @@ export const createTerrain = (options) => {
     const latitude = 90 - (z / height) * 180;
     const latitudeFactor = 1 - 2 * (Math.abs(latitude) / 90) ** 1.35;
     const altitudeCooling = clamp((h - seaLevel) / 280, 0, 0.65);
-    const temperature = clamp(latitudeFactor * 0.92 + fbm2(R ^ 0x7feb352d, x, z, climatePeriod, { octaves: 2 }) * 0.3 - altitudeCooling, -1, 1);
+    /* Пятна в несколько километров: климат задаёт пояс, а эти пятна — какая
+       именно земля под ногами. Без них биом один на сотни километров, и идти
+       по нему некуда. */
+    const patch = fbm2(R ^ 0xe5b1a7c3, x, z, patchesPeriod, { octaves: 1 });
+    const temperature = clamp(latitudeFactor * 0.92 + fbm2(R ^ 0x7feb352d, x, z, climatePeriod, { octaves: 2 }) * 0.3 + patch * 0.1 - altitudeCooling, -1, 1);
 
     const coastal = 1 - clamp(c / 0.4, 0, 1);
     const dryBelt = Math.exp(-(((Math.abs(latitude) - 26) / 13) ** 2));
-    const humidity = clamp(coastal * 0.72 + fbm2(R ^ 0x846ca68b, x, z, climatePeriod * 0.7, { octaves: d >= 3 ? 3 : 2 }) * 0.52 - dryBelt * 0.58, -1, 1);
+    const humidity = clamp(coastal * 0.72 + fbm2(R ^ 0x846ca68b, x, z, climatePeriod * 0.7, { octaves: d >= 3 ? 3 : 2 }) * 0.52 - dryBelt * 0.58 - patch * 0.14, -1, 1);
 
     const mountainous = erosion < -0.35 || h > seaLevel + 96;
     const biome = pickBiome(temperature, humidity, c, erosion, weirdness, h, seaLevel, water, mountainous);

@@ -34,11 +34,10 @@ import { C, COLUMN_SIZE, createBlockWorld, S, STAGE, STAGE_LABEL } from '../gen/
 export const LAYERS = Object.freeze([
   { id: 'biome', name: 'биомы', hint: 'Цвет биома: так выглядит мир сверху' },
   { id: 'relief', name: 'рельеф', hint: 'Высоты с отмывкой склонов — как на настоящей карте' },
+  { id: 'continents', name: 'материки', hint: 'Каждый кусок суши своим цветом: материки — плотным, острова — бледным' },
   { id: 'climate', name: 'климат', hint: 'Температура: у экватора тепло, у полюсов мороз' },
   { id: 'rain', name: 'осадки', hint: 'Годовые осадки: пустыни светлые, джунгли синие' },
   { id: 'blocks', name: 'блоки', hint: 'Срез мира на выбранном ярусе — тот же блок, что в игре' },
-  { id: 'caves', name: 'пещеры', hint: 'Доля пустот в коре: где мир внутри пуст' },
-  { id: 'ores', name: 'руды', hint: 'Рудные жилы: уголь и железо выше, алмаз глубже' },
   { id: 'villages', name: 'деревни', hint: 'Постройки: площадки деревень, дома и дороги' },
 ]);
 
@@ -53,7 +52,7 @@ export const TIER_PRESETS = Object.freeze([
 ]);
 
 /** Слои, которым нужна полная колонка: они стоят дороже остальных. */
-const HEAVY_LAYERS = new Set(['blocks', 'caves', 'ores']);
+const HEAVY_LAYERS = new Set(['blocks', 'villages']);
 /** Размер клетки в пикселях: у дорогих слоёв крупнее, иначе кадр не успевает. */
 const CELL_PX = { light: 2, heavy: 4 };
 /** Потолок выборок на кадр — по нему выбирается размер клетки. */
@@ -65,12 +64,16 @@ const VILLAGE_LIMIT = 240;
 
 const clamp = (value, min, max) => (value < min ? min : value > max ? max : value);
 
-/* Палитры слоёв: гипсометрия Земли, температура и осадки. Цвета приглушены под
-   тёмную тему интерфейса — карта не должна светиться ярче панелей. */
+/* Палитры слоёв. Гипсометрия задана в метрах над уровнем моря — тех же, что
+   показывает строка состояния, — а не в ярусах: иначе шкала растягивается на
+   всю высоту мира (11 км), и вся суша оказывается в белом. Реальные ориентиры:
+   шельф, берег, равнина, предгорья, горы, снеговая линия. Температура и осадки
+   — условные шкалы от −40 до +40 °C и от 0 до 2400 мм. */
 const HYPSOMETRY = [
-  [10, 16, 42], [16, 34, 76], [22, 62, 122], [36, 100, 152],
-  [64, 136, 154], [116, 162, 126], [170, 178, 108],
-  [186, 152, 96], [156, 114, 88], [198, 196, 192], [246, 250, 252],
+  [-11000, [8, 14, 38]], [-5000, [12, 30, 68]], [-2500, [18, 52, 104]],
+  [-1000, [28, 82, 134]], [-200, [46, 118, 152]], [0, [64, 138, 152]],
+  [200, [110, 162, 126]], [800, [156, 172, 108]], [1800, [190, 168, 104]],
+  [3000, [168, 132, 96]], [4500, [152, 140, 136]], [6000, [206, 206, 204]], [9000, [246, 250, 252]],
 ];
 const TEMPERATURE = [
   [64, 92, 168], [92, 134, 186], [128, 176, 178], [188, 196, 138], [206, 156, 106], [184, 96, 80],
@@ -80,13 +83,35 @@ const PRECIPITATION = [
 ];
 
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+/** Цвет по равномерной шкале: t от 0 до 1. */
 const palette = (stops, t) => {
   const scaled = clamp(t, 0, 1) * (stops.length - 1);
   const index = Math.min(stops.length - 2, Math.floor(scaled));
   return mix(stops[index], stops[index + 1], scaled - index);
 };
+/** Цвет по шкале с опорными значениями: сами значения задают кривую. */
+const paletteAt = (stops, value) => {
+  if (!(value > stops[0][0])) return stops[0][1];
+  const last = stops[stops.length - 1];
+  if (!(value < last[0])) return last[1];
+  let index = 0;
+  while (index < stops.length - 2 && stops[index + 1][0] <= value) index += 1;
+  const a = stops[index];
+  const b = stops[index + 1];
+  return mix(a[1], b[1], (value - a[0]) / (b[0] - a[0]));
+};
 
 const rgbOf = (value) => [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+
+/** Цвет по тону: материки различаются тоном, а не заливкой из палитры. */
+const hsl = (hue, saturation, lightness) => {
+  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = c * (1 - Math.abs(((hue * 6) % 2) - 1));
+  const m = lightness - c / 2;
+  const sector = Math.floor(hue * 6) % 6;
+  const rgb = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][sector];
+  return [(rgb[0] + m) * 255, (rgb[1] + m) * 255, (rgb[2] + m) * 255];
+};
 
 /* Дёрн и листва в игре зеленеют от биома: тот же приём, что в генераторе
    колонок, — иначе близкий вид расходится с цветом блока в подсказке. */
@@ -231,7 +256,9 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   const cellPixels = (layer) => (HEAVY_LAYERS.has(layer) ? CELL_PX.heavy : CELL_PX.light);
   const blocksPerPixel = () => 2 ** (maxLevel - view.level);
-  const detailFor = (cellBlocks) => (cellBlocks >= 512 ? 2 : cellBlocks >= 64 ? 3 : 4);
+  /* Мелкий слой рельефа (сотни метров) виден только тогда, когда клетка его
+     крупнее: на грубых уровнях он не рисует рельеф, а сыплет шумом. */
+  const detailFor = (cellBlocks) => (cellBlocks >= 64 ? 3 : 4);
 
   /** Размер полотна в пикселях устройства не важен: пиксель карты — блок. */
   const fitCanvas = () => {
@@ -293,6 +320,16 @@ export const mountBlockWorldView = (host, options = {}) => {
     paint.flags[row * paint.cols + col] = 1;
   };
 
+  /** Клетка за краем мира: там ничего нет, и вид говорит об этом фоном. */
+  const writeVoid = (col, row) => {
+    const offset = (row * paint.cols + col) * 4;
+    const data = paint.image.data;
+    data[offset] = 10;
+    data[offset + 1] = 15;
+    data[offset + 2] = 22;
+    paint.flags[row * paint.cols + col] = 1;
+  };
+
   /**
    * Цвет одной клетки. Сюда сходятся все правила окраски: слой решает, что
    * именно спрашивают у мира, а форма ответа одна — три канала.
@@ -304,11 +341,20 @@ export const mountBlockWorldView = (host, options = {}) => {
       const height = scratchColumn[C.HEIGHT];
       const y = clamp(Math.round(view.tier), 0, WORLD_Y - 1);
       const block = world.blockInColumn(x, y, z, scratchColumn);
+      /* Плоскость реза выше поверхности — значит смотрим на верх мира, а не
+         внутрь: показываем тот блок, на который падает свет. Иначе на обзорном
+         масштабе весь материк оказался бы небом. */
+      const skin = y > height;
       if (block === 0) {
-        /* Пустота: выше поверхности — небо, ниже — пещера. */
-        const sky = y > height;
-        const fade = clamp((y - height) / 40, 0, 1);
-        write(col, row, 96 + fade * 46, 126 + fade * 40, 158 + fade * 34);
+        if (skin) {
+          const top = world.blockInColumn(x, height, z, scratchColumn) || scratchColumn[C.SURFACE];
+          const [sr, sg, sb] = blockRgb(top);
+          write(col, row, sr * 0.9, sg * 0.9, sb * 0.9);
+          return height;
+        }
+        /* Ниже поверхности пустота — это пещера: чем глубже, тем темнее. */
+        const fade = clamp((height - y) / 120, 0, 1);
+        write(col, row, 42 - fade * 18, 46 - fade * 18, 56 - fade * 16);
         return height;
       }
       const [br, bg, bb] = blockRgb(block);
@@ -326,36 +372,21 @@ export const mountBlockWorldView = (host, options = {}) => {
       write(col, row, r * shade, g * shade, b * shade);
       return height;
     }
-    if (layer === 'caves') {
-      world.columnAt(x, z, scratchColumn);
-      const height = scratchColumn[C.HEIGHT];
-      let holes = 0;
-      let probes = 0;
-      const step = Math.max(8, cellBlocks * 2);
-      for (let k = 1; k <= 4; k += 1) {
-        const y = Math.round(height - k * step);
-        if (y <= 4) break;
-        probes += 1;
-        if (world.isCave(x, y, z)) holes += 1;
+    if (layer === 'continents') {
+      /* Материк — это то, что мир перечисляет, а не то, что видно глазом:
+         цвет берётся у куска суши, а не у высоты или биома. */
+      const component = world.grid ? world.grid.componentAt(x, z) : null;
+      if (!component) {
+        /* Океан: у суши свой цвет, у моря — общий фон. */
+        world.columnAt(x, z, scratchColumn);
+        const sea = scratchColumn[C.WATER] !== WATER_NONE;
+        write(col, row, sea ? 24 : 30, sea ? 44 : 48, sea ? 72 : 62);
+        return scratchColumn[C.HEIGHT];
       }
-      const share = probes ? holes / probes : 0;
-      write(col, row, 20 + share * 150, 24 + share * 174, 32 + share * 196);
-      return height;
-    }
-    if (layer === 'ores') {
-      world.columnAt(x, z, scratchColumn);
-      const height = scratchColumn[C.HEIGHT];
-      const mountainous = scratchColumn[C.MOUNTAIN] === 1;
-      let hits = 0;
-      let probes = 0;
-      for (const y of [12, 32, 60, 96]) {
-        if (y >= height) break;
-        probes += 1;
-        if (world.oreAt(x, y, z, mountainous)) hits += 1;
-      }
-      const share = probes ? hits / probes : 0;
-      write(col, row, 34 + share * 200, 34 + share * 130, 40 + share * 70);
-      return height;
+      const hue = (component.id * 0.6180339887) % 1;
+      const [r, g, b] = hsl(hue, component.continent ? 0.44 : 0.2, component.continent ? 0.56 : 0.62);
+      write(col, row, r, g, b);
+      return world.grid.heightAt(x, z);
     }
     if (layer === 'villages') {
       world.columnAt(x, z, scratchColumn);
@@ -375,7 +406,12 @@ export const mountBlockWorldView = (host, options = {}) => {
     world.sampleInto(x, z, detailFor(cellBlocks), scratchSample);
     const height = scratchSample[S.HEIGHT];
     if (layer === 'relief') {
-      const [r, g, b] = palette(HYPSOMETRY, (height - 2) / (WORLD_Y - 12));
+      /* Высота в метрах: там, где вода, шкала уходит вглубь, а на суше —
+         вверх от берега. Так цвета совпадают с числами в строке состояния. */
+      const meters = scratchSample[S.WATER] !== WATER_NONE
+        ? elevationMeters(Math.min(height, SEA_LEVEL))
+        : elevationMeters(height);
+      const [r, g, b] = paletteAt(HYPSOMETRY, meters);
       write(col, row, r, g, b);
       return height;
     }
@@ -423,10 +459,18 @@ export const mountBlockWorldView = (host, options = {}) => {
     const layer = view.layer;
     const z = paint.originZ + (row + 0.5) * paint.cellBlocks;
     const rowStart = row * paint.cols;
+    /* Строка целиком за краем мира — весь ряд фон. */
+    const rowOutside = z < 0 || z >= planet.height;
     let leftHeight = Number.NaN;
     for (let col = 0; col < paint.cols; col += 1) {
       const index = rowStart + col;
       const x = paint.originX + (col + 0.5) * paint.cellBlocks;
+      if (rowOutside || x < 0 || x >= planet.width) {
+        if (!paint.flags[index]) writeVoid(col, row);
+        heightsRow[col] = Number.NaN;
+        leftHeight = Number.NaN;
+        continue;
+      }
       const height = paint.flags[index] ? heightsPrev[col] : colorAt(x, z, col, row, paint.cellBlocks);
       heightsRow[col] = height;
       if ((layer === 'relief' || layer === 'biome') && !paint.flags[index]) {
@@ -463,11 +507,15 @@ export const mountBlockWorldView = (host, options = {}) => {
     const z1 = view.center[1] + halfZ;
     const layer = view.layer;
 
-    /* Реки линиями: русло уже пикселя на мелком масштабе, а сеть должна быть
-       видна — так и поступают настоящие карты. */
+    /* Реки линиями — но только с того масштаба, где они читаются сетью.
+       Речная сетка мира грубая (клетка ≈ 104 км), и на обзорном кадре, где
+       пиксель покрывает десятки километров, прямые пробеги D8 превращаются в
+       длинные линейки через полкарты. Настоящие карты так же не рисуют реку
+       тоньше пикселя: она появляется, когда её видно. */
     const hydro = world.hydro;
-    if (hydro && mpp >= 4 && (layer === 'biome' || layer === 'relief' || layer === 'rain')) {
-      context.lineWidth = mpp >= 64 ? 1 : 1.5;
+    const showRivers = mpp <= 8192 && (layer === 'biome' || layer === 'relief' || layer === 'rain' || layer === 'continents');
+    if (hydro && showRivers) {
+      context.lineWidth = mpp >= 256 ? 1.5 : 2;
       context.strokeStyle = layer === 'relief' ? 'rgba(74,140,214,0.9)' : 'rgba(96,168,244,0.92)';
       context.beginPath();
       for (const segment of hydro.segments) {
@@ -495,7 +543,7 @@ export const mountBlockWorldView = (host, options = {}) => {
     }
 
     /* Деревни: точка и имя. Список берётся прямоугольником кадра — их немного. */
-    if (mpp <= 24 && layer !== 'ores' && layer !== 'caves') {
+    if (mpp <= 24) {
       const villages = world.villagesIn(x0, z0, x1, z1).slice(0, VILLAGE_LIMIT);
       context.font = '600 11px system-ui, sans-serif';
       context.textBaseline = 'middle';
@@ -620,6 +668,10 @@ export const mountBlockWorldView = (host, options = {}) => {
         .join('');
       return;
     }
+    if (view.layer === 'continents') {
+      legendHost.innerHTML = '<span class="world-voxel-legend__item">цвет — свой у каждого куска суши, бледный у островов</span>';
+      return;
+    }
     legendHost.innerHTML = '';
   };
 
@@ -704,8 +756,8 @@ export const mountBlockWorldView = (host, options = {}) => {
         view.center = [continent.centerX, continent.centerZ];
         /* Масштаб подбирается так, чтобы материк занял примерно половину
            полотна: у материков разная площадь, и общий уровень им не годится. */
-        const spanKm = Math.max(continent.widthKm, continent.heightKm);
-        const wanted = Math.ceil(Math.log2((spanKm * 1000) / Math.max(320, canvas.width))) + 1;
+        const spanBlocks = Math.max(continent.widthKm, continent.heightKm) * 1000;
+        const wanted = Math.floor(Math.log2(Math.max(1, spanBlocks / Math.max(200, canvas.width))));
         view.level = clamp(maxLevel - wanted, 0, maxLevel);
         view.centered = true;
         setNote(`${continent.name}: ${areaLabel(continent.areaKm2)}, ${digits(continent.widthKm)} × ${digits(continent.heightKm)} км.`);
@@ -757,9 +809,11 @@ export const mountBlockWorldView = (host, options = {}) => {
   };
   const toEarth = () => {
     view.center = [planet.width / 2, planet.height / 2];
-    /* Весь мир целиком: материк 40 000 км не влез бы, а Земля — влезает. */
-    const wanted = Math.ceil(Math.log2(planet.width / Math.max(320, canvas.width)));
-    view.level = clamp(maxLevel - wanted, 0, maxLevel);
+    /* Весь мир целиком: блоков на пиксель берём столько, чтобы в кадр влезла
+       большая сторона мира. Округление вниз — чтобы по краям был запас, а не
+       обрезка. */
+    const mppNeeded = Math.max(planet.width / Math.max(200, canvas.width), planet.height / Math.max(200, canvas.height));
+    view.level = clamp(maxLevel - Math.floor(Math.log2(Math.max(1, mppNeeded))), 0, maxLevel);
     view.centered = true;
     layout();
     syncLabels();

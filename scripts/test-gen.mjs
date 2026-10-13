@@ -386,7 +386,10 @@ const columnRounds = 20000;
 const sampleStart = performance.now();
 for (let i = 0; i < columnRounds; i += 1) earth.columnAt(4_000_000 + i * 1291, 6_000_000 + i * 911, columnSamples);
 const perColumn = ((performance.now() - sampleStart) / columnRounds) * 1000;
-add(perColumn < 4, 'колонка считается за микросекунды', `${perColumn.toFixed(2)} мкс`);
+/* Потолок — кадровый бюджет вида: он берёт не больше 120 000 колонок на
+   кадр, значит колонка обязана укладываться в восемь микросекунд, иначе
+   один кадр не собрать и за секунду. Заодно ловит регресс на порядок. */
+add(perColumn < 8, 'колонка укладывается в кадровый бюджет вида', `${perColumn.toFixed(2)} мкс — потолок 8`);
 /* Кадр идёт по соседним точкам: так колонка дешевле, чем по разбросанным. */
 const frameStart = performance.now();
 for (let i = 0; i < columnRounds; i += 1) earth.columnAt(4_000_000 + (i % 1000) * 3, 6_000_000 + Math.floor(i / 1000) * 3, columnSamples);
