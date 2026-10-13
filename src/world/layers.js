@@ -50,9 +50,9 @@ import {
   isOpaque,
 } from './blocks.js';
 
-import { CHUNK_SX, CHUNK_SZ, blockAt } from './chunk.js';
+import { CHUNK_SX, CHUNK_SZ, blockAt, columnBlock, fieldProfile, paletteCache } from './chunk.js';
 
-import { F_BEACH, F_ICE, F_RIVER, F_WATER, flowVector, fold } from './field.js';
+import { F_BEACH, F_ICE, F_RIVER, F_WATER, flowVector, fold, latticeCell } from './field.js';
 
 /** Пикселей экрана на блок. Ниже 1 — блоки всё равно не разобрать. */
 
@@ -615,35 +615,22 @@ export const cutY = (field, i, level) => {
 
 */
 
-const waterShown = (field, i, level) => {
+const waterShown = (field, i, level, cell) => {
   if ((field.flags[i] & F_WATER) === 0) return false;
 
-  return field.waterY[i] > field.ground[i] && level > field.ground[i];
+  if (field.waterY[i] <= field.ground[i] || level <= field.ground[i]) return false;
+
+  /* Лёд на поверхности — блок, а не жидкость: замёрзшая вода не течёт и не
+     пульсирует, и береговая линия не должна обводить её как открытую воду.
+     Правило одно с `columnBlock` — иначе лёд спорит с построенными чанками. */
+
+  if ((field.flags[i] & F_ICE) === 0) return true;
+
+  const thickness = field.cellTemp[cell] <= -12 ? 3 : 1;
+
+  return level <= field.waterY[i] - thickness;
 };
 
-const tileOfField = (field, i, level) => {
-  const flags = field.flags[i];
-
-  const wet = (flags & F_WATER) !== 0;
-
-  const ground = field.ground[i];
-
-  if (level > ground) {
-    if (wet && level <= field.waterY[i]) return BLOCKS[WATER].top;
-
-    return null;
-  }
-
-  if (level === ground) {
-    if ((flags & F_ICE) !== 0) return BLOCKS[ICE].top;
-
-    if ((flags & F_BEACH) !== 0 || ground <= field.seaY) return BLOCKS[SAND].top;
-
-    return BLOCKS[GRASS].top;
-  }
-
-  return BLOCKS[STONE].top;
-};
 
 /* ---------- срез ---------- */
 
@@ -716,6 +703,12 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
 
   let water = 0;
 
+  /* Пиксель без чанка считается из поля тем же правилом, что строит колонку:
+     профиль и палитры клеток держим при кадре, чтобы не собирать их заново на
+     каждом пикселе. */
+  const pixelProfile = {};
+  const pixelPalettes = paletteCache(field);
+
   ensureMarks(cellsX * cellsZ);
 
   for (let z = 0; z < cellsZ; z += 1) {
@@ -780,23 +773,20 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
         }
       }
 
+      if (id === null) {
+        /* Чанка на этот пиксель ещё нет: блок берётся тем же правилом, что
+           строит колонку. Приглушать поле нельзя — граница построенных чанков
+           читалась бы прямоугольником на всю загруженную область. */
+        id = columnBlock(cut, fieldProfile(field, u, v, i, pixelProfile, pixelPalettes));
+
+        fromField += 1;
+      }
+
       let rgb;
 
       let alpha = 1;
 
-      if (id === null) {
-        const tile = tileOfField(field, i, cut);
-
-        rgb = tile === null ? SKY : mix(colors[tile] ?? [120, 120, 128], 0.82);
-
-        alpha = tile === null ? 1 : 0.85;
-
-        isLiquid = tile === BLOCKS[WATER].top;
-
-        if (isLiquid) water += 1;
-
-        fromField += 1;
-      } else if (id === AIR) {
+      if (id === AIR) {
         /* Пусто внутри грунта — это пещера: её надо видеть чёрной дырой,
 
 а не небом. Снаружи (выше вершины) — небо. */
@@ -873,11 +863,11 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
 
 в реке исчезает. */
 
-        if (x + 1 < cellsX && waterShown(field, i + 1, level) !== isLiquid) {
+        if (x + 1 < cellsX && waterShown(field, i + 1, level, latticeCell(field, u + 1, v)) !== isLiquid) {
           pushCoast(cellsX, isLiquid ? x + 1 : x, z);
         }
 
-        if (z + 1 < cellsZ && waterShown(field, i + field.width, level) !== isLiquid) {
+        if (z + 1 < cellsZ && waterShown(field, i + field.width, level, latticeCell(field, u, v + 1)) !== isLiquid) {
           pushCoast(cellsX, x, isLiquid ? z + 1 : z);
         }
       }

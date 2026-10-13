@@ -13,7 +13,7 @@
 export const FAKE_MAP = { cells: 6, spacing: 16, size: 96, seaLevel: 20 };
 
 /** @returns {object} объект, годный как `iframe.contentWindow` для readSource */
-export const fakeEditorWindow = () => {
+export const fakeEditorWindow = (options = {}) => {
   const total = FAKE_MAP.cells * FAKE_MAP.cells;
   const gridH = new Array(total).fill(5); // всё под уровнем моря
   gridH[0] = 12;
@@ -21,7 +21,7 @@ export const fakeEditorWindow = () => {
   temp[7] = 3;
   const prec = new Array(total).fill(20);
   prec[14] = 40;
-  return {
+  const win = {
     SEA_LEVEL: FAKE_MAP.seaLevel,
     options: { map: { graph: { width: FAKE_MAP.size, height: FAKE_MAP.size } } },
     grid: {
@@ -41,6 +41,11 @@ export const fakeEditorWindow = () => {
       rivers: [{ i: 1, cells: [1, 2], sourceWidth: 0.5, widthFactor: 1, discharge: 40 }],
     },
   };
+  /* Биомы генератор считает позже упаковки: между этими шагами окно выглядит
+     именно так — сетка и pack есть, биомов нет. Мост обязан считать такой мир
+     неготовым, а не падать на undefined при переносе биомов. */
+  if (options.biomes === false) delete win.pack.cells.biome;
+  return win;
 };
 
 /** Ожидания от снимка этого окна — по ним и проверяем мост. */

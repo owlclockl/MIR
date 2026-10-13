@@ -626,6 +626,45 @@ await wait(WAIT_PROBE);
 
 add(goneHost.childElementCount === 0, 'ожидание снимается до появления карты');
 
+/* Окно, в котором генератор уже отдал сетку и упаковку, а биомы ещё считает:
+   именно на этом шаге падал снимок («Cannot read properties of undefined»),
+   потому что мост считал такую карту готовой. Теперь это ожидание — и оно
+   обязано закончиться само, как только биомы появятся. */
+
+const biomeHost = window.document.createElement('div');
+
+window.document.body.append(biomeHost);
+
+const biomeWindow = fakeEditorWindow({ biomes: false });
+
+const biome = mountWorldView(biomeHost, {
+
+  frame: { contentWindow: biomeWindow },
+
+  config: { seed: 'биомы', width: FAKE_MAP.size, height: FAKE_MAP.size },
+
+});
+
+add(biome.waiting === true, 'окно без биомов — это ожидание', biome.error ?? '');
+
+add(/биом/.test(biome.element.textContent ?? ''), 'сцена говорит, что ждёт биомы',
+
+  (biome.element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 70));
+
+biomeWindow.pack.cells.biome = [1, 7, 7];
+
+await wait(600);
+
+add(biome.waiting === false && biome.element.querySelector('canvas') !== null,
+
+  'биомы появились — вид построился сам, без второго нажатия');
+
+add(biome.error === '' || biome.error === undefined, 'ожидание биомов не оставило ошибки', biome.error ?? '');
+
+biome.dispose();
+
+add(biomeHost.childElementCount === 0, 'ожидание биомов снимается по dispose');
+
 const orphanHost = window.document.createElement('div');
 
 const empty = mountWorldView(orphanHost, { frame: null, config: null });

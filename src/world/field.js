@@ -9,7 +9,7 @@
    пиксель = scale × scale блоков (scale — опция buildField). Мир не замощён:
    одна полная карта, координаты за её краем приводятся к краю (fold). */
 
-import { clamp, fbm2, hash32, noise2 } from './math.js';
+import { clamp, fbm2, hash32, noise2, rand01 } from './math.js';
 
 /** Уровень моря в Azgaar: h < 20 — вода. */
 export const FMG_SEA_LEVEL = 20;
@@ -86,6 +86,44 @@ export const latticeCell = (field, u, v) => {
   const cx = clamp(Math.floor(u / field.spacing), 0, field.cellsX - 1);
   const cy = clamp(Math.floor(v / field.spacing), 0, field.cellsY - 1);
   return cy * field.cellsX + cx;
+};
+
+/* Ширина полосы у границы клетки, где биом выбирается шумом, в блоках. */
+const BIOME_DITHER = 3;
+
+/**
+ * Биом колонки — с рваной границей. У клетки решётки Azgaar биом один на всю
+ * клетку, и в блоках её край читается квадратом в тридцать блоков: это первое,
+ * что видно в кадре и чего в природе не бывает. Поэтому у самой границы биом
+ * выбирается шумом между своей клеткой и соседней — край размывается на пару
+ * блоков. Правило одно на генерацию и кадр: колонка и её блок берут биом отсюда.
+ *
+ * `cell` и `own` — уже посчитанные клетка и её биом: кадр зовёт это на каждом
+ * пикселе, и повторять `latticeCell` там незачем.
+ */
+export const biomeAt = (field, u, v, cell, own) => {
+  const spacing = field.spacing;
+  const cx = cell % field.cellsX;
+  const cy = (cell - cx) / field.cellsX;
+  /* Расстояние до ближайшей границы клетки по обеим осям, в блоках. */
+  const lx = u / spacing - cx;
+  const ly = v / spacing - cy;
+  const edgeX = Math.min(lx, 1 - lx) * spacing;
+  const edgeY = Math.min(ly, 1 - ly) * spacing;
+  const near = Math.min(edgeX, edgeY);
+  if (near > BIOME_DITHER) return own;
+  const nx = cx + (edgeX <= edgeY ? (lx < 0.5 ? -1 : 1) : 0);
+  const ny = cy + (edgeY < edgeX ? (ly < 0.5 ? -1 : 1) : 0);
+  if (nx < 0 || ny < 0 || nx >= field.cellsX || ny >= field.cellsY) return own;
+  const other = field.cellBiome[ny * field.cellsX + nx];
+  if (other === own) return own;
+  /* Ровно на границе уступаем соседу в половине случаев, а к третьему блоку
+     внутрь — уже почти никогда: полоса вдоль границы выходит рваной, а не
+     ровной. Шум берём на грубой решётке в два блока — в кадре это пятна
+     биома, а не рябь по пикселям. */
+  const chance = 0.5 * (1 - near / (BIOME_DITHER + 1));
+  const noise = rand01(field.seed + 0x51ed, Math.floor(u / 2), Math.floor(v / 2), 0);
+  return noise < chance ? other : own;
 };
 
 /**
@@ -446,7 +484,7 @@ export const sampleColumn = (field, x, z) => {
     dir: flowByte & 15,
     depth: flowByte >> 4,
     lakeType: field.lakeType[i],
-    biome: field.cellBiome[c],
+    biome: biomeAt(field, u, v, c, field.cellBiome[c]),
     temp: field.cellTemp[c],
     prec: field.cellPrec[c],
     h: field.base[i],

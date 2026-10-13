@@ -34,9 +34,21 @@ export class VoxelSourceError extends Error {
   }
 }
 
-/** Достаточно ли данных для поля: сетка, упаковка и «родительские» клетки. */
+/**
+ * Достаточно ли данных для поля: сетка, упаковка, «родительские» клетки и
+ * биомы. Биомы обязательны: их перенос читает `pack.cells.biome` по клетке, и
+ * без него снимок падал на `undefined` — а готовым мост его уже считал, потому
+ * что биомы появляются позже упаковки (порядок генератора: сетка → pack →
+ * климат → биомы).
+ */
 export const mapsReady = (win) =>
-  Boolean(win?.grid?.cells?.h?.length && win?.pack?.cells?.h?.length && win?.pack?.cells?.g?.length && win?.grid?.spacing);
+  Boolean(
+    win?.grid?.cells?.h?.length &&
+      win?.pack?.cells?.h?.length &&
+      win?.pack?.cells?.g?.length &&
+      win?.pack?.cells?.biome?.length &&
+      win?.grid?.spacing,
+  );
 
 /** Что не готово — для человеческой подсказки в интерфейсе. */
 export const missingMapsPart = (win) => {
@@ -44,6 +56,7 @@ export const missingMapsPart = (win) => {
   if (!win.grid.cells?.h?.length) return 'высоты сетки ещё не построены';
   if (!win.pack?.cells?.h?.length) return 'упаковка карты (pack) ещё не построена';
   if (!win.pack?.cells?.g?.length) return 'связь pack → grid ещё не построена';
+  if (!win.pack?.cells?.biome?.length) return 'биомы клеток ещё не посчитаны';
   return 'данных достаточно';
 };
 
@@ -63,6 +76,10 @@ const numberOr = (value, fallback) => (Number.isFinite(Number(value)) ? Number(v
 /** Высоты и биомы pack-клеток переносим на решётку grid через pack.cells.g. */
 const spreadPackToGrid = (grid, pack, cellsX, cellsY, seaLevel) => {
   const total = cellsX * cellsY;
+  /* Мост обязан называть свою причину, а не падать `TypeError` из недр: снимок
+     берут и руками, и тесты, а генератор живёт в соседнем окне. */
+  if (!pack?.cells?.g?.length) throw new VoxelSourceError('упаковка карты (pack) ещё не построена');
+  if (!pack.cells.biome?.length) throw new VoxelSourceError('биомы клеток ещё не посчитаны: строить рано');
   const cellH = new Float32Array(total);
   const cellBiome = new Uint8Array(total);
   const raw = grid.cells.h;
@@ -118,7 +135,7 @@ const readLakes = (pack, cellsX, cellsY, seaLevel) => {
 const readRivers = (win, pack, width, height) => {
   const Rivers = win.Rivers;
   const list = Array.isArray(pack.rivers) ? pack.rivers : [];
-  const pointsOf = pack.cells.p;
+  const pointsOf = pack?.cells?.p ?? null;
   const rivers = [];
   let skipped = 0;
   for (let index = 0; index < list.length; index += 1) {
@@ -140,7 +157,7 @@ const readRivers = (win, pack, width, height) => {
     if (!raw || raw.length < 2) {
       raw = [];
       for (const cell of cells) {
-        const point = cell > 0 ? pointsOf[cell] : null;
+        const point = pointsOf && cell > 0 ? pointsOf[cell] : null;
         if (point && Number.isFinite(point[0])) raw.push([point[0], point[1], numberOr(river.discharge, 30)]);
       }
     }
