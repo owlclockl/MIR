@@ -1675,23 +1675,44 @@ export const WORLD_ROLES = ['master', 'player'];
 export const WORLD_SLOT_COUNT = 6;
 export const WORLD_SEED_MAX = 48;
 
-/* Размеры карты — пиксели SVG Azgaar. Размер входит в карту: тот же seed
-   при другом размере даёт другие границы, поэтому хранится вместе с seed.
-   Пресеты, а не произвольные числа: мастер и игрок, выбравшие один пункт,
-   получают одну и ту же карту. */
+/* Размер карты — планета Земля в метрах, а не обзорное окно. Блочный
+   генератор берёт размер карты Azgaar по пикселям и делает один пиксель
+   одним блоком (1 блок = 1 м), поэтому земной размер даёт земной блочный
+   мир: 40 075 017 × 20 003 932 блока, и конвертация пиксель → блок не
+   требует никакого коэффициента. Раньше карта была обзором
+   1280×800…1920×1080 «пикселей», блочный мир выходил крошечным, а за его
+   краем вид упирался в прижатую к краю колонку — один и тот же кусок карты
+   дублировался полосой. Теперь край мира — край планеты, и вид в
+   src/game/world-view.js не выпускает камеру за него.
+
+   Точек у карты Azgaar — миллион: на земном холсте это клетка решётки
+   около 28 км, сопоставимо с прежней детализацией обзорных карт.
+   Генерация такой карты заметно тяжелее прежней — это честная цена
+   масштаба, и экран создания мира об этом предупреждает. */
+export const WORLD_MAP_POINTS = 1_000_000;
 export const WORLD_SIZES = [
-  { id: 'compact', label: 'Компактная', width: 1280, height: 800 },
-  { id: 'standard', label: 'Стандартная', width: 1600, height: 1000 },
-  { id: 'wide', label: 'Широкая', width: 1920, height: 1080 },
+  { id: 'earth', label: 'Земля', width: 40_075_017, height: 20_003_932 },
 ];
-export const WORLD_DEFAULT_SIZE = WORLD_SIZES[1];
+export const WORLD_DEFAULT_SIZE = WORLD_SIZES[0];
+
+/* Размеры обзорных карт до земного масштаба. В пресетах их больше нет, но
+   слоты, сохранённые прежними версиями, обязаны открывать ту же карту, что
+   и раньше: размер входит в seed-мир, и молчаливая подмена размера
+   означала бы потерю мира. Поэтому normalizeWorldConfig их по-прежнему
+   принимает, а интерфейс показывает честную подпись «обзорная карта». */
+export const WORLD_LEGACY_SIZES = [
+  { id: 'compact', label: 'Компактная (обзорная)', width: 1280, height: 800 },
+  { id: 'standard', label: 'Стандартная (обзорная)', width: 1600, height: 1000 },
+  { id: 'wide', label: 'Широкая (обзорная)', width: 1920, height: 1080 },
+];
+const WORLD_KNOWN_SIZES = [...WORLD_SIZES, ...WORLD_LEGACY_SIZES];
 
 /** Параметры мира в допустимом виде: неизвестный размер заменяется стандартным. */
 export const normalizeWorldConfig = (raw) => {
   const source = raw && typeof raw === 'object' ? raw : {};
   const seed = String(source.seed ?? '').trim().slice(0, WORLD_SEED_MAX);
   const size =
-    WORLD_SIZES.find((item) => item.width === Number(source.width) && item.height === Number(source.height)) ??
+    WORLD_KNOWN_SIZES.find((item) => item.width === Number(source.width) && item.height === Number(source.height)) ??
     WORLD_DEFAULT_SIZE;
   return { seed, width: size.width, height: size.height };
 };

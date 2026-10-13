@@ -5,7 +5,7 @@ The civilization of the sages includes the complete web source and static assets
 ## Adaptations for The civilization of the sages
 
 - The full editor is hosted at `/fmg/` and shown from the full-screen world studio, not opened in a small dialog.
-- The world seed, width and height are passed in the query: `?seed=…&width=…&height=…&options=default`. `options=default` ignores the editor's saved browser options, so a slot always opens the same map. Maps saved from the editor are Azgaar `.map` files; a MIR slot does not keep them.
+- The world seed, size and point count are passed in the query: `?seed=…&width=…&height=…&points=1000000&options=default`. MIR maps are Earth-sized (40 075 017 × 20 003 932, one pixel = one metre = one block in the game's block view), so MIR always asks for a million points: at that extent a million cells is a ~28 km grid. `getRequestedMapSize` (`src/services/map-size.ts`) reads the exact `points` value, `generate()` (`src/components/lifecycle.ts`) applies it over the density slider and adopts the matching density step (14 in `src/data/graph-density.ts`, added for this) so editor regenerations keep the count. `options=default` ignores the editor's saved browser options, so a slot always opens the same map. Maps saved from the editor are Azgaar `.map` files; a MIR slot does not keep them.
 - The first map uses Azgaar's built-in `night` style. UI controls use a forest-green / warm-gold palette from `public/mir-theme.css`; other map styles remain selectable in the editor.
 - The nested Azgaar service worker is disabled under `/fmg/`. The root service worker caches the full editor offline, avoids conflicting worker scopes, and avoids the upstream Workbox CDN request. The `electron` Vite mode also removes upstream Google Analytics from the built page.
 - The Azgaar interface is fully localized into Russian by a build-time substitution layer (`locale/`), described below. The game wrapper, navigation, seed hand-off and attribution are Russian as well.
@@ -62,11 +62,11 @@ stay in Latin script because they are saved into map files.
 
 `mir.html` carries the editor as a `srcdoc` frame. The editor's HTML is stored once, as a JSON string in `<script type="application/json" id="mir-fmg-template">`, and the game fills in the load parameters at runtime:
 
-- MIR builds `iframe.srcdoc` from the template and replaces `__FMG_QUERY__` with the JSON-encoded query string (`?seed=…&width=…&height=…&options=default`; `<` is escaped as `\u003c`).
+- MIR builds `iframe.srcdoc` from the template and replaces `__FMG_QUERY__` with the JSON-encoded query string (`?seed=…&width=…&height=…&points=1000000&options=default`; `<` is escaped as `\u003c`).
 - Inside that frame, `src/services/embed.ts` sees `globalThis.MIR_FMG_HOST = { query }`. `isEmbedded()` returns true, and `pageURL()` reads the query from that object, because a srcdoc frame has no address of its own.
 - Behaviour that changes in embedded mode:
   - `seed.ts` takes the seed from the query.
-  - `url-params.ts` takes `width` and `height`, which set `options.map.graph`.
+  - `url-params.ts` takes `width`, `height` and `points`, which set `options.map.graph`.
   - `pins.ts`: `options=default` ignores the editor's stored browser options, so the map depends only on seed and size.
   - `shell.ts`: `warnIfServerless()` does not show the "run it from a server" alert on `file://`.
   - `versioning.ts`: `announceVersion()` does nothing, so the upstream version window does not appear.

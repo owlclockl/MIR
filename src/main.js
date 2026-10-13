@@ -166,6 +166,7 @@ const dialogShell = ({ label, title, size = '', body }) => `
   <div class="overlay" data-action="overlay-down">
     <section class="dialog${size ? ` dialog--${size}` : ''}" role="dialog" aria-modal="true" aria-label="${escapeHtml(label)}">
       <header class="dialog__head">
+        <span class="dialog__mark" aria-hidden="true">${icon('sigil')}</span>
         <h2 class="dialog__title">${escapeHtml(title)}</h2>
         <button class="icon-button icon-button--sm" type="button" data-action="close-modal" aria-label="Закрыть">
           ${icon('x')}
@@ -1926,8 +1927,9 @@ const worldSeed = () => {
 };
 
 const worldSizeOf = (config) =>
-  store.WORLD_SIZES.find((size) => size.width === config.width && size.height === config.height) ??
-  store.WORLD_DEFAULT_SIZE;
+  [...store.WORLD_SIZES, ...store.WORLD_LEGACY_SIZES].find(
+    (size) => size.width === config.width && size.height === config.height,
+  ) ?? store.WORLD_DEFAULT_SIZE;
 
 const worldSlotIndex = (el) => {
   const index = Number(el.dataset.slotIndex);
@@ -1999,7 +2001,7 @@ const worldSlotCardHtml = (role, index, entry) => {
       <div class="world-slot-card__plate" aria-hidden="true">
         ${seedArtOrIcon(entry.seed, `${role}-${index}`)}
         <span>${escapeHtml(size.label)}</span>
-        <small>${entry.width} × ${entry.height}</small>
+        <small>${entry.width.toLocaleString('ru-RU')} × ${entry.height.toLocaleString('ru-RU')}</small>
       </div>
       <div class="world-slot-body">
         <p class="world-slot-body__title">Мир <code translate="no">${escapeHtml(entry.seed)}</code></p>
@@ -2029,6 +2031,7 @@ const worldSlotsHtml = (session) => {
             <p class="world-slots__lead">${player
               ? 'Войдите по seed мастера или загрузите файл карты. В режиме игрока панели правки Azgaar скрыты.'
               : 'Создайте карту в свободном слоте или продолжите работу с сохранённым миром.'}</p>
+            <p class="world-slots__progress" aria-label="Занято слотов: ${slots[role].filter(Boolean).length} из ${store.WORLD_SLOT_COUNT}"><span style="--filled:${slots[role].filter(Boolean).length / store.WORLD_SLOT_COUNT}"></span><small>${slots[role].filter(Boolean).length} / ${store.WORLD_SLOT_COUNT} занято</small></p>
           </div>
           <div class="world-slot-tabs" role="tablist" aria-label="Роль в игре">
             ${store.WORLD_ROLES.map((value) => {
@@ -2107,12 +2110,12 @@ const worldSetupHtml = (session) => {
           <div class="world-size-list" role="radiogroup" aria-labelledby="world-size-label">
             ${store.WORLD_SIZES.map((size) => {
               const active = size.width === config.width && size.height === config.height;
-              return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width} × ${size.height}</span></button>`;
+              return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width.toLocaleString('ru-RU')} × ${size.height.toLocaleString('ru-RU')}</span></button>`;
             }).join('')}
           </div>
           <span class="world-field__hint">${player
-            ? 'Размер входит в карту: выберите тот же, что у мастера, иначе мир будет другим.'
-            : 'Размер входит в карту: тот же seed при другом размере даёт другие границы.'}</span>
+            ? 'Размер входит в карту: у мастера та же Земля, иначе мир будет другим.'
+            : 'Карта размером с Землю: один пиксель Azgaar — один блок (1 м) в блочном мире, без пересчёта. Точек у карты — 1 000 000, поэтому первая генерация может занять несколько минут и попросить много памяти.'}</span>
         </div>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
           <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
@@ -2470,6 +2473,9 @@ const closeWorldPage = ({ history = true } = {}) => {
     else window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
   }
   worldPageHistoryEntry = false;
+  /* Слоты могли измениться, пока игрок был на карте: сводка и
+     «Продолжить» на сцене обязаны показать актуальные миры сразу. */
+  renderRegions();
   playSound('close');
 };
 
@@ -2682,6 +2688,95 @@ const accountSlotHtml = () => {
     </button>`;
 };
 
+/* ---------- главное меню: компоновка игрового лобби --------------
+   Расположение элементов повторяет привычную схему игровых меню
+   (ориентир — CS2, только по компоновке, не по стилю): слева вертикальная
+   колонка навигации с большой кнопкой «Играть» наверху, в центре — витрина
+   мира (заголовок, сводка и «Продолжить»), справа — колонка друзей во всю
+   высоту. Стиль при этом наш: печать мудрецов, шалфей и старинное золото,
+   тонкие контуры и разрядка в подписях. Навигация и сцена — две отдельные
+   области (`sidenav` и `stage-menu`): каждая пересобирается, только когда
+   её строка изменилась (см. setMarkupIfChanged), а слоты и друзья берутся
+   из кеша store. */
+const menuCounts = () => {
+  const me = store.getCurrentUser();
+  const slots = store.loadWorldSlots();
+  const filled = store.WORLD_ROLES.flatMap((role) =>
+    slots[role].map((entry, index) => (entry ? { role, index, entry } : null)).filter(Boolean));
+  const friends = me ? store.listFriends(me.id) : [];
+  return {
+    me,
+    filled,
+    friends,
+    online: friends.filter((friend) => store.presenceOf(friend) !== 'offline').length,
+    requests: me ? store.incomingRequests(me.id).length : 0,
+    hub: !backendReady ? 'Проверяем хаб…' : store.isHub() ? store.hubHost() : 'Локально, в этом браузере',
+  };
+};
+
+const sidenavHtml = () => {
+  const { me, filled, online, requests, hub } = menuCounts();
+  const items = [
+    ['map', 'Миры и карты', filled.length ? `Занято ${filled.length} из 12 слотов` : 'Слоты мастера и игрока', 'open-world', ''],
+    ['users', 'Лобби с друзьями', 'Общая карта · до 8 игроков', 'open-lobby', ''],
+    ['userPlus', me ? 'Друзья и заявки' : 'Войти и найти друзей', me ? `${online} в сети` : 'Аккаунт и код-приглашение', me ? 'open-add-friend' : 'open-auth', requests ? String(requests) : ''],
+    ['globe', 'Общий хаб', hub, 'open-hub', ''],
+    ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
+  ];
+  return `
+    <button class="sidenav__play" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
+      ${icon('play', 'icon--play')}<span>Играть</span>
+    </button>
+    <div class="sidenav__list" role="list">
+      ${items.map(([glyph, title, hint, action, badge]) => `
+        <button class="sidenav__item" type="button" role="listitem" data-action="${action}">
+          <span class="sidenav__icon">${icon(glyph)}</span>
+          <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(hint)}</small></span>
+          ${badge ? `<span class="sidenav__badge" aria-label="Новых заявок: ${badge}">${badge}</span>` : ''}
+        </button>`).join('')}
+    </div>
+    <div class="sidenav__foot">
+      <button class="sidenav__item" type="button" data-action="${me ? 'open-profile' : 'open-auth'}">
+        <span class="sidenav__icon">${icon('user')}</span>
+        <span class="sidenav__text"><strong>${me ? escapeHtml(me.name) : 'Войти'}</strong><small>${me ? 'Профиль и аватар' : 'Аккаунт мудреца'}</small></span>
+      </button>
+      <button class="sidenav__item" type="button" data-action="open-settings">
+        <span class="sidenav__icon">${icon('settings')}</span>
+        <span class="sidenav__text"><strong>Настройки</strong><small>Звук, анимации, обновления</small></span>
+      </button>
+    </div>`;
+};
+
+const stageMenuHtml = () => {
+  const { me, filled, friends, online, hub } = menuCounts();
+  const recent = [...filled].sort((a, b) => (b.entry.savedAt || 0) - (a.entry.savedAt || 0)).slice(0, 3);
+  return `
+    <div class="hero__stats" aria-label="Сводка">
+      <span class="hero-stat"><strong>${filled.length}<i>/12</i></strong><small>миров в слотах</small></span>
+      <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
+      <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
+    </div>
+    ${recent.length ? `
+    <section class="continue" aria-labelledby="continue-title">
+      <header class="continue__head">
+        <p class="eyebrow">${icon('history', 'icon--xs')} Продолжить</p>
+        <h2 class="continue__title" id="continue-title">Последние миры</h2>
+      </header>
+      <div class="continue__list">
+        ${recent.map(({ role, index, entry }) => {
+          const size = worldSizeOf(entry);
+          return `
+          <button class="continue-row" type="button" data-action="menu-open-world" data-role="${role}" data-index="${index}" aria-label="Открыть мир ${escapeHtml(entry.seed)}, ${WORLD_ROLE_LABELS[role]}">
+            <span class="continue-row__art" aria-hidden="true">${seedArtOrIcon(entry.seed, `menu-${role}-${index}`)}</span>
+            <span class="continue-row__text"><strong translate="no">${escapeHtml(entry.seed)}</strong><small>${WORLD_ROLE_LABELS[role]} · ${escapeHtml(size.label)} · ${entry.savedAt ? worldSlotDateFormatter.format(new Date(entry.savedAt)) : ''}</small></span>
+            <span class="continue-row__cta">${icon(role === 'player' ? 'eye' : 'play', 'icon--xs')}<span>Открыть</span></span>
+          </button>`;
+        }).join('')}
+      </div>
+    </section>` : `
+    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — первый появится здесь, и его можно будет открыть в один клик.</span></p>`}`;
+};
+
 /* ---------- правая панель: друзья ---------------------------- */
 
 const requestRowHtml = (request) => {
@@ -2812,17 +2907,20 @@ const railHtml = () => {
     </div>
 
     <div class="rail__foot">
-      <button class="mini-button mini-button--wide" type="button" data-action="open-hub">
-        ${icon('globe', 'icon--xs')} Общий хаб
-      </button>
-      <button class="mini-button mini-button--wide" type="button" data-action="open-direct">
-        ${icon('link', 'icon--xs')} Прямое подключение по коду
-      </button>
       <p class="eyebrow">Мой код-приглашение</p>
       <button class="code-box code-box--button" type="button" data-action="copy-code" data-code="${me.inviteCode}" title="Нажмите, чтобы скопировать">
         <code class="code-box__value" translate="no">${me.inviteCode}</code>
         ${icon('copy')}
       </button>
+      <div class="rail__foot-actions">
+        <button class="mini-button mini-button--wide" type="button" data-action="open-hub">
+          ${icon('globe', 'icon--xs')} Общий хаб
+        </button>
+        <button class="mini-button mini-button--wide" type="button" data-action="open-direct">
+          ${icon('link', 'icon--xs')} Прямое подключение
+        </button>
+      </div>
+      <p class="rail__foot-note">${store.isHub() ? `Хаб · ${escapeHtml(store.hubHost())}` : 'Локальный режим · хаб не подключён'}</p>
     </div>`;
 };
 
@@ -2832,9 +2930,6 @@ document.querySelector('#app').innerHTML = `
   <div class="shell">
     <header class="topbar">
       <div class="topbar__side topbar__side--start">
-        <button class="icon-button" type="button" data-action="open-settings" aria-label="Настройки">
-          ${icon('settings')}
-        </button>
         <p class="brand" translate="no">
           <button class="brand__mark" type="button" data-action="admin-tap" aria-label="Печать The civilization of the sages">${icon('sigil')}</button>
           <span class="brand__name" lang="en">
@@ -2842,13 +2937,19 @@ document.querySelector('#app').innerHTML = `
             <span class="brand__line brand__line--muted">${TITLE.tail}</span>
           </span>
         </p>
+        <span class="topbar__divider" aria-hidden="true"></span>
+        <button class="icon-button" type="button" data-action="open-settings" aria-label="Настройки" title="Настройки">
+          ${icon('settings')}
+        </button>
       </div>
 
       <nav class="topbar__nav" aria-label="Основная навигация">
+        <button class="topbar-link" type="button" data-action="open-lobby">Лобби</button>
         <button class="play-button" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
           ${icon('play', 'icon--play')}
           <span>Играть</span>
         </button>
+        <button class="topbar-link" type="button" data-action="open-hub">Хаб</button>
       </nav>
 
       <div class="topbar__side topbar__side--end" data-region="account"></div>
@@ -2856,28 +2957,33 @@ document.querySelector('#app').innerHTML = `
       <div class="update-bar" data-region="update" hidden></div>
     </header>
 
-    <main id="main" class="stage">
-      <div class="atmosphere" aria-hidden="true">
-        <span class="atmosphere__ring atmosphere__ring--inner"></span>
-        <span class="atmosphere__ring atmosphere__ring--outer"></span>
-        <span class="atmosphere__beam atmosphere__beam--a"></span>
-        <span class="atmosphere__beam atmosphere__beam--b"></span>
-      </div>
+    <aside class="sidenav" data-region="sidenav" aria-label="Главное меню"></aside>
 
-      <section class="hero" aria-labelledby="hero-title">
-        <p class="eyebrow">Цивилизация мудрецов</p>
-        <h1 class="hero__title" id="hero-title" lang="en" translate="no">
-          <span class="hero__line">${TITLE.lead}</span>
-          <span class="hero__line hero__line--tail">${TITLE.tail}</span>
-        </h1>
-        <p class="hero__caption"><span>Мудрость создаёт миры.</span></p>
-      </section>
+    <main id="main" class="stage">
+      <div class="stage__inner">
+        <section class="hero" aria-labelledby="hero-title">
+          <span class="hero__seal" aria-hidden="true">${icon('sigil')}</span>
+          <p class="eyebrow eyebrow--sage">Цивилизация мудрецов · картографический штаб</p>
+          <h1 class="hero__title" id="hero-title" lang="en" translate="no">
+            <span class="hero__line">${TITLE.lead}</span>
+            <span class="hero__line hero__line--tail">${TITLE.tail}</span>
+          </h1>
+          <p class="hero__caption"><span>Мудрость создаёт миры.</span></p>
+          <div class="hero__actions">
+            <button class="hero-cta hero-cta--primary" type="button" data-action="open-world">${icon('play', 'icon--play')}<span>Играть</span>${icon('arrowRight', 'icon--xs')}</button>
+            <button class="hero-cta" type="button" data-action="open-lobby">${icon('users', 'icon--xs')}<span>Лобби с друзьями</span></button>
+            <button class="hero-cta" type="button" data-action="open-hub">${icon('globe', 'icon--xs')}<span>Общий хаб</span></button>
+          </div>
+        </section>
+        <div class="stage-menu" data-region="stage-menu"></div>
+      </div>
     </main>
 
     <aside class="rail" data-region="rail" aria-label="Друзья"></aside>
 
     <footer class="footer">
       <span>Версия ${VERSION}</span>
+      <span class="footer__hint">Миры · друзья · общая карта</span>
       <span class="footer__name" lang="en" translate="no">© 2026 ${TITLE_FULL}</span>
     </footer>
 
@@ -2911,16 +3017,22 @@ const setMarkupIfChanged = (node, html, region) => {
   const hadFocus = node.contains(active);
   const action = hadFocus ? active.dataset?.action : '';
   const id = hadFocus ? active.dataset?.id : '';
+  const role = hadFocus ? active.dataset?.role : '';
+  const index = hadFocus ? active.dataset?.index : '';
   node.innerHTML = html;
   if (!hadFocus || !action) return;
   const replacement = [...node.querySelectorAll('[data-action]')]
-    .find((item) => item.dataset.action === action && item.dataset.id === id);
+    .find((item) =>
+      item.dataset.action === action && item.dataset.id === id &&
+      (item.dataset.role ?? '') === (role ?? '') && (item.dataset.index ?? '') === (index ?? ''));
   replacement?.focus({ preventScroll: true });
 };
 
 const renderRegions = () => {
   setMarkupIfChanged(document.querySelector('[data-region="account"]'), accountSlotHtml(), 'account');
   setMarkupIfChanged(document.querySelector('[data-region="rail"]'), railHtml(), 'rail');
+  setMarkupIfChanged(document.querySelector('[data-region="sidenav"]'), sidenavHtml(), 'sidenav');
+  setMarkupIfChanged(document.querySelector('[data-region="stage-menu"]'), stageMenuHtml(), 'stage-menu');
 };
 
 const render = () => {
@@ -3713,6 +3825,28 @@ const onLobbyEvent = (event) => {
 const actions = {
   'open-world': () => openWorldPage({ slots: true }),
 
+  /* Главное меню ведёт сразу в лобби, минуя слоты: страница мира та же,
+     меняется только её экран. */
+  'open-lobby': () => {
+    openWorldPage({ slots: true });
+    if (!ui.world?.open) return;
+    ui.world.screen = 'lobby';
+    ui.world.leaveArmed = false;
+    renderWorldPage();
+    if (lobby.lobbyAvailable() && store.getCurrentUser()) lobby.refreshLobby().catch(lobbyFailed);
+  },
+
+  /* «Продолжить» со сцены: слот открывается напрямую, без картотеки. */
+  'menu-open-world': (el) => {
+    const role = el.dataset.role;
+    const index = Number(el.dataset.index);
+    if (!store.WORLD_ROLES.includes(role) || !Number.isInteger(index)) return;
+    openWorldPage({ slots: true });
+    if (!ui.world?.open) return;
+    ui.world.tab = role;
+    openWorldSlot(role, index);
+  },
+
   'world-exit': () => closeWorldPage(),
 
   'world-lobby-open': () => {
@@ -4444,7 +4578,7 @@ const actions = {
 
 const ACTIONS_WITH_OWN_SOUND = new Set([
   'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
-  'open-direct', 'open-hub', 'open-world', 'world-generate', 'world-slot-tab', 'world-slot-open',
+  'open-direct', 'open-hub', 'open-world', 'open-lobby', 'menu-open-world', 'world-generate', 'world-slot-tab', 'world-slot-open',
   'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
   'admin-back', 'admin-lock', 'auth-tab',
 ]);

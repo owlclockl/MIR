@@ -138,9 +138,11 @@ const WAIT_STEP_MS = 250;
    документ просто ещё едет. */
 const waitReason = (reason) => (reason === 'документ редактора не открыт' ? 'документ ещё загружается' : reason);
 
-/* Сколько ждём, прежде чем сдаться. Дольше двух минут молчащий генератор —
-   это уже не «считает», а отказ, и о нём должен сказать сам вид. */
-const WAIT_LIMIT_MS = 120_000;
+/* Сколько ждём, прежде чем сдаться. Земная карта на миллион точек считается
+   заметно дольше прежних обзорных, поэтому срок — десять минут; дольше
+   молчащий генератор — это уже не «считает», а отказ, и о нём должен
+   сказать сам вид. */
+const WAIT_LIMIT_MS = 600_000;
 
 /**
  * Ждёт, пока в документе редактора появятся карты, и отдаёт место настоящему
@@ -209,7 +211,7 @@ const mountWaitingView = (host, options) => {
   const giveUp = () => {
     clearTimeout(timer);
     timer = 0;
-    gaveUp = `Генератор не ответил за две минуты: ${waitReason(missingMapsPart(frame?.contentWindow))}.`;
+    gaveUp = `Генератор не ответил за десять минут: ${waitReason(missingMapsPart(frame?.contentWindow))}.`;
     waitText.textContent = 'Карта так и не построилась.';
     note.textContent = `${gaveUp} ${describeFrame(frame)}. Кнопка «Карта блоками» попробует снова.`;
   };
@@ -428,8 +430,8 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
     const stepZ = Math.max(1, Math.round(cells.cellsZ / 32));
     for (let z = 0; z < cells.cellsZ; z += stepZ) {
       for (let x = 0; x < cells.cellsX; x += stepX) {
-        const { u, v } = fold(field, cells.x0 + x, cells.z0 + z);
-        sum += field.ground[v * field.width + u];
+        /* surfaceY работает и у ленивого земного поля, где растра нет. */
+        sum += surfaceY(field, cells.x0 + x, cells.z0 + z);
         count += 1;
       }
     }
@@ -464,6 +466,14 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
     syncLabel();
     view.dirty = true;
   };
+  /* Камера не уезжает за край мира. Раньше панорама за краем упиралась в
+     прижатую fold-ом краевую колонку, и один и тот же кусок карты тянулся
+     полосой-дублем, пока хватало чанков. Теперь край планеты — жёсткая
+     граница кадра: дальше смотреть просто некуда. */
+  const clampCenter = () => {
+    view.center[0] = clamp(view.center[0], 0, field.width - 1);
+    view.center[1] = clamp(view.center[1], 0, field.height - 1);
+  };
   const applyZoom = (next, anchor = null) => {
     const before = view.zoom;
     const after = clamp(Math.round(next), ZOOM_MIN, ZOOM_MAX);
@@ -473,6 +483,7 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
          разнице «сколько блоков было под курсором» и «сколько стало». */
       view.center[0] += anchor[0] * (1 / before - 1 / after);
       view.center[1] += anchor[1] * (1 / before - 1 / after);
+      clampCenter();
     }
     view.zoom = after;
     view.dirty = true;
@@ -552,6 +563,7 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
     if (drag) {
       view.center[0] -= (event.clientX - drag.x) / view.zoom;
       view.center[1] -= (event.clientY - drag.y) / view.zoom;
+      clampCenter();
       drag.x = event.clientX;
       drag.y = event.clientY;
       syncLabel();
@@ -691,6 +703,7 @@ const buildWorldView = (host, { frame, config, onExit } = {}) => {
     }
     if (handled) {
       event.preventDefault();
+      clampCenter();
       syncLabel();
       view.dirty = true;
     }
