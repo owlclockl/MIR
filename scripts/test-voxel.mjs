@@ -21,6 +21,7 @@ import {
   sampleColumn,
   F_ICE,
   F_RIVER,
+  F_LAKE,
   biomeAt,
   F_WATER,
   F_FALL,
@@ -793,6 +794,31 @@ add(
     src.cellTemp[FAKE_EXPECT.cells.lake] === 3 &&
     src.cellPrec[FAKE_EXPECT.cells.river] === 40,
   'мост: биомы, температуры и осадки доехали',
+);
+
+/* Плотный берег pack проходит посреди клетки grid: перенос только на grid
+   давал другую сушу, хотя на карте Azgaar берег был на x=48. */
+const packedWin = fakeEditorWindow();
+packedWin.pack.cells.p = [[24, 48], [48, 48], [72, 48]];
+packedWin.pack.cells.h = [5, 5, 70];
+packedWin.pack.cells.biome = [0, 0, 11];
+packedWin.Pack = { findCell: (x) => (x < 48 ? 0 : 2) };
+const packedSource = readSource(packedWin);
+const packedField = buildField(packedSource, { scale: 2 });
+const seaSample = sampleColumn(packedField, 40, 176);
+const landSample = sampleColumn(packedField, 140, 176);
+add(
+  packedSource.packHeight[88 * 96 + 20] === 5 && packedSource.packHeight[88 * 96 + 70] === 70 &&
+    (seaSample.flags & F_WATER) !== 0 && (landSample.flags & F_WATER) === 0,
+  'берег блока = ближайшая pack-клетка Azgaar, даже когда grid показывает другое',
+);
+add(
+  landSample.biome === 11 && biomeAt(packedField, 140, 176, latticeCell(packedField, 140, 176), 4) === 11,
+  'биом блока = биом той же pack-клетки',
+);
+add(
+  packedSource.packLake[31 * 96 + 17] === 0 && (sampleColumn(packedField, 34, 62).flags & F_LAKE) === 0,
+  'озеро grid не затапливает соседнюю pack-клетку',
 );
 
 add(src.stats.lakes === 1 && src.cellFeature[FAKE_EXPECT.cells.lake] === 1, 'мост: озеро помечено на клетке-родителе');

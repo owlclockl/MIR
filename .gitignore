@@ -9,5 +9,15 @@ logs/
 *.log
 .wrangler/
 
+# Локальные секреты: Vite не должен случайно запаковать их в клиент.
+.env
+.env.*
+!.env.example
+.dev.vars*
+
+# Новые базы хаба не должны попадать в Git. Уже отслеживаемый файл
+# server/data/mir-hub.json это правило НЕ удаляет из истории/индекса.
+server/data/
+
 # Картинка-черновик генератора планеты (scripts/planet-preview.mjs)
 planet-preview.png

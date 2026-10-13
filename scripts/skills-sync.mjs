@@ -15,7 +15,8 @@
 
    Запуск:
      node scripts/skills-sync.mjs          # скачать и обновить всё
-     node scripts/skills-sync.mjs --check  # только сверить хеши
+     node scripts/skills-sync.mjs --check     # сверить локальные хеши с замком
+     node scripts/skills-sync.mjs --upstream  # сверить и с GitHub (публичный API, без ключа)
    =========================================================== */
 
 import { createHash } from 'node:crypto';
@@ -100,7 +101,8 @@ const dirFiles = (dir, base = '') =>
     return entry.isDirectory() ? dirFiles(join(dir, entry.name), rel) : [rel];
   });
 
-const check = process.argv.includes('--check');
+const upstream = process.argv.includes('--upstream');
+const check = upstream || process.argv.includes('--check');
 const lock = JSON.parse(readFileSync(LOCK_FILE, 'utf8'));
 const skills = {};
 let changed = 0;
@@ -113,8 +115,15 @@ for (const source of SOURCES) {
     const actual = createHash('sha256').update(readFileSync(skillFile)).digest('hex');
     const recorded = lock.skills?.[source.name]?.computedHash;
     const same = actual === recorded;
-    if (!same) drifted += 1;
-    console.log(`  ${same ? '•' : '!'} ${source.name} ${same ? 'совпадает' : 'источник изменился'}`);
+    let remoteSame = true;
+    if (upstream) {
+      // --check без сети говорит только о локальной целостности. Для правды о
+      // новых версиях нужен явный запрос к публичному API GitHub (без ключа).
+      const raw = await fetchRaw(source.repo, `${source.path}/SKILL.md`);
+      remoteSame = createHash('sha256').update(raw).digest('hex') === recorded;
+    }
+    if (!same || !remoteSame) drifted += 1;
+    console.log(`  ${same && remoteSame ? '•' : '!'} ${source.name}: локально ${same ? 'совпадает' : 'изменено'}${upstream ? `, GitHub ${remoteSame ? 'совпадает' : 'обновлён'}` : ''}`);
     skills[source.name] = { ...lock.skills?.[source.name] };
     continue;
   }
@@ -143,6 +152,6 @@ if (!check) {
   writeFileSync(LOCK_FILE, `${JSON.stringify({ version: 1, skills: ordered }, null, 2)}\n`);
   console.log(`\nГотово: скиллов ${Object.keys(ordered).length}, обновлено ${changed}. Замок записан.`);
 } else {
-  console.log(`\nПроверка: скиллов ${Object.keys(skills).length}, у ${drifted} источник ушёл вперёд.`);
+  console.log(`\nПроверка: ${Object.keys(skills).length} скиллов; расхождений ${drifted} (${upstream ? 'локально и на GitHub' : 'только локально, без проверки источника'}).`);
   if (drifted > 0) process.exitCode = 1;
 }
