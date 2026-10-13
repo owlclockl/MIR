@@ -192,8 +192,10 @@ ok(
   `${blockedLogin.status} ${blockedLogin.data.error || ''}`,
 );
 
-const closed = await call('POST', '/api/admin/settings', { registrationOpen: false }, admin);
-ok('регистрация закрывается из панели', closed.status === 200 && closed.data.settings?.registrationOpen === false);
+const closed = await call('POST', '/api/admin/settings', { registrationOpen: false, motd: 'Техперерыв' }, admin);
+ok('регистрация закрывается из панели и сохраняется motd', closed.status === 200 && closed.data.settings?.registrationOpen === false && closed.data.settings?.motd === 'Техперерыв');
+const writtenWorkerFile = await call('POST', '/api/admin/files', { action: 'write', path: 'notes/worker.md', content: '# DO File\nSaved in Cloudflare DO' }, admin);
+ok('файл сервера записывается через воркер', writtenWorkerFile.status === 200 && writtenWorkerFile.data.file?.path === 'notes/worker.md');
 const refused = await call('POST', '/api/register', { name: 'cloudrefused', salt, passHash });
 ok('при закрытой регистрации аккаунт не создаётся', refused.status === 403, `${refused.status}`);
 const journal = await call('POST', '/api/admin/state', {}, admin);
@@ -210,7 +212,9 @@ const after = await call('POST', '/api/admin/state', {}, admin);
 const survived = after.data.users?.find((u) => u.id === userId);
 ok('ключ панели действует после перезапуска', after.status === 200, `${after.status}`);
 ok('блокировка переживает перезапуск', !!survived?.ban, JSON.stringify(survived?.ban ?? null));
-ok('настройки переживают перезапуск', after.data.settings?.registrationOpen === false);
+ok('настройки переживают перезапуск', after.data.settings?.registrationOpen === false && after.data.settings?.motd === 'Техперерыв');
+const survivedFile = await call('POST', '/api/admin/files', { action: 'read', path: 'notes/worker.md' }, admin);
+ok('файл сервера переживает перезапуск объекта', survivedFile.status === 200 && survivedFile.data.file?.content.includes('Saved in Cloudflare DO'));
 ok('журнал переживает перезапуск', (after.data.events ?? []).length > 0, `записей: ${after.data.events?.length}`);
 
 const stillBlocked = await call('POST', '/api/login', { name: 'cloudprobe', passHash });

@@ -11,8 +11,8 @@
    друзей в той же Wi-Fi. Без зависимостей — встроенные модули Node.
    =========================================================== */
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 
 import {
   DEFAULT_LIMITS,
@@ -65,9 +65,11 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
         events: Array.isArray(parsed.events) ? parsed.events : [],
         /* Состав лобби (без карт): переживает перезапуск вместе с данными. */
         lobbies: Array.isArray(parsed.lobbies) ? parsed.lobbies : [],
+        /* Пользовательские файлы сервера из панели администратора. */
+        files: Array.isArray(parsed.files) ? parsed.files : [],
       };
     } catch {
-      return { users: [], requests: [], adminKey: '', events: [], lobbies: [] };
+      return { users: [], requests: [], adminKey: '', events: [], lobbies: [], files: [] };
     }
   };
 
@@ -120,7 +122,84 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
     if (saveTimer) writeLater();
   };
 
-  const core = createHubCore({ db, persist, limits, adminKey: envKey });
+  /* На ПК файлы панели также зеркалятся в data/files/ на диске, а серверный
+     журнал logs/mir-server.log виден и очищается прямо из панели. */
+  const filesRoot = resolve(dirname(dbFile), 'files');
+  const serverLogFile = resolve(dirname(dbFile), '..', 'logs', 'mir-server.log');
+  const safeDiskPath = (relPath) => {
+    const candidate = resolve(filesRoot, String(relPath || ''));
+    if (candidate === filesRoot || !candidate.startsWith(filesRoot + sep)) return null;
+    return candidate;
+  };
+  const serverFiles = {
+    systemFiles: () => [
+      {
+        path: 'logs/mir-server.log',
+        category: 'log',
+        system: true,
+        writable: true,
+        deletable: true,
+        updatedAt: (() => {
+          try {
+            return existsSync(serverLogFile) ? statSync(serverLogFile).mtimeMs : Date.now();
+          } catch {
+            return Date.now();
+          }
+        })(),
+        read: () => {
+          try {
+            if (!existsSync(serverLogFile)) return '';
+            const raw = readFileSync(serverLogFile, 'utf8');
+            return raw.length > 64 * 1024 ? raw.slice(-64 * 1024) : raw;
+          } catch {
+            return '';
+          }
+        },
+        write: (content) => {
+          try {
+            mkdirSync(dirname(serverLogFile), { recursive: true });
+            writeFileSync(serverLogFile, String(content ?? ''), 'utf8');
+          } catch {
+            /* ошибка диска не должна ронять хаб */
+          }
+        },
+        clear: () => {
+          try {
+            if (existsSync(serverLogFile)) writeFileSync(serverLogFile, '', 'utf8');
+          } catch {
+            /* ошибка диска не должна ронять хаб */
+          }
+        },
+      },
+    ],
+    writeCustom: (relPath, content) => {
+      try {
+        const target = safeDiskPath(relPath);
+        if (!target) return;
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, String(content ?? ''), 'utf8');
+      } catch {}
+    },
+    renameCustom: (oldPath, newPath, content) => {
+      try {
+        const from = safeDiskPath(oldPath);
+        const to = safeDiskPath(newPath);
+        if (from && existsSync(from)) rmSync(from, { force: true });
+        if (to) {
+          mkdirSync(dirname(to), { recursive: true });
+          writeFileSync(to, String(content ?? ''), 'utf8');
+        }
+      } catch {}
+    },
+    deleteCustom: (relPath) => {
+      try {
+        const target = safeDiskPath(relPath);
+        if (target && existsSync(target)) rmSync(target, { force: true });
+      } catch {}
+    },
+  };
+
+  const core = createHubCore({ db, persist, limits, adminKey: envKey, serverFiles });
 
   /* Уборка лобби и молчащих сокетов по таймеру, без ожидания HTTP-запроса.
      Таймер не держит процесс: за ним ничего не происходит, что не случилось бы

@@ -47,6 +47,11 @@ const MAX_EVENTS = 300;
 const MAX_EVENTS_FOR_PANEL = 150;
 const MAX_BAN_REASON = 140;
 const MAX_LOG_TEXT = 160;
+const MAX_MOTD_CHARS = 240;
+export const MAX_ADMIN_FILES = 64;
+export const MAX_ADMIN_FILE_CHARS = 256 * 1024;
+const MAX_FILE_PATH = 120;
+const FILE_PATH_RE = /^[A-Za-zА-Яа-яЁё0-9._/-]{1,120}$/;
 
 /* ---------- сигналинг P2P ----------------------------------
    Хаб сводит друзей напрямую: через него идут только offer/answer/ICE
@@ -75,6 +80,8 @@ export const DEFAULT_LIMITS = {
   '/api/admin/request': 60,
   '/api/admin/settings': 60,
   '/api/admin/events': 60,
+  '/api/admin/files': 120,
+  '/api/admin/server': 60,
   /* Сигналинг шумный по своей природе: ICE-кандидаты летят пачками,
      а длинный опрос входящих висит по 20 секунд и сразу повторяется. */
   '/api/p2p/signal': 1200,
@@ -148,13 +155,24 @@ const secretEquals = (a, b) => {
   return diff === 0;
 };
 
-export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS, adminKey = '' }) {
+export function createHubCore({
+  db,
+  persist = () => {},
+  limits = DEFAULT_LIMITS,
+  adminKey = '',
+  serverFiles = null,
+}) {
   db.users ??= [];
   db.requests ??= [];
-  /* Журнал и настройки появились позже остальных данных: у старых хабов
-     этих полей в файле/хранилище ещё нет — дописываем на месте. */
+  /* Журнал, настройки и пользовательские файлы сервера появились позже
+     остальных данных: у старых хабов этих полей в хранилище ещё нет —
+     дописываем на месте. */
   if (!Array.isArray(db.events)) db.events = [];
-  db.settings = { registrationOpen: db.settings?.registrationOpen !== false };
+  if (!Array.isArray(db.files)) db.files = [];
+  db.settings = {
+    registrationOpen: db.settings?.registrationOpen !== false,
+    motd: String(db.settings?.motd ?? '').trim().slice(0, MAX_MOTD_CHARS),
+  };
 
   /* ---------- сохранение ------------------------------------
      Мутации ждут записи (иначе перезапуск съест регистрацию),
@@ -336,7 +354,10 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       ? `Аккаунт заблокирован администратором: ${ban.reason}`
       : 'Аккаунт заблокирован администратором.';
 
-  const settingsShape = () => ({ registrationOpen: db.settings.registrationOpen !== false });
+  const settingsShape = () => ({
+    registrationOpen: db.settings.registrationOpen !== false,
+    motd: String(db.settings.motd ?? '').trim().slice(0, MAX_MOTD_CHARS),
+  });
 
   /* Токен приходит заголовком (обычный путь) либо телом/параметром —
      так же, как его ищет auth. Нужен и входу, и явному выходу. */
@@ -394,36 +415,6 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     ban: banOf(u),
   });
 
-  const adminStats = () => {
-    const now = Date.now();
-    const day = 24 * 60 * 60 * 1000;
-    return {
-      users: db.users.length,
-      online: db.users.filter((u) => u.online && now - (u.seenAt ?? 0) < 90_000).length,
-      avatars: db.users.filter((u) => u.avatar).length,
-      requests: db.requests.length,
-      links: Math.round(db.users.reduce((sum, u) => sum + (u.friends?.length ?? 0), 0) / 2),
-      banned: db.users.filter((u) => banOf(u)).length,
-      today: db.users.filter((u) => now - (u.createdAt ?? 0) < day).length,
-      week: db.users.filter((u) => now - (u.createdAt ?? 0) < day * 7).length,
-      activeDay: db.users.filter((u) => now - (u.seenAt ?? 0) < day).length,
-      events: db.events.length,
-      bytes: JSON.stringify({ users: db.users, requests: db.requests, events: db.events }).length,
-    };
-  };
-
-  /* Снимок для панели. Журнал отдаём свежими записями вперёд — панель
-     показывает его как ленту, и переворачивать её на клиенте незачем. */
-  const adminState = () => ({
-    users: db.users.map(adminUserShape),
-    requests: db.requests,
-    events: db.events.slice(-MAX_EVENTS_FOR_PANEL).reverse(),
-    settings: settingsShape(),
-    stats: adminStats(),
-    /* Ключ ещё заводской — панель по этому признаку напоминает сменить. */
-    key: { isDefault: adminKeyIsDefault() },
-  });
-
   const adminDropUser = (user) => {
     lobbies.forgetUser(user.id, 'Аккаунт удалён администратором.');
     db.users = db.users.filter((u) => u.id !== user.id);
@@ -448,6 +439,408 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
     normalizeCode,
     hex,
     persistSoon,
+  });
+
+  /* ---------- файлы сервера и служебное хранилище --------------
+     Панель админа умеет просматривать, редактировать, создавать,
+     переименовывать и удалять файлы сервера, не выходя из окна:
+     — системные файлы показывают живой срез конфигурации, аккаунтов,
+       заявок, лобби и журналов (без хешей паролей и секретов);
+     — пользовательские файлы (db.files) хранят заметки, правила,
+       пресеты карт и конфигурацию и переживают перезапуск. */
+
+  const normalizeFilePath = (raw) => {
+    const cleaned = String(raw ?? '')
+      .replace(/\\/g, '/')
+      .trim()
+      .replace(/^\/+|\/+$/g, '')
+      .replace(/\/{2,}/g, '/');
+    if (!cleaned || cleaned.length > MAX_FILE_PATH || !FILE_PATH_RE.test(cleaned))
+      throw httpError(
+        400,
+        'Укажите допустимый путь файла (буквы, цифры, дефис, точка и слэш, до 120 символов).',
+      );
+    const parts = cleaned.split('/');
+    for (const part of parts) {
+      const lower = part.toLowerCase();
+      if (
+        !part ||
+        part === '.' ||
+        part === '..' ||
+        lower === '.git' ||
+        lower === 'node_modules' ||
+        lower.startsWith('.env') ||
+        lower.startsWith('.dev.vars') ||
+        lower.endsWith('.tmp')
+      ) {
+        throw httpError(400, 'Недопустимое имя файла или каталога.');
+      }
+    }
+    return cleaned;
+  };
+
+  const fileCategoryOf = (path) => {
+    if (path.startsWith('config/') || /\.(cfg|ini|conf)$/i.test(path)) return 'config';
+    if (path.startsWith('logs/') || /\.log$/i.test(path)) return 'log';
+    if (path.startsWith('data/')) return 'data';
+    return 'custom';
+  };
+
+  const formatEventsLog = () =>
+    db.events
+      .map((e) => {
+        const iso = new Date(e.at || 0).toISOString();
+        const actor = e.name ? ` · ${e.name}` : '';
+        const target = e.targetName ? ` → ${e.targetName}` : '';
+        const detail = e.text ? ` (${e.text})` : '';
+        return `[${iso}] ${e.kind}${actor}${target}${detail}`;
+      })
+      .join('\n');
+
+  const systemFilesMap = () => {
+    const now = Date.now();
+    const map = new Map([
+      [
+        'config/settings.json',
+        {
+          path: 'config/settings.json',
+          category: 'config',
+          system: true,
+          writable: true,
+          deletable: false,
+          updatedAt: db.settingsUpdatedAt || now,
+          read: () => JSON.stringify(settingsShape(), null, 2),
+          write: (content) => {
+            let parsed;
+            try {
+              parsed = JSON.parse(content);
+            } catch {
+              throw httpError(400, 'Файл config/settings.json должен быть корректным JSON.');
+            }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+              throw httpError(400, 'Настройки должны быть JSON-объектом.');
+            db.settings.registrationOpen = parsed.registrationOpen !== false;
+            db.settings.motd = String(parsed.motd ?? '').trim().slice(0, MAX_MOTD_CHARS);
+            db.settingsUpdatedAt = Date.now();
+          },
+        },
+      ],
+      [
+        'data/users.json',
+        {
+          path: 'data/users.json',
+          category: 'data',
+          system: true,
+          writable: true,
+          deletable: false,
+          updatedAt: db.users.reduce((max, u) => Math.max(max, u.seenAt || 0, u.createdAt || 0), 0) || now,
+          read: () => JSON.stringify(db.users.map(adminUserShape), null, 2),
+          write: (content) => {
+            let parsed;
+            try {
+              parsed = JSON.parse(content);
+            } catch {
+              throw httpError(400, 'Файл data/users.json должен быть корректным JSON-массивом.');
+            }
+            if (!Array.isArray(parsed))
+              throw httpError(400, 'Файл data/users.json должен содержать массив аккаунтов.');
+            const keepIds = new Set(parsed.map((item) => item?.id).filter(Boolean));
+            for (const existing of [...db.users]) {
+              if (!keepIds.has(existing.id)) adminDropUser(existing);
+            }
+            for (const item of parsed) {
+              const user = byId(item?.id);
+              if (!user) continue;
+              if (typeof item.name === 'string' && item.name.trim() && item.name.trim() !== user.name) {
+                const nextName = item.name.trim();
+                validName(nextName);
+                const owner = byName(nextName);
+                if (owner && owner.id !== user.id) throw httpError(409, `Имя ${nextName} уже занято.`);
+                user.name = nextName;
+                user.nameKey = nextName.toLowerCase();
+              }
+              if (typeof item.inviteCode === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(item.inviteCode)) {
+                user.inviteCode = item.inviteCode;
+              }
+              if (item.ban === null || item.ban === false) {
+                delete user.ban;
+              } else if (item.ban && typeof item.ban === 'object') {
+                user.ban = {
+                  reason: String(item.ban.reason || '').trim().slice(0, MAX_BAN_REASON),
+                  at: Number(item.ban.at) || Date.now(),
+                  until: Number(item.ban.until) || 0,
+                };
+                user.tokens = [];
+                user.online = false;
+              }
+            }
+          },
+        },
+      ],
+      [
+        'data/requests.json',
+        {
+          path: 'data/requests.json',
+          category: 'data',
+          system: true,
+          writable: true,
+          deletable: true,
+          updatedAt: db.requests.reduce((max, r) => Math.max(max, r.at || 0), 0) || now,
+          read: () => JSON.stringify(db.requests, null, 2),
+          write: (content) => {
+            let parsed;
+            try {
+              parsed = JSON.parse(content);
+            } catch {
+              throw httpError(400, 'Файл data/requests.json должен быть корректным JSON-массивом.');
+            }
+            if (!Array.isArray(parsed))
+              throw httpError(400, 'Файл data/requests.json должен содержать массив заявок.');
+            db.requests = parsed
+              .filter((r) => r && typeof r.id === 'string' && byId(r.from) && byId(r.to))
+              .map((r) => ({ id: r.id, from: r.from, to: r.to, at: Number(r.at) || Date.now() }));
+          },
+          clear: () => {
+            db.requests = [];
+          },
+        },
+      ],
+      [
+        'data/lobbies.json',
+        {
+          path: 'data/lobbies.json',
+          category: 'data',
+          system: true,
+          writable: true,
+          deletable: true,
+          updatedAt: (db.lobbies ?? []).reduce((max, l) => Math.max(max, l.createdAt || 0), 0) || now,
+          read: () => JSON.stringify(lobbies.listAdmin(), null, 2),
+          write: (content) => {
+            let parsed;
+            try {
+              parsed = JSON.parse(content);
+            } catch {
+              throw httpError(400, 'Файл data/lobbies.json должен быть корректным JSON-массивом.');
+            }
+            if (!Array.isArray(parsed))
+              throw httpError(400, 'Файл data/lobbies.json должен содержать массив лобби.');
+            const keepIds = new Set(parsed.map((item) => item?.id).filter(Boolean));
+            for (const lobby of [...(db.lobbies ?? [])]) {
+              if (!keepIds.has(lobby.id)) lobbies.closeLobby(lobby.id, 'Лобби закрыто администратором.');
+            }
+          },
+          clear: () => {
+            lobbies.closeAllLobbies('Все лобби закрыты администратором.');
+          },
+        },
+      ],
+      [
+        'logs/events.log',
+        {
+          path: 'logs/events.log',
+          category: 'log',
+          system: true,
+          writable: true,
+          deletable: true,
+          updatedAt: db.events.at(-1)?.at || now,
+          read: () => formatEventsLog(),
+          write: (content) => {
+            if (!String(content ?? '').trim()) db.events = [];
+          },
+          clear: () => {
+            db.events = [];
+          },
+        },
+      ],
+    ]);
+
+    if (serverFiles?.systemFiles) {
+      for (const extra of serverFiles.systemFiles()) {
+        if (extra?.path && !map.has(extra.path)) map.set(extra.path, extra);
+      }
+    }
+    return map;
+  };
+
+  const fileMetaShape = ({ path, category, size, updatedAt, system, writable, deletable }) => ({
+    path,
+    name: path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path,
+    folder: path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '',
+    category: category || fileCategoryOf(path),
+    size: Number(size) || 0,
+    updatedAt: Number(updatedAt) || Date.now(),
+    system: !!system,
+    writable: writable !== false,
+    deletable: !!deletable,
+  });
+
+  const adminFilesList = () => {
+    const sys = systemFilesMap();
+    const out = [];
+    for (const entry of sys.values()) {
+      const content = String(entry.read() ?? '');
+      out.push(
+        fileMetaShape({
+          path: entry.path,
+          category: entry.category,
+          size: content.length,
+          updatedAt: entry.updatedAt,
+          system: true,
+          writable: entry.writable,
+          deletable: entry.deletable,
+        }),
+      );
+    }
+    for (const item of db.files) {
+      if (!item?.path || sys.has(item.path)) continue;
+      const content = String(item.content ?? '');
+      out.push(
+        fileMetaShape({
+          path: item.path,
+          category: fileCategoryOf(item.path),
+          size: content.length,
+          updatedAt: item.updatedAt || item.createdAt || Date.now(),
+          system: false,
+          writable: true,
+          deletable: true,
+        }),
+      );
+    }
+    return out.sort((a, b) => Number(b.system) - Number(a.system) || a.path.localeCompare(b.path, 'ru'));
+  };
+
+  const adminReadFile = (rawPath) => {
+    const path = normalizeFilePath(rawPath);
+    const sys = systemFilesMap().get(path);
+    if (sys) {
+      const content = String(sys.read() ?? '');
+      return {
+        ...fileMetaShape({
+          path: sys.path,
+          category: sys.category,
+          size: content.length,
+          updatedAt: sys.updatedAt,
+          system: true,
+          writable: sys.writable,
+          deletable: sys.deletable,
+        }),
+        content,
+      };
+    }
+    const found = db.files.find((item) => item.path === path);
+    if (!found) throw httpError(404, 'Файл не найден на сервере.');
+    const content = String(found.content ?? '');
+    return {
+      ...fileMetaShape({
+        path: found.path,
+        category: fileCategoryOf(found.path),
+        size: content.length,
+        updatedAt: found.updatedAt || found.createdAt,
+        system: false,
+        writable: true,
+        deletable: true,
+      }),
+      content,
+    };
+  };
+
+  const adminWriteFile = (rawPath, rawContent) => {
+    const path = normalizeFilePath(rawPath);
+    const content = String(rawContent ?? '');
+    if (content.length > MAX_ADMIN_FILE_CHARS)
+      throw httpError(413, 'Файл слишком большой (максимум 256 КБ).');
+    const sys = systemFilesMap().get(path);
+    if (sys) {
+      if (sys.writable === false) throw httpError(403, 'Этот системный файл доступен только для чтения.');
+      sys.write(content);
+      return adminReadFile(path);
+    }
+    const now = Date.now();
+    const existing = db.files.find((item) => item.path === path);
+    if (existing) {
+      existing.content = content;
+      existing.updatedAt = now;
+    } else {
+      if (db.files.length >= MAX_ADMIN_FILES)
+        throw httpError(400, `Достигнут лимит пользовательских файлов (${MAX_ADMIN_FILES}).`);
+      db.files.push({ path, content, createdAt: now, updatedAt: now });
+    }
+    serverFiles?.writeCustom?.(path, content);
+    return adminReadFile(path);
+  };
+
+  const adminRenameFile = (rawPath, rawNextPath) => {
+    const path = normalizeFilePath(rawPath);
+    const nextPath = normalizeFilePath(rawNextPath);
+    if (path === nextPath) return adminReadFile(path);
+    const sys = systemFilesMap();
+    if (sys.has(path)) throw httpError(400, 'Системный файл нельзя переименовать.');
+    if (sys.has(nextPath) || db.files.some((item) => item.path === nextPath))
+      throw httpError(409, 'Файл с таким путём уже существует.');
+    const entry = db.files.find((item) => item.path === path);
+    if (!entry) throw httpError(404, 'Исходный файл не найден.');
+    entry.path = nextPath;
+    entry.updatedAt = Date.now();
+    serverFiles?.renameCustom?.(path, nextPath, entry.content);
+    return adminReadFile(nextPath);
+  };
+
+  const adminDeleteFile = (rawPath) => {
+    const path = normalizeFilePath(rawPath);
+    const sys = systemFilesMap().get(path);
+    if (sys) {
+      if (!sys.deletable || typeof sys.clear !== 'function')
+        throw httpError(400, 'Этот системный файл нельзя удалить — его можно отредактировать.');
+      sys.clear();
+      return { cleared: true, path };
+    }
+    const before = db.files.length;
+    db.files = db.files.filter((item) => item.path !== path);
+    if (db.files.length === before) throw httpError(404, 'Файл не найден.');
+    serverFiles?.deleteCustom?.(path);
+    return { deleted: true, path };
+  };
+
+  const adminStats = () => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const files = adminFilesList();
+    const fileBytes = files.reduce((sum, item) => sum + (item.size || 0), 0);
+    return {
+      users: db.users.length,
+      online: db.users.filter((u) => u.online && now - (u.seenAt ?? 0) < 90_000).length,
+      avatars: db.users.filter((u) => u.avatar).length,
+      requests: db.requests.length,
+      links: Math.round(db.users.reduce((sum, u) => sum + (u.friends?.length ?? 0), 0) / 2),
+      banned: db.users.filter((u) => banOf(u)).length,
+      today: db.users.filter((u) => now - (u.createdAt ?? 0) < day).length,
+      week: db.users.filter((u) => now - (u.createdAt ?? 0) < day * 7).length,
+      activeDay: db.users.filter((u) => now - (u.seenAt ?? 0) < day).length,
+      events: db.events.length,
+      lobbies: (db.lobbies ?? []).length,
+      files: files.length,
+      fileBytes,
+      bytes: JSON.stringify({
+        users: db.users,
+        requests: db.requests,
+        events: db.events,
+        files: db.files,
+      }).length,
+    };
+  };
+
+  /* Снимок для панели. Журнал отдаём свежими записями вперёд — панель
+     показывает его как ленту, и переворачивать её на клиенте незачем. */
+  const adminState = () => ({
+    users: db.users.map(adminUserShape),
+    requests: db.requests,
+    events: db.events.slice(-MAX_EVENTS_FOR_PANEL).reverse(),
+    settings: settingsShape(),
+    stats: adminStats(),
+    files: adminFilesList(),
+    lobbies: lobbies.listAdmin(),
+    /* Ключ ещё заводской — панель по этому признаку напоминает сменить. */
+    key: { isDefault: adminKeyIsDefault() },
   });
 
   /* ---------- обработчики маршрутов ----------------------------
@@ -835,9 +1228,8 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
       return adminState();
     },
 
-    /* Настройки хаба, которые владелец меняет из панели. Пока это
-       одно: открыта ли регистрация. Закрывают её, когда идёт игра
-       своим кругом, а лишние аккаунты не нужны. */
+    /* Настройки хаба, которые владелец меняет из панели: открыта ли
+       регистрация и объявление сервера (motd). */
     'POST /api/admin/settings': async (req, body, save) => {
       adminAuth(req);
       if ('registrationOpen' in (body ?? {})) {
@@ -850,8 +1242,116 @@ export function createHubCore({ db, persist = () => {}, limits = DEFAULT_LIMITS,
             text: open ? 'регистрация открыта' : 'регистрация закрыта',
           });
       }
+      if ('motd' in (body ?? {})) {
+        const motd = String(body.motd ?? '').trim().slice(0, MAX_MOTD_CHARS);
+        const changed = (db.settings.motd ?? '') !== motd;
+        db.settings.motd = motd;
+        if (changed)
+          logEvent('admin:settings', {
+            by: 'admin',
+            text: motd ? `объявление: ${motd.slice(0, 60)}` : 'объявление убрано',
+          });
+      }
       save.now();
       return { ok: true, ...adminState() };
+    },
+
+    /* Управление файлами сервера из панели: список, чтение, запись,
+       переименование и удаление/очистка. */
+    'POST /api/admin/files': async (req, body, save) => {
+      adminAuth(req);
+      const action = String(body?.action || 'list');
+      switch (action) {
+        case 'list':
+          return { ok: true, files: adminFilesList() };
+        case 'read':
+          return { ok: true, file: adminReadFile(body?.path) };
+        case 'write': {
+          const file = adminWriteFile(body?.path, body?.content);
+          logEvent('admin:file-write', { by: 'admin', text: file.path });
+          save.now();
+          return { ok: true, file, ...adminState() };
+        }
+        case 'rename': {
+          const before = normalizeFilePath(body?.path);
+          const file = adminRenameFile(body?.path, body?.nextPath);
+          logEvent('admin:file-rename', { by: 'admin', text: `${before} → ${file.path}` });
+          save.now();
+          return { ok: true, file, ...adminState() };
+        }
+        case 'delete': {
+          const result = adminDeleteFile(body?.path);
+          logEvent('admin:file-delete', { by: 'admin', text: result.path });
+          save.now();
+          return { ok: true, ...result, ...adminState() };
+        }
+        default:
+          throw httpError(400, 'Неизвестное файловое действие панели.');
+      }
+    },
+
+    /* Управление сервером из панели: живые лобби, сброс сессий и
+       восстановление снимка данных. */
+    'POST /api/admin/server': async (req, body, save) => {
+      adminAuth(req);
+      const action = String(body?.action || '');
+      switch (action) {
+        case 'close-lobby': {
+          const closed = lobbies.closeLobby(String(body?.lobbyId || ''), 'Лобби закрыто администратором.');
+          if (!closed) throw httpError(404, 'Лобби не найдено.');
+          logEvent('admin:lobby-close', { by: 'admin', text: closed.code });
+          save.now();
+          return { ok: true, ...adminState() };
+        }
+        case 'close-all-lobbies': {
+          const count = lobbies.closeAllLobbies('Все лобби закрыты администратором.');
+          logEvent('admin:lobby-close-all', { by: 'admin', count });
+          save.now();
+          return { ok: true, count, ...adminState() };
+        }
+        case 'kick-all': {
+          let count = 0;
+          for (const user of db.users) {
+            if (user.online || (user.tokens && user.tokens.length > 0)) count += 1;
+            user.online = false;
+            user.tokens = [];
+            lobbies.forgetUser(user.id, 'Сессии сброшены администратором.');
+          }
+          logEvent('admin:kick-all', { by: 'admin', count });
+          save.now();
+          return { ok: true, count, ...adminState() };
+        }
+        case 'import-snapshot': {
+          const snap = body?.snapshot;
+          if (!snap || typeof snap !== 'object')
+            throw httpError(400, 'Некорректный снимок данных для импорта.');
+          if (snap.settings && typeof snap.settings === 'object') {
+            if ('registrationOpen' in snap.settings)
+              db.settings.registrationOpen = snap.settings.registrationOpen !== false;
+            if ('motd' in snap.settings)
+              db.settings.motd = String(snap.settings.motd ?? '').trim().slice(0, MAX_MOTD_CHARS);
+          }
+          let importedFiles = 0;
+          if (Array.isArray(snap.files)) {
+            for (const item of snap.files) {
+              if (!item || typeof item.path !== 'string' || item.system) continue;
+              if (typeof item.content === 'string') {
+                adminWriteFile(item.path, item.content);
+                importedFiles += 1;
+              }
+            }
+          }
+          logEvent('admin:backup-restore', {
+            by: 'admin',
+            count: importedFiles,
+            text: importedFiles ? `файлов: ${importedFiles}` : 'настройки',
+          });
+          save.now();
+          return { ok: true, importedFiles, ...adminState() };
+        }
+        default:
+          throw httpError(400, 'Неизвестное серверное действие панели.');
+      }
     },
 
     /* Очистка журнала: владелец приводит память панели в порядок,

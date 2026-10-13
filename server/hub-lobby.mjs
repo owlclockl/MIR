@@ -780,10 +780,30 @@ export function createLobbies({
     }
   };
 
+  /* Управление лобби из панели администратора: список всех активных комнат
+     и принудительное закрытие зависшего или нежелательного лобби. */
+  const listAdmin = () => db.lobbies.map((lobby) => view(lobby, lobby.masterId));
+
+  const closeLobby = (lobbyId, reason = 'admin') => {
+    const lobby = lobbyById(lobbyId);
+    if (!lobby) return null;
+    removeLobby(lobby, reason);
+    return lobby;
+  };
+
+  const closeAllLobbies = (reason = 'admin') => {
+    const count = db.lobbies.length;
+    for (const lobby of [...db.lobbies]) removeLobby(lobby, reason);
+    return count;
+  };
+
   return {
     routes,
     socket,
     forgetUser,
+    listAdmin,
+    closeLobby,
+    closeAllLobbies,
     sweep,
     tick,
     stats: () => ({ lobbies: db.lobbies.length, sockets: sockets.size, frames: frames.size, live: liveFrames.size }),
