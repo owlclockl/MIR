@@ -14,6 +14,14 @@ import { configureSounds, playSound } from './ui/sound.js';
 import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
 import { mountWorldView } from './game/world-view.js';
+import { mountPlanetView } from './planet/view.js';
+import {
+  WORLD_TEMPLATES,
+  generateProceduralWorld,
+  mountProceduralGenerator,
+  toAzgaarWindow,
+} from './game/procedural-generator.js';
+import { mapsReady } from './world/bridge.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
 import { seedArtOrIcon } from './ui/seed-art.js';
@@ -71,10 +79,20 @@ const ADMIN_TAPS = 7; // быстрых касаний по знаку — се�
 const ADMIN_TAP_WINDOW = 2800; // миллисекунд на комбинацию
 
 const adminState = () => ({
-  tab: 'overview', // overview | players | requests | events | system
+  tab: 'overview', // overview | players | requests | files | events | system
   query: '',
   requestQuery: '',
   eventQuery: '',
+  fileQuery: '',
+  fileFilter: 'all', // all | config | data | log | custom
+  filePath: '',
+  fileDraftPath: '',
+  fileContent: '',
+  fileLoadedPath: '',
+  fileCreating: false,
+  fileDirty: false,
+  fileMeta: null,
+  motdDraft: null,
   range: '14', // сколько дней показать в аналитике
   filter: 'all', // all | online | offline | banned | today | active
   sort: 'name', // name | seen | created
@@ -424,13 +442,7 @@ const profileModalHtml = () => {
 
         <div class="divider" role="separator"></div>
 
-        <div class="dialog__actions dialog__actions--spread">
-          <button class="mini-button" type="button" data-action="open-hub">
-            ${icon('globe', 'icon--xs')} Общий хаб
-          </button>
-          <button class="mini-button" type="button" data-action="open-direct">
-            ${icon('link', 'icon--xs')} Прямое подключение по коду
-          </button>
+        <div class="dialog__actions">
           <button class="mini-button mini-button--danger" type="button" data-action="logout">
             ${icon('logOut', 'icon--xs')} Выйти из аккаунта
           </button>
@@ -960,6 +972,13 @@ const EVENT_LABELS = {
   'admin:settings': 'Панель: настройки',
   'admin:events-clear': 'Панель: журнал очищен',
   'admin:wipe': 'Панель: локальные аккаунты очищены',
+  'admin:file-write': 'Панель: файл сохранён',
+  'admin:file-rename': 'Панель: файл переименован',
+  'admin:file-delete': 'Панель: файл удалён',
+  'admin:lobby-close': 'Панель: лобби закрыто',
+  'admin:lobby-close-all': 'Панель: все лобби закрыты',
+  'admin:kick-all': 'Панель: сброс всех сессий',
+  'admin:backup-restore': 'Панель: импорт снимка',
 };
 
 const eventLabel = (kind) => EVENT_LABELS[kind] ?? kind;
@@ -1717,6 +1736,7 @@ const adminOverviewHtml = () => {
           <button class="mini-button ${registrationOpen ? 'mini-button--danger' : 'mini-button--accent'}" type="button" data-action="admin-registration" data-open="${registrationOpen ? '0' : '1'}">
             ${registrationOpen ? 'Закрыть регистрацию' : 'Открыть регистрацию'}
           </button>
+          <button class="mini-button" type="button" data-action="admin-tab" data-tab="files">Файлы и сервер</button>
           <button class="mini-button" type="button" data-action="admin-tab" data-tab="system">Ключ и диагностика</button>
         </div>
       </section>
@@ -1737,6 +1757,259 @@ const adminOverviewHtml = () => {
     </div>`;
 };
 
+const ADMIN_FILE_FILTERS = [
+  ['all', 'Все'],
+  ['config', 'Конфиг'],
+  ['data', 'Данные'],
+  ['log', 'Логи'],
+  ['custom', 'Свои'],
+];
+
+const ADMIN_FILE_TEMPLATES = [
+  ['rules', 'config/rules.json', 'Правила JSON', '{\n  "title": "Правила сервера",\n  "fairPlay": true,\n  "maxPlayersPerLobby": 8\n}'],
+  ['motd', 'notes/announcement.md', 'Объявление', '# Объявление сервера\n\nДобро пожаловать в The Civilization of the Sages!\n'],
+  ['whitelist', 'config/whitelist.json', 'Белый список', '{\n  "enabled": false,\n  "players": []\n}'],
+];
+
+const formatFileSize = (bytes) => {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} Б`;
+  return `${(n / 1024).toFixed(1)} КБ`;
+};
+
+const fileCategoryIcon = (category) =>
+  category === 'config' ? 'settings' : category === 'data' ? 'layers' : category === 'log' ? 'history' : 'folderOpen';
+
+const fileCategoryLabel = (category, system) =>
+  system
+    ? category === 'config'
+      ? 'Конфиг · системный'
+      : category === 'log'
+        ? 'Журнал · системный'
+        : 'Данные · системный'
+    : 'Пользовательский файл';
+
+const adminFilesHtml = () => {
+  const data = ui.admin.data;
+  const allFiles = data?.files ?? [];
+  const lobbies = data?.lobbies ?? [];
+  const filter = ui.admin.fileFilter || 'all';
+  const query = ui.admin.fileQuery.trim().toLocaleLowerCase('ru');
+  const files = allFiles.filter((file) => {
+    const matchFilter =
+      filter === 'all' ||
+      (filter === 'custom' ? !file.system : file.category === filter);
+    const matchQuery =
+      !query ||
+      String(file.path || '').toLocaleLowerCase('ru').includes(query) ||
+      String(file.name || '').toLocaleLowerCase('ru').includes(query);
+    return matchFilter && matchQuery;
+  });
+
+  const isCreating = ui.admin.fileCreating;
+  const activePath = isCreating ? '' : ui.admin.filePath;
+  const activeMeta = isCreating
+    ? { path: ui.admin.fileDraftPath, system: false, writable: true, deletable: false, category: 'custom' }
+    : ui.admin.fileMeta ?? allFiles.find((item) => item.path === activePath) ?? null;
+  const draftPath = isCreating ? ui.admin.fileDraftPath : (ui.admin.fileDraftPath || activeMeta?.path || '');
+  const content = String(ui.admin.fileContent ?? '');
+  const lineCount = content ? content.split('\n').length : 1;
+  const isJson = /\.json$/i.test(draftPath);
+  const motdValue = ui.admin.motdDraft !== null ? ui.admin.motdDraft : (data?.settings?.motd ?? '');
+  const registrationOpen = data?.settings?.registrationOpen !== false;
+
+  return `
+    <div class="admin-page-intro">
+      <p class="hint">Управление файлами сервера, живой конфигурацией, журналами, активными лобби и резервными копиями прямо из панели.</p>
+      <div class="dialog__actions">
+        <button class="mini-button mini-button--accent" type="button" data-action="admin-file-new">
+          ${icon('plus', 'icon--xs')}<span>Новый файл</span>
+        </button>
+        <button class="mini-button" type="button" data-action="admin-file-upload">
+          ${icon('fileDown', 'icon--xs')}<span>Загрузить файл</span>
+        </button>
+        <button class="mini-button" type="button" data-action="admin-import-backup">
+          ${icon('folderOpen', 'icon--xs')}<span>Импорт снимка</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="admin-chips" role="group" aria-label="Категория файлов">
+      ${ADMIN_FILE_FILTERS.map(([value, label]) =>
+        adminChipHtml('admin-file-filter', value, label, filter === value),
+      ).join('')}
+    </div>
+
+    <label class="field admin-search-field">
+      <span class="field__label">Поиск по пути или имени файла</span>
+      <input class="input" type="search" placeholder="Например, config/settings.json или logs/…" autocomplete="off" spellcheck="false"
+             value="${escapeHtml(ui.admin.fileQuery)}" data-role="admin-file-search" />
+    </label>
+
+    <div class="admin-files-grid">
+      <section class="admin-card admin-files-sidebar" aria-label="Список файлов сервера">
+        <div class="admin-card__heading">
+          <div><p class="eyebrow">Хранилище</p><h4>Файлы (${files.length} из ${allFiles.length})</h4></div>
+          <span class="admin-result-count">${formatFileSize(data?.stats?.fileBytes ?? 0)}</span>
+        </div>
+        <div class="admin-list admin-files__list">
+          ${
+            files.length
+              ? files
+                  .map((item) => {
+                    const active = !isCreating && item.path === activePath;
+                    return `
+                      <button class="admin-row admin-file-row${active ? ' admin-file-row--active' : ''}" type="button"
+                              data-action="admin-file-open" data-path="${escapeHtml(item.path)}">
+                        ${icon(fileCategoryIcon(item.category), 'icon--sm')}
+                        <span class="admin-row__text">
+                          <strong class="admin-row__name" translate="no">${escapeHtml(item.path)}</strong>
+                          <small class="admin-row__meta">${escapeHtml(fileCategoryLabel(item.category, item.system))} · ${escapeHtml(formatFileSize(item.size))} · ${escapeHtml(seenText(item.updatedAt))}</small>
+                        </span>
+                        <span class="admin-file-tag${item.system ? ' admin-file-tag--sys' : ''}">${item.system ? 'СИСТЕМНЫЙ' : 'СВОЙ'}</span>
+                      </button>`;
+                  })
+                  .join('')
+              : '<div class="admin-empty"><strong>Файлы не найдены</strong><span>Смените фильтр или создайте новый файл.</span></div>'
+          }
+        </div>
+      </section>
+
+      <section class="admin-card admin-file-editor" aria-label="Редактор файла">
+        ${
+          activeMeta || isCreating
+            ? `
+              <form class="form admin-file-form" data-form="admin-file-save" novalidate>
+                <div class="admin-card__heading">
+                  <div>
+                    <p class="eyebrow">${isCreating ? 'Создание файла' : activeMeta?.system ? 'Системный файл сервера' : 'Пользовательский файл сервера'}</p>
+                    <h4 translate="no">${escapeHtml(draftPath || 'Новый файл')}</h4>
+                  </div>
+                  <span class="admin-result-count" translate="no">${lineCount} стр. · ${formatFileSize(content.length)}${ui.admin.fileDirty ? ' · изменён' : ''}</span>
+                </div>
+
+                <div class="admin-chips" role="group" aria-label="Шаблоны файла">
+                  <span class="admin-chips__label">Шаблон:</span>
+                  ${ADMIN_FILE_TEMPLATES.map(
+                    ([tplId, path, label]) =>
+                      `<button class="chip${draftPath === path ? ' chip--active' : ''}" type="button" data-action="admin-file-template" data-template="${escapeHtml(tplId)}" data-path="${escapeHtml(path)}">${escapeHtml(label)}</button>`,
+                  ).join('')}
+                </div>
+
+                <label class="field">
+                  <span class="field__label">${activeMeta?.system && !isCreating ? 'Путь системного файла (фиксирован)' : 'Путь файла на сервере (можно переименовать)'}</span>
+                  <input class="input input--code" name="path" type="text" maxlength="120" spellcheck="false"
+                         placeholder="folder/filename.json" value="${escapeHtml(draftPath)}"
+                         data-role="admin-file-path" ${activeMeta?.system && !isCreating ? 'readonly' : ''} required />
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Содержимое файла</span>
+                  <textarea class="input admin-file-textarea" name="content" rows="12" spellcheck="false"
+                            placeholder="Текст или JSON содержимое файла…"
+                            data-role="admin-file-content">${escapeHtml(content)}</textarea>
+                </label>
+
+                <p class="form-error" data-role="form-error" hidden></p>
+
+                <div class="dialog__actions dialog__actions--spread">
+                  <button class="mini-button mini-button--accent" type="submit" data-role="submit">
+                    ${icon('save', 'icon--xs')}<span>${isCreating ? 'Создать и сохранить' : 'Сохранить на сервере'}</span>
+                  </button>
+                  ${
+                    isJson
+                      ? `<button class="mini-button" type="button" data-action="admin-file-format">
+                           ${icon('check', 'icon--xs')}<span>Форматировать JSON</span>
+                         </button>`
+                      : ''
+                  }
+                  <button class="mini-button" type="button" data-action="admin-file-copy">
+                    ${icon('copy', 'icon--xs')}<span>Скопировать</span>
+                  </button>
+                  <button class="mini-button" type="button" data-action="admin-file-download">
+                    ${icon('download', 'icon--xs')}<span>Скачать</span>
+                  </button>
+                  ${
+                    !isCreating && (!activeMeta?.system || activeMeta?.deletable)
+                      ? `<button class="mini-button mini-button--danger" type="button" data-action="admin-file-delete" data-path="${escapeHtml(activeMeta.path)}">
+                           ${icon('trash', 'icon--xs')}<span>${activeMeta?.system ? 'Очистить' : 'Удалить'}</span>
+                         </button>`
+                      : ''
+                  }
+                </div>
+              </form>`
+            : '<div class="admin-empty"><strong>Файл не выбран</strong><span>Выберите файл слева или нажмите «Новый файл».</span></div>'
+        }
+      </section>
+    </div>
+
+    <div class="admin-overview-grid">
+      <section class="admin-card">
+        <div class="admin-card__heading"><div><p class="eyebrow">Сервер</p><h4>Объявление и доступ</h4></div>${icon('globe', 'admin-card__icon')}</div>
+        <form class="form" data-form="admin-motd" novalidate>
+          <label class="field">
+            <span class="field__label">Объявление сервера (MOTD)</span>
+            <input class="input" name="motd" type="text" maxlength="240" spellcheck="false"
+                   placeholder="Статус сервера, расписание игр или техработы…"
+                   value="${escapeHtml(motdValue)}" data-role="admin-motd-input" />
+          </label>
+          <p class="form-error" data-role="form-error" hidden></p>
+          <div class="admin-card__actions">
+            <button class="mini-button mini-button--accent" type="submit">Сохранить объявление</button>
+            ${
+              data?.settings?.motd
+                ? `<button class="mini-button" type="button" data-action="admin-motd-clear">Убрать</button>`
+                : ''
+            }
+          </div>
+        </form>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card__heading">
+          <div><p class="eyebrow">Комнаты</p><h4>Активные лобби (${lobbies.length})</h4></div>
+          ${icon('map', 'admin-card__icon')}
+        </div>
+        ${
+          lobbies.length
+            ? `<div class="admin-list admin-list--flat">${lobbies
+                .map(
+                  (item) => `
+                    <div class="admin-row admin-row--static">
+                      <span class="admin-row__text">
+                        <strong class="admin-row__name" translate="no">${escapeHtml(item.code)} · ${escapeHtml(item.masterName || item.masterId)}</strong>
+                        <small class="admin-row__meta">Участников: ${item.members?.length ?? 1} · seed ${escapeHtml(item.seed || '—')}</small>
+                      </span>
+                      <button class="mini-button mini-button--danger" type="button" data-action="admin-lobby-close" data-id="${escapeHtml(item.id)}">
+                        Закрыть
+                      </button>
+                    </div>`,
+                )
+                .join('')}</div>
+               <div class="admin-card__actions">
+                 <button class="mini-button mini-button--danger" type="button" data-action="admin-lobby-close-all">
+                   ${icon('trash', 'icon--xs')}<span>Закрыть все лобби</span>
+                 </button>
+               </div>`
+            : '<div class="admin-empty"><strong>Активных лобби нет</strong><span>Открытые комнаты появятся здесь автоматически.</span></div>'
+        }
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card__heading"><div><p class="eyebrow">Обслуживание</p><h4>Сессии и доступ</h4></div>${icon('shield', 'admin-card__icon')}</div>
+        <p class="hint">Быстрое управление сессиями игроков и регистрацией перед обновлением или обслуживанием сервера.</p>
+        <div class="admin-card__actions">
+          <button class="mini-button ${registrationOpen ? 'mini-button--danger' : 'mini-button--accent'}" type="button" data-action="admin-registration" data-open="${registrationOpen ? '0' : '1'}">
+            ${registrationOpen ? 'Закрыть регистрацию' : 'Открыть регистрацию'}
+          </button>
+          <button class="mini-button mini-button--danger" type="button" data-action="admin-kick-all">
+            ${icon('power', 'icon--xs')}<span>Сбросить все сессии</span>
+          </button>
+        </div>
+      </section>
+    </div>`;
+};
+
 const adminSystemHtml = () => {
   const data = ui.admin.data;
   const local = store.localDataInfo();
@@ -1745,6 +2018,7 @@ const adminSystemHtml = () => {
     <div class="admin-stats">
       ${statRow('Режим данных', data?.mode === 'hub' ? 'общий хаб' : 'только этот браузер')}
       ${statRow('Адрес хаба', data?.mode === 'hub' ? data.host || address : 'не подключён')}
+      ${statRow('Объявление сервера', data?.settings?.motd || 'не задано')}
       ${statRow('Аккаунтов на хабе', String(data?.stats?.users ?? 0))}
       ${statRow('Из них в сети', String(data?.stats?.online ?? 0))}
       ${statRow('Новых за сутки', String(data?.stats?.today ?? 0))}
@@ -1753,6 +2027,8 @@ const adminSystemHtml = () => {
       ${statRow('Заблокировано', String(data?.stats?.banned ?? 0))}
       ${statRow('Заявок', String(data?.stats?.requests ?? 0))}
       ${statRow('Дружб', String(data?.stats?.links ?? 0))}
+      ${statRow('Активных лобби', String(data?.stats?.lobbies ?? data?.lobbies?.length ?? 0))}
+      ${statRow('Файлов сервера', `${data?.stats?.files ?? data?.files?.length ?? 0} (${formatFileSize(data?.stats?.fileBytes ?? 0)})`)}
       ${statRow('Аватарок', String(data?.stats?.avatars ?? 0))}
       ${statRow('Записей в журнале', String(data?.stats?.events ?? data?.events?.length ?? 0))}
       ${statRow('Объём данных', `${Math.round((data?.stats?.bytes ?? 0) / 1024)} КБ`)}
@@ -1829,17 +2105,26 @@ const adminModalHtml = () => {
       ? adminPlayersHtml()
       : ui.admin.tab === 'requests'
         ? adminRequestsHtml()
-        : ui.admin.tab === 'events'
-          ? adminEventsHtml()
-          : ui.admin.tab === 'system'
-            ? adminSystemHtml()
-            : adminOverviewHtml();
+        : ui.admin.tab === 'files'
+          ? adminFilesHtml()
+          : ui.admin.tab === 'events'
+            ? adminEventsHtml()
+            : ui.admin.tab === 'system'
+              ? adminSystemHtml()
+              : adminOverviewHtml();
   const host = data.mode === 'hub'
     ? data.host || (typeof location !== 'undefined' ? location.origin : 'Общий хаб')
     : 'Данные только этого браузера';
   const sectionTitle = user
     ? user.name
-    : ({ overview: 'Обзор', players: 'Игроки', requests: 'Заявки', events: 'Журнал событий', system: 'Система' }[ui.admin.tab] ?? 'Обзор');
+    : ({
+        overview: 'Обзор',
+        players: 'Игроки',
+        requests: 'Заявки',
+        files: 'Файлы и сервер',
+        events: 'Журнал событий',
+        system: 'Система',
+      }[ui.admin.tab] ?? 'Обзор');
   const sectionDescription = user
     ? 'Аккаунт игрока · действия администратора'
     : ui.admin.tab === 'overview'
@@ -1848,9 +2133,11 @@ const adminModalHtml = () => {
         ? 'Поиск и управление аккаунтами'
         : ui.admin.tab === 'requests'
           ? 'Очередь заявок в друзья'
-          : ui.admin.tab === 'events'
-            ? 'История активности и действий панели'
-            : 'Безопасность, настройки и диагностика';
+          : ui.admin.tab === 'files'
+            ? 'Просмотр, редактирование и загрузка файлов сервера, управление лобби и сессиями'
+            : ui.admin.tab === 'events'
+              ? 'История активности и действий панели'
+              : 'Безопасность, настройки и диагностика';
   const modeLabel = data.mode === 'hub' ? 'ОБЩИЙ ХАБ' : 'ЛОКАЛЬНЫЙ РЕЖИМ';
   return dialogShell({
     label: 'Панель админа',
@@ -1869,6 +2156,7 @@ const adminModalHtml = () => {
             ${adminTabHtml('overview', 'Обзор', 'sigil')}
             ${adminTabHtml('players', 'Игроки', 'users', data.users.length)}
             ${adminTabHtml('requests', 'Заявки', 'userPlus', data.requests.length)}
+            ${adminTabHtml('files', 'Файлы', 'folderOpen', (data.files ?? []).length)}
             ${adminTabHtml('events', 'Журнал', 'message', data.events?.length ?? 0)}
             ${adminTabHtml('system', 'Система', 'settings')}
           </nav>
@@ -1959,6 +2247,11 @@ const createWorldSession = () => ({
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
   voxel: false, // надстройка «карта блоками» (плоские ярусы) над экраном карты
   voxelView: null, // смонтированный вид: dispose при выходе из режима
+  procGen: false, // надстройка «тестовый процедурный генератор 2D»
+  procView: null, // смонтированный тестовый генератор
+  procWindow: null, // синтетическое окно { grid, pack } от процедурного генератора
+  planet: false, // надстройка «планетарный генератор 23 слоя»
+  planetView: null, // смонтированный вид планеты
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // остановка синхронизации лобби для текущего iframe
   leaveArmed: false, // первый клик «Выйти» ждёт подтверждения
@@ -2047,10 +2340,6 @@ const worldSlotsHtml = (session) => {
         <div class="world-slot-grid" role="list" aria-label="Слоты: ${WORLD_ROLE_LABELS[role]}">
           ${slots[role].map((entry, index) => worldSlotCardHtml(role, index, entry)).join('')}
         </div>
-        <footer class="world-lobby-entry">
-          <span class="world-lobby-entry__text"><strong>Лобби с друзьями</strong><small>Мастер ведёт общую карту, игроки видят её и его правки.</small></span>
-          <button class="mini-button mini-button--accent" type="button" data-action="world-lobby-open">${icon('users', 'icon--xs')}<span>Открыть лобби</span></button>
-        </footer>
       </section>
     </div>`;
 };
@@ -2064,22 +2353,22 @@ const worldModeToolsHtml = (player) => `
     <ul class="world-mode-list">
       ${(player
         ? [
-            ['check', 'Просмотр карты: перемещение и масштаб Azgaar'],
+            ['check', 'Просмотр карты: перемещение и масштаб'],
             ['x', 'Слои, генерация, экспорт и сохранение скрыты'],
             ['x', 'Создание карты и смена seed'],
           ]
         : [
-            ['check', 'Создание карты и заполнение слота'],
-            ['check', 'Полный редактор Azgaar: рельеф, государства, города'],
+            ['check', 'Быстрый 2D тест-генератор: рельеф, биомы, реки, государства'],
+            ['check', 'Мгновенная воксельная карта блоками и редактор Azgaar'],
             ['check', 'Экспорт seed и размера карты в файл'],
-            ['check', 'Новый мир с тем же размером'],
+            ['check', 'Новый мир в один клик'],
           ])
         .map(([mark, text]) => `<li class="world-mode-list__item world-mode-list__item--${mark}">${icon(mark === 'check' ? 'check' : 'x', 'icon--xs')}<span>${text}</span></li>`)
         .join('')}
     </ul>
     <p class="world-mode-note">${player
       ? 'Ограничение интерфейсное: панели скрыты, но не заблокированы.'
-      : 'Правки редактора в слот не попадают: карта строится заново по seed и размеру. Сохранить правки можно кнопками Azgaar.'}</p>
+      : 'Карта строится детерминированно по seed и размеру и доступна сразу в трёх режимах: Тест-генератор 2D, Карта блоками и Azgaar.'}</p>
   </section>`;
 
 const worldSetupHtml = (session) => {
@@ -2093,17 +2382,17 @@ const worldSetupHtml = (session) => {
         <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
         <p class="world-config__lead">${player
           ? 'Введите seed и размер, которые назвал мастер, или загрузите файл карты. Тогда мир будет тем же, что у мастера.'
-          : 'Карта займёт этот слот и откроется в редакторе Azgaar. Один seed и один размер дают один и тот же мир.'}</p>
+          : 'Карта займёт этот слот и построится по единому seed. Вы сможете переключаться между Тест-генератором, Картой блоками и редактором Azgaar.'}</p>
         <label class="field world-field">
           <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
             <input class="input input--code" type="text" maxlength="${store.WORLD_SEED_MAX}" autocomplete="off" spellcheck="false" data-role="world-seed" value="${escapeHtml(config.seed)}" />
             ${player ? '' : `<button class="icon-button icon-button--sm world-seed-random" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('dices', 'icon--xs')}</button>`}
-            <span class="world-seed-art" data-role="world-seed-art" title="Узор этого seed — настоящий мир построит Azgaar">${seedArtOrIcon(config.seed, 'setup')}</span>
+            <span class="world-seed-art" data-role="world-seed-art" title="Узор этого seed">${seedArtOrIcon(config.seed, 'setup')}</span>
           </span>
           <span class="world-field__hint">${player
             ? 'Seed выдаёт мастер. Введите его без изменений.'
-            : 'Seed определяет рельеф, государства и города. Пустое поле заполнится случайным значением.'}</span>
+            : 'Seed определяет рельеф, климат, реки, биомы, государства и города.'}</span>
         </label>
         <div class="world-field">
           <span class="field__label" id="world-size-label">Размер карты</span>
@@ -2114,8 +2403,8 @@ const worldSetupHtml = (session) => {
             }).join('')}
           </div>
           <span class="world-field__hint">${player
-            ? 'Размер входит в карту: у мастера та же Земля, иначе мир будет другим.'
-            : 'Карта размером с Землю: один пиксель Azgaar — один блок (1 м) в блочном мире, без пересчёта. Точек у карты — 1 000 000, поэтому первая генерация может занять несколько минут и попросить много памяти.'}</span>
+            ? 'Выберите тот же размер, что у мастера, чтобы континенты и реки совпали.'
+            : 'Стандартная 1600×1000 генерируется мгновенно и подходит для всех режимов.'}</span>
         </div>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
           <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
@@ -2171,10 +2460,11 @@ const worldPageHtml = () => {
     : screen === 'map' && session.lobby
       ? `<button class="world-topbar-button" type="button" data-action="world-lobby-back" aria-label="К лобби" title="К лобби">${icon('chevronLeft', 'icon--xs')}<span>К лобби</span></button>`
       : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
-  /* Кнопка режима не зависит от session.voxel: перерисовка страницы убила бы
-     iframe с документом Azgaar, а режим переключается классом (syncWorldVoxel). */
-  const voxelAction = screen === 'map'
-    ? `<button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Карта блоками: тот же мир ярус за ярусом, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
+  const mapViewButtons = screen === 'map'
+    ? `
+        <button class="world-topbar-button" type="button" data-action="world-proc-gen" aria-label="Тест-генератор 2D" title="Высокодетальный процедурный 2D-генератор (до 1 000 000 клеток)">${icon('compass', 'icon--xs')}<span>Тест-генератор</span></button>
+        <button class="world-topbar-button" type="button" data-action="world-planet" aria-label="Планета 23 слоя" title="Планетарный генератор: 23 слоя, тектоника, атмосфера, гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>
+        <button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Карта блоками: тот же мир ярус за ярусом, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -2192,7 +2482,6 @@ const worldPageHtml = () => {
     <div class="world-app" role="application" aria-label="The civilization of the sages — карта мира">
       <header class="world-topbar">
         <div class="world-topbar__identity">
-          <button class="world-back-button" type="button" data-action="world-exit" aria-label="Вернуться в главное меню" title="В меню">${icon('chevronLeft', 'icon--sm')}</button>
           <span class="world-brand-mark">${icon('sigil')}</span>
           <div class="world-brand-copy"><span>THE CIVILIZATION OF THE SAGES</span><strong>${titles[screen]}</strong></div>
           ${screen === 'slots' || screen === 'lobby' ? '' : `<span class="world-mode-chip${player ? ' world-mode-chip--player' : ''}">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ИГРОК' : 'МАСТЕР'}</span></span>`}
@@ -2203,7 +2492,7 @@ const worldPageHtml = () => {
           ${screen === 'map' && session.lobby ? '<span class="world-lobby-chip" data-role="lobby-chip"></span>' : ''}
         </div>
         <div class="world-topbar__actions">
-          ${backToSlots}${voxelAction}${masterMapActions}
+          ${backToSlots}${mapViewButtons}${masterMapActions}
           <button class="world-exit-button" type="button" data-action="world-exit" aria-label="В меню" title="В меню">${icon('logOut', 'icon--xs')}<span>В меню</span></button>
         </div>
       </header>
@@ -2278,46 +2567,140 @@ const syncWorldVoxel = () => {
   const root = worldRoot();
   const app = root?.querySelector('.world-app');
   if (!session?.open || !app) return;
-  const wanted = session.screen === 'map' && session.voxel === true;
-  app.classList.toggle('is-voxel', wanted);
+
+  const wantedProc = session.screen === 'map' && session.procGen === true;
+  const wantedPlanet = session.screen === 'map' && session.planet === true && !wantedProc;
+  const wantedVoxel = session.screen === 'map' && session.voxel === true && !wantedProc && !wantedPlanet;
+
+  app.classList.toggle('is-proc-gen', wantedProc);
+  app.classList.toggle('is-planet', wantedPlanet);
+  app.classList.toggle('is-voxel', wantedVoxel);
+
+  const procBtn = app.querySelector('[data-action="world-proc-gen"]');
+  procBtn?.classList.toggle('is-on', wantedProc);
+  procBtn?.setAttribute('aria-pressed', wantedProc ? 'true' : 'false');
+
+  const planetBtn = app.querySelector('[data-action="world-planet"]');
+  planetBtn?.classList.toggle('is-on', wantedPlanet);
+  planetBtn?.setAttribute('aria-pressed', wantedPlanet ? 'true' : 'false');
+
   const button = app.querySelector('[data-action="world-voxel"]');
-  button?.classList.toggle('is-on', wanted);
-  button?.setAttribute('aria-pressed', wanted ? 'true' : 'false');
-  if (!wanted) {
+  button?.classList.toggle('is-on', wantedVoxel);
+  button?.setAttribute('aria-pressed', wantedVoxel ? 'true' : 'false');
+
+  const host = root.querySelector('[data-role="world-editor-host"]');
+
+  /* 1. Тестовый процедурный 2D-генератор (до 1 000 000 клеток). */
+  if (!wantedProc) {
+    session.procView?.dispose();
+    session.procView = null;
+  } else if (host && (!session.procView || !session.procView.element?.isConnected)) {
+    session.procView?.dispose();
+    session.procView = mountProceduralGenerator(host, {
+      config: session.config,
+      onWorldChange: (world, azWin) => {
+        session.procWindow = azWin;
+        session.config = { ...session.config, seed: world.seed };
+        const seedNode = app.querySelector('.world-topbar__seed');
+        if (seedNode) seedNode.textContent = worldSessionInfo(session);
+      },
+      onOpenVoxel: (_world, azWin) => {
+        session.procWindow = azWin;
+        session.procGen = false;
+        session.planet = false;
+        session.voxel = true;
+        playSound('open');
+        syncWorldVoxel();
+      },
+    });
+  }
+
+  /* 2. Планетарный 23-слойный генератор (тектоника, атмосфера, климат). */
+  if (!wantedPlanet) {
+    session.planetView?.dispose();
+    session.planetView = null;
+  } else if (host && (!session.planetView || !session.planetView.element?.isConnected)) {
+    session.planetView?.dispose();
+    const frame = host.querySelector('[data-role="world-editor"]');
+    const sizeMult = session.config.width >= 150_000_000 ? 4 : session.config.width >= 75_000_000 ? 2 : 1;
+    session.planetView = mountPlanetView(host, {
+      seed: session.config.seed || 'mir-2026',
+      size: sizeMult,
+      frame,
+      config: session.config,
+      onExit: () => setWorldPlanet(false),
+    });
+  }
+
+  /* 3. Воксельная карта блоками (с мгновенным мостом от процедурного генератора). */
+  if (!wantedVoxel) {
     worldVoxelWatch?.disconnect();
     worldVoxelWatch = null;
     session.voxelView?.dispose();
     session.voxelView = null;
     return;
   }
-  const host = root.querySelector('[data-role="world-editor-host"]');
   if (!host) return;
-  /* Кадр редактора пересоздаётся на новый seed, смену размера и карту лобби —
-     это уже другой документ Azgaar. Вид, построенный по прежнему, показывал бы
-     в блоковой карте прошлый мир, поэтому такой вид снимаем и строим заново. */
   const frame = host.querySelector('[data-role="world-editor"]');
   if (session.voxelView && session.voxelView.frame !== frame) {
     session.voxelView.dispose();
     session.voxelView = null;
   }
-  /* Вид уже в этом DOM — не трогаем: перемонтирование сбросило бы ярус,
-     масштаб и центр, и все чанки построились бы заново. */
   if (session.voxelView && session.voxelView.element?.isConnected) return;
   session.voxelView?.dispose();
   watchWorldLive(host);
+
+  let sourceFrame = frame;
+  if (session.procWindow && !mapsReady(frame?.contentWindow)) {
+    sourceFrame = { contentWindow: session.procWindow };
+  }
+
   session.voxelView = mountWorldView(host, {
-    frame,
+    frame: sourceFrame,
     config: session.config,
     onExit: () => setWorldVoxel(false),
   });
+  session.voxelView.frame = frame;
+};
+
+const setWorldProcGen = (on) => {
+  const session = ui.world;
+  if (!session?.open || session.screen !== 'map') return;
+  const wanted = Boolean(on);
+  if (session.procGen === wanted) return;
+  session.procGen = wanted;
+  if (wanted) {
+    session.planet = false;
+    session.voxel = false;
+  }
+  playSound(wanted ? 'open' : 'close');
+  syncWorldVoxel();
+};
+
+const setWorldPlanet = (on) => {
+  const session = ui.world;
+  if (!session?.open || session.screen !== 'map') return;
+  const wanted = Boolean(on);
+  if (session.planet === wanted && !session.procGen) return;
+  session.planet = wanted;
+  if (wanted) {
+    session.procGen = false;
+    session.voxel = false;
+  }
+  playSound(wanted ? 'open' : 'close');
+  syncWorldVoxel();
 };
 
 const setWorldVoxel = (on) => {
   const session = ui.world;
   if (!session?.open || session.screen !== 'map') return;
   const wanted = Boolean(on);
-  if (session.voxel === wanted) return;
+  if (session.voxel === wanted && !session.procGen && !session.planet) return;
   session.voxel = wanted;
+  if (wanted) {
+    session.procGen = false;
+    session.planet = false;
+  }
   playSound(wanted ? 'open' : 'close');
   syncWorldVoxel();
   if (wanted && session.voxelView?.error) toast(session.voxelView.error, 'error');
@@ -2333,6 +2716,13 @@ const dropWorldVoxel = () => {
   session.voxelView?.dispose();
   session.voxelView = null;
   session.voxel = false;
+  session.procView?.dispose();
+  session.procView = null;
+  session.procGen = false;
+  session.procWindow = null;
+  session.planetView?.dispose();
+  session.planetView = null;
+  session.planet = false;
 };
 
 /* Живой предпросмотр правок мастера — это снимки поверх iframe, а карта блоками
@@ -2715,17 +3105,17 @@ const menuCounts = () => {
 };
 
 const sidenavHtml = () => {
-  const { me, filled, online, requests, hub } = menuCounts();
+  const { filled, hub } = menuCounts();
   const items = [
-    ['map', 'Миры и карты', filled.length ? `Занято ${filled.length} из 12 слотов` : 'Слоты мастера и игрока', 'open-world', ''],
+    ['compass', 'Тестовый генератор', 'Быстрая процедурная 2D-карта', 'open-test-generator', ''],
     ['users', 'Лобби с друзьями', 'Общая карта · до 8 игроков', 'open-lobby', ''],
-    ['userPlus', me ? 'Друзья и заявки' : 'Войти и найти друзей', me ? `${online} в сети` : 'Аккаунт и код-приглашение', me ? 'open-add-friend' : 'open-auth', requests ? String(requests) : ''],
     ['globe', 'Общий хаб', hub, 'open-hub', ''],
     ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
   ];
   return `
-    <button class="sidenav__play" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
+    <button class="sidenav__play play-button" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
       ${icon('play', 'icon--play')}<span>Играть</span>
+      <small class="sidenav__play-sub">${filled.length ? `Слотов: ${filled.length}/12` : 'Картотека миров'}</small>
     </button>
     <div class="sidenav__list" role="list">
       ${items.map(([glyph, title, hint, action, badge]) => `
@@ -2736,10 +3126,6 @@ const sidenavHtml = () => {
         </button>`).join('')}
     </div>
     <div class="sidenav__foot">
-      <button class="sidenav__item" type="button" data-action="${me ? 'open-profile' : 'open-auth'}">
-        <span class="sidenav__icon">${icon('user')}</span>
-        <span class="sidenav__text"><strong>${me ? escapeHtml(me.name) : 'Войти'}</strong><small>${me ? 'Профиль и аватар' : 'Аккаунт мудреца'}</small></span>
-      </button>
       <button class="sidenav__item" type="button" data-action="open-settings">
         <span class="sidenav__icon">${icon('settings')}</span>
         <span class="sidenav__text"><strong>Настройки</strong><small>Звук, анимации, обновления</small></span>
@@ -2774,7 +3160,7 @@ const stageMenuHtml = () => {
         }).join('')}
       </div>
     </section>` : `
-    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — первый появится здесь, и его можно будет открыть в один клик.</span></p>`}`;
+    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — нажмите «Играть» или «Тестовый генератор» слева, чтобы создать первый мир.</span></p>`}`;
 };
 
 /* ---------- правая панель: друзья ---------------------------- */
@@ -2832,7 +3218,7 @@ const railHtml = () => {
       <div class="rail__head">
         <div class="rail__heading">
           <p class="eyebrow">Сообщество</p>
-          <h2 class="rail__title">Общий хаб</h2>
+          <h2 class="rail__title">Друзья</h2>
         </div>
       </div>
       <div class="rail__list">
@@ -2855,13 +3241,7 @@ const railHtml = () => {
       <div class="rail__list">
         <div class="empty">
           <p class="empty__title">Здесь появятся друзья</p>
-          <p class="empty__text">Войдите или создайте аккаунт — заявки, коды-приглашения и список друзей живут внутри.</p>
-          <button class="mini-button mini-button--accent" type="button" data-action="open-auth">
-            ${icon('user', 'icon--xs')} Войти / создать аккаунт
-          </button>
-          <button class="mini-button" type="button" data-action="open-hub">
-            ${icon('globe', 'icon--xs')} ${store.isHub() ? 'Общий хаб подключён' : 'Подключиться к общему хабу'}
-          </button>
+          <p class="empty__text">Войдите в аккаунт в правом верхнем углу — откроются список друзей, заявки и личный код-приглашение.</p>
         </div>
       </div>`;
   }
@@ -2878,7 +3258,7 @@ const railHtml = () => {
           Друзья <span class="rail__count">${online} / ${friends.length}</span>
         </h2>
       </div>
-      <button class="icon-button icon-button--sm icon-button--badged" type="button" data-action="open-add-friend" aria-label="Добавить друга">
+      <button class="icon-button icon-button--sm icon-button--badged" type="button" data-action="open-add-friend" aria-label="Добавить друга" title="Добавить друга">
         ${icon('userPlus')}
         ${requests.length ? `<span class="badge" aria-label="Входящих заявок: ${requests.length}">${requests.length}</span>` : ''}
       </button>
@@ -2898,10 +3278,7 @@ const railHtml = () => {
           ? friends.map(friendRowHtml).join('')
           : `<div class="empty">
               <p class="empty__title">Пока пусто</p>
-              <p class="empty__text">Найдите друзей по имени или поделитесь своим код-приглашением ниже.</p>
-              <button class="mini-button mini-button--accent" type="button" data-action="open-add-friend">
-                ${icon('userPlus', 'icon--xs')} Добавить друга
-              </button>
+              <p class="empty__text">Нажмите на значок «+» в шапке панели или поделитесь своим код-приглашением ниже.</p>
             </div>`
       }
     </div>
@@ -2912,14 +3289,6 @@ const railHtml = () => {
         <code class="code-box__value" translate="no">${me.inviteCode}</code>
         ${icon('copy')}
       </button>
-      <div class="rail__foot-actions">
-        <button class="mini-button mini-button--wide" type="button" data-action="open-hub">
-          ${icon('globe', 'icon--xs')} Общий хаб
-        </button>
-        <button class="mini-button mini-button--wide" type="button" data-action="open-direct">
-          ${icon('link', 'icon--xs')} Прямое подключение
-        </button>
-      </div>
       <p class="rail__foot-note">${store.isHub() ? `Хаб · ${escapeHtml(store.hubHost())}` : 'Локальный режим · хаб не подключён'}</p>
     </div>`;
 };
@@ -2937,20 +3306,7 @@ document.querySelector('#app').innerHTML = `
             <span class="brand__line brand__line--muted">${TITLE.tail}</span>
           </span>
         </p>
-        <span class="topbar__divider" aria-hidden="true"></span>
-        <button class="icon-button" type="button" data-action="open-settings" aria-label="Настройки" title="Настройки">
-          ${icon('settings')}
-        </button>
       </div>
-
-      <nav class="topbar__nav" aria-label="Основная навигация">
-        <button class="topbar-link" type="button" data-action="open-lobby">Лобби</button>
-        <button class="play-button" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
-          ${icon('play', 'icon--play')}
-          <span>Играть</span>
-        </button>
-        <button class="topbar-link" type="button" data-action="open-hub">Хаб</button>
-      </nav>
 
       <div class="topbar__side topbar__side--end" data-region="account"></div>
 
@@ -2969,11 +3325,6 @@ document.querySelector('#app').innerHTML = `
             <span class="hero__line hero__line--tail">${TITLE.tail}</span>
           </h1>
           <p class="hero__caption"><span>Мудрость создаёт миры.</span></p>
-          <div class="hero__actions">
-            <button class="hero-cta hero-cta--primary" type="button" data-action="open-world">${icon('play', 'icon--play')}<span>Играть</span>${icon('arrowRight', 'icon--xs')}</button>
-            <button class="hero-cta" type="button" data-action="open-lobby">${icon('users', 'icon--xs')}<span>Лобби с друзьями</span></button>
-            <button class="hero-cta" type="button" data-action="open-hub">${icon('globe', 'icon--xs')}<span>Общий хаб</span></button>
-          </div>
         </section>
         <div class="stage-menu" data-region="stage-menu"></div>
       </div>
@@ -3264,7 +3615,20 @@ const refreshAdmin = async () => {
   ui.admin.busy = true;
   if (ui.modal?.type === 'admin') renderModal({ focus: false });
   try {
+    const firstLoad = ui.admin.lastUpdatedAt === 0;
     ui.admin.data = await store.adminSnapshot();
+    if (firstLoad && ui.admin.motdDraft === null) {
+      ui.admin.motdDraft = ui.admin.data?.settings?.motd ?? '';
+    }
+    if (ui.admin.filePath && !ui.admin.fileDirty && !ui.admin.fileCreating && ui.admin.fileMeta?.system) {
+      try {
+        const refreshedFile = await store.adminReadFile(ui.admin.filePath);
+        ui.admin.fileContent = refreshedFile.content ?? '';
+        ui.admin.fileMeta = refreshedFile;
+      } catch {
+        /* ignore if file was removed */
+      }
+    }
     ui.admin.lastUpdatedAt = Date.now();
     ui.admin.error = '';
   } catch (error) {
@@ -3272,6 +3636,94 @@ const refreshAdmin = async () => {
   } finally {
     ui.admin.busy = false;
     if (ui.modal?.type === 'admin') renderModal({ focus: false });
+  }
+};
+
+const openAdminFile = async (path) => {
+  const clean = String(path || '').trim();
+  if (!clean) return;
+  ui.admin.fileBusy = true;
+  if (ui.modal?.type === 'admin') renderModal({ focus: false });
+  try {
+    const file = await store.adminReadFile(clean);
+    ui.admin.fileCreating = false;
+    ui.admin.filePath = file.path;
+    ui.admin.fileDraftPath = file.path;
+    ui.admin.fileContent = file.content ?? '';
+    ui.admin.fileDirty = false;
+    ui.admin.fileMeta = file;
+  } catch (error) {
+    playSound('error');
+    toast(error instanceof Error ? error.message : 'Не удалось прочитать файл.', 'error');
+  } finally {
+    ui.admin.fileBusy = false;
+    if (ui.modal?.type === 'admin') renderModal({ focus: false });
+  }
+};
+
+const pickAdminTextFile = (accept = '.json,.txt,.md,.cfg,.ini,.log,.csv') =>
+  new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.setAttribute('aria-hidden', 'true');
+    input.tabIndex = -1;
+    input.style.cssText =
+      'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none';
+    let settled = false;
+    const done = (file) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(file ?? null);
+    };
+    input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true });
+    input.addEventListener('cancel', () => done(null), { once: true });
+    document.body.append(input);
+    input.click();
+  });
+
+const adminUploadFile = async () => {
+  const file = await pickAdminTextFile();
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_') || 'uploaded.txt';
+    const folder = safeName.endsWith('.json') ? 'config' : 'uploads';
+    const targetPath = `${folder}/${safeName}`;
+    const saved = await store.adminWriteFile(targetPath, text);
+    ui.admin.fileCreating = false;
+    ui.admin.filePath = saved.path;
+    ui.admin.fileDraftPath = saved.path;
+    ui.admin.fileContent = saved.content ?? text;
+    ui.admin.fileDirty = false;
+    ui.admin.fileMeta = saved;
+    await refreshAdmin();
+    toast(`Файл ${saved.path} загружен на сервер.`);
+  } catch (error) {
+    playSound('error');
+    toast(error instanceof Error ? error.message : 'Не удалось загрузить файл.', 'error');
+  }
+};
+
+const adminImportBackup = async () => {
+  const file = await pickAdminTextFile('.json,application/json');
+  if (!file) return;
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') throw new Error('Некорректный JSON-файл.');
+    await store.adminServerAction('import-snapshot', { snapshot: parsed });
+    if (parsed.settings && typeof parsed.settings === 'object' && 'motd' in parsed.settings) {
+      ui.admin.motdDraft = parsed.settings.motd ?? '';
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    await store.adminWriteFile(`backups/import-${stamp}.json`, JSON.stringify(parsed, null, 2));
+    await refreshAdmin();
+    toast('Резервная копия импортирована в файлы сервера.');
+  } catch (error) {
+    playSound('error');
+    toast(error instanceof Error ? error.message : 'Не удалось импортировать JSON.', 'error');
   }
 };
 
@@ -3312,6 +3764,8 @@ const adminExport = () => {
       settings: data.settings ?? null,
       users: data.users,
       requests: data.requests,
+      lobbies: data.lobbies ?? [],
+      files: data.files ?? [],
       events: data.events ?? [],
     },
     null,
@@ -3500,6 +3954,46 @@ const formHandlers = {
       renderModal({ focus: false });
     }),
 
+  'admin-motd': (form, fields) =>
+    withBusy(form, async () => {
+      const text = (fields.motd?.value ?? ui.admin.motdDraft ?? '').trim();
+      await store.adminSetMotd(text);
+      ui.admin.motdDraft = text;
+      setFormError(form, '');
+      playSound('success');
+      toast(text ? 'Объявление сервера сохранено.' : 'Объявление сервера очищено.');
+      await refreshAdmin();
+    }),
+
+  'admin-file-save': (form, fields) =>
+    withBusy(form, async () => {
+      const targetPath = (fields.path?.value ?? ui.admin.fileDraftPath ?? ui.admin.filePath ?? '').trim();
+      const content = fields.content ? fields.content.value : ui.admin.fileContent;
+      if (!targetPath) throw new Error('Укажите путь файла.');
+      if (ui.admin.filePath && !ui.admin.fileCreating && !ui.admin.fileMeta?.system && ui.admin.filePath !== targetPath) {
+        await store.adminRenameFile(ui.admin.filePath, targetPath);
+      }
+      const saved = await store.adminWriteFile(targetPath, content);
+      ui.admin.fileCreating = false;
+      ui.admin.filePath = saved.path;
+      ui.admin.fileDraftPath = saved.path;
+      ui.admin.fileContent = saved.content ?? content;
+      ui.admin.fileDirty = false;
+      ui.admin.fileMeta = saved;
+      if (saved.path === 'config/settings.json') {
+        try {
+          const parsed = JSON.parse(saved.content || '{}');
+          if (typeof parsed.motd === 'string') ui.admin.motdDraft = parsed.motd;
+        } catch {
+          /* ignore */
+        }
+      }
+      setFormError(form, '');
+      playSound('success');
+      toast(`Файл ${saved.path} сохранён на сервере.`);
+      await refreshAdmin();
+    }),
+
   'direct-accept': (form) =>
     withBusy(form, async () => {
       const area = form.querySelector('[data-role="direct-offer"]');
@@ -3564,6 +4058,19 @@ document.addEventListener('input', (event) => {
     ui.admin.eventQuery = event.target.value;
     renderModal({ focus: false });
   }
+  if (role === 'admin-file-search') {
+    ui.admin.fileQuery = event.target.value;
+    renderModal({ focus: false });
+  }
+  if (role === 'admin-file-path') {
+    ui.admin.fileDraftPath = event.target.value;
+    ui.admin.fileDirty = true;
+  }
+  if (role === 'admin-file-content') {
+    ui.admin.fileContent = event.target.value;
+    ui.admin.fileDirty = true;
+  }
+  if (role === 'admin-motd-input') ui.admin.motdDraft = event.target.value;
   if (role === 'admin-name') ui.admin.nameDraft = event.target.value;
   if (role === 'admin-ban-reason') ui.admin.banReason = event.target.value;
   if (role === 'admin-ban-hours') ui.admin.banHours = event.target.value;
@@ -3825,6 +4332,23 @@ const onLobbyEvent = (event) => {
 const actions = {
   'open-world': () => openWorldPage({ slots: true }),
 
+  /* Быстрый запуск тестового процедурного 2D-генератора из главного меню (песочница без перезаписи слотов). */
+  'open-test-generator': () => {
+    openWorldPage({ slots: true });
+    if (!ui.world?.open) return;
+    const session = ui.world;
+    session.config = store.normalizeWorldConfig({ seed: worldSeed() });
+    session.mode = 'master';
+    session.tab = 'master';
+    session.slot = null;
+    session.importToSlot = null;
+    dropWorldVoxel();
+    session.screen = 'map';
+    session.procGen = true;
+    session.voxel = false;
+    renderWorldPage();
+  },
+
   /* Главное меню ведёт сразу в лобби, минуя слоты: страница мира та же,
      меняется только её экран. */
   'open-lobby': () => {
@@ -3994,6 +4518,18 @@ const actions = {
     renderWorldPage();
   },
 
+  'world-proc-gen': () => {
+    const session = ui.world;
+    if (!session?.open || session.screen !== 'map') return;
+    setWorldProcGen(!session.procGen);
+  },
+
+  'world-planet': () => {
+    const session = ui.world;
+    if (!session?.open || session.screen !== 'map') return;
+    setWorldPlanet(!session.planet);
+  },
+
   /* Блочная карта строится из живого документа карты. Пока генератор считает,
      вид ждёт его сам (mountWaitingView), поэтому кнопка отвечает только за
      режим — кроме одного случая ниже: если мир и правда не построился, второе
@@ -4101,9 +4637,18 @@ const actions = {
       lobbyNewMap();
       return;
     }
-    if (!session?.open || session.screen !== 'map' || session.mode !== 'master' || !session.slot) return;
+    if (!session?.open || session.screen !== 'map' || session.mode !== 'master') return;
     const config = store.normalizeWorldConfig({ ...session.config, seed: worldSeed() });
-    enterWorldMap(session.slot, config);
+    if (session.slot) {
+      enterWorldMap(session.slot, config);
+    } else {
+      const wasProc = session.procGen;
+      dropWorldVoxel();
+      session.config = config;
+      session.procGen = wasProc;
+      session.voxel = !wasProc;
+      renderWorldPage();
+    }
     toast(`Новый мир: ${config.seed}.`);
   },
 
@@ -4246,13 +4791,17 @@ const actions = {
     playSound('select');
     ui.admin.tab = el.dataset.tab;
     ui.admin.openId = null;
+    if (ui.admin.tab === 'files' && !ui.admin.filePath && !ui.admin.fileDraftPath && ui.admin.data?.files?.length) {
+      openAdminFile(ui.admin.data.files[0].path);
+      return;
+    }
     renderModal({ focus: false });
   },
 
   'admin-go': (el) => {
     playSound('select');
     const tab = el.dataset.tab;
-    if (!['overview', 'players', 'requests', 'events', 'system'].includes(tab)) return;
+    if (!['overview', 'players', 'requests', 'files', 'events', 'system'].includes(tab)) return;
     ui.admin.tab = tab;
     ui.admin.openId = null;
     if (tab === 'players') {
@@ -4261,7 +4810,187 @@ const actions = {
       ui.admin.query = '';
       ui.admin.limit = 60;
     }
+    if (tab === 'files' && !ui.admin.filePath && !ui.admin.fileDraftPath && ui.admin.data?.files?.length) {
+      openAdminFile(ui.admin.data.files[0].path);
+      return;
+    }
     renderModal();
+  },
+
+  'admin-file-open': (el) => {
+    playSound('select');
+    openAdminFile(el.dataset.path);
+  },
+
+  'admin-file-new': () => {
+    playSound('select');
+    const defaultPath = 'notes/server-note.md';
+    const defaultContent = '# Заметка сервера\n\n';
+    ui.admin.fileCreating = true;
+    ui.admin.filePath = '';
+    ui.admin.fileDraftPath = defaultPath;
+    ui.admin.fileContent = defaultContent;
+    ui.admin.fileDirty = true;
+    ui.admin.fileMeta = {
+      path: defaultPath,
+      name: 'server-note.md',
+      category: 'custom',
+      system: false,
+      writable: true,
+      deletable: false,
+      updatedAt: Date.now(),
+      size: defaultContent.length,
+    };
+    renderModal({ focus: false });
+  },
+
+  'admin-file-template': (el) => {
+    playSound('select');
+    const tplId = el.dataset.template;
+    const tplPath = el.dataset.path;
+    const found = ADMIN_FILE_TEMPLATES.find(([id, path]) => id === tplId || path === tplPath) || ADMIN_FILE_TEMPLATES[0];
+    const [, path, , content] = found;
+    ui.admin.fileCreating = true;
+    ui.admin.filePath = '';
+    ui.admin.fileDraftPath = path;
+    ui.admin.fileContent = content;
+    ui.admin.fileDirty = true;
+    ui.admin.fileMeta = {
+      path,
+      name: path.split('/').pop(),
+      category: 'custom',
+      system: false,
+      writable: true,
+      deletable: false,
+      updatedAt: Date.now(),
+      size: content.length,
+    };
+    renderModal({ focus: false });
+    toast('Шаблон подставлен — нажмите «Сохранить на сервере», чтобы записать файл.');
+  },
+
+  'admin-file-filter': (el) => {
+    ui.admin.fileFilter = el.dataset.value || 'all';
+    renderModal({ focus: false });
+  },
+
+  'admin-file-format': () => {
+    try {
+      const parsed = JSON.parse(ui.admin.fileContent || '{}');
+      ui.admin.fileContent = JSON.stringify(parsed, null, 2);
+      ui.admin.fileDirty = true;
+      renderModal({ focus: false });
+      toast('JSON отформатирован.');
+    } catch {
+      playSound('error');
+      toast('Ошибка синтаксиса JSON — проверьте скобки и запятые.', 'error');
+    }
+  },
+
+  'admin-file-copy': async () => {
+    const ok = await copyText(ui.admin.fileContent || '');
+    toast(
+      ok ? 'Содержимое файла скопировано.' : 'Не получилось скопировать — выделите вручную.',
+      ok ? 'ok' : 'error',
+    );
+  },
+
+  'admin-file-download': () => {
+    const path = ui.admin.fileDraftPath || ui.admin.filePath || 'server-file.txt';
+    const fileName = path.split('/').pop() || 'server-file.txt';
+    const mime = fileName.endsWith('.json') ? 'application/json' : 'text/plain;charset=utf-8';
+    const url = URL.createObjectURL(new Blob([ui.admin.fileContent || ''], { type: mime }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    toast(`Файл ${fileName} скачан.`);
+  },
+
+  'admin-file-upload': () => adminUploadFile(),
+
+  'admin-import-backup': () => adminImportBackup(),
+
+  'admin-file-delete': (el) => {
+    const path = el.dataset.path || ui.admin.filePath;
+    if (!path) return;
+    ui.confirm = {
+      title: 'Удалить файл сервера?',
+      text: `Файл «${path}» будет удалён с сервера без возможности восстановления.`,
+      label: 'Удалить',
+      action: 'admin-file-delete-run',
+      id: path,
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-file-delete-run': async (el) => {
+    const path = el.dataset.id;
+    try {
+      await store.adminDeleteFile(path);
+      if (ui.admin.filePath === path || ui.admin.fileDraftPath === path) {
+        ui.admin.fileCreating = false;
+        ui.admin.filePath = '';
+        ui.admin.fileDraftPath = '';
+        ui.admin.fileContent = '';
+        ui.admin.fileDirty = false;
+        ui.admin.fileMeta = null;
+      }
+      ui.modal = { type: 'admin' };
+      renderModal();
+      await refreshAdmin();
+      toast(`Файл ${path} удалён.`);
+    } catch (error) {
+      playSound('error');
+      toast(error instanceof Error ? error.message : 'Не получилось удалить файл.', 'error');
+    }
+  },
+
+  'admin-motd-clear': () =>
+    runAdminAction(async () => {
+      await store.adminSetMotd('');
+      ui.admin.motdDraft = '';
+    }, 'Объявление сервера очищено.'),
+
+  'admin-lobby-close': (el) =>
+    runAdminAction(
+      () => store.adminServerAction('close-lobby', { id: el.dataset.id }),
+      'Лобби принудительно закрыто.',
+    ),
+
+  'admin-lobby-close-all': () =>
+    runAdminAction(
+      () => store.adminServerAction('close-all-lobbies'),
+      'Все активные лобби закрыты.',
+    ),
+
+  'admin-kick-all': () => {
+    ui.confirm = {
+      title: 'Отключить все сессии?',
+      text: 'Все авторизованные устройства на хабе будут разлогинены и отключены от живого соединения. Игрокам потребуется войти заново.',
+      label: 'Сбросить сессии',
+      action: 'admin-kick-all-run',
+      id: '',
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'admin-kick-all-run': async () => {
+    try {
+      await store.adminServerAction('kick-all');
+      ui.modal = { type: 'admin' };
+      renderModal();
+      await refreshAdmin();
+      toast('Все активные сессии сброшены.');
+    } catch (error) {
+      playSound('error');
+      toast(error instanceof Error ? error.message : 'Не получилось сбросить сессии.', 'error');
+    }
   },
 
   'admin-open': (el) => {
@@ -4613,7 +5342,17 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: карта блоками → карта → страница игры. */
+    /* Ступеньки: надстройка карты (тест-генератор или блоки) → карта → страница игры. */
+    if (ui.world.screen === 'map' && ui.world.procGen) {
+      event.preventDefault();
+      setWorldProcGen(false);
+      return;
+    }
+    if (ui.world.screen === 'map' && ui.world.planet) {
+      event.preventDefault();
+      setWorldPlanet(false);
+      return;
+    }
     if (ui.world.screen === 'map' && ui.world.voxel) {
       event.preventDefault();
       setWorldVoxel(false);

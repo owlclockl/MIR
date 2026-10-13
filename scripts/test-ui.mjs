@@ -67,10 +67,18 @@ window.TextDecoder = globalThis.TextDecoder;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* Отдельная «страница» на том же mir.html — для проверок перезагрузки:
-   браузер отдаёт ей ту же localStorage, что была у прошлой страницы. */
+   браузер отдаёт ей ту же localStorage, что была у прошлой страницы.
+   Вшитый 27 МБ шаблон редактора карт проверяется в основном окне выше,
+   поэтому во вспомогательных окнах перезагрузки не парсим его повторно в JSDOM. */
+const fmgTagStart = html.indexOf('<script type="application/json" id="mir-fmg-template">');
+const fmgTagEnd = fmgTagStart >= 0 ? html.indexOf('</script>', fmgTagStart) : -1;
+const htmlReload =
+  fmgTagStart >= 0 && fmgTagEnd >= 0
+    ? `${html.slice(0, fmgTagStart)}<script type="application/json" id="mir-fmg-template">""</script>${html.slice(fmgTagEnd + '</script>'.length)}`
+    : html;
 const bootPage2 = (saved, pageUrl = `${HUB}/`) => {
   const origin = new URL(pageUrl).origin;
-  return new JSDOM(html, {
+  return new JSDOM(htmlReload, {
     runScripts: 'dangerously',
     url: pageUrl,
     pretendToBeVisual: true,
@@ -217,7 +225,7 @@ try {
     webSrc,
   );
   ok(
-    'веб-сборка: seed, земной размер, миллион точек и options=default переданы в адресе',
+    'веб-сборка: seed, планетарный размер 40075017×20003932, 1000000 точек и options=default переданы в адресе',
     webUrl.searchParams.get('seed') === 'MIR-UI-TEST'
       && webUrl.searchParams.get('width') === '40075017'
       && webUrl.searchParams.get('height') === '20003932'
@@ -237,17 +245,60 @@ try {
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
-  'главное меню: левая навигация с «Играть», сводка на витрине и вход в лобби',
-  !!$('.sidenav__play') && $$('.sidenav__item').length === 7 && !!$('.hero__stats') && !!$('[data-region="sidenav"] [data-action="open-lobby"]'),
+  'главное меню без дублей: единственная кнопка «Играть», 5 пунктов разделов, сводка на витрине',
+  $$('[data-action="open-world"]').length === 1
+    && $$('[data-action="open-lobby"]').length === 1
+    && $$('[data-action="open-hub"]').length === 1
+    && $$('[data-action="open-settings"]').length === 1
+    && !!$('.sidenav__play')
+    && $$('.sidenav__item').length === 5
+    && !!$('.hero__stats')
+    && !!$('[data-region="sidenav"] [data-action="open-test-generator"]'),
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
 );
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
+/* Тестовый процедурный генератор мира запускается из главного меню в 1 клик. */
+click('[data-action="open-test-generator"]');
+await wait(40);
+ok(
+  'тестовый процедурный 2D-генератор открывается сразу с холстом, слоями, пресетами до 1 млн клеток и инспектором',
+  !!$('[data-role="world-proc-gen"]')
+    && !!$('[data-role="proc-canvas"]')
+    && $$('[data-proc-layer]').length === 5
+    && $$('[data-role="proc-density"] option').length === 4
+    && /Seed:/.test($('[data-role="proc-hud"]')?.textContent || ''),
+  $('[data-role="proc-hud"]')?.textContent?.trim(),
+);
+const densitySelect = $('[data-role="proc-density"]');
+densitySelect.value = '164k';
+densitySelect.dispatchEvent(new window.Event('change', { bubbles: true }));
+await wait(40);
+ok(
+  'переключение плотности 512×320 (164 тыс. клеток) перестраивает процедурный мир',
+  /512×320/.test($('[data-role="proc-hud"]')?.textContent || ''),
+  $('[data-role="proc-hud"]')?.textContent?.trim(),
+);
+densitySelect.value = '64k';
+densitySelect.dispatchEvent(new window.Event('change', { bubbles: true }));
+await wait(30);
+click('[data-proc-action="random-seed"]');
+await wait(30);
+click('[data-proc-action="open-voxel"]');
+await wait(40);
+ok(
+  'переход из тест-генератора в «Карту блоками» строит воксельный мир мгновенно без ожидания iframe',
+  !!$('[data-role="world-voxel"]') && !!$('[data-role="voxel-canvas"]'),
+);
+click('[data-action="world-exit"]');
+await wait(40);
+
 /* Кнопка «Играть»: экран слотов с ролями, по шесть слотов у каждой и две вкладки. */
 click('.play-button');
 ok('кнопка «Играть» открывает отдельную полноэкранную страницу, не модальное окно', !!$('#world-page-root .world-app') && !$('.dialog--world') && window.document.body.classList.contains('world-page-open'));
 ok('игровая страница отражена в адресе и истории браузера', window.location.hash === '#play');
+ok('в шапке мира одна кнопка выхода в меню без дублей', $$('#world-page-root [data-action="world-exit"]').length === 1);
 ok('в мире нет снимка атласа, экспорта PNG, слоёв и камеры', !$('[data-action="world-save"]') && !$('[data-action="world-export-image"]') && !$('[data-action="world-layer"]') && !$('[data-role="world-focus-map"]'));
 ok(
   'слоты: по шесть на каждой роли, две вкладки, выбран мастер',
@@ -261,6 +312,10 @@ ok(
   $$('[data-action="world-slot-tab"]').every((button) => button.querySelector('svg.icon'))
     && $$('[data-action="world-slot-create"] svg.icon').length === 6,
 );
+/* Очистим первый слот мастера после проверки тест-генератора, чтобы пройти полное создание с нуля. */
+if ($('[data-action="world-slot-clear"][data-slot-index="0"]')) {
+  click('[data-action="world-slot-clear"][data-slot-index="0"]');
+}
 ok('на вкладке мастера пустой слот предлагает создать карту', $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Создать карту'));
 click('[data-action="world-slot-tab"][data-tab="player"]');
 ok(
@@ -277,21 +332,21 @@ ok(
   'экран создания: поле seed, размер, кнопка создания и полный редактор',
   !!$('[data-role="world-seed"]') && !!$('[data-action="world-generate"]') && /ПОЛНЫЙ РЕДАКТОР/.test($('.world-page-body')?.textContent || ''),
 );
-ok('размер по умолчанию — Земля, пресет один', $('.world-size.is-active')?.dataset.size === 'earth' && $$('.world-size').length === 1);
+ok('размер по умолчанию — Земля 1:1 (40075017×20003932), доступно 5 пресетов', $('.world-size.is-active')?.dataset.size === 'earth' && $$('.world-size').length === 5);
 const seedBeforeRandom = $('[data-role="world-seed"]').value;
 click('[data-action="world-random-seed"]');
 const masterSeed = $('[data-role="world-seed"]').value;
 ok('кнопка выдаёт новый seed', seedBeforeRandom !== masterSeed && masterSeed.length > 0);
-ok('земной пресет не сбрасывает набранный seed', $('[data-role="world-seed"]').value === masterSeed && $('.world-size.is-active')?.dataset.size === 'earth');
+ok('пресет размера сохраняет набранный seed', $('[data-role="world-seed"]').value === masterSeed && $('.world-size.is-active')?.dataset.size === 'earth');
 click('[data-action="world-generate"]');
 await wait(30);
 const masterFrame = $('.world-editor-frame');
 const masterDoc = masterFrame?.srcdoc ?? '';
 ok(
-  'карта мастера: Azgaar встроен с тем же seed, земным размером, миллионом точек и options=default',
+  'карта мастера: Azgaar встроен с тем же seed, планетарным размером 40075017×20003932, 1000000 точек и options=default',
   masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=40075017') && masterDoc.includes('height=20003932') && masterDoc.includes('points=1000000') && masterDoc.includes('options=default'),
 );
-ok('топбар карты мастера: «РЕЖИМ МАСТЕРА», «Новый мир» и «Экспорт»', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
+ok('топбар карты мастера: «РЕЖИМ МАСТЕРА», «Тест-генератор», «Планета», «Карта блоками», «Новый мир» и «Экспорт»', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !!$('[data-action="world-proc-gen"]') && !!$('[data-action="world-planet"]') && !!$('[data-action="world-voxel"]') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
 ok('однофайловая копия вшивает шаблон Azgaar', !!window.document.getElementById('mir-fmg-template'));
 click('[data-action="world-slots"]');
 const storedAfterCreate = JSON.parse(window.localStorage.getItem('mir-world-slots') || '{}');
@@ -314,7 +369,7 @@ $('[data-role="world-seed"]').value = 'MIR-UI-PLAYER';
 click('[data-action="world-generate"]');
 await wait(30);
 const playerDoc = $('.world-editor-frame')?.srcdoc ?? '';
-ok('игрок: Azgaar открыт с тем же seed, земным размером и миллионом точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=1000000'));
+ok('игрок: Azgaar открыт с тем же seed, размером 40075017×20003932 и 1000000 точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=1000000'));
 ok('игрок: режим «РЕЖИМ ИГРОКА», без «Нового мира» и «Экспорта»', /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-new"]') && !$('[data-action="world-export"]'));
 
 /* Импорт файла карты в пустой слот игрока. */
@@ -441,19 +496,18 @@ ok('аккаунт создан на хабе', registered, $('.profile')?.textC
 click('[data-action="open-profile"]');
 await wait(200);
 ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new URL(HUB).host}`.replace(/\./g, '\\.')).test($('.account__meta')?.textContent || ''), $('.account__meta')?.textContent?.trim());
-ok('в профиле есть кнопка хаба', !!$('[data-action="open-hub"]'));
-click('[data-action="open-direct"]');
+ok('в профиле нет дублирующих кнопок хаба и прямого подключения', !$('.dialog [data-action="open-hub"]') && !$('.dialog [data-action="open-direct"]'));
+click('[data-action="close-modal"]');
 await wait(50);
-ok('прямое подключение из профиля не перезагружает страницу', $('.dialog__title')?.textContent === 'Прямое подключение' && $('.shell') === shellBeforeMenus);
+click('[data-region="sidenav"] [data-action="open-direct"]');
+await wait(50);
+ok('прямое подключение из главного меню не перезагружает страницу', $('.dialog__title')?.textContent === 'Прямое подключение' && $('.shell') === shellBeforeMenus);
 click('[data-action="close-modal"]');
-click('[data-action="open-profile"]');
 await wait(100);
-click('[data-action="close-modal"]');
-await wait(100);
-ok('подвал панели: хаб и прямое подключение', !!$('.rail__foot [data-action="open-hub"]') && !!$('.rail__foot [data-action="open-direct"]'));
+ok('подвал панели друзей содержит только код-приглашение без дублей меню', !!$('.rail__foot [data-action="copy-code"]') && !$('.rail__foot [data-action="open-hub"]') && !$('.rail__foot [data-action="open-direct"]'));
 
 /* Отключаемся обратно — аккаунты снова локальные. */
-click('.rail__foot [data-action="open-hub"]');
+click('[data-region="sidenav"] [data-action="open-hub"]');
 await wait(150);
 click('[data-action="hub-disconnect"]');
 await wait(300);
@@ -506,7 +560,7 @@ ok('админка собрана в отдельное адаптивное р�
 ok('обзор содержит графики регистраций и активности', $$('.admin-chart svg[role="img"]').length === 2);
 ok('на обзоре видна настройка регистрации', !!$('[data-action="admin-registration"]'));
 const panelTabs = $$('.admin-nav [data-action="admin-tab"]');
-ok('в панели пять вкладок', panelTabs.length === 5, panelTabs.map((el) => el.dataset.tab).join(', '));
+ok('в панели шесть вкладок (включая «Файлы»)', panelTabs.length === 6, panelTabs.map((el) => el.dataset.tab).join(', '));
 click('[data-action="admin-range"][data-value="7"]');
 await wait(100);
 ok('период графиков переключается без потери панели', $('[data-action="admin-range"][data-value="7"]')?.getAttribute('aria-pressed') === 'true' && $('.admin-chart__svg')?.querySelector('desc')?.textContent.includes('7 календарных дней'));
@@ -546,9 +600,32 @@ click('[data-action="admin-unban"]');
 await wait(500);
 ok('панель снимает блокировку', !$('[data-action="admin-unban"]') && !!$('form[data-form="admin-ban"]'));
 
-/* Журнал: регистрация и действия панели записаны. */
+/* Файлы сервера: просмотр системных файлов, создание и сохранение файла без выхода из панели. */
 click('[data-action="admin-back"]');
 await wait(200);
+click('[data-action="admin-tab"][data-tab="files"]');
+await wait(300);
+ok(
+  'вкладка «Файлы» показывает список системных файлов и редактор',
+  !!$('.admin-files__list') &&
+    ($('.admin-files__list')?.textContent || '').includes('config/settings.json') &&
+    !!$('form[data-form="admin-file-save"]'),
+);
+click('[data-action="admin-file-template"][data-template="rules"]');
+await wait(150);
+ok(
+  'шаблон подставляет путь и содержимое файла в редактор',
+  $('[data-role="admin-file-path"]')?.value === 'config/rules.json' &&
+    ($('[data-role="admin-file-content"]')?.value || '').includes('Правила сервера'),
+);
+$('form[data-form="admin-file-save"]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(400);
+ok(
+  'пользовательский файл сохраняется и появляется в дереве файлов панели',
+  ($('.admin-files__list')?.textContent || '').includes('config/rules.json'),
+);
+
+/* Журнал: регистрация и действия панели записаны. */
 click('[data-action="admin-tab"][data-tab="events"]');
 await wait(200);
 const journal = $('.admin-list')?.textContent || '';

@@ -31,11 +31,12 @@ const KEYS = {
   hub: 'mir:hub',
   settings: 'mir:settings',
   admin: 'mir:admin',
-  /* Настройки служебной панели (пока одно: открыта ли регистрация)
-     и журнал событий — в локальном режиме они лежат здесь, в режиме
-     хаба приходят снимком от хаба. */
+  /* Настройки служебной панели (открыта ли регистрация, объявление),
+     пользовательские файлы и журнал событий — в локальном режиме они
+     лежат здесь, в режиме хаба приходят снимком от хаба. */
   hubSettings: 'mir:hub-settings',
   events: 'mir:events',
+  files: 'mir:files',
   /* Слоты карт (мир): прежний ключ, чтобы слоты предыдущих версий не терялись. */
   worlds: 'mir-world-slots',
 };
@@ -333,7 +334,10 @@ const PRESENCE_WRITE_MS = 15_000;
    что у хаба, только данные лежат в localStorage. Нужны, чтобы панель
    вела себя одинаково в обоих режимах. */
 const localSettings = () => readJSON(KEYS.hubSettings, {});
-const localSettingsShape = () => ({ registrationOpen: localSettings().registrationOpen !== false });
+const localSettingsShape = () => ({
+  registrationOpen: localSettings().registrationOpen !== false,
+  motd: String(localSettings().motd ?? '').trim().slice(0, 240),
+});
 const saveLocalSettings = (patch) => writeJSON(KEYS.hubSettings, { ...localSettings(), ...patch });
 
 let localEventSeq = 0;
@@ -1366,9 +1370,366 @@ const adminUserShape = (user) => ({
   ban: banOf(user),
 });
 
-const adminStats = (users, requests, bytes, events = 0) => {
+const MAX_ADMIN_FILES = 64;
+const MAX_ADMIN_FILE_CHARS = 256 * 1024;
+const MAX_FILE_PATH = 120;
+const FILE_PATH_RE = /^[A-Za-zА-Яа-яЁё0-9._/-]{1,120}$/;
+
+const normalizeAdminFilePath = (raw) => {
+  const cleaned = String(raw ?? '')
+    .replace(/\\/g, '/')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\/{2,}/g, '/');
+  if (!cleaned || cleaned.length > MAX_FILE_PATH || !FILE_PATH_RE.test(cleaned))
+    throw new Error('Укажите допустимый путь файла (буквы, цифры, дефис, точка и слэш, до 120 символов).');
+  for (const part of cleaned.split('/')) {
+    const lower = part.toLowerCase();
+    if (
+      !part ||
+      part === '.' ||
+      part === '..' ||
+      lower === '.git' ||
+      lower === 'node_modules' ||
+      lower.startsWith('.env') ||
+      lower.startsWith('.dev.vars') ||
+      lower.endsWith('.tmp')
+    ) {
+      throw new Error('Недопустимое имя файла или каталога.');
+    }
+  }
+  return cleaned;
+};
+
+const fileCategoryOf = (path) => {
+  if (path.startsWith('config/') || /\.(cfg|ini|conf)$/i.test(path)) return 'config';
+  if (path.startsWith('logs/') || /\.log$/i.test(path)) return 'log';
+  if (path.startsWith('data/')) return 'data';
+  return 'custom';
+};
+
+const fileMetaShape = ({ path, category, size, updatedAt, system, writable, deletable }) => ({
+  path,
+  name: path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path,
+  folder: path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '',
+  category: category || fileCategoryOf(path),
+  size: Number(size) || 0,
+  updatedAt: Number(updatedAt) || Date.now(),
+  system: !!system,
+  writable: writable !== false,
+  deletable: !!deletable,
+});
+
+const localCustomFiles = () => readJSON(KEYS.files, []);
+const saveLocalCustomFiles = (list) => writeJSON(KEYS.files, list);
+
+const localSystemFilesMap = () => {
+  const now = Date.now();
+  const users = localBackend.listUsers();
+  const requests = localBackend.listRequests();
+  const events = readJSON(KEYS.events, []);
+  const formatEventsLog = () =>
+    events
+      .map((e) => {
+        const iso = new Date(e.at || 0).toISOString();
+        const actor = e.name ? ` · ${e.name}` : '';
+        const target = e.targetName ? ` → ${e.targetName}` : '';
+        const detail = e.text ? ` (${e.text})` : '';
+        return `[${iso}] ${e.kind}${actor}${target}${detail}`;
+      })
+      .join('\n');
+
+  return new Map([
+    [
+      'config/settings.json',
+      {
+        path: 'config/settings.json',
+        category: 'config',
+        system: true,
+        writable: true,
+        deletable: false,
+        updatedAt: now,
+        read: () => JSON.stringify(localSettingsShape(), null, 2),
+        write: (content) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            throw new Error('Файл config/settings.json должен быть корректным JSON.');
+          }
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+            throw new Error('Настройки должны быть JSON-объектом.');
+          saveLocalSettings({
+            registrationOpen: parsed.registrationOpen !== false,
+            motd: String(parsed.motd ?? '').trim().slice(0, 240),
+          });
+        },
+      },
+    ],
+    [
+      'data/users.json',
+      {
+        path: 'data/users.json',
+        category: 'data',
+        system: true,
+        writable: true,
+        deletable: false,
+        updatedAt: users.reduce((max, u) => Math.max(max, u.seenAt || 0, u.createdAt || 0), 0) || now,
+        read: () => JSON.stringify(users.map(adminUserShape), null, 2),
+        write: (content) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            throw new Error('Файл data/users.json должен быть корректным JSON-массивом.');
+          }
+          if (!Array.isArray(parsed))
+            throw new Error('Файл data/users.json должен содержать массив аккаунтов.');
+          const current = localBackend.listUsers();
+          const keepIds = new Set(parsed.map((item) => item?.id).filter(Boolean));
+          const next = current.filter((u) => keepIds.has(u.id));
+          for (const item of parsed) {
+            const user = next.find((u) => u.id === item?.id);
+            if (!user) continue;
+            if (typeof item.name === 'string' && item.name.trim() && item.name.trim() !== user.name) {
+              const nextName = item.name.trim();
+              validateName(nextName);
+              const owner = next.find((u) => u.nameKey === nextName.toLowerCase() && u.id !== user.id);
+              if (owner) throw new Error(`Имя ${nextName} уже занято.`);
+              user.name = nextName;
+              user.nameKey = nextName.toLowerCase();
+            }
+            if (typeof item.inviteCode === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(item.inviteCode)) {
+              user.inviteCode = item.inviteCode;
+            }
+            if (item.ban === null || item.ban === false) {
+              delete user.ban;
+            } else if (item.ban && typeof item.ban === 'object') {
+              user.ban = {
+                reason: String(item.ban.reason || '').trim().slice(0, 140),
+                at: Number(item.ban.at) || Date.now(),
+                until: Number(item.ban.until) || 0,
+              };
+              user.online = false;
+              user.token = null;
+            }
+          }
+          localBackend.saveUsers(next);
+        },
+      },
+    ],
+    [
+      'data/requests.json',
+      {
+        path: 'data/requests.json',
+        category: 'data',
+        system: true,
+        writable: true,
+        deletable: true,
+        updatedAt: requests.reduce((max, r) => Math.max(max, r.at || 0), 0) || now,
+        read: () => JSON.stringify(requests, null, 2),
+        write: (content) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            throw new Error('Файл data/requests.json должен быть корректным JSON-массивом.');
+          }
+          if (!Array.isArray(parsed))
+            throw new Error('Файл data/requests.json должен содержать массив заявок.');
+          localBackend.saveRequests(
+            parsed
+              .filter((r) => r && typeof r.id === 'string' && r.from && r.to)
+              .map((r) => ({ id: r.id, from: r.from, to: r.to, at: Number(r.at) || Date.now() })),
+          );
+        },
+        clear: () => localBackend.saveRequests([]),
+      },
+    ],
+    [
+      'data/lobbies.json',
+      {
+        path: 'data/lobbies.json',
+        category: 'data',
+        system: true,
+        writable: true,
+        deletable: true,
+        updatedAt: now,
+        read: () => '[]',
+        write: (content) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            throw new Error('Файл data/lobbies.json должен быть корректным JSON-массивом.');
+          }
+          if (!Array.isArray(parsed))
+            throw new Error('Файл data/lobbies.json должен содержать массив лобби.');
+        },
+        clear: () => {},
+      },
+    ],
+    [
+      'logs/events.log',
+      {
+        path: 'logs/events.log',
+        category: 'log',
+        system: true,
+        writable: true,
+        deletable: true,
+        updatedAt: events.at(-1)?.at || now,
+        read: () => formatEventsLog(),
+        write: (content) => {
+          if (!String(content ?? '').trim()) writeJSON(KEYS.events, []);
+        },
+        clear: () => writeJSON(KEYS.events, []),
+      },
+    ],
+  ]);
+};
+
+const localFilesList = () => {
+  const sys = localSystemFilesMap();
+  const out = [];
+  for (const entry of sys.values()) {
+    const content = String(entry.read() ?? '');
+    out.push(
+      fileMetaShape({
+        path: entry.path,
+        category: entry.category,
+        size: content.length,
+        updatedAt: entry.updatedAt,
+        system: true,
+        writable: entry.writable,
+        deletable: entry.deletable,
+      }),
+    );
+  }
+  for (const item of localCustomFiles()) {
+    if (!item?.path || sys.has(item.path)) continue;
+    const content = String(item.content ?? '');
+    out.push(
+      fileMetaShape({
+        path: item.path,
+        category: fileCategoryOf(item.path),
+        size: content.length,
+        updatedAt: item.updatedAt || item.createdAt || Date.now(),
+        system: false,
+        writable: true,
+        deletable: true,
+      }),
+    );
+  }
+  return out.sort((a, b) => Number(b.system) - Number(a.system) || a.path.localeCompare(b.path, 'ru'));
+};
+
+const localReadFile = (rawPath) => {
+  const path = normalizeAdminFilePath(rawPath);
+  const sys = localSystemFilesMap().get(path);
+  if (sys) {
+    const content = String(sys.read() ?? '');
+    return {
+      ...fileMetaShape({
+        path: sys.path,
+        category: sys.category,
+        size: content.length,
+        updatedAt: sys.updatedAt,
+        system: true,
+        writable: sys.writable,
+        deletable: sys.deletable,
+      }),
+      content,
+    };
+  }
+  const found = localCustomFiles().find((item) => item.path === path);
+  if (!found) throw new Error('Файл не найден.');
+  const content = String(found.content ?? '');
+  return {
+    ...fileMetaShape({
+      path: found.path,
+      category: fileCategoryOf(found.path),
+      size: content.length,
+      updatedAt: found.updatedAt || found.createdAt,
+      system: false,
+      writable: true,
+      deletable: true,
+    }),
+    content,
+  };
+};
+
+const localWriteFile = (rawPath, rawContent) => {
+  const path = normalizeAdminFilePath(rawPath);
+  const content = String(rawContent ?? '');
+  if (content.length > MAX_ADMIN_FILE_CHARS)
+    throw new Error('Файл слишком большой (максимум 256 КБ).');
+  const sys = localSystemFilesMap().get(path);
+  if (sys) {
+    sys.write(content);
+    localLogEvent('admin:file-write', { by: 'admin', text: path });
+    notify();
+    return localReadFile(path);
+  }
+  const list = [...localCustomFiles()];
+  const now = Date.now();
+  const existing = list.find((item) => item.path === path);
+  if (existing) {
+    existing.content = content;
+    existing.updatedAt = now;
+  } else {
+    if (list.length >= MAX_ADMIN_FILES)
+      throw new Error(`Достигнут лимит пользовательских файлов (${MAX_ADMIN_FILES}).`);
+    list.push({ path, content, createdAt: now, updatedAt: now });
+  }
+  saveLocalCustomFiles(list);
+  localLogEvent('admin:file-write', { by: 'admin', text: path });
+  notify();
+  return localReadFile(path);
+};
+
+const localRenameFile = (rawPath, rawNextPath) => {
+  const path = normalizeAdminFilePath(rawPath);
+  const nextPath = normalizeAdminFilePath(rawNextPath);
+  if (path === nextPath) return localReadFile(path);
+  const sys = localSystemFilesMap();
+  if (sys.has(path)) throw new Error('Системный файл нельзя переименовать.');
+  const list = [...localCustomFiles()];
+  if (sys.has(nextPath) || list.some((item) => item.path === nextPath))
+    throw new Error('Файл с таким путём уже существует.');
+  const entry = list.find((item) => item.path === path);
+  if (!entry) throw new Error('Исходный файл не найден.');
+  entry.path = nextPath;
+  entry.updatedAt = Date.now();
+  saveLocalCustomFiles(list);
+  localLogEvent('admin:file-rename', { by: 'admin', text: `${path} → ${nextPath}` });
+  notify();
+  return localReadFile(nextPath);
+};
+
+const localDeleteFile = (rawPath) => {
+  const path = normalizeAdminFilePath(rawPath);
+  const sys = localSystemFilesMap().get(path);
+  if (sys) {
+    if (!sys.deletable || typeof sys.clear !== 'function')
+      throw new Error('Этот системный файл нельзя удалить — его можно отредактировать.');
+    sys.clear();
+    localLogEvent('admin:file-delete', { by: 'admin', text: path });
+    notify();
+    return { cleared: true, path };
+  }
+  const list = localCustomFiles();
+  const next = list.filter((item) => item.path !== path);
+  if (next.length === list.length) throw new Error('Файл не найден.');
+  saveLocalCustomFiles(next);
+  localLogEvent('admin:file-delete', { by: 'admin', text: path });
+  notify();
+  return { deleted: true, path };
+};
+
+const adminStats = (users, requests, bytes, events = 0, files = [], lobbies = []) => {
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
+  const fileBytes = files.reduce((sum, item) => sum + (item.size || 0), 0);
   return {
     users: users.length,
     online: users.filter((user) => presenceOf(user) !== 'offline').length,
@@ -1380,6 +1741,9 @@ const adminStats = (users, requests, bytes, events = 0) => {
     week: users.filter((user) => now - (user.createdAt ?? 0) < day * 7).length,
     activeDay: users.filter((user) => now - (user.seenAt ?? 0) < day).length,
     events,
+    lobbies: lobbies.length,
+    files: files.length,
+    fileBytes,
     bytes,
   };
 };
@@ -1395,21 +1759,25 @@ const rawLength = (key) => {
   }
 };
 
-/** Полный снимок для панели: игроки, заявки, размеры. */
+/** Полный снимок для панели: игроки, заявки, файлы, лобби, размеры. */
 export const adminSnapshot = async () => {
   if (backend.mode === 'hub') {
     const data = await remote.apiAdminState(adminSessionKey);
     const users = (data.users ?? []).map(adminUserShape);
     const requests = data.requests ?? [];
     const events = data.events ?? [];
+    const files = Array.isArray(data.files) ? data.files : [];
+    const lobbies = Array.isArray(data.lobbies) ? data.lobbies : [];
     return {
       mode: 'hub',
       host: hubHost(),
       users,
       requests,
       events,
-      settings: data.settings ?? { registrationOpen: true },
-      stats: data.stats ?? adminStats(users, requests, 0, events.length),
+      files,
+      lobbies,
+      settings: data.settings ?? { registrationOpen: true, motd: '' },
+      stats: data.stats ?? adminStats(users, requests, 0, events.length, files, lobbies),
       /* Хаб сам знает, заводской ли сейчас ключ. */
       keyDefault: data.key?.isDefault === true,
     };
@@ -1417,18 +1785,24 @@ export const adminSnapshot = async () => {
   const users = localBackend.listUsers();
   const requests = localBackend.listRequests();
   const events = readJSON(KEYS.events, []);
+  const files = localFilesList();
+  const lobbies = [];
   return {
     mode: 'local',
     host: '',
     users: users.map(adminUserShape),
     requests,
     events: panelEvents(events),
+    files,
+    lobbies,
     settings: localSettingsShape(),
     stats: adminStats(
       users,
       requests,
-      rawLength(KEYS.users) + rawLength(KEYS.requests) + rawLength(KEYS.events),
+      rawLength(KEYS.users) + rawLength(KEYS.requests) + rawLength(KEYS.events) + rawLength(KEYS.files),
       events.length,
+      files,
+      lobbies,
     ),
     keyDefault: adminKeyIsDefault(),
   };
@@ -1590,6 +1964,119 @@ export const adminSetRegistration = async (open) => {
   notify();
 };
 
+/** Объявление или статус сервера (motd) на хабе или локально. */
+export const adminSetMotd = async (rawMotd) => {
+  const motd = String(rawMotd ?? '').trim().slice(0, 240);
+  if (backend.mode === 'hub') {
+    await remote.apiAdminSettings(adminSessionKey, { motd });
+    return;
+  }
+  saveLocalSettings({ motd });
+  localLogEvent('admin:settings', {
+    by: 'admin',
+    text: motd ? `объявление: ${motd.slice(0, 60)}` : 'объявление убрано',
+  });
+  notify();
+};
+
+/** Чтение файла сервера из панели админа. */
+export const adminReadFile = async (path) => {
+  if (backend.mode === 'hub') {
+    const res = await remote.apiAdminFiles(adminSessionKey, { action: 'read', path });
+    return res.file;
+  }
+  return localReadFile(path);
+};
+
+/** Запись или создание файла сервера из панели админа. */
+export const adminWriteFile = async (path, content) => {
+  if (backend.mode === 'hub') {
+    const res = await remote.apiAdminFiles(adminSessionKey, { action: 'write', path, content });
+    return res.file;
+  }
+  return localWriteFile(path, content);
+};
+
+/** Переименование или перемещение пользовательского файла сервера. */
+export const adminRenameFile = async (path, nextPath) => {
+  if (backend.mode === 'hub') {
+    const res = await remote.apiAdminFiles(adminSessionKey, { action: 'rename', path, nextPath });
+    return res.file;
+  }
+  return localRenameFile(path, nextPath);
+};
+
+/** Удаление пользовательского файла или очистка очищаемого системного файла. */
+export const adminDeleteFile = async (path) => {
+  if (backend.mode === 'hub') {
+    return remote.apiAdminFiles(adminSessionKey, { action: 'delete', path });
+  }
+  return localDeleteFile(path);
+};
+
+/** Серверные операции из панели: закрытие лобби, сброс сессий, импорт снимка. */
+export const adminServerAction = async (action, payload = {}) => {
+  if (backend.mode === 'hub') {
+    return remote.apiAdminServer(adminSessionKey, { action, ...payload });
+  }
+  switch (action) {
+    case 'close-lobby':
+    case 'close-all-lobbies':
+      localLogEvent(action === 'close-all-lobbies' ? 'admin:lobby-close-all' : 'admin:lobby-close', {
+        by: 'admin',
+        count: 0,
+      });
+      notify();
+      return { ok: true, count: 0 };
+    case 'kick-all': {
+      const users = localBackend.listUsers();
+      let count = 0;
+      for (const user of users) {
+        if (user.online || user.token) count += 1;
+        user.online = false;
+        user.token = null;
+      }
+      localBackend.saveUsers(users);
+      storage.removeItem(KEYS.session);
+      localLogEvent('admin:kick-all', { by: 'admin', count });
+      notify();
+      return { ok: true, count };
+    }
+    case 'import-snapshot': {
+      const snap = payload?.snapshot;
+      if (!snap || typeof snap !== 'object')
+        throw new Error('Некорректный снимок данных для импорта.');
+      if (snap.settings && typeof snap.settings === 'object') {
+        const patch = {};
+        if ('registrationOpen' in snap.settings)
+          patch.registrationOpen = snap.settings.registrationOpen !== false;
+        if ('motd' in snap.settings)
+          patch.motd = String(snap.settings.motd ?? '').trim().slice(0, 240);
+        saveLocalSettings(patch);
+      }
+      let importedFiles = 0;
+      if (Array.isArray(snap.files)) {
+        for (const item of snap.files) {
+          if (!item || typeof item.path !== 'string' || item.system) continue;
+          if (typeof item.content === 'string') {
+            localWriteFile(item.path, item.content);
+            importedFiles += 1;
+          }
+        }
+      }
+      localLogEvent('admin:backup-restore', {
+        by: 'admin',
+        count: importedFiles,
+        text: importedFiles ? `файлов: ${importedFiles}` : 'настройки',
+      });
+      notify();
+      return { ok: true, importedFiles };
+    }
+    default:
+      throw new Error('Неизвестное серверное действие панели.');
+  }
+};
+
 /** Очистить журнал панели. */
 export const adminClearEvents = async () => {
   if (backend.mode === 'hub') {
@@ -1647,7 +2134,7 @@ export const adminResetKey = async () => {
 export const localDataInfo = () => ({
   accounts: localBackend.listUsers().length,
   requests: localBackend.listRequests().length,
-  bytes: rawLength(KEYS.users) + rawLength(KEYS.requests),
+  bytes: rawLength(KEYS.users) + rawLength(KEYS.requests) + rawLength(KEYS.files),
   persists: storagePersists(),
 });
 
@@ -1656,6 +2143,7 @@ export const adminWipeLocal = async () => {
   const count = localBackend.listUsers().length;
   localBackend.saveUsers([]);
   localBackend.saveRequests([]);
+  storage.removeItem(KEYS.files);
   storage.removeItem(KEYS.session);
   localLogEvent('admin:wipe', { by: 'admin', count });
   notify();
@@ -1691,19 +2179,17 @@ export const WORLD_SEED_MAX = 48;
    масштаба, и экран создания мира об этом предупреждает. */
 export const WORLD_MAP_POINTS = 1_000_000;
 export const WORLD_SIZES = [
-  { id: 'earth', label: 'Земля', width: 40_075_017, height: 20_003_932 },
+  { id: 'earth', label: 'Земля (40 075 × 20 004 км)', width: 40_075_017, height: 20_003_932 },
+  { id: 'super_earth', label: 'Суперземля 2× (80 150 × 40 008 км)', width: 80_150_034, height: 40_007_864 },
+  { id: 'giant', label: 'Гигант 4× (160 300 × 80 016 км)', width: 160_300_068, height: 80_015_728 },
+  { id: 'continent', label: 'Крупный материк (8192 × 5120)', width: 8192, height: 5120 },
+  { id: 'standard', label: 'Обзорная (1600 × 1000)', width: 1600, height: 1000 },
 ];
 export const WORLD_DEFAULT_SIZE = WORLD_SIZES[0];
 
-/* Размеры обзорных карт до земного масштаба. В пресетах их больше нет, но
-   слоты, сохранённые прежними версиями, обязаны открывать ту же карту, что
-   и раньше: размер входит в seed-мир, и молчаливая подмена размера
-   означала бы потерю мира. Поэтому normalizeWorldConfig их по-прежнему
-   принимает, а интерфейс показывает честную подпись «обзорная карта». */
 export const WORLD_LEGACY_SIZES = [
-  { id: 'compact', label: 'Компактная (обзорная)', width: 1280, height: 800 },
-  { id: 'standard', label: 'Стандартная (обзорная)', width: 1600, height: 1000 },
-  { id: 'wide', label: 'Широкая (обзорная)', width: 1920, height: 1080 },
+  { id: 'compact', label: 'Компактная (1280 × 800)', width: 1280, height: 800 },
+  { id: 'wide', label: 'Широкая (1920 × 1080)', width: 1920, height: 1080 },
 ];
 const WORLD_KNOWN_SIZES = [...WORLD_SIZES, ...WORLD_LEGACY_SIZES];
 

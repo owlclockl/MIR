@@ -146,6 +146,14 @@ export const apiAdminRequest = (key, requestId) =>
 export const apiAdminKey = (key, payload) =>
   call('POST', '/api/admin/key', payload, { headers: adminHeaders(key), timeout: 15_000 });
 
+/** Управление файлами сервера из панели: list, read, write, rename, delete. */
+export const apiAdminFiles = (key, payload) =>
+  call('POST', '/api/admin/files', payload, { headers: adminHeaders(key), timeout: 15_000 });
+
+/** Управление сервером из панели: close-lobby, close-all-lobbies, kick-all, import-snapshot. */
+export const apiAdminServer = (key, payload) =>
+  call('POST', '/api/admin/server', payload, { headers: adminHeaders(key), timeout: 15_000 });
+
 /* ---------- лобби и живая карта ------------------------------
    Состав лобби и параметры — HTTP; сама карта и ход синхронизации —
    по WebSocket (src/data/lobby.js). Ошибки приходят с текстом от хаба. */

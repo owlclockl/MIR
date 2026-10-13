@@ -473,12 +473,76 @@ const adminPing = await call('POST', '/api/admin/ping', { admin: ADMIN_KEY, body
   );
   const reopened = await call('POST', '/api/admin/settings', {
     admin: ADMIN_KEY,
-    body: { registrationOpen: true },
+    body: { registrationOpen: true, motd: 'Проверка объявления сервера' },
   });
   expect(
-    'панель открывает регистрацию обратно',
-    reopened.status === 200 && reopened.data.settings?.registrationOpen === true,
+    'панель открывает регистрацию обратно и задаёт объявление сервера',
+    reopened.status === 200 &&
+      reopened.data.settings?.registrationOpen === true &&
+      reopened.data.settings?.motd === 'Проверка объявления сервера',
   );
+  await call('POST', '/api/admin/settings', { admin: ADMIN_KEY, body: { motd: '' } });
+
+  /* Файлы сервера и управление ресурсами из панели. */
+  const filesList = await call('POST', '/api/admin/files', { admin: ADMIN_KEY, body: { action: 'list' } });
+  expect(
+    'панель отдаёт список виртуальных и серверных файлов',
+    filesList.status === 200 &&
+      Array.isArray(filesList.data.files) &&
+      filesList.data.files.some((f) => f.path === 'config/settings.json') &&
+      filesList.data.files.some((f) => f.path === 'data/users.json'),
+    `файлов: ${filesList.data.files?.length ?? 0}`,
+  );
+  const readUsersFile = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'read', path: 'data/users.json' },
+  });
+  expect(
+    'чтение системного файла data/users.json не выдаёт passHash и salt',
+    readUsersFile.status === 200 &&
+      typeof readUsersFile.data.file?.content === 'string' &&
+      !readUsersFile.data.file.content.includes('passHash') &&
+      !readUsersFile.data.file.content.includes('salt'),
+  );
+  const badPath = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'write', path: '../secret.txt', content: 'nope' },
+  });
+  expect('попытка выйти за пределы каталога файлов отклоняется → 400', badPath.status === 400, badPath.data.error);
+
+  const customPath = `notes/probe-${n}.md`;
+  const customRenamed = `notes/probe-${n}-renamed.md`;
+  const writtenFile = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'write', path: customPath, content: '# Проверка файла\nПривет, сервер!' },
+  });
+  expect(
+    'панель создаёт и сохраняет пользовательский файл на сервере',
+    writtenFile.status === 200 && writtenFile.data.file?.path === customPath,
+    writtenFile.data.error,
+  );
+  const readCustom = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'read', path: customPath },
+  });
+  expect(
+    'панель читает сохранённый пользовательский файл',
+    readCustom.status === 200 && readCustom.data.file?.content.includes('Привет, сервер!'),
+  );
+  const renamedFile = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'rename', path: customPath, nextPath: customRenamed },
+  });
+  expect(
+    'панель переименовывает пользовательский файл',
+    renamedFile.status === 200 && renamedFile.data.file?.path === customRenamed,
+    renamedFile.data.error,
+  );
+  const deletedFile = await call('POST', '/api/admin/files', {
+    admin: ADMIN_KEY,
+    body: { action: 'delete', path: customRenamed },
+  });
+  expect('панель удаляет пользовательский файл', deletedFile.status === 200 && deletedFile.data.ok === true);
 
   /* Журнал панели: события копятся, свежие впереди, очистка работает. */
   const journal = await call('POST', '/api/admin/state', { admin: ADMIN_KEY, body: {} });

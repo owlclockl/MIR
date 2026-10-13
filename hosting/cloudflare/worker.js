@@ -124,6 +124,14 @@ export class MirHub {
       /* Состав лобби (без карт): переживает перезапуск объекта. */
       const lobbies = (await state.storage.get('lobbies')) ?? [];
       this.snapshot.set('lobbies', JSON.stringify(lobbies));
+      /* Пользовательские файлы сервера (по одному ключу f:<путь>, чтобы
+         не упереться в лимит одного значения хранилища). */
+      const files = [];
+      const storedFiles = await state.storage.list({ prefix: 'f:' });
+      for (const [key, value] of storedFiles) {
+        files.push(value);
+        this.snapshot.set(key, JSON.stringify(value));
+      }
       this.db = {
         users,
         requests,
@@ -131,6 +139,7 @@ export class MirHub {
         settings: settings && typeof settings === 'object' ? settings : undefined,
         events: Array.isArray(events) ? events : [],
         lobbies: Array.isArray(lobbies) ? lobbies : [],
+        files,
       };
       this.core = createHubCore({
         db: this.db,
@@ -188,7 +197,19 @@ export class MirHub {
       puts.lobbies = this.db.lobbies ?? [];
       snapshotsAfterWrite.set('lobbies', lobbies);
     }
-    const gone = [...this.snapshot.keys()].filter((key) => key.startsWith('u:') && !alive.has(key));
+    const aliveFiles = new Set();
+    for (const file of this.db.files ?? []) {
+      const key = `f:${file.path}`;
+      aliveFiles.add(key);
+      const text = JSON.stringify(file);
+      if (this.snapshot.get(key) !== text) {
+        puts[key] = file;
+        snapshotsAfterWrite.set(key, text);
+      }
+    }
+    const gone = [...this.snapshot.keys()].filter(
+      (key) => (key.startsWith('u:') && !alive.has(key)) || (key.startsWith('f:') && !aliveFiles.has(key)),
+    );
     /* Больше 128 ключей за раз хранилище не принимает. */
     const keys = Object.keys(puts);
     for (let i = 0; i < keys.length; i += 100) {
