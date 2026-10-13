@@ -38,6 +38,9 @@ import {
 } from '../world/layers.js';
 
 import { icon } from '../ui/icons.js';
+/* Динамику гасят система и тумблер «Анимации» — правило одно на весь
+   интерфейс, см. src/ui/motion.js. */
+import { motionOff, motionQuery } from '../ui/motion.js';
 
 const BUDGET_MS = 6;
 
@@ -51,21 +54,6 @@ const PAN_STEP = 24;
    больше нельзя даже на 4K-мониторе при мелком блоке. */
 const MAX_CELLS = 260_000;
 const clamp = (value, min, max) => (value < min ? min : value > max ? max : value);
-
-/* Динамику здесь выключают два независимых решения: системное
-   `prefers-reduced-motion` и тумблер «Анимации» в настройках игры. Второй
-   сильнее: main.js держит класс `reduce-motion` на `<html>`, и раньше вид его
-   не видел — игрок гасил анимации в настройках, а течение рек продолжало
-   бежать. Спрашивать надо оба, и заново на каждом кадре: настройку можно
-   переключить, не закрывая карту. */
-const motionQuery = () =>
-  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)')
-    : null;
-
-const motionOff = (query) =>
-  (typeof document !== 'undefined' && document.documentElement?.classList?.contains('reduce-motion') === true) ||
-  Boolean(query?.matches);
 
 /**
  * @param {HTMLElement} host элемент .world-editor: в нём лежит iframe с картой
