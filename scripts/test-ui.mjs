@@ -259,37 +259,41 @@ ok(
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
-/* Тестовый процедурный генератор мира запускается из главного меню в 1 клик. */
+/* Новый генератор мира открывается из главного меню в один клик: сперва картой
+   мира (биомы и рельеф), затем срезом того же мира. */
 click('[data-action="open-test-generator"]');
-await wait(40);
+await wait(700);
 ok(
-  'тестовый процедурный 2D-генератор открывается сразу с холстом, слоями, пресетами до 1 млн клеток и инспектором',
-  !!$('[data-role="world-proc-gen"]')
-    && !!$('[data-role="proc-canvas"]')
-    && $$('[data-proc-layer]').length === 5
-    && $$('[data-role="proc-density"] option').length === 4
-    && /Seed:/.test($('[data-role="proc-hud"]')?.textContent || ''),
-  $('[data-role="proc-hud"]')?.textContent?.trim(),
+  'тест-генератор открывается сразу картой мира: холст, семь слоёв, шесть пресетов ярусов и строка состояния',
+  $('[data-role="world-voxel"]')?.dataset.mode === 'map'
+    && !!$('[data-role="voxel-canvas"]')
+    && $$('[data-layer]').length === 7
+    && $$('[data-tier]').length === 6
+    && /[0-9]/.test($('[data-role="voxel-hud"]')?.textContent || ''),
+  $('[data-role="voxel-hud"]')?.textContent?.trim(),
 );
-const densitySelect = $('[data-role="proc-density"]');
-densitySelect.value = '164k';
-densitySelect.dispatchEvent(new window.Event('change', { bubbles: true }));
-await wait(40);
+click('[data-layer="blocks"]');
+await wait(60);
 ok(
-  'переключение плотности 512×320 (164 тыс. клеток) перестраивает процедурный мир',
-  /512×320/.test($('[data-role="proc-hud"]')?.textContent || ''),
-  $('[data-role="proc-hud"]')?.textContent?.trim(),
+  'срез мира включается прямо из карты: ползунок яруса и подпись масштаба на месте',
+  $('[data-role="voxel-tier-row"]')?.hidden === false
+    && !!$('[data-role="voxel-level"]')
+    && /px|бл\./.test($('[data-role="voxel-zoom-value"]')?.textContent || ''),
+  $('[data-role="voxel-zoom-value"]')?.textContent?.trim(),
 );
-densitySelect.value = '64k';
-densitySelect.dispatchEvent(new window.Event('change', { bubbles: true }));
-await wait(30);
-click('[data-proc-action="random-seed"]');
-await wait(30);
-click('[data-proc-action="open-voxel"]');
-await wait(40);
+click('[data-layer="biome"]');
+click('[data-voxel-action="earth"]');
+await wait(60);
 ok(
-  'переход из тест-генератора в «Карту блоками» строит воксельный мир мгновенно без ожидания iframe',
-  !!$('[data-role="world-voxel"]') && !!$('[data-role="voxel-canvas"]'),
+  '«Весь мир» показывает Землю целиком и называет её размер',
+  /Весь мир/.test($('[data-role="voxel-note"]')?.textContent || ''),
+  $('[data-role="voxel-note"]')?.textContent?.trim(),
+);
+click('[data-action="world-voxel"]');
+await wait(400);
+ok(
+  'переход к «Карте блоками» — тот же мир, открытый срезом',
+  $('[data-role="world-voxel"]')?.dataset.mode === 'blocks' && !!$('[data-role="voxel-canvas"]'),
 );
 click('[data-action="world-exit"]');
 await wait(40);

@@ -5340,9 +5340,9 @@ button.admin-file-row--active:hover {
   background: linear-gradient(#16202a 0%, #101720 100%);
 }
 
-/* Полотно размером с окно и с разрешением в один блок на пиксель: растягивает
-его CSS, и только pixelated держит сетку чанков ровной (сглаживание превратило
-бы карту в кашу из полутонов). */
+/* Полотно размером с окно: клетки карты считаются в маленький холст и
+растягиваются на экран, и только pixelated держит сетку блоков ровной
+(сглаживание превратило бы карту в кашу из полутонов). */
 
 .world-voxel-canvas {
   flex: 1 1 auto;
@@ -5365,9 +5365,9 @@ button.admin-file-row--active:hover {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-/* Строка состояния: ярус, чанки, цена кадра, блок под курсором. Она внутри
-панели ярусов, а не поверх полотна: абсолютная плашка с фиксированным
-отступом неизбежно легла бы на ползунок при трёх строках. */
+/* Строка состояния: координаты, биом, высота, климат, то, что под курсором.
+   Она внутри панели слоёв, а не поверх полотна: абсолютная плашка с
+   фиксированным отступом неизбежно легла бы на ползунок и кнопки. */
 
 .world-voxel-hud {
   padding: var(--sp-6) var(--sp-6) 0;
@@ -5524,9 +5524,65 @@ button.admin-file-row--active:hover {
   max-width: calc(100% - var(--sp-32));
 }
 
-/* Ожидание генератора: карта блоков строится из живого документа Azgaar, и до
-   готовности карт показывать нечего. Это не ошибка и не пустая сцена — это
-   состояние, поэтому в центре спокойный пульс и сказано, чего ждём. */
+/* Легенда: что означает цвет на текущем слое. Стоит поверх полотна в правом
+   нижнем углу — напротив панели слоёв, которая слева, — и не ловит мышь:
+   кликов по ней нет, это подпись к картинке. */
+
+.world-voxel-legend {
+  position: absolute;
+  right: var(--sp-12);
+  bottom: var(--sp-12);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-4) var(--sp-10);
+  max-width: min(46%, 420px);
+  pointer-events: none;
+}
+
+.world-voxel-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--text-soft);
+  font: 500 10px/1.2 var(--font-ui);
+}
+
+.world-voxel-legend__item i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+/* Полоска проявления: карта рисуется строками, и без неё не видно, что мир
+   ещё считается, — кадр просто стоит недорисованным. */
+
+.world-voxel-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.world-voxel-progress.is-on {
+  opacity: 1;
+}
+
+.world-voxel-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--world-accent);
+  transition: width 0.12s linear;
+}
+
+/* Ожидание мира: генератор строит материки и реки ступенями, и до готовности
+   среза показывать нечего. Это не ошибка и не пустая сцена — это состояние,
+   поэтому в центре спокойный пульс и сказано, чего именно ждём. */
 
 .world-voxel-wait {
   position: absolute;
