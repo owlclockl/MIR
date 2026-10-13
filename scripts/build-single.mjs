@@ -15,7 +15,7 @@ import { statSync } from 'node:fs';
 import { buildSingleHtml } from './lib/build.mjs';
 
 const started = Date.now();
-const html = await buildSingleHtml();
+await buildSingleHtml();
 const kb = (statSync('mir.html').size / 1024).toFixed(0);
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 

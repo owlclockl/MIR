@@ -61,7 +61,6 @@ const SOURCES = [
 ];
 
 const GITHUB_API = 'https://api.github.com';
-const HEADERS = ['User-Agent: mir-skills-sync', 'Accept: application/vnd.github.raw'];
 
 /* Транспорт — curl, а не fetch: часть сред (корпоративный прокси) подменяет
    TLS-цепочку, которую системный curl принимает, а Node — нет. */

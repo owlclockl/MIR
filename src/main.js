@@ -16,7 +16,7 @@ import { startLobbySync } from './game/lobby-sync.js';
 import { mountWorldView } from './game/world-view.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
-import { seedArtOrIcon, seedArtSvg } from './ui/seed-art.js';
+import { seedArtOrIcon } from './ui/seed-art.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -2148,7 +2148,7 @@ const worldSessionInfo = (session) => {
 const worldPageHtml = () => {
   const session = ui.world;
   if (!session) return '';
-  const { screen, mode, slot, config } = session;
+  const { screen, mode } = session;
   const player = mode === 'player';
   const titles = {
     slots: 'Слоты карт',

@@ -17,6 +17,13 @@
    лобби, чтобы показать игрокам прогресс мастера.
    =========================================================== */
 
+/* Динамику гасят система и тумблер «Анимации» в настройках игры. Накладка
+   живёт в документе Azgaar (iframe), поэтому CSS-правило родителя её не
+   достаёт: класс `reduce-motion` стоит на `<html>` родителя, а стили здесь
+   свои. Спрашиваем то же правило, что и вид карты (src/ui/motion.js), — иначе
+   выключенные анимации не гасили бы ни вертушку, ни появление карты. */
+import { motionOff } from '../ui/motion.js';
+
 const PATCHED = '__mirStage';
 const VEIL_ID = 'mir-gen-veil';
 const STYLE_ID = 'mir-gen-style';
@@ -86,6 +93,8 @@ const STYLE = `
 #map.mir-reveal{animation:mir-reveal 1.2s cubic-bezier(.2,.7,.2,1) both}
 @keyframes mir-reveal{from{opacity:0;filter:blur(10px);transform:scale(1.02)}to{opacity:1;filter:none;transform:none}}
 @media (prefers-reduced-motion:reduce){.mir-gen-seal{animation:none}#map.mir-reveal{animation:none}}
+.mir-gen-quiet{transition:none}
+.mir-gen-quiet .mir-gen-seal{animation:none}
 `;
 
 const ensureVeil = (doc) => {
@@ -117,6 +126,8 @@ const ensureVeil = (doc) => {
 
 const showVeil = (doc, { stage, count, ratio }) => {
   const veil = ensureVeil(doc);
+  /* Заново на каждый шаг: настройку можно переключить на открытом экране. */
+  veil.classList.toggle('mir-gen-quiet', motionOff());
   veil.querySelector('.mir-gen-stage').textContent = stage;
   veil.querySelector('.mir-gen-count').textContent = count;
   veil.querySelector('.mir-gen-fill').style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
@@ -126,7 +137,9 @@ const showVeil = (doc, { stage, count, ratio }) => {
 const hideVeil = (doc, { reveal }) => {
   const veil = doc.getElementById(VEIL_ID);
   veil?.classList.remove('is-on');
-  if (!reveal) return;
+  /* Динамика выключена — карта появляется сразу: анимация появления не
+     украшение, а движение, и его обещали не показывать. */
+  if (!reveal || motionOff()) return;
   const map = doc.getElementById('map');
   if (!map) return;
   /* Перезапуск анимации: класс снимаем, даём браузеру отметить это, ставим снова. */

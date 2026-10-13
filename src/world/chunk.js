@@ -299,8 +299,6 @@ export const generateColumn = (field, x, z, out, options = {}) => {
 
   const vein = options.ores === false ? null : oreVein(field.seed, x, z, height);
   const caves = options.caves === false ? null : options.caveGrid ?? null;
-  const lx = options.lx ?? 0;
-  const lz = options.lz ?? 0;
 
   for (let y = 0; y <= surfaceY; y += 1) {
     let id = columnBlock(y, profile);
