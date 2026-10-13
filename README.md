@@ -63,8 +63,11 @@ seed и размеру. Размер нужен явно: без него кар
 и править блоки в этом режиме нельзя. Режим не пересоздаёт страницу: iframe с
 Azgaar живёт под полотном, переключение — класс на `.world-app`. Разбор и цифры —
 [`docs/voxel-world-generation.md`](docs/voxel-world-generation.md); проверки —
-`npm run test:voxel` (86 проверок в Node) и `npm run test:voxel-view`
-(81 в jsdom).
+`npm run test:voxel` и `npm run test:voxel-view`. Берег, биомы и озёра
+обзорного разрешения берутся из тех же pack-клеток Azgaar, если они доступны.
+**Это ещё не карта размером с Землю и не 1 м/блок:** для этого нужно ленивое
+построение тайлов вместо массива на всю карту. Пределы и план —
+[`docs/earth-scale-map.md`](docs/earth-scale-map.md).
 
 В web/PWA карта открывается из `/fmg/`; офлайн-кэш PWA содержит её ресурсы. В
 однофайловых сборках (`mir.html`, APK, EXE) Azgaar вшит в тот же файл. Шрифты
@@ -89,8 +92,10 @@ Azgaar живёт под полотном, переключение — клас
 
 > История проекта — в [`CHANGELOG.md`](CHANGELOG.md), договорённости по стилю и
 > правила работы — в [`AGENTS.md`](AGENTS.md). Что делать следующим и в каком
-> порядке — в [`docs/improvement-plan.md`](docs/improvement-plan.md). Меняете
-> что-то — допишите запись в журнал.
+> порядке — в [`docs/improvement-plan.md`](docs/improvement-plan.md). Роли
+> ИИ-агентов для разработки и общедоступный GitHub API без ключа —
+> в [`docs/ai-agents.md`](docs/ai-agents.md). ИИ в игру не добавлен.
+> Меняете что-то — допишите запись в журнал.
 
 ## Установить как приложение
 

@@ -102,6 +102,8 @@ const BIOME_DITHER = 3;
  * пикселе, и повторять `latticeCell` там незачем.
  */
 export const biomeAt = (field, u, v, cell, own) => {
+  const exact = field.packBiome?.[Math.floor(v / field.scale) * field.sourceWidth + Math.floor(u / field.scale)];
+  if (exact !== undefined && exact !== 255) return exact;
   const spacing = field.spacing;
   const cx = cell % field.cellsX;
   const cy = (cell - cx) / field.cellsX;
@@ -207,7 +209,12 @@ export const buildField = (source, options = {}) => {
   const field = {
     width,
     height,
+    sourceWidth,
+    sourceHeight,
     scale,
+    packHeight: source.packHeight?.length === sourceWidth * sourceHeight ? source.packHeight : null,
+    packBiome: source.packBiome?.length === sourceWidth * sourceHeight ? source.packBiome : null,
+    packLake: source.packLake?.length === sourceWidth * sourceHeight ? source.packLake : null,
     area: width * height,
     spacing,
     cellsX,
@@ -238,7 +245,9 @@ export const buildField = (source, options = {}) => {
   const base = field.base = new Float32Array(width * height);
   for (let v = 0; v < height; v += 1) {
     for (let u = 0; u < width; u += 1) {
-      let h = latticeBilinear(field.cellH, u, v, field);
+      const sourceIndex = Math.floor(v / scale) * sourceWidth + Math.floor(u / scale);
+      const packed = field.packHeight?.[sourceIndex];
+      let h = packed !== undefined && packed !== 255 ? packed : latticeBilinear(field.cellH, u, v, field);
       if (h >= seaLevel) {
         h = Math.max(seaLevel, h + fbm2(field.seed, u, v, 3.5 * scale, 3) * 0.85 * field.detail);
       } else {
@@ -283,7 +292,9 @@ const applyLakes = (field) => {
   const { cellFeature, ground, groundBase, waterY, flags, lakeType, width } = field;
   for (let v = 0; v < field.height; v += 1) {
     for (let u = 0; u < width; u += 1) {
-      const id = cellFeature[latticeCell(field, u, v)];
+      const sourceIndex = Math.floor(v / field.scale) * field.sourceWidth + Math.floor(u / field.scale);
+      const packed = field.packLake?.[sourceIndex];
+      const id = packed !== undefined && packed !== 65535 ? packed : cellFeature[latticeCell(field, u, v)];
       const y = surface.get(id);
       if (y === undefined) continue;
       const i = v * width + u;

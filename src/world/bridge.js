@@ -104,6 +104,7 @@ const spreadPackToGrid = (grid, pack, cellsX, cellsY, seaLevel) => {
 const readLakes = (pack, cellsX, cellsY, seaLevel) => {
   const features = [];
   const cellFeature = new Uint16Array(cellsX * cellsY);
+  const packLakeKeys = new Uint16Array(pack.cells.h.length);
   const list = Array.isArray(pack.features) ? pack.features : [];
   for (const feature of list) {
     if (!feature || feature.type !== 'lake' || !Array.isArray(feature.cells) || !feature.cells.length) continue;
@@ -114,6 +115,7 @@ const readLakes = (pack, cellsX, cellsY, seaLevel) => {
       const parent = pack.cells.g[cell];
       if (!(parent >= 0 && parent < cellFeature.length)) continue;
       cellFeature[parent] = key;
+      packLakeKeys[cell] = key;
       marked += 1;
     }
     if (!marked) continue;
@@ -124,7 +126,7 @@ const readLakes = (pack, cellsX, cellsY, seaLevel) => {
       height: numberOr(feature.height, seaLevel),
     });
   }
-  return { features, cellFeature };
+  return { features, cellFeature, packLakeKeys };
 };
 
 /**
@@ -230,8 +232,38 @@ export const readSource = (win, hint = {}) => {
   };
   const cellTemp = copy(grid.cells.temp, Int8Array, 12);
   const cellPrec = copy(grid.cells.prec, Uint8Array, 20);
-  const { features, cellFeature } = readLakes(pack, cellsX, cellsY, seaLevel);
+  const { features, cellFeature, packLakeKeys } = readLakes(pack, cellsX, cellsY, seaLevel);
   const { rivers, skipped } = readRivers(win, pack, width, height);
+
+  /* Azgaar рисует берег и биомы по ближайшей pack-клетке, а не по grid.
+     Раскладываем тот же Pack.findCell в разрешении обзорной карты один раз:
+     интерполяция grid сглаживала берег и давала другую сушу даже при общем seed.
+     Для чужих/старых документов без Pack оставляем прежний путь. Предел не
+     позволяет повреждённому документу запросить гигантский буфер. */
+  let packHeight = null;
+  let packBiome = null;
+  let packLake = null;
+  if (
+    width * height <= 3_000_000 && typeof win.Pack?.findCell === 'function' &&
+    pack.cells.p?.length === pack.cells.h.length && pack.cells.biome?.length === pack.cells.h.length
+  ) {
+    packHeight = new Uint8Array(width * height);
+    packBiome = new Uint8Array(width * height);
+    packLake = new Uint16Array(width * height);
+    packHeight.fill(255); // неизвестная клетка — используем grid
+    packBiome.fill(255);
+    packLake.fill(65535);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const cell = win.Pack.findCell(x + 0.5, y + 0.5);
+        if (!Number.isInteger(cell) || cell < 0 || cell >= pack.cells.h.length) continue;
+        const i = y * width + x;
+        packHeight[i] = pack.cells.h[cell];
+        packBiome[i] = pack.cells.biome[cell];
+        packLake[i] = packLakeKeys[cell];
+      }
+    }
+  }
   return {
     width,
     height,
@@ -247,6 +279,9 @@ export const readSource = (win, hint = {}) => {
     cellFeature,
     features,
     rivers,
+    packHeight,
+    packBiome,
+    packLake,
     stats: { cells: cellsX * cellsY, rivers: rivers.length, lakes: features.length, riversSkipped: skipped },
   };
 };
