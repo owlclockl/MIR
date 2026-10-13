@@ -297,6 +297,10 @@ add(
   `${cellsAtMax.x} → ${view.cells.x} колонок`,
 );
 
+/* Центр ставим внутрь карты вручную: панорама теперь упирается в край мира
+   (за краем раньше тянулся дубль краевой колонки), и сдвиг на 90 px от
+   точки появления просто дошёл бы до границы раньше конца жеста. */
+view.center = [120, 120];
 const centerBefore = [...view.center];
 const mouse = (type, x, y) => {
   const event = new window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
@@ -337,6 +341,7 @@ add(
   `${zoomBeforeWheel} → ${view.zoom}`,
 );
 
+view.center = [120, 120];
 key('ArrowRight');
 
 const panned = view.center[0];
@@ -353,6 +358,17 @@ add(
   Math.abs(view.center[0] - (panned - 96)) < 0.51,
   'Shift+стрелка — широкий шаг по карте',
   `${panned.toFixed(1)} → ${view.center[0].toFixed(1)}`,
+);
+
+/* Край мира — конец панорамы: за ним не должно тянуться повторение
+   краевого куска карты, из-за которого мир выглядел замощённым дублями. */
+view.center = [10, 10];
+key('ArrowLeft', { shiftKey: true });
+key('ArrowUp', { shiftKey: true });
+add(
+  view.center[0] === 0 && view.center[1] === 0,
+  'панорама упирается в край мира и не уезжает в дубли за ним',
+  `${view.center[0]}, ${view.center[1]}`,
 );
 
 overlays[0].click();

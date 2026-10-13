@@ -48,7 +48,7 @@ const sizeButtons = (draft) =>
   draft.sizes
     .map((size) => {
       const active = size.width === draft.width && size.height === draft.height;
-      return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-lobby-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width} × ${size.height}</span></button>`;
+      return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-lobby-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width.toLocaleString('ru-RU')} × ${size.height.toLocaleString('ru-RU')}</span></button>`;
     })
     .join('');
 

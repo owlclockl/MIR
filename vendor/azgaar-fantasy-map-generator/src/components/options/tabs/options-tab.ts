@@ -244,7 +244,7 @@ const TEMPLATE = /* html */ `
           data-option="points"
           type="range"
           min="1"
-          max="13"
+          max="14"
           value="4"
           data-cells="10000"
         />
@@ -722,7 +722,7 @@ function syncCellsDensity(): void {
 
   const readout = ensureEl("options").querySelector<HTMLOutputElement>('[data-option-output="points"]');
   if (!readout) return;
-  readout.value = `${cellsDesired / 1000}K`;
+  readout.value = cellsDesired >= 1_000_000 ? `${cellsDesired / 1_000_000}M` : `${cellsDesired / 1000}K`;
   readout.style.color = cellsDensityColor(cellsDesired);
 }
 

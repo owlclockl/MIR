@@ -7,7 +7,18 @@
 
    Единица растра = один блок. Карта Azgaar увеличивается по пикселям: один
    пиксель = scale × scale блоков (scale — опция buildField). Мир не замощён:
-   одна полная карта, координаты за её краем приводятся к краю (fold). */
+   одна полная карта, координаты за её краем приводятся к краю (fold).
+
+   Земной масштаб — отдельный режим (`field.lazy`). Карта Azgaar размером с
+   планету (40 075 017 × 20 003 932 пикселя, 1 пиксель = 1 блок = 1 метр)
+   не может лечь в растры width × height: это ~8 × 10^14 колонок. Поэтому
+   ленивое поле не выделяет растров вовсе: колонка считается по запросу из
+   решётки клеток (у земной карты их миллион — это посильные массивы),
+   рек и озёр тем же порядком правил, что и растровый путь (море → озёра →
+   реки → берег → климат), а чанки и кадры спрашивают только те колонки,
+   что реально видны. Масштаб при этом принудительно 1: пиксель карты и
+   есть блок, конвертация не требует коэффициента — именно ради этого
+   размер карты и сделан земным. */
 
 import { clamp, fbm2, hash32, noise2, rand01 } from './math.js';
 
@@ -44,6 +55,15 @@ const LAKE_CODES = {
 /** Блоков на пиксель карты Azgaar по умолчанию и предел (память растёт как scale²). */
 export const DEFAULT_SCALE = 2;
 export const MAX_SCALE = 8;
+
+/**
+ * Потолок колонок полного растра. Выше него поле строится лениво
+ * (`field.lazy`): растры ground/waterY/flags на земную карту потребовали бы
+ * сотни терабайт, а решётка клеток и реки помещаются легко. Порог заметно
+ * выше любой обзорной карты (1920×1080 при scale 8 — 133 млн колонок уже
+ * лениво; обычные миры при scale 2 — до ~8 млн и идут прежним путём).
+ */
+export const LAZY_RASTER_LIMIT = 16_000_000;
 
 /**
  * Профили мира. heightScale — сколько блоков стоит одна единица высоты
@@ -189,9 +209,16 @@ export const buildField = (source, options = {}) => {
      Клетки и их шкала растягиваются вместе с картой, шум — пропорционально,
      поэтому рельеф выглядит тем же, но крупнее и с мелкой деталью между
      клетками. Сама карта Azgaar не меняется. */
-  const scale = clamp(Math.round(options.scale ?? DEFAULT_SCALE), 1, MAX_SCALE);
   const sourceWidth = Math.max(64, Math.round(source.width));
   const sourceHeight = Math.max(64, Math.round(source.height));
+  /* Ленивый режим: растры на всю карту не выделяются, колонка считается по
+     запросу. Включается сам, когда полный растр больше LAZY_RASTER_LIMIT
+     колонок (земная карта — именно этот случай), или явно опцией lazy.
+     Масштаб здесь всегда 1: пиксель карты = блок, иначе земная конвертация
+     снова потребовала бы коэффициента и реки/озёра встали бы не туда. */
+  const requestedScale = clamp(Math.round(options.scale ?? DEFAULT_SCALE), 1, MAX_SCALE);
+  const lazy = options.lazy ?? sourceWidth * requestedScale * (sourceHeight * requestedScale) > LAZY_RASTER_LIMIT;
+  const scale = lazy ? 1 : requestedScale;
   const width = sourceWidth * scale;
   const height = sourceHeight * scale;
   const cellsX = Math.max(2, Math.round(source.cellsX) || Math.ceil(sourceWidth / (source.spacing || 12)));
@@ -232,13 +259,32 @@ export const buildField = (source, options = {}) => {
     cellFeature: fill(source.cellFeature, Uint16Array, 0),
     features: source.features ?? [],
     rivers: source.rivers ?? [],
-    ground: new Uint8Array(width * height),
-    waterY: new Uint8Array(width * height),
-    flow: new Uint8Array(width * height),
-    flags: new Uint8Array(width * height),
-    riverId: new Uint16Array(width * height),
-    lakeType: new Uint8Array(width * height),
+    /* Ленивое поле растров не держит: ground/waterY/flow/flags/riverId/
+       lakeType/base у него null, а колонку отдаёт lazyColumnAt ниже. Все
+       потребители обязаны смотреть field.lazy, а не трогать растры вслепую. */
+    lazy,
+    base: null, // растровый путь перезапишет настоящим Float32Array ниже
+    groundBase: null,
+    ground: lazy ? null : new Uint8Array(width * height),
+    waterY: lazy ? null : new Uint8Array(width * height),
+    flow: lazy ? null : new Uint8Array(width * height),
+    flags: lazy ? null : new Uint8Array(width * height),
+    riverId: lazy ? null : new Uint16Array(width * height),
+    lakeType: lazy ? null : new Uint8Array(width * height),
   };
+
+  if (lazy) {
+    const lakes = lakeTables(field);
+    field.lakeSurface = lakes.surface;
+    field.lakeKinds = lakes.kinds;
+    field.riverIndex = buildRiverIndex(field);
+    field.lazyCache = new Map();
+    /* Детальный шум — в долях клетки решётки, а не в блоках: у земной карты
+       клетка ~28 км, и шум с длиной волны 3,5 блока дал бы только метровую
+       рябь поверх гладкого билатерального рельефа. */
+    field.lazyDetailScale = clamp(spacing * 0.3, 3.5, 32768);
+    return field;
+  }
 
   /* Высота — непрерывной (шум снимает «ступени клеток»), дискретные поля —
      кусочно-постоянными: биом не имеет права перетекать через берег. */
@@ -278,8 +324,8 @@ const applySea = (field) => {
   }
 };
 
-/** Озёра: поверхность — own height фичи, а не уровень моря; тип задаёт материал. */
-const applyLakes = (field) => {
+/** Таблицы озёр: id фичи → гладь (Y) и материал. Общие у растрового и ленивого путей. */
+const lakeTables = (field) => {
   const surface = new Map();
   const kinds = new Map();
   for (const feature of field.features) {
@@ -288,6 +334,12 @@ const applyLakes = (field) => {
     surface.set(feature.i, clamp(heightToY(field, h), 1, field.worldHeight - 2));
     kinds.set(feature.i, LAKE_CODES[feature.subtype] ?? LAKE_FRESH);
   }
+  return { surface, kinds };
+};
+
+/** Озёра: поверхность — own height фичи, а не уровень моря; тип задаёт материал. */
+const applyLakes = (field) => {
+  const { surface, kinds } = lakeTables(field);
   if (!surface.size) return;
   const { cellFeature, ground, groundBase, waterY, flags, lakeType, width } = field;
   for (let v = 0; v < field.height; v += 1) {
@@ -472,6 +524,191 @@ const applyClimateCaps = (field) => {
   }
 };
 
+/* ---------- ленивое поле: колонка по запросу ---------- */
+
+/* Шаг бакетов речного индекса, в блоках. Река в земном мире может тянуться
+   на тысячи километров: без индекса каждая колонка проверяла бы все
+   сегменты всех рек, и одна видимая область стоила бы миллиарды сравнений. */
+const RIVER_BUCKET = 8192;
+
+const buildRiverIndex = (field) => {
+  const buckets = new Map();
+  const key = (bx, bz) => `${bx},${bz}`;
+  for (const river of field.rivers) {
+    const points = river.points;
+    if (!points || points.length < 2) continue;
+    for (let s = 0; s + 1 < points.length; s += 1) {
+      const [ax, ay] = points[s];
+      const [bx, by] = points[s + 1];
+      const segment = { river, ax, ay, bx, by, index: s };
+      const pad = 16;
+      const x0 = Math.floor((Math.min(ax, bx) - pad) / RIVER_BUCKET);
+      const x1 = Math.floor((Math.max(ax, bx) + pad) / RIVER_BUCKET);
+      const z0 = Math.floor((Math.min(ay, by) - pad) / RIVER_BUCKET);
+      const z1 = Math.floor((Math.max(ay, by) + pad) / RIVER_BUCKET);
+      for (let bz = z0; bz <= z1; bz += 1) {
+        for (let bx = x0; bx <= x1; bx += 1) {
+          const k = key(bx, bz);
+          if (!buckets.has(k)) buckets.set(k, []);
+          buckets.get(k).push(segment);
+        }
+      }
+    }
+  }
+  return buckets;
+};
+
+/** Ближайший сегмент реки к колонке и расстояние до него, или null. */
+const lazyRiverHit = (field, u, v) => {
+  const list = field.riverIndex.get(`${Math.floor(u / RIVER_BUCKET)},${Math.floor(v / RIVER_BUCKET)}`);
+  if (!list) return null;
+  let best = null;
+  for (const segment of list) {
+    const dx = segment.bx - segment.ax;
+    const dy = segment.by - segment.ay;
+    const length2 = dx * dx + dy * dy || 1;
+    const t = clamp(((u - segment.ax) * dx + (v - segment.ay) * dy) / length2, 0, 1);
+    const px = segment.ax + dx * t;
+    const py = segment.ay + dy * t;
+    const dist = Math.hypot(u - px, v - py);
+    const half = clamp(
+      (Number(segment.river.half?.[segment.index]) || 0.6) * (1 - t) +
+        (Number(segment.river.half?.[segment.index + 1]) || 0.6) * t,
+      0.4,
+      12,
+    );
+    if (dist > half + 0.35) continue;
+    if (!best || dist < best.dist) {
+      const flux = Math.max(
+        1,
+        (Number(segment.river.flux?.[segment.index]) || 30) * (1 - t) +
+          (Number(segment.river.flux?.[segment.index + 1]) || 30) * t,
+      );
+      best = { segment, dist, px, py, half, flux };
+    }
+  }
+  return best;
+};
+
+/** Непрерывная высота и Y вершины колонки — та же формула, что в растре. */
+const lazyHeight = (field, u, v) => {
+  const sourceIndex = Math.floor(v / field.scale) * field.sourceWidth + Math.floor(u / field.scale);
+  const packed = field.packHeight?.[sourceIndex];
+  let h = packed !== undefined && packed !== 255 ? packed : latticeBilinear(field.cellH, u, v, field);
+  const detailScale = field.lazyDetailScale;
+  if (h >= field.seaLevel) {
+    h = Math.max(field.seaLevel, h + fbm2(field.seed, u, v, detailScale, 3) * 0.85 * field.detail);
+  } else {
+    h = Math.min(field.seaLevel - 0.05, h + fbm2(field.seed, u, v, detailScale * 0.74, 2) * 0.35 * field.detail);
+  }
+  return h;
+};
+
+/**
+ * Базовая колонка ленивого поля: море → озёра → реки, без берега и климата
+ * (берегу нужны соседи, климату — финальная высота). Результат кэшируется:
+ * чанк спрашивает колонку несколько раз (колонка, пещеры, декор, соседи).
+ */
+const lazyBase = (field, u, v) => {
+  const key = v * field.width + u;
+  let entry = field.lazyCache.get(key);
+  if (entry?.base) return entry.base;
+  const cell = latticeCell(field, u, v);
+  const h = lazyHeight(field, u, v);
+  const groundBase = heightToY(field, h);
+  let ground = groundBase;
+  let waterY = 0;
+  let flags = 0;
+  let lakeType = 0;
+  let flow = 0;
+  let riverId = 0;
+  if (ground < field.seaY) {
+    waterY = field.seaY;
+    flags |= F_WATER | F_SEA;
+  }
+  const sourceIndex = Math.floor(v / field.scale) * field.sourceWidth + Math.floor(u / field.scale);
+  const packedLake = field.packLake?.[sourceIndex];
+  const lakeId = packedLake !== undefined && packedLake !== 65535 ? packedLake : field.cellFeature[cell];
+  const lakeY = field.lakeSurface.get(lakeId);
+  if (lakeY !== undefined) {
+    lakeType = field.lakeKinds.get(lakeId) ?? LAKE_FRESH;
+    if (lakeType === LAKE_DRY) {
+      flags |= F_LAKE;
+    } else if (groundBase > lakeY) {
+      flags |= F_LAKE; // берег или остров внутри озера
+    } else {
+      flags = (flags & ~F_SEA) | F_LAKE | F_WATER;
+      waterY = lakeY;
+      const depth = lakeType === LAKE_LAVA ? 2 : 1 + ((u * 7919 + v * 104729) % 3);
+      ground = clamp(Math.min(ground, lakeY - depth), 0, lakeY - 1);
+    }
+  }
+  const hit = lazyRiverHit(field, u, v);
+  if (hit) {
+    /* Гладь растрового пути идёт «бегущим максимумом» от устья вверх по
+       всей реке — ленивая колонка всей реки не видит. Здесь гладь — высота
+       дна долины в ближайшей точке русла: вода не висит над склоном и не
+       тонет под ним, а русло режется ниже глади на глубину по стоку. */
+    const valleyY = heightToY(field, lazyHeight(field, Math.round(hit.px), Math.round(hit.py)));
+    const surf = clamp(Math.max(field.seaY, valleyY), 1, field.worldHeight - 4);
+    const depth = clamp(1 + Math.floor(Math.log2(Math.max(1, hit.flux) / 24)), 1, 4);
+    riverId = hit.segment.river.id || 1;
+    flags = (flags & ~F_SEA) | F_RIVER | F_WATER;
+    const bed = clamp(Math.min(groundBase, surf - 1, surf - depth), 1, field.worldHeight - 2);
+    ground = Math.min(ground, bed);
+    waterY = surf;
+    flow = (clamp(surf - bed, 0, 15) << 4) | direction8(hit.segment.bx - hit.segment.ax, hit.segment.by - hit.segment.ay);
+  }
+  const base = { h, ground, groundBase, waterY, flags, lakeType, flow, riverId, cell };
+  if (!entry) {
+    if (field.lazyCache.size > 300_000) field.lazyCache.clear();
+    entry = { base: null, full: null };
+    field.lazyCache.set(key, entry);
+  }
+  entry.base = base;
+  return base;
+};
+
+/** Полная колонка ленивого поля: базовая + берег по соседям + климат. */
+export const lazyColumnAt = (field, u, v) => {
+  const key = v * field.width + u;
+  const cached = field.lazyCache.get(key)?.full;
+  if (cached) return cached;
+  const base = lazyBase(field, u, v);
+  let { ground, flags } = base;
+  if ((flags & F_WATER) === 0) {
+    let surface = 0;
+    for (let dv = -1; dv <= 1; dv += 1) {
+      for (let du = -1; du <= 1; du += 1) {
+        if (!du && !dv) continue;
+        const nu = u + du;
+        const nv = v + dv;
+        if (nu < 0 || nv < 0 || nu >= field.width || nv >= field.height) continue;
+        const neighbour = lazyBase(field, nu, nv);
+        if ((neighbour.flags & F_WATER) === 0) continue;
+        if (neighbour.waterY - ground > 3) continue;
+        if (neighbour.waterY > surface) surface = neighbour.waterY;
+      }
+    }
+    if (surface) {
+      flags |= F_BEACH;
+      if (ground < surface) ground = clamp(surface, 1, field.worldHeight - 2);
+    }
+  }
+  const temp = field.cellTemp[base.cell];
+  if ((flags & F_WATER) !== 0) {
+    if (temp <= -1) flags |= F_ICE;
+  } else {
+    const lapse = (ground - field.seaY) * 0.06 * field.heightScale;
+    if (temp - lapse <= -2 || field.cellBiome[base.cell] === 11) flags |= F_SNOW;
+    else if (temp <= 0 && noise2(field.seed, u, v, 24) > 0.4) flags |= F_SNOW;
+  }
+  const full = { ...base, ground, flags };
+  const entry = field.lazyCache.get(key);
+  if (entry) entry.full = full;
+  return full;
+};
+
 /* ---------- выборка для чанков ---------- */
 
 /**
@@ -480,6 +717,26 @@ const applyClimateCaps = (field) => {
  */
 export const sampleColumn = (field, x, z) => {
   const { u, v, mx, my } = fold(field, x, z);
+  if (field.lazy) {
+    const column = lazyColumnAt(field, u, v);
+    const c = column.cell;
+    return {
+      u,
+      v,
+      mx,
+      my,
+      y: column.ground,
+      waterY: (column.flags & F_WATER) !== 0 ? column.waterY : 0,
+      flags: column.flags,
+      dir: column.flow & 15,
+      depth: column.flow >> 4,
+      lakeType: column.lakeType,
+      biome: biomeAt(field, u, v, c, field.cellBiome[c]),
+      temp: field.cellTemp[c],
+      prec: field.cellPrec[c],
+      h: column.h,
+    };
+  }
   const i = v * field.width + u;
   const c = latticeCell(field, u, v);
   const flowByte = field.flow[i];
@@ -505,6 +762,7 @@ export const sampleColumn = (field, x, z) => {
 /** Только верх твёрдого блока — для превью слота и точки появления. */
 export const surfaceY = (field, x, z) => {
   const { u, v } = fold(field, x, z);
+  if (field.lazy) return lazyColumnAt(field, u, v).ground;
   return field.ground[v * field.width + u];
 };
 
@@ -517,9 +775,10 @@ export const spawnPoint = (field) => {
       const angle = (a / 24) * Math.PI * 2;
       const x = Math.round(cx + Math.cos(angle) * radius);
       const z = Math.round(cy + Math.sin(angle) * radius);
-      const i = clamp(z, 0, field.height - 1) * field.width + clamp(x, 0, field.width - 1);
-      if ((field.flags[i] & F_WATER) === 0 && field.ground[i] >= field.seaY) {
-        return { x, z, y: field.ground[i] + 1 };
+      /* Через sampleColumn: у ленивого поля растров нет, а правило одно. */
+      const column = sampleColumn(field, clamp(x, 0, field.width - 1), clamp(z, 0, field.height - 1));
+      if ((column.flags & F_WATER) === 0 && column.y >= field.seaY) {
+        return { x: clamp(x, 0, field.width - 1), z: clamp(z, 0, field.height - 1), y: column.y + 1 };
       }
     }
   }

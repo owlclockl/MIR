@@ -19,8 +19,8 @@
 
 import { AIR, BLOCKS, COAL_ORE, GEM_ORE, GOLD_ORE, IRON_ORE, LAVA, STONE, isOpaque } from './blocks.js';
 
-import { CHUNK_SX, CHUNK_SZ, blockAt, columnBlock, fieldProfile, paletteCache } from './chunk.js';
-import { F_ICE, F_RIVER, F_WATER, flowVector, fold, latticeCell } from './field.js';
+import { CHUNK_SX, CHUNK_SZ, blockAt, columnBlock, columnProfile, fieldProfile, paletteCache } from './chunk.js';
+import { F_ICE, F_RIVER, F_WATER, flowVector, fold, latticeCell, lazyColumnAt, sampleColumn, surfaceY } from './field.js';
 
 /** Пикселей экрана на блок. Ниже 1 — блоки всё равно не разобрать. */
 export const ZOOM_MIN = 1;
@@ -107,8 +107,8 @@ const medianGround = (field, view, { dry = false } = {}) => {
   const values = [];
   const land = [];
 
-  sampleView(field, view, Math.max(1, Math.round(view.cellsX / 24)), Math.max(1, Math.round(view.cellsZ / 24)), (i) => {
-    const height = field.ground[i];
+  sampleView(field, view, Math.max(1, Math.round(view.cellsX / 24)), Math.max(1, Math.round(view.cellsZ / 24)), (i, x, z) => {
+    const height = field.lazy ? surfaceY(field, x, z) : field.ground[i];
     values.push(height);
     if (height > field.seaY) land.push(height);
   });
@@ -143,7 +143,7 @@ const richestLevel = (field, blockAtWorld, view, score) => {
     Math.max(1, Math.round(view.cellsX / 36)),
     Math.max(1, Math.round(view.cellsZ / 30)),
     (i, x, z) => {
-      const surface = field.ground[i];
+      const surface = field.lazy ? surfaceY(field, x, z) : field.ground[i];
       for (let li = 0; li < levels.length; li += 1) {
         const y = levels[li];
         if (y >= surface - 1) continue;
@@ -358,6 +358,17 @@ const tileOf = (id, atSurface) => {
  * называть блок, которого на картинке нет.
  */
 export const cutY = (field, i, level) => {
+  /* Ленивое поле: индекс растра раскладывается обратно в (u, v), колонка
+     считается по запросу. Индекс точен в double до 2^53 — земной мир
+     (8 × 10^14) в этот предел укладывается. */
+  if (field.lazy) {
+    const u = i % field.width;
+    const v = Math.floor(i / field.width);
+    const column = lazyColumnAt(field, u, v);
+    const wet = (column.flags & F_WATER) !== 0;
+    const crown = wet && column.waterY > column.ground ? column.waterY : column.ground;
+    return level > crown ? crown : level;
+  }
   const ground = field.ground[i];
   const wet = (field.flags[i] & F_WATER) !== 0;
   const crown = wet && field.waterY[i] > ground ? field.waterY[i] : ground;
@@ -369,16 +380,26 @@ export const cutY = (field, i, level) => {
  * выше вершины — тогда клетка показывает зеркало воды. Правило «level ≤
  * waterY» сюда не годится: на ярусе выше вершин море остался бы сухим.
  */
-const waterShown = (field, i, level, cell) => {
-  if ((field.flags[i] & F_WATER) === 0) return false;
-  if (field.waterY[i] <= field.ground[i] || level <= field.ground[i]) return false;
+const waterShownData = (ground, waterY, flags, temp, level) => {
+  if ((flags & F_WATER) === 0) return false;
+  if (waterY <= ground || level <= ground) return false;
 
   /* Лёд на поверхности — блок, а не жидкость: замёрзшая вода не течёт и не
      пульсирует, и береговая линия не должна обводить её как открытую воду.
      Правило одно с `columnBlock` — иначе лёд спорит с построенными чанками. */
-  if ((field.flags[i] & F_ICE) === 0) return true;
-  const thickness = field.cellTemp[cell] <= -12 ? 3 : 1;
-  return level <= field.waterY[i] - thickness;
+  if ((flags & F_ICE) === 0) return true;
+  const thickness = temp <= -12 ? 3 : 1;
+  return level <= waterY - thickness;
+};
+
+const waterShown = (field, i, level, cell) => {
+  if (field.lazy) {
+    const u = i % field.width;
+    const v = Math.floor(i / field.width);
+    const column = lazyColumnAt(field, u, v);
+    return waterShownData(column.ground, column.waterY, column.flags, field.cellTemp[cell], level);
+  }
+  return waterShownData(field.ground[i], field.waterY[i], field.flags[i], field.cellTemp[cell], level);
 };
 
 /* ---------- срез ---------- */
@@ -437,14 +458,16 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
       const wx = view.x0 + x;
       const { u, v } = fold(field, wx, wz);
       const i = v * field.width + u;
-      const ground = field.ground[i];
-      const flags = field.flags[i];
+      /* Ленивое поле отдаёт колонку целиком; растровое читается по индексу. */
+      const lazyColumn = field.lazy ? lazyColumnAt(field, u, v) : null;
+      const ground = lazyColumn ? lazyColumn.ground : field.ground[i];
+      const flags = lazyColumn ? lazyColumn.flags : field.flags[i];
       const wet = (flags & F_WATER) !== 0;
 
       /* Верхняя граница воды: -1, если столбец сухой. Вершиной столбца вода
          считается наравне с грунтом — иначе на уровне моря вместо глади было
          бы дно. */
-      const waterTop = wet && field.waterY[i] > ground ? field.waterY[i] : -1;
+      const waterTop = wet && (lazyColumn ? lazyColumn.waterY : field.waterY[i]) > ground ? (lazyColumn ? lazyColumn.waterY : field.waterY[i]) : -1;
       const crown = waterTop >= 0 ? waterTop : ground;
       const cut = cutY(field, i, level);
 
@@ -471,7 +494,10 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
         /* Чанка на этот пиксель ещё нет: блок берётся тем же правилом, что
            строит колонку. Приглушать поле нельзя — граница построенных чанков
            читалась бы прямоугольником на всю загруженную область. */
-        id = columnBlock(cut, fieldProfile(field, u, v, i, pixelProfile, pixelPalettes));
+        id = columnBlock(
+          cut,
+          field.lazy ? columnProfile(field, sampleColumn(field, wx, wz), pixelProfile) : fieldProfile(field, u, v, i, pixelProfile, pixelPalettes),
+        );
         fromField += 1;
       }
 
@@ -502,8 +528,8 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
 
       /* Вода в русле течёт: гребень проходит по направлению D8 и возвращается,
          так что русло «дышит» на месте, а не просто мигает. */
-      if (show.flow && isLiquid && (field.flags[i] & F_RIVER) !== 0) {
-        const dir = field.flow[i] & 15;
+      if (show.flow && isLiquid && (flags & F_RIVER) !== 0) {
+        const dir = (lazyColumn ? lazyColumn.flow : field.flow[i]) & 15;
         if (dir) {
           const [fx, fz] = flowVector(dir);
           const along = (wx * fx + wz * fz) / FLOW_PERIOD - time * (FLOW_SPEED / FLOW_PERIOD);
@@ -537,7 +563,7 @@ export const buildSlice = (field, colors, world, view, options = {}) => {
       /* Решётка — по мировым координатам, иначе при перетаскивании стрелки
          скользили бы по руслу туда-сюда вместо того, чтобы стоять на воде. */
       if (show.arrows && isLiquid && wx % ARROW_STRIDE === 0 && wz % ARROW_STRIDE === 0) {
-        const dir = field.flow[i] & 15;
+        const dir = (lazyColumn ? lazyColumn.flow : field.flow[i]) & 15;
         if (dir) {
           const pulse = 0.5 + 0.5 * Math.abs(Math.sin(flowPhase + (wx + wz) * 0.16));
           flowMarks[flowCount * 4] = x;
@@ -576,6 +602,14 @@ const blend = (a, b, t) => [
 /** Свет от рельефа: склон к западу и к «северу» темнее, отлогое — светлее. */
 const reliefFactor = (field, i, level, ground) => {
   if (level > ground) return 1;
+  if (field.lazy) {
+    const u = i % field.width;
+    const v = Math.floor(i / field.width);
+    const west = u > 0 ? lazyColumnAt(field, u - 1, v).ground : ground;
+    const north = v > 0 ? lazyColumnAt(field, u, v - 1).ground : ground;
+    const slope = ground - west + (ground - north);
+    return 1 + Math.max(-0.3, Math.min(0.24, slope * 0.055));
+  }
   const west = i > 0 ? field.ground[i - 1] : ground;
   const north = i >= field.width ? field.ground[i - field.width] : ground;
   const slope = ground - west + (ground - north);
@@ -595,7 +629,7 @@ const labelPeaks = (field, view, data, cellsX, cellsZ) => {
       const wz = view.z0 + z;
       const here = fold(field, wx, wz);
       const i = here.v * field.width + here.u;
-      const ground = field.ground[i];
+      const ground = field.lazy ? surfaceY(field, wx, wz) : field.ground[i];
       if (ground <= field.seaY + 4) continue; // воду и отмели не подписываем
       /* Вершину ищем среди узлов той же решётки, а не среди соседних клеток:
          детали рельефа делают каждый «склоном», и на шумном профиле локальных
@@ -605,7 +639,10 @@ const labelPeaks = (field, view, data, cellsX, cellsZ) => {
         for (let dx = -1; dx <= 1; dx += 1) {
           if (!dx && !dz) continue;
           const n = fold(field, wx + dx * step, wz + dz * step);
-          if (field.ground[n.v * field.width + n.u] > ground) {
+          const neighbourGround = field.lazy
+            ? surfaceY(field, wx + dx * step, wz + dz * step)
+            : field.ground[n.v * field.width + n.u];
+          if (neighbourGround > ground) {
             peak = false;
             break;
           }

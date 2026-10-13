@@ -13,7 +13,12 @@ export const POINTS_BY_DENSITY: Record<number, number> = {
   10: 70000,
   11: 80000,
   12: 90000,
-  13: 100000
+  13: 100000,
+  // MIR (The civilization of the sages) generates Earth-sized maps
+  // (40 075 017 × 20 003 932) with a million points: at that extent a
+  // million cells is a ~28 km grid, comparable to the default density
+  // on a 1280 × 800 canvas. Generation is proportionally heavier.
+  14: 1000000
 };
 
 export const DENSITY_STEPS = Object.keys(POINTS_BY_DENSITY).map(Number);

@@ -234,6 +234,8 @@ export const columnProfile = (field, column, out = {}) => {
  * кэш палитр из `paletteCache(field)`, `out` — переиспользуемый объект профиля.
  */
 export const fieldProfile = (field, u, v, i, out, cells) => {
+  /* Ленивое поле растров не держит: профиль собирается из колонки по запросу. */
+  if (field.lazy) return columnProfile(field, sampleColumn(field, u, v), out);
   const flags = field.flags[i];
   const c = latticeCell(field, u, v);
   const own = field.cellBiome[c];

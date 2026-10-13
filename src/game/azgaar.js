@@ -14,6 +14,7 @@
    Ограничение игрока — интерфейсное: панели правки скрываются стилями,
    а не запрещаются. Тот, кто откроет инструменты разработчика, их увидит. */
 
+import { WORLD_MAP_POINTS } from '../data/store.js';
 import { attachGenerationStage, injectGenerationHook } from './generation-stage.js';
 
 const TEMPLATE_ID = 'mir-fmg-template';
@@ -40,10 +41,20 @@ const readEmbeddedTemplate = () => {
 
 /**
  * Строка запроса для Azgaar. options=default отключает сохранённые в браузере
- * настройки редактора: карта зависит только от seed и размера.
+ * настройки редактора: карта зависит только от seed и размера. Число точек
+ * задаётся явно — миллион (`points` читает vendored Azgaar, см.
+ * src/services/url-params.ts в нём): при options=default плотность иначе
+ * сбрасывалась бы к стандартным 10 000 точкам, и земной холст остался бы
+ * почти пустым.
  */
 export const editorQuery = ({ seed, width, height }) =>
-  `?${new URLSearchParams({ seed, width: String(width), height: String(height), options: 'default' })}`;
+  `?${new URLSearchParams({
+    seed,
+    width: String(width),
+    height: String(height),
+    points: String(WORLD_MAP_POINTS),
+    options: 'default',
+  })}`;
 
 const restrictEditor = (frame) => {
   const doc = frame.contentDocument;

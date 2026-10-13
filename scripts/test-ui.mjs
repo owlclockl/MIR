@@ -206,7 +206,6 @@ try {
   await wait(40);
   const webSeed = webWindow.document.querySelector('[data-role="world-seed"]');
   if (webSeed) webSeed.value = 'MIR-UI-TEST';
-  webClick('[data-action="world-size"][data-size="compact"]');
   webClick('[data-action="world-generate"]');
   await wait(60);
   const webFrame = webWindow.document.querySelector('.world-editor-frame');
@@ -218,10 +217,11 @@ try {
     webSrc,
   );
   ok(
-    'веб-сборка: seed, размер 1280×800 и options=default переданы в адресе',
+    'веб-сборка: seed, земной размер, миллион точек и options=default переданы в адресе',
     webUrl.searchParams.get('seed') === 'MIR-UI-TEST'
-      && webUrl.searchParams.get('width') === '1280'
-      && webUrl.searchParams.get('height') === '800'
+      && webUrl.searchParams.get('width') === '40075017'
+      && webUrl.searchParams.get('height') === '20003932'
+      && webUrl.searchParams.get('points') === '1000000'
       && webUrl.searchParams.get('options') === 'default',
     webSrc,
   );
@@ -236,6 +236,11 @@ try {
 }
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
+ok(
+  'главное меню: левая навигация с «Играть», сводка на витрине и вход в лобби',
+  !!$('.sidenav__play') && $$('.sidenav__item').length === 7 && !!$('.hero__stats') && !!$('[data-region="sidenav"] [data-action="open-lobby"]'),
+  $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
+);
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
@@ -272,20 +277,19 @@ ok(
   'экран создания: поле seed, размер, кнопка создания и полный редактор',
   !!$('[data-role="world-seed"]') && !!$('[data-action="world-generate"]') && /ПОЛНЫЙ РЕДАКТОР/.test($('.world-page-body')?.textContent || ''),
 );
-ok('размер по умолчанию — стандартный, пресетов три', $('.world-size.is-active')?.dataset.size === 'standard' && $$('.world-size').length === 3);
+ok('размер по умолчанию — Земля, пресет один', $('.world-size.is-active')?.dataset.size === 'earth' && $$('.world-size').length === 1);
 const seedBeforeRandom = $('[data-role="world-seed"]').value;
 click('[data-action="world-random-seed"]');
 const masterSeed = $('[data-role="world-seed"]').value;
 ok('кнопка выдаёт новый seed', seedBeforeRandom !== masterSeed && masterSeed.length > 0);
-click('[data-action="world-size"][data-size="compact"]');
-ok('выбор размера не сбрасывает набранный seed', $('[data-role="world-seed"]').value === masterSeed && $('.world-size.is-active')?.dataset.size === 'compact');
+ok('земной пресет не сбрасывает набранный seed', $('[data-role="world-seed"]').value === masterSeed && $('.world-size.is-active')?.dataset.size === 'earth');
 click('[data-action="world-generate"]');
 await wait(30);
 const masterFrame = $('.world-editor-frame');
 const masterDoc = masterFrame?.srcdoc ?? '';
 ok(
-  'карта мастера: Azgaar встроен с тем же seed, размером 1280×800 и options=default',
-  masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=1280') && masterDoc.includes('height=800') && masterDoc.includes('options=default'),
+  'карта мастера: Azgaar встроен с тем же seed, земным размером, миллионом точек и options=default',
+  masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=40075017') && masterDoc.includes('height=20003932') && masterDoc.includes('points=1000000') && masterDoc.includes('options=default'),
 );
 ok('топбар карты мастера: «РЕЖИМ МАСТЕРА», «Новый мир» и «Экспорт»', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
 ok('однофайловая копия вшивает шаблон Azgaar', !!window.document.getElementById('mir-fmg-template'));
@@ -294,7 +298,7 @@ const storedAfterCreate = JSON.parse(window.localStorage.getItem('mir-world-slot
 const masterSlot = storedAfterCreate.master?.[0] ?? null;
 ok(
   'слот хранит только seed и параметры размера, без картинки и правок',
-  !!masterSlot && Object.keys(masterSlot).sort().join(',') === 'height,savedAt,seed,width' && masterSlot.seed === masterSeed && masterSlot.width === 1280 && masterSlot.height === 800,
+  !!masterSlot && Object.keys(masterSlot).sort().join(',') === 'height,savedAt,seed,width' && masterSlot.seed === masterSeed && masterSlot.width === 40075017 && masterSlot.height === 20003932,
   JSON.stringify(masterSlot),
 );
 ok('карточка заполненного слота показывает seed', $('.world-slot-card--filled')?.textContent.includes(masterSeed) === true);
@@ -307,11 +311,10 @@ ok(
   !$('[data-action="world-random-seed"]') && /Войдите в карту/.test($('.world-page-body')?.textContent || '') && /ПАНЕЛИ СКРЫТЫ/.test($('.world-page-body')?.textContent || ''),
 );
 $('[data-role="world-seed"]').value = 'MIR-UI-PLAYER';
-click('[data-action="world-size"][data-size="wide"]');
 click('[data-action="world-generate"]');
 await wait(30);
 const playerDoc = $('.world-editor-frame')?.srcdoc ?? '';
-ok('игрок: Azgaar открыт с тем же seed и широким размером 1920×1080', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=1920') && playerDoc.includes('height=1080'));
+ok('игрок: Azgaar открыт с тем же seed, земным размером и миллионом точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=1000000'));
 ok('игрок: режим «РЕЖИМ ИГРОКА», без «Нового мира» и «Экспорта»', /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-new"]') && !$('[data-action="world-export"]'));
 
 /* Импорт файла карты в пустой слот игрока. */
@@ -327,6 +330,16 @@ ok('импорт файла кладёт карту в слот игрока', /
 click('[data-action="world-exit"]');
 await wait(50);
 ok('«В меню» закрывает игровую страницу и показывает меню', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open') && !!$('.shell'));
+ok(
+  'главное меню: последние миры открываются из «Продолжить» в один клик',
+  $$('[data-action="menu-open-world"]').length > 0 && /IMPORT-UI|MIR-UI/.test($('.continue__list')?.textContent || ''),
+  $('.continue__list')?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120),
+);
+click('[data-action="menu-open-world"]');
+await wait(50);
+ok('«Продолжить» открывает карту напрямую, без картотеки слотов', !!$('#world-page-root .world-app') && /СЛОТ|SEED/.test($('.world-topbar__seed')?.textContent || ''), $('.world-topbar__seed')?.textContent?.trim());
+click('[data-action="world-exit"]');
+await wait(50);
 click('.play-button');
 /* Карта блоков открывается сразу: первый Esc гасит её, второй закрывает мир. */
 for (let press = 0; press < 2; press += 1) {

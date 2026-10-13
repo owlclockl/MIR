@@ -19,6 +19,7 @@ import {
   buildField,
   fold,
   sampleColumn,
+  spawnPoint,
   F_ICE,
   F_RIVER,
   F_LAKE,
@@ -1134,6 +1135,121 @@ pickWorld.dispose();
 const cleared = pickWorld.stats();
 
 add(cleared.chunks === 0 && cleared.bytes === 0, 'dispose освобождает хранилище', `${cleared.chunks} чанков`);
+
+/* ---------- земной масштаб: ленивое поле без растра ----------
+
+   Карта Azgaar размером с планету (40 075 017 × 20 003 932 пикселя) при
+   «1 пиксель = 1 блок» не может лечь в растры — это ~8 × 10^14 колонок.
+   Поле обязано стать ленивым: размеры земные, масштаб 1, растров нет, а
+   колонка, чанк и кадр считаются по запросу из решётки клеток. */
+{
+  const EARTH_W = 40_075_017;
+  const EARTH_H = 20_003_932;
+  const ECX = 200;
+  const ECY = 100;
+  const eCellH = new Float32Array(ECX * ECY);
+  const eCellBiome = new Uint8Array(ECX * ECY);
+  const eCellTemp = new Int8Array(ECX * ECY);
+  const eCellPrec = new Uint8Array(ECX * ECY);
+  const eCellFeature = new Uint16Array(ECX * ECY);
+  for (let cy = 0; cy < ECY; cy += 1) {
+    for (let cx = 0; cx < ECX; cx += 1) {
+      const nx = (cx / (ECX - 1)) * 2 - 1;
+      const ny = (cy / (ECY - 1)) * 2 - 1;
+      const d = Math.hypot(nx * 1.05, ny * 1.4);
+      const i = cy * ECX + cx;
+      eCellH[i] = Math.round(Math.max(2, Math.min(96, 78 - d * 85)));
+      eCellTemp[i] = Math.round(26 - Math.abs(ny) * 30);
+      eCellPrec[i] = 40;
+      eCellBiome[i] = eCellH[i] <= 20 ? 0 : 4;
+    }
+  }
+  const midX = Math.floor(EARTH_W / 2);
+  const midY = Math.floor(EARTH_H / 2);
+  const earthSource = {
+    width: EARTH_W,
+    height: EARTH_H,
+    spacing: EARTH_W / ECX,
+    cellsX: ECX,
+    cellsY: ECY,
+    seaLevel: 20,
+    seedSalt: 777,
+    cellH: eCellH,
+    cellBiome: eCellBiome,
+    cellTemp: eCellTemp,
+    cellPrec: eCellPrec,
+    cellFeature: eCellFeature,
+    features: [],
+    rivers: [
+      {
+        id: 1,
+        points: [
+          [midX - 2_000_000, midY],
+          [midX, midY],
+          [midX + 2_000_000, midY],
+        ],
+        half: [3, 3, 3],
+        flux: [500, 500, 500],
+      },
+    ],
+  };
+  const earth = buildField(earthSource, { profile: 2, detail: 1 });
+  add(
+    earth.lazy === true && earth.scale === 1 && earth.width === EARTH_W && earth.height === EARTH_H,
+    'земная карта: ленивое поле, 1 пиксель = 1 блок, без коэффициента конвертации',
+    `${earth.width} × ${earth.height}`,
+  );
+  add(
+    earth.ground === null && earth.flags === null && earth.base === null,
+    'земная карта: полных растров нет (иначе понадобились бы сотни терабайт)',
+    `клеток решётки ${earth.cellsX * earth.cellsY}`,
+  );
+  const centre = sampleColumn(earth, midX, midY + 500_000);
+  const shore = sampleColumn(earth, 10, 10);
+  add(
+    (centre.flags & F_WATER) === 0 && centre.y > earth.seaY,
+    'земная карта: центр материка — суша над морем',
+    `Y ${centre.y}`,
+  );
+  add((shore.flags & F_WATER) !== 0, 'земная карта: угол карты уходит под море', `Y ${shore.y}`);
+  const again = sampleColumn(earth, midX, midY + 500_000);
+  add(again.y === centre.y && again.flags === centre.flags && again.h === centre.h, 'земная карта: колонка детерминирована');
+  const farAway = sampleColumn(earth, midX + 6_000_000, midY + 500_000);
+  add(
+    farAway.h !== centre.h || farAway.y !== centre.y,
+    'земная карта: далёкие колонки не дублируют один кусок карты',
+    `h ${centre.h} против ${farAway.h}`,
+  );
+  const onRiver = sampleColumn(earth, midX, midY);
+  add(
+    (onRiver.flags & F_RIVER) !== 0 && onRiver.waterY > onRiver.y,
+    'земная карта: река легла по координатам карты, вода выше дна русла',
+    `вода ${onRiver.waterY}, дно ${onRiver.y}`,
+  );
+  const spawn = spawnPoint(earth);
+  add(
+    spawn.x >= 0 && spawn.x < earth.width && spawn.z >= 0 && spawn.z < earth.height && spawn.y > earth.seaY,
+    'земная карта: точка появления внутри планеты и на суше',
+    `${spawn.x}, ${spawn.z}`,
+  );
+  const chunk = generateChunk(earth, Math.floor(midX / CHUNK_SX), Math.floor((midY + 500_000) / CHUNK_SZ), {});
+  let solid = 0;
+  for (let i = 0; i < chunk.blocks.length; i += 1) if (chunk.blocks[i] !== AIR) solid += 1;
+  add(solid > 1000, 'земная карта: чанк строится по запросу из ленивых колонок', `${solid} блоков`);
+  const earthColors = buildTileColors(buildAtlas(earth.seed));
+  const slice = buildSlice(earth, earthColors, null, makeView([midX, midY + 500_000], 32, 24), {
+    level: earth.worldHeight - 1,
+    shade: false,
+    coast: true,
+    arrows: false,
+    labels: false,
+  });
+  add(
+    slice.fromField === 32 * 24 && slice.data.length === 32 * 24 * 4,
+    'земная карта: кадр слоя рисуется без единого растра',
+    `${slice.fromField} колонок по полю`,
+  );
+}
 
 /* ---------- итог ---------- */
 

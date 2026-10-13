@@ -14,7 +14,7 @@ import { applyDefaultViewboxEvents } from "@/components/viewbox-events";
 import { setViewportSize } from "@/components/viewport";
 import { invokeActiveZooming, resetZoom } from "@/components/zoom";
 import { Controllers } from "@/controllers";
-import { getPointsNumber } from "@/data/graph-density";
+import { getPointsNumber, POINTS_BY_DENSITY } from "@/data/graph-density";
 import { GenerationPipeline } from "@/generators/generation-pipeline";
 import { adoptLegacyIconSlots } from "@/generators/styles-legacy";
 import { stashCallbackToken } from "@/services/assistant/azgaar-server/auth";
@@ -59,7 +59,17 @@ export async function generate(config?: GenerationConfig): Promise<void> {
     setSeed(precreatedSeed);
     Options.randomize();
     Icons.syncCustom(); // the carried-over custom icons, and the stored ones at startup
-    if (precreatedGraph && points !== undefined) options.map.graph.points = points;
+    if (points !== undefined) {
+      // An exact count asked for by the link (MIR passes points=1000000 for
+      // its Earth-sized maps) wins over the density slider, with or without
+      // a precreated graph. Where a slider step stands for the same count,
+      // adopt it as the generation density, so a later regeneration from
+      // the editor keeps the requested count instead of falling back to
+      // the default 10K.
+      options.map.graph.points = points;
+      const step = Object.entries(POINTS_BY_DENSITY).find(([, count]) => count === points);
+      if (step) options.generation.graph.density = Number(step[0]);
+    }
     applyGraphSize(); // TODO: DOM change, not part of generation
 
     await GenerationPipeline.run({ graph: precreatedGraph });
