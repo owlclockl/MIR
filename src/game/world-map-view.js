@@ -1,33 +1,15 @@
-/* Вид блочного мира: карта Земли блок за блоком.
+/* Основная карта собственного генератора.
 
-   Это единственный вид собственного генератора. Его открывают обе кнопки —
-   «Тест-генератор» (режим `map`: биомы, рельеф, климат) и «Карта блоками»
-   (режим `blocks`: срез мира на выбранном ярусе). Мир у них один и тот же:
-   кнопки отличаются только слоем, который виден при открытии.
-
-   Почему счёт идёт клетками, а не пикселями. Полный растр Земли — это
-   8 × 10^14 колонок, а один кадр 1600 × 900 — 1,4 млн колонок. Колонка стоит
-   около трёх микросекунд, то есть полный кадр «блок за блок» — четыре секунды
-   на кадр. Поэтому полотно делится на квадратные клетки: клетка покрывает
-   `cellBlocks` блоков мира и рисуется как `cs × cs` пикселей. Пиксель остаётся
-   блоком (на близком масштабе — ровно один блок на пиксель), но выборок на
-   кадр становится в `cs²` раз меньше. Дальше картинка растягивается без
-   сглаживания — это и даёт блочный вид.
-
-   Почему рисование идёт по строкам. Строка клеток дешевле кадра, поэтому
-   карта проявляется сверху вниз порциями по бюджету времени, а не одним
-   залпом. Панорамирование и смена слоя начинают рисование заново с той строки,
-   где остановились, а прогресс виден в полоске под панелью.
-
-   Слои — это один и тот же мир, у которого спрашивают разное: биом, высоту,
-   температуру, осадки, блок на ярусе, долю пустот, руду, деревни. Ярус режет
-   мир горизонтальной плоскостью, как в игре, и по нему же считается блок. */
+   Мир никогда не хранится растровой картинкой целиком: точки вычисляются по
+   seed, а кадр разбивается на клетки и рисуется строками небольшими порциями.
+   Поэтому карта остаётся отзывчивой и на земном размере, и при приближении.
+   Слои показывают биомы, рельеф, материки, климат, осадки и поселения.
+*/
 
 import { icon } from '../ui/icons.js';
 import { motionOff, motionQuery } from '../ui/motion.js';
 import { BIOME_COLORS, BIOMES, biomeName, WATER_NONE } from '../gen/biomes.js';
-import { blockRgb, blockName, GRASS_BLOCK } from '../gen/blocks.js';
-import { areaLabel, digits, elevationMeters, SEA_LEVEL, WORLD_Y } from '../gen/scale.js';
+import { areaLabel, digits, ELEVATION_M_PER_BLOCK, elevationMeters, SEA_LEVEL } from '../gen/scale.js';
 import { C, COLUMN_SIZE, createBlockWorld, S, STAGE, STAGE_LABEL } from '../gen/world.js';
 
 /** Слои карты: имя кнопки и подсказка, что именно видно. */
@@ -37,22 +19,11 @@ export const LAYERS = Object.freeze([
   { id: 'continents', name: 'материки', hint: 'Каждый кусок суши своим цветом: материки — плотным, острова — бледным' },
   { id: 'climate', name: 'климат', hint: 'Температура: у экватора тепло, у полюсов мороз' },
   { id: 'rain', name: 'осадки', hint: 'Годовые осадки: пустыни светлые, джунгли синие' },
-  { id: 'blocks', name: 'блоки', hint: 'Срез мира на выбранном ярусе — тот же блок, что в игре' },
   { id: 'villages', name: 'деревни', hint: 'Постройки: площадки деревень, дома и дороги' },
 ]);
 
-/** Ярусы мира по кнопкам — как пресеты в карте блоков. */
-export const TIER_PRESETS = Object.freeze([
-  { id: 'canopy', name: 'кроны', hint: 'Верх крон деревьев' },
-  { id: 'surface', name: 'поверхность', hint: 'Тот блок, на который падает свет' },
-  { id: 'sea', name: 'море', hint: 'Уровень моря — 63-й ярус' },
-  { id: 'caves', name: 'пещеры', hint: 'Сорок блоков под поверхностью' },
-  { id: 'ores', name: 'руды', hint: 'Ярус 12: полоса алмаза и редстоуна' },
-  { id: 'bedrock', name: 'основание', hint: 'Нижний ярус мира' },
-]);
-
 /** Слои, которым нужна полная колонка: они стоят дороже остальных. */
-const HEAVY_LAYERS = new Set(['blocks', 'villages']);
+const HEAVY_LAYERS = new Set(['villages']);
 /** Размер клетки в пикселях: у дорогих слоёв крупнее, иначе кадр не успевает. */
 const CELL_PX = { light: 2, heavy: 4 };
 /** Потолок выборок на кадр — по нему выбирается размер клетки. */
@@ -113,18 +84,11 @@ const hsl = (hue, saturation, lightness) => {
   return [(rgb[0] + m) * 255, (rgb[1] + m) * 255, (rgb[2] + m) * 255];
 };
 
-/* Дёрн и листва в игре зеленеют от биома: тот же приём, что в генераторе
-   колонок, — иначе близкий вид расходится с цветом блока в подсказке. */
-const LEAVES_EXCEPT_GRASS = new Set([38, 39, 40, 41, 42, 43]);
-const GRASS_TINT = BIOMES.map((biome) => rgbOf(biome.grass));
-const isGrassy = (block) => block === GRASS_BLOCK || LEAVES_EXCEPT_GRASS.has(block);
-
 /**
  * @param {HTMLElement} host элемент, в который монтируется вид
- * @param {{mode?: 'map'|'blocks', config?: object, onExit?: () => void}} [options]
+ * @param {{config?: object}} [options]
  */
-export const mountBlockWorldView = (host, options = {}) => {
-  const mode = options.mode === 'blocks' ? 'blocks' : 'map';
+export const mountWorldMapView = (host, options = {}) => {
   if (!host) return { element: null, error: 'Негде показать карту.', dispose: () => {} };
   const config = options.config ?? {};
   const seed = String(config.seed ?? '') || 'мир';
@@ -132,49 +96,39 @@ export const mountBlockWorldView = (host, options = {}) => {
   const height = Number(config.height) > 0 ? Number(config.height) : undefined;
 
   const root = document.createElement('div');
-  root.className = 'world-voxel';
-  root.dataset.role = 'world-voxel';
-  root.dataset.mode = mode;
+  root.className = 'world-map-view';
+  root.dataset.role = 'world-map-view';
   root.innerHTML = `
-<canvas class="world-voxel-canvas" data-role="voxel-canvas" tabindex="0" aria-label="Карта блочного мира"></canvas>
-<div class="world-voxel-toolbar">
-<button class="world-voxel-button" type="button" data-voxel-action="spawn" aria-label="К точке появления" title="К точке появления (R)">${icon('crosshair', 'icon--xs')}<span>Появление</span></button>
-<button class="world-voxel-button" type="button" data-voxel-action="earth" aria-label="Показать весь мир" title="Показать весь мир (W)">${icon('globe', 'icon--xs')}<span>Весь мир</span></button>
-<button class="world-voxel-button" type="button" data-voxel-action="exit" aria-label="Назад к редактору карты" title="Назад к редактору (Esc)">${icon('map', 'icon--xs')}<span>К карте</span></button>
+<canvas class="world-map-view-canvas" data-role="world-map-canvas" tabindex="0" aria-label="Основная карта мира"></canvas>
+<div class="world-map-view-toolbar">
+<button class="world-map-view-button" type="button" data-map-action="spawn" aria-label="К точке появления" title="К точке появления (R)">${icon('crosshair', 'icon--xs')}<span>Появление</span></button>
+<button class="world-map-view-button" type="button" data-map-action="earth" aria-label="Показать весь мир" title="Показать весь мир (W)">${icon('globe', 'icon--xs')}<span>Весь мир</span></button>
 </div>
-<div class="world-voxel-layers" data-role="voxel-layers">
-<div class="world-voxel-row" data-role="voxel-tier-row">
-<span class="world-voxel-label">ярус</span>
-<button class="world-voxel-step" type="button" data-voxel-action="level-down" aria-label="Ярус ниже">${icon('minus', 'icon--xs')}</button>
-<input class="world-voxel-slider" type="range" data-role="voxel-level" min="0" max="${WORLD_Y - 1}" step="1" value="${SEA_LEVEL}" aria-label="Ярус среза мира">
-<button class="world-voxel-step" type="button" data-voxel-action="level-up" aria-label="Ярус выше">${icon('plus', 'icon--xs')}</button>
-<output class="world-voxel-value" data-role="voxel-level-value"></output>
+<div class="world-map-view-layers" data-role="world-map-panel">
+<div class="world-map-view-row">
+<span class="world-map-view-label">слой</span>
+<span class="world-map-view-row" data-role="world-map-layer-buttons"></span>
 </div>
-<div class="world-voxel-row" data-role="voxel-presets"></div>
-<div class="world-voxel-row">
-<span class="world-voxel-label">слой</span>
-<span class="world-voxel-row" data-role="voxel-overlays"></span>
+<div class="world-map-view-row">
+<span class="world-map-view-label">масштаб</span>
+<button class="world-map-view-step" type="button" data-map-action="zoom-out" aria-label="Отдалить" title="Отдалить (минус)">${icon('minus', 'icon--xs')}</button>
+<output class="world-map-view-value" data-role="world-map-zoom-value"></output>
+<button class="world-map-view-step" type="button" data-map-action="zoom-in" aria-label="Приблизить" title="Приблизить (плюс)">${icon('plus', 'icon--xs')}</button>
+<span class="world-map-view-label world-map-view-label--right">материки</span>
+<span class="world-map-view-row" data-role="world-map-continents"></span>
 </div>
-<div class="world-voxel-row">
-<span class="world-voxel-label">масштаб</span>
-<button class="world-voxel-step" type="button" data-voxel-action="zoom-out" aria-label="Мельче" title="Мельче (минус)">${icon('minus', 'icon--xs')}</button>
-<output class="world-voxel-value" data-role="voxel-zoom-value"></output>
-<button class="world-voxel-step" type="button" data-voxel-action="zoom-in" aria-label="Крупнее" title="Крупнее (плюс)">${icon('plus', 'icon--xs')}</button>
-<span class="world-voxel-label world-voxel-label--right">материки</span>
-<span class="world-voxel-row" data-role="voxel-continents"></span>
+<p class="world-map-view-hud" data-role="world-map-hud" role="status" aria-live="off">Мир строится…</p>
 </div>
-<p class="world-voxel-hud" data-role="voxel-hud" role="status" aria-live="off">Мир строится…</p>
-</div>
-<p class="world-voxel-note" data-role="voxel-note" hidden></p>
-<div class="world-voxel-legend" data-role="voxel-legend" aria-hidden="true"></div>
-<div class="world-voxel-progress" data-role="voxel-progress" aria-hidden="true"><i></i></div>
-<div class="world-voxel-wait" data-role="voxel-wait" role="status">
-<span class="world-voxel-wait__pulse" aria-hidden="true"></span>
-<p class="world-voxel-wait__text" data-role="voxel-wait-text">Строю мир…</p>
+<p class="world-map-view-note" data-role="world-map-note" hidden></p>
+<div class="world-map-view-legend" data-role="world-map-legend" aria-hidden="true"></div>
+<div class="world-map-view-progress" data-role="world-map-progress" aria-hidden="true"><i></i></div>
+<div class="world-map-view-wait" data-role="world-map-wait" role="status">
+<span class="world-map-view-wait__pulse" aria-hidden="true"></span>
+<p class="world-map-view-wait__text" data-role="world-map-wait-text">Строю мир…</p>
 </div>`;
   host.append(root);
 
-  const canvas = root.querySelector('[data-role="voxel-canvas"]');
+  const canvas = root.querySelector('[data-role="world-map-canvas"]');
   /* Контекста может не быть вовсе — в jsdom его нет, и это не повод падать:
      вид обязан собраться, показать панели и честно сказать, что холста нет. */
   const context = (() => {
@@ -184,20 +138,16 @@ export const mountBlockWorldView = (host, options = {}) => {
       return null;
     }
   })();
-  const hud = root.querySelector('[data-role="voxel-hud"]');
-  const note = root.querySelector('[data-role="voxel-note"]');
-  const slider = root.querySelector('[data-role="voxel-level"]');
-  const levelValue = root.querySelector('[data-role="voxel-level-value"]');
-  const zoomValue = root.querySelector('[data-role="voxel-zoom-value"]');
-  const tierRow = root.querySelector('[data-role="voxel-tier-row"]');
-  const presetHost = root.querySelector('[data-role="voxel-presets"]');
-  const layerHost = root.querySelector('[data-role="voxel-overlays"]');
-  const continentHost = root.querySelector('[data-role="voxel-continents"]');
-  const legendHost = root.querySelector('[data-role="voxel-legend"]');
-  const progress = root.querySelector('[data-role="voxel-progress"]');
+  const hud = root.querySelector('[data-role="world-map-hud"]');
+  const note = root.querySelector('[data-role="world-map-note"]');
+  const zoomValue = root.querySelector('[data-role="world-map-zoom-value"]');
+  const layerHost = root.querySelector('[data-role="world-map-layer-buttons"]');
+  const continentHost = root.querySelector('[data-role="world-map-continents"]');
+  const legendHost = root.querySelector('[data-role="world-map-legend"]');
+  const progress = root.querySelector('[data-role="world-map-progress"]');
   const progressBar = progress.firstElementChild;
-  const waitBox = root.querySelector('[data-role="voxel-wait"]');
-  const waitText = root.querySelector('[data-role="voxel-wait-text"]');
+  const waitBox = root.querySelector('[data-role="world-map-wait"]');
+  const waitText = root.querySelector('[data-role="world-map-wait-text"]');
 
   const world = createBlockWorld({ seed, width, height });
   const planet = world.planet;
@@ -210,22 +160,18 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   const view = {
     element: root,
-    mode,
     world,
     error: context ? '' : 'Браузер не дал холст для карты.',
     waiting: true,
     center: [planet.width / 2, planet.height / 2],
-    level: mode === 'blocks' ? Math.max(0, maxLevel - 3) : Math.max(0, maxLevel - 13),
-    layer: mode === 'blocks' ? 'blocks' : 'biome',
-    tier: SEA_LEVEL,
-    tierPreset: 'sea',
+    level: Math.max(0, maxLevel - 13),
+    layer: 'biome',
     cursor: null,
     centered: false,
     dispose: () => {},
   };
 
-  /* Появление вида: та же анимация, что была у карты блоков (класс is-reveal),
-     и она же гасится правилом движения — одно правило на весь интерфейс. */
+  /* Основная карта использует общее правило движения интерфейса. */
   let revealTimer = 0;
   if (!motionOff(motionQuery())) {
     root.classList.add('is-reveal');
@@ -236,8 +182,7 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   const paint = {
     layer: '',
-    tier: Number.NaN,
-    cellBlocks: 0,
+    cellMeters: 0,
     cols: 0,
     rows: 0,
     cs: 0,
@@ -255,12 +200,12 @@ export const mountBlockWorldView = (host, options = {}) => {
   let prevRowHeights = new Float32Array(0);
 
   const cellPixels = (layer) => (HEAVY_LAYERS.has(layer) ? CELL_PX.heavy : CELL_PX.light);
-  const blocksPerPixel = () => 2 ** (maxLevel - view.level);
+  const metersPerPixel = () => 2 ** (maxLevel - view.level);
   /* Мелкий слой рельефа (сотни метров) виден только тогда, когда клетка его
      крупнее: на грубых уровнях он не рисует рельеф, а сыплет шумом. */
-  const detailFor = (cellBlocks) => (cellBlocks >= 64 ? 3 : 4);
+  const detailFor = (cellMeters) => (cellMeters >= 64 ? 3 : 4);
 
-  /** Размер полотна в пикселях устройства не важен: пиксель карты — блок. */
+  /** Размер полотна следует CSS-размеру: каждая клетка — выборка поверхности. */
   const fitCanvas = () => {
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(96, Math.round(rect.width || canvas.width || 960));
@@ -273,18 +218,17 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   const layout = () => {
     if (!context) return false;
-    const mpp = blocksPerPixel();
+    const mpp = metersPerPixel();
     const cs = cellPixels(view.layer);
-    const cellBlocks = mpp * cs;
+    const cellMeters = mpp * cs;
     /* Ничего не изменилось — старую картинку не пересчитываем: панорама и
        смена масштаба приходят сюда на каждое движение мыши. */
-    if (paint.cellBlocks === cellBlocks && paint.layer === view.layer && paint.tier === view.tier
+    if (paint.cellMeters === cellMeters && paint.layer === view.layer
       && paint.cs === cs && paint.cols === Math.ceil(canvas.width / cs) && paint.rows === Math.ceil(canvas.height / cs)) return false;
     const cols = Math.ceil(canvas.width / cs);
     const rows = Math.ceil(canvas.height / cs);
     paint.layer = view.layer;
-    paint.tier = view.tier;
-    paint.cellBlocks = cellBlocks;
+    paint.cellMeters = cellMeters;
     paint.cols = cols;
     paint.rows = rows;
     paint.cs = cs;
@@ -334,44 +278,8 @@ export const mountBlockWorldView = (host, options = {}) => {
    * Цвет одной клетки. Сюда сходятся все правила окраски: слой решает, что
    * именно спрашивают у мира, а форма ответа одна — три канала.
    */
-  const colorAt = (x, z, col, row, cellBlocks) => {
+  const colorAt = (x, z, col, row, cellMeters) => {
     const layer = view.layer;
-    if (layer === 'blocks') {
-      world.columnAt(x, z, scratchColumn);
-      const height = scratchColumn[C.HEIGHT];
-      const y = clamp(Math.round(view.tier), 0, WORLD_Y - 1);
-      const block = world.blockInColumn(x, y, z, scratchColumn);
-      /* Плоскость реза выше поверхности — значит смотрим на верх мира, а не
-         внутрь: показываем тот блок, на который падает свет. Иначе на обзорном
-         масштабе весь материк оказался бы небом. */
-      const skin = y > height;
-      if (block === 0) {
-        if (skin) {
-          const top = world.blockInColumn(x, height, z, scratchColumn) || scratchColumn[C.SURFACE];
-          const [sr, sg, sb] = blockRgb(top);
-          write(col, row, sr * 0.9, sg * 0.9, sb * 0.9);
-          return height;
-        }
-        /* Ниже поверхности пустота — это пещера: чем глубже, тем темнее. */
-        const fade = clamp((height - y) / 120, 0, 1);
-        write(col, row, 42 - fade * 18, 46 - fade * 18, 56 - fade * 16);
-        return height;
-      }
-      const [br, bg, bb] = blockRgb(block);
-      let r = br;
-      let g = bg;
-      let b = bb;
-      if (isGrassy(block)) {
-        const tint = GRASS_TINT[scratchColumn[C.BIOME]] ?? [br, bg, bb];
-        r = (r + tint[0]) * 0.5;
-        g = (g + tint[1]) * 0.5;
-        b = (b + tint[2]) * 0.5;
-      }
-      /* Тень по высоте: без неё срез выглядит плоской заливкой. */
-      const shade = 1 + clamp((height - 64) / 160, -0.22, 0.3);
-      write(col, row, r * shade, g * shade, b * shade);
-      return height;
-    }
     if (layer === 'continents') {
       /* Материк — это то, что мир перечисляет, а не то, что видно глазом:
          цвет берётся у куска суши, а не у высоты или биома. */
@@ -403,7 +311,7 @@ export const mountBlockWorldView = (host, options = {}) => {
     }
 
     /* Карты поверхности: рельеф, климат, осадки, биомы. */
-    world.sampleInto(x, z, detailFor(cellBlocks), scratchSample);
+    world.sampleInto(x, z, detailFor(cellMeters), scratchSample);
     const height = scratchSample[S.HEIGHT];
     if (layer === 'relief') {
       /* Высота в метрах: там, где вода, шкала уходит вглубь, а на суше —
@@ -457,24 +365,24 @@ export const mountBlockWorldView = (host, options = {}) => {
       heightsRow = new Float32Array(paint.cols);
     }
     const layer = view.layer;
-    const z = paint.originZ + (row + 0.5) * paint.cellBlocks;
+    const z = paint.originZ + (row + 0.5) * paint.cellMeters;
     const rowStart = row * paint.cols;
     /* Строка целиком за краем мира — весь ряд фон. */
     const rowOutside = z < 0 || z >= planet.height;
     let leftHeight = Number.NaN;
     for (let col = 0; col < paint.cols; col += 1) {
       const index = rowStart + col;
-      const x = paint.originX + (col + 0.5) * paint.cellBlocks;
+      const x = paint.originX + (col + 0.5) * paint.cellMeters;
       if (rowOutside || x < 0 || x >= planet.width) {
         if (!paint.flags[index]) writeVoid(col, row);
         heightsRow[col] = Number.NaN;
         leftHeight = Number.NaN;
         continue;
       }
-      const height = paint.flags[index] ? heightsPrev[col] : colorAt(x, z, col, row, paint.cellBlocks);
+      const height = paint.flags[index] ? heightsPrev[col] : colorAt(x, z, col, row, paint.cellMeters);
       heightsRow[col] = height;
       if ((layer === 'relief' || layer === 'biome') && !paint.flags[index]) {
-        /* Склон: разница с левым и верхним соседом, в блоках на клетку. */
+        /* Склон: разница высот с левым и верхним соседом, в клетках рельефа. */
         let slope = 0;
         if (Number.isFinite(leftHeight)) slope += (height - leftHeight) / 22;
         if (row > 0) slope += (height - heightsPrev[col]) / 22;
@@ -498,7 +406,7 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   const drawOverlays = () => {
     if (!context) return;
-    const mpp = blocksPerPixel();
+    const mpp = metersPerPixel();
     const halfW = (canvas.width / 2) * mpp;
     const halfZ = (canvas.height / 2) * mpp;
     const x0 = view.center[0] - halfW;
@@ -595,10 +503,10 @@ export const mountBlockWorldView = (host, options = {}) => {
       context.stroke();
     }
 
-    /* Масштабная линейка: без неё «1 px = 4 бл.» ничего не говорит о мире. */
+    /* Масштабная линейка переводит пиксели кадра в расстояние на поверхности. */
     const barPx = Math.min(canvas.width * 0.32, 220);
-    const barBlocks = barPx * mpp;
-    const barKm = barBlocks / 1000;
+    const barMeters = barPx * mpp;
+    const barKm = barMeters / 1000;
     context.fillStyle = 'rgba(12,18,24,0.72)';
     context.fillRect(12, canvas.height - 26, barPx + 16, 18);
     context.strokeStyle = 'rgba(240,244,248,0.85)';
@@ -626,20 +534,13 @@ export const mountBlockWorldView = (host, options = {}) => {
 
   /* ---------- подписи, легенда, подсказка ---------- */
 
+  const distanceLabel = (meters) => meters >= 1000
+    ? `${digits(meters / 1000)} км`
+    : `${digits(meters)} м`;
+
   const syncLabels = () => {
-    const mpp = blocksPerPixel();
-    zoomValue.textContent = mpp <= 1 ? '1 блок = 1 px' : `1 px = ${digits(mpp)} бл.`;
-    const tier = Math.round(view.tier);
-    const meters = elevationMeters(tier);
-    levelValue.textContent = `ярус ${tier} · ${digits(Math.abs(meters))} м ${meters >= 0 ? 'над морем' : 'под морем'}`;
-    slider.value = String(tier);
-    tierRow.hidden = view.layer !== 'blocks';
-    presetHost.hidden = view.layer !== 'blocks';
-    for (const chip of presetHost.querySelectorAll('[data-tier]')) {
-      const on = chip.dataset.tier === view.tierPreset;
-      chip.classList.toggle('is-on', on);
-      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-    }
+    const mpp = metersPerPixel();
+    zoomValue.textContent = mpp <= 1 ? '1 м = 1 px' : `1 px = ${distanceLabel(mpp)}`;
     for (const chip of layerHost.querySelectorAll('[data-layer]')) {
       const on = chip.dataset.layer === view.layer;
       chip.classList.toggle('is-on', on);
@@ -648,57 +549,44 @@ export const mountBlockWorldView = (host, options = {}) => {
   };
 
   const updateLegend = () => {
-    if (view.layer === 'blocks') {
-      legendHost.innerHTML = [
-        ['вода', 30], ['песок', 18], ['дёрн', 13], ['камень', 1], ['сланец', 2], ['уголь', 61], ['железо', 62], ['алмаз', 67],
-      ].map(([name, id]) => {
-        const rgb = blockRgb(id);
-        return `<span class="world-voxel-legend__item"><i style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]})"></i>${name}</span>`;
-      }).join('');
-      return;
-    }
     if (view.layer === 'biome' || view.layer === 'villages') {
       legendHost.innerHTML = BIOMES
         .filter((biome) => biome.category !== 'ocean' || biome.key === 'ocean')
         .slice(0, 10)
         .map((biome) => {
           const rgb = rgbOf(biome.color);
-          return `<span class="world-voxel-legend__item"><i style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]})"></i>${biome.name}</span>`;
+          return `<span class="world-map-view-legend__item"><i style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]})"></i>${biome.name}</span>`;
         })
         .join('');
       return;
     }
     if (view.layer === 'continents') {
-      legendHost.innerHTML = '<span class="world-voxel-legend__item">цвет — свой у каждого куска суши, бледный у островов</span>';
+      legendHost.innerHTML = '<span class="world-map-view-legend__item">цвет — свой у каждого куска суши, бледный у островов</span>';
       return;
     }
     legendHost.innerHTML = '';
   };
 
   const updateHud = () => {
-    const mpp = blocksPerPixel();
+    const mpp = metersPerPixel();
     const x = clamp(Math.round(view.center[0] + (view.cursor ? (view.cursor[0] - canvas.width / 2) * mpp : 0)), 0, planet.width - 1);
     const z = clamp(Math.round(view.center[1] + (view.cursor ? (view.cursor[1] - canvas.height / 2) * mpp : 0)), 0, planet.height - 1);
     const info = world.columnInfo(x, z);
     view.cursorInfo = info;
     const geo = world.geoAt(x, z);
     const parts = [
-      `${digits(x)}, ${digits(z)}`,
+      `${digits(x)} м, ${digits(z)} м`,
       `${geo.lat.toFixed(1).replace('.', ',')}° ш., ${geo.lon.toFixed(1).replace('.', ',')}° д.`,
       biomeName(info.biome),
-      `${info.height} бл. (${digits(info.height >= SEA_LEVEL ? elevationMeters(info.height) : -elevationMeters(info.height))} м)`,
+      `высота ${digits(elevationMeters(info.height))} м`,
       `${(info.temperature * 40).toFixed(0)} °C`,
       `${digits(info.precipitation)} мм`,
     ];
     const continent = world.continentAt(x, z);
     if (continent?.name) parts.push(`${continent.name} · ${areaLabel(continent.areaKm2)}`);
-    if (info.water === 2) parts.push(`река ${digits(Math.round(info.riverWidth))} бл., водосбор ${areaLabel(info.riverArea)}`);
-    else if (info.water === 3) parts.push(`озеро глубиной ${info.lakeDepth.toFixed(1).replace('.', ',')} бл.`);
+    if (info.water === 2) parts.push(`река шириной ${distanceLabel(info.riverWidth)}, водосбор ${areaLabel(info.riverArea)}`);
+    else if (info.water === 3) parts.push(`озеро глубиной ${digits(info.lakeDepth * ELEVATION_M_PER_BLOCK)} м`);
     if (info.structure) parts.push(`деревня «${info.structure}»`);
-    if (view.layer === 'blocks') {
-      const block = world.blockInColumn(x, Math.round(view.tier), z, scratchColumn);
-      parts.push(block ? `${blockName(block)} на ярусе ${Math.round(view.tier)}` : 'пусто');
-    }
     if (!paint.done && paint.rows) parts.push(`рисую ${Math.round((paint.nextRow / paint.rows) * 100)} %`);
     hud.textContent = parts.join(' · ');
   };
@@ -747,7 +635,7 @@ export const mountBlockWorldView = (host, options = {}) => {
     if (!list.length || continentHost.childElementCount === list.length) return;
     continentHost.innerHTML = list
       .slice(0, 8)
-      .map((continent) => `<button class="world-voxel-chip" type="button" data-continent="${continent.name}" title="${areaLabel(continent.areaKm2)}">${continent.name}</button>`)
+      .map((continent) => `<button class="world-map-view-chip" type="button" data-continent="${continent.name}" title="${areaLabel(continent.areaKm2)}">${continent.name}</button>`)
       .join('');
     for (const chip of continentHost.querySelectorAll('[data-continent]')) {
       chip.addEventListener('click', () => {
@@ -776,12 +664,12 @@ export const mountBlockWorldView = (host, options = {}) => {
   const zoom = (delta, anchor = null) => {
     const next = clamp(view.level + delta, 0, maxLevel);
     if (next === view.level) return;
-    const mppBefore = blocksPerPixel();
+    const mppBefore = metersPerPixel();
     view.level = next;
-    const mppAfter = blocksPerPixel();
+    const mppAfter = metersPerPixel();
     if (anchor) {
       /* Мир под точкой экрана остаётся на месте: центр сдвигается на разницу
-         «сколько блоков было под пикселем». */
+         «сколько метров было под пикселем». */
       view.center[0] += anchor[0] * (mppBefore - mppAfter);
       view.center[1] += anchor[1] * (mppBefore - mppAfter);
     }
@@ -790,7 +678,7 @@ export const mountBlockWorldView = (host, options = {}) => {
     syncLabels();
   };
   const panBy = (dxPixels, dyPixels) => {
-    const mpp = blocksPerPixel();
+    const mpp = metersPerPixel();
     view.center[0] += dxPixels * mpp;
     view.center[1] += dyPixels * mpp;
     clampCenter();
@@ -801,7 +689,7 @@ export const mountBlockWorldView = (host, options = {}) => {
     if (!spawn?.x) return;
     view.center = [spawn.x, spawn.z];
     view.centered = true;
-    view.level = mode === 'blocks' ? Math.max(0, maxLevel - 3) : Math.max(0, maxLevel - 9);
+    view.level = Math.max(0, maxLevel - 9);
     clampCenter();
     layout();
     syncLabels();
@@ -809,7 +697,7 @@ export const mountBlockWorldView = (host, options = {}) => {
   };
   const toEarth = () => {
     view.center = [planet.width / 2, planet.height / 2];
-    /* Весь мир целиком: блоков на пиксель берём столько, чтобы в кадр влезла
+    /* Весь мир целиком: метров на пиксель берём столько, чтобы в кадр влезла
        большая сторона мира. Округление вниз — чтобы по краям был запас, а не
        обрезка. */
     const mppNeeded = Math.max(planet.width / Math.max(200, canvas.width), planet.height / Math.max(200, canvas.height));
@@ -861,8 +749,6 @@ export const mountBlockWorldView = (host, options = {}) => {
     else if (event.key === 'ArrowDown') panBy(0, fast);
     else if (event.key === '+' || event.key === '=') zoom(1);
     else if (event.key === '-' || event.key === '_') zoom(-1);
-    else if (event.key === 'PageUp') view.tier = clamp(view.tier + 4, 0, WORLD_Y - 1);
-    else if (event.key === 'PageDown') view.tier = clamp(view.tier - 4, 0, WORLD_Y - 1);
     else if (event.key === 'r' || event.key === 'R' || event.key === 'к' || event.key === 'К') toSpawn();
     else if (event.key === 'w' || event.key === 'W' || event.key === 'ц' || event.key === 'Ц') toEarth();
     else return;
@@ -870,62 +756,26 @@ export const mountBlockWorldView = (host, options = {}) => {
     syncLabels();
   });
 
-  presetHost.innerHTML = TIER_PRESETS
-    .map((preset) => `<button class="world-voxel-chip" type="button" data-tier="${preset.id}" title="${preset.hint}">${preset.name}</button>`)
-    .join('');
   layerHost.innerHTML = LAYERS
-    .map((layer) => `<button class="world-voxel-chip" type="button" data-layer="${layer.id}" title="${layer.hint}">${layer.name}</button>`)
+    .map((layer) => `<button class="world-map-view-chip" type="button" data-layer="${layer.id}" title="${layer.hint}">${layer.name}</button>`)
     .join('');
 
-  listen(presetHost, 'click', (event) => {
-    const chip = event.target.closest?.('[data-tier]');
-    if (!chip) return;
-    view.tierPreset = chip.dataset.tier;
-    const info = view.cursorInfo ?? world.columnInfo(view.center[0], view.center[1]);
-    if (view.tierPreset === 'canopy') view.tier = Math.round(info.canopyTop || info.height);
-    else if (view.tierPreset === 'surface') view.tier = info.height;
-    else if (view.tierPreset === 'sea') view.tier = SEA_LEVEL;
-    else if (view.tierPreset === 'caves') view.tier = Math.max(5, info.height - 40);
-    else if (view.tierPreset === 'ores') view.tier = 12;
-    else if (view.tierPreset === 'bedrock') view.tier = 2;
-    layout();
-    syncLabels();
-  });
   listen(layerHost, 'click', (event) => {
     const chip = event.target.closest?.('[data-layer]');
     if (!chip) return;
     view.layer = chip.dataset.layer;
-    if (view.layer === 'blocks') view.tier = view.tierPreset === 'custom' ? view.tier : view.tier;
     layout();
     updateLegend();
     syncLabels();
     setNote(LAYERS.find((layer) => layer.id === view.layer)?.hint ?? '');
   });
-  listen(slider, 'input', () => {
-    view.tier = clamp(Number(slider.value) || 0, 0, WORLD_Y - 1);
-    view.tierPreset = 'custom';
-    layout();
-    syncLabels();
-  });
-  for (const button of root.querySelectorAll('[data-voxel-action]')) {
+  for (const button of root.querySelectorAll('[data-map-action]')) {
     listen(button, 'click', () => {
-      const action = button.dataset.voxelAction;
+      const action = button.dataset.mapAction;
       if (action === 'spawn') toSpawn();
       else if (action === 'earth') toEarth();
-      else if (action === 'exit') options.onExit?.();
       else if (action === 'zoom-in') zoom(1);
       else if (action === 'zoom-out') zoom(-1);
-      else if (action === 'level-up') {
-        view.tier = clamp(Math.round(view.tier) + 4, 0, WORLD_Y - 1);
-        view.tierPreset = 'custom';
-        layout();
-        syncLabels();
-      } else if (action === 'level-down') {
-        view.tier = clamp(Math.round(view.tier) - 4, 0, WORLD_Y - 1);
-        view.tierPreset = 'custom';
-        layout();
-        syncLabels();
-      }
     });
   }
 
