@@ -102,12 +102,10 @@ No new terrain engine and no restoration of the previously deleted generator.
 - `npm run test:surface`: real DOM input flow with mocked Canvas; drawing,
   all drawing modes, editing/moving/deletion, cancellation, undo/redo, pin history
   and preference persistence across remount.
-- `npm run test:surface-browser -- http://127.0.0.1:4173`: actual Chromium, real
-  terrain generation, all six tools, editing/history, pixel-changing layer order
-  and visibility, grids/minimap, actual downloaded JSON/GeoJSON/PNG, rejected and
-  undoable imports, remount, 320/390px viewports,
-  file:// single bundle and full MIT notice. Requires vendor Playwright and
-  a Chromium installation; optionally set MIR_CHROMIUM_EXECUTABLE. Screenshots
-  go to ignored `logs/surface-xaeroplus-*.png`.
+- The Chromium scenario (`test:surface-browser`) drove the surface through the
+  game screen that was removed on 2026-10-14 together with the Play button; it
+  was deleted with that screen. The surface itself stays covered by
+  `test:xaeroplus` and `test:surface`, and it can be mounted directly (the planet
+  workshop `planet.html` shows the same family of views).
 - `npm run build && npm run single && npm run test:build`: web/offline outputs,
   including MIT notice. `test:ui`, `test:earth` and `test:spacing` remain required.
