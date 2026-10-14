@@ -213,4 +213,3 @@ export const ORES = Object.freeze([
   { id: DIAMOND_ORE, name: 'Алмазная руда', minY: 1, maxY: 24, peak: 8, spread: 16, chance: 0.0011 },
   { id: EMERALD_ORE, name: 'Изумрудная руда', minY: 2, maxY: 96, peak: 40, spread: 70, chance: 0.0007, mountainsOnly: true },
 ]);
-
