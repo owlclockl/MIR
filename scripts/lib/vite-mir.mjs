@@ -229,10 +229,9 @@ export function mirServiceWorker({ version }) {
       if (bundle['sw.js']) return; // уже собран (несколько сборок в одном процессе)
 
       const publicPaths = publicFiles();
-      /* Фиксированные public-файлы тоже входят в отпечаток. Это особенно
-         важно для встроенного Azgaar: его статический редактор живёт под
-         /fmg/, а изменения в нём обязаны менять ключ офлайн-кэша, даже если
-         основной JS-бандл MIR остался прежним. */
+      /* Фиксированные public-файлы тоже входят в отпечаток: их изменения
+         обязаны менять ключ офлайн-кэша, даже если основной JS-бандл
+         остался прежним. */
       const publicFingerprint = publicPaths
         .map((name) => `${name}\n${createHash('sha256').update(readFileSync(join('public', name))).digest('hex')}`)
         .join('\n');

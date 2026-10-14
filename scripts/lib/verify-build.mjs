@@ -22,31 +22,11 @@ import { BUILD_INFO_FILE } from './vite-mir.mjs';
 
 const ROOT_FILES = ['dist', 'mir.html'];
 
-/* Бюджеты веса — сигнал о случайно попавших ресурсах, не запрет на продуктовые
-   функции. В основной бандл входят свой процедурный генератор (`src/gen/`),
-   основная поверхность (`src/game/world-map-view.js`) и дополнительный вид
-   планеты (`src/planet/`). Azgaar остаётся отдельным, лениво открываемым
-   редактором: его CSS — 262 КБ (бюджет 280 КБ), а однофайловая сборка вшивает
-   весь редактор — около 27 МиБ, бюджет 30 МиБ. Звуки web-версии по-прежнему
-   отдельными файлами, не в JS.
-
-   Пользовательского режима блочного среза нет: вертикальная модель генератора
-   остаётся внутренним источником высот, геологии и будущих игровых данных.
-   Основная карта рисует поверхность клетками и укладывается в общий бюджет JS.
-
-   Земной масштаб и основная карта (2026-10-14): карта использует размеры
-   40 075 017 × 20 003 932 м и детерминирована seed/размером. Варианты Azgaar
-   и планеты доступны дополнительно; точка входа приложения загружает карту
-   собственного генератора первой.
-
-   Редизайн главного меню: сцена получила сводку, навигацию и «Продолжить» по
-   последним мирам. Это продуктовая разметка и стили, а не случайно попавший
-   ресурс. Редактор Azgaar и его автономная сборка проверяются отдельно.
-*/
+/* Бюджеты веса. Генератор мира удалён (2026-10-14), поэтому проверок
+   Azgaar/FMG здесь больше нет. */
 export const BUDGETS = {
   js: 16 * 1024 * 1024,
   css: 4 * 1024 * 1024,
-  fmgCss: 4 * 1024 * 1024,
   single: 120 * 1024 * 1024,
 };
 
@@ -91,10 +71,6 @@ export function checkWeb() {
 
   const files = walk('dist');
   const html = readFileSync('dist/index.html', 'utf8');
-  const fmgHtmlPath = 'dist/fmg/index.html';
-  const fmgHtml = existsSync(fmgHtmlPath) ? readFileSync(fmgHtmlPath, 'utf8') : '';
-  const fmgFiles = files.filter((name) => name.startsWith('fmg/'));
-  const fmgEntry = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
   const manifestPath = join('dist', 'manifest.webmanifest');
   let manifest = null;
   try {
@@ -116,21 +92,7 @@ export function checkWeb() {
     'манифест PWA содержит полное имя и короткий системный ярлык',
     `name: ${manifest?.name ?? '—'}, short_name: ${manifest?.short_name ?? '—'}`,
   );
-  add(
-    fmgHtml.includes('<title>The civilization of the sages — редактор карт</title>')
-      && /<link rel="icon"[^>]*href="\/icons\/icon-48\.png"[^>]*sizes="48x48"/.test(fmgHtml),
-    'встроенный редактор карт использует бренд и фирменный favicon',
-  );
-  add(
-    Boolean(fmgHtml) && fmgFiles.length > 100 && Boolean(fmgEntry) && existsSync(join('dist', fmgEntry)),
-    'полный Azgaar FMG встроен в веб-сборку',
-    fmgHtml ? `${fmgFiles.length} файлов, входной модуль ${fmgEntry ?? 'не найден'}` : 'dist/fmg/index.html отсутствует',
-  );
-  add(
-    Boolean(fmgHtml) && !/googletagmanager\.com|storage\.googleapis\.com/.test(fmgHtml) && !existsSync('dist/fmg/sw.js'),
-    'FMG не запускает внешнюю аналитику или вложенный service worker',
-    'аналитика удалена, офлайн-кэш обслуживает приложение',
-  );
+  add(!existsSync('dist/fmg/index.html'), 'генератор Azgaar отсутствует в сборке', 'dist/fmg не должен существовать');
 
   const missing = localRefs(html).filter((ref) => !existsSync(join('dist', ref)));
   add(
@@ -151,14 +113,9 @@ export function checkWeb() {
   add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
   const appCode = jsFiles.map((name) => readFileSync(join('dist', name), 'utf8')).join('\n');
   add(
-    appCode.includes('fmg/index.html') && appCode.includes('world-editor-frame') && appCode.includes('mir-world-slots'),
-    'мир открывает Azgaar во встроенном редакторе и хранит слоты',
-    'iframe /fmg/index.html с seed и размером; слоты в mir-world-slots',
-  );
-  add(
-    appCode.includes('#optionsContainer') && appCode.includes('mir-player-restriction'),
-    'игрок открывает Azgaar с скрытыми панелями правки',
-    'ограничение применяется к документу редактора после загрузки',
+    appCode.includes('mir-world-slots') && !appCode.includes('fmg/index.html'),
+    'экран мира хранит слоты и не тянет удалённый генератор',
+    'слоты в mir-world-slots; ссылок на fmg быть не должно',
   );
 
   const jsBytes = jsFiles.reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -192,14 +149,6 @@ export function checkWeb() {
     .filter((name) => name.startsWith('assets/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
   add(mirCssBytes > 0 && mirCssBytes <= BUDGETS.css, `стили приложения в бюджете (${kb(BUDGETS.css)})`, kb(mirCssBytes));
-  const fmgCssBytes = files
-    .filter((name) => name.startsWith('fmg/') && name.endsWith('.css'))
-    .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
-  add(
-    fmgCssBytes > 0 && fmgCssBytes <= BUDGETS.fmgCss,
-    `стили Azgaar в бюджете (${kb(BUDGETS.fmgCss)})`,
-    kb(fmgCssBytes),
-  );
 
   /* Service worker: имя кэша и список оболочки. */
   if (!existsSync('dist/sw.js')) {
@@ -225,12 +174,6 @@ export function checkWeb() {
       precache.length > 2 && broken.length === 0,
       'список оболочки service worker существует целиком',
       broken.length ? `нет: ${broken.join(', ')}` : `${precache.length} файлов`,
-    );
-    const missingFmgPrecache = fmgFiles.filter((name) => !precache.includes(`/${name}`));
-    add(
-      fmgFiles.length > 100 && precache.includes('/fmg/index.html') && missingFmgPrecache.length === 0,
-      'весь редактор Azgaar включён в офлайн-кэш приложения',
-      missingFmgPrecache.length ? `вне precache: ${missingFmgPrecache.slice(0, 6).join(', ')}` : `${fmgFiles.length} файлов`,
     );
     add(
       new Set(precache).size === precache.length,
@@ -337,8 +280,6 @@ export function checkSingle() {
     'автономная версия сохраняет полное имя и фирменную фразу',
   );
 
-  /* Внутри шаблона Azgaar строки вида "/assets/icons/…" — ключи модулей, а не
-     ссылки на файлы: их подменяет сборщик. Поэтому ищем только атрибуты загрузки. */
   const forbidden = [
     ['<script[^>]*type="module"', 'модульный скрипт'],
     ['modulepreload', 'предзагрузка модулей'],
@@ -358,33 +299,7 @@ export function checkSingle() {
     external.filter((url) => !allowed || !/fonts\.g/.test(url)).join(', ') || `${external.length} ссылок`,
   );
 
-  /* Шаблон Azgaar лежит в JSON-строке, поэтому его атрибуты экранированы
-     (\"…\"). Скрипты и стили из него должны грузиться только из шрифтов:
-     внешний скрипт сломает офлайн-запуск. Ссылки в тексте справки
-     (картинки, встроенные страницы Watabou) открываются только по просьбе
-     игрока и здесь не проверяются. */
-  const templateMatch = html.match(/<script type="application\/json" id="mir-fmg-template">([\s\S]*?)<\/script>/);
-  let template = '';
-  try {
-    template = templateMatch ? JSON.parse(templateMatch[1]) : '';
-  } catch {
-    template = '';
-  }
-  add(template.length > 1_000_000, 'редактор Azgaar вшит в mir.html', template ? kb(template.length) : 'шаблон не найден');
-  /* Внешние скрипты сборщик уже вставляет внутрь; если ссылка на скрипт
-     осталась, это сломанная сборка — поэтому запрещаем любой <script src>. */
-  const templateScriptSrc = [...template.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
-  const templateStyles = [...template.matchAll(/<link[^>]*href="(https?:\/\/[^"]+)"[^>]*>/g)].map((m) => m[1]);
-  const externalCode = [...templateScriptSrc, ...templateStyles];
-  add(
-    templateScriptSrc.length === 0 && templateStyles.every(fontHost),
-    'редактор Azgaar не грузит скриптов по ссылкам и внешних стилей, кроме шрифтов',
-    externalCode.length ? `ссылок: ${externalCode.length}` : 'всё внутри файла',
-  );
-  add(
-    html.includes('Copyright 2017-2024 Max Haniyeu (Azgaar)') && html.includes('MIT License'),
-    'MIT-лицензия Azgaar и атрибуция сохранены в mir.html',
-  );
+  add(!html.includes('mir-fmg-template'), 'в mir.html нет вшитого редактора Azgaar');
 
   const expected = version();
   add(

@@ -19,5 +19,3 @@ logs/
 # server/data/mir-hub.json это правило НЕ удаляет из истории/индекса.
 server/data/
 
-# Картинка-черновик генератора планеты (scripts/planet-preview.mjs)
-planet-preview.png

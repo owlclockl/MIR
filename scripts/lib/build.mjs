@@ -13,7 +13,6 @@
 import { writeFileSync } from 'node:fs';
 import { build as viteBuild } from 'vite';
 import './root.mjs';
-import { buildEmbeddedEditor, embedTemplate } from './fmg-offline.mjs';
 import { singleFileHtml } from './vite-mir.mjs';
 
 /**
@@ -30,16 +29,12 @@ export async function buildWeb({ logLevel = 'warn' } = {}) {
 }
 
 /**
- * Однофайловая сборка mir.html: игра и редактор карт Azgaar в одном файле.
- * Редактор собирается из vendor/ (нужен `npm run fmg:install`) и вшивается
- * JSON-блоком после сборки игры — см. scripts/lib/fmg-offline.mjs.
+ * Однофайловая сборка mir.html.
  * @param {{ write?: boolean, logLevel?: string }} [options]
  *   write: false — только вернуть HTML, ничего не писать (нужно .apk);
  *   по умолчанию файл ещё и обновляется на диске.
  */
 export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) {
-  const editor = await buildEmbeddedEditor();
-
   /* Сборка идёт в память: на диск попадает ровно один файл — mir.html. */
   const result = await viteBuild({
     mode: 'single',
@@ -58,12 +53,8 @@ export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) 
         'Проверьте режим сборки: нужен `mode: "single"`.',
     );
 
-  const html = embedTemplate(game, editor.template);
-  if (!html.includes('id="mir-fmg-template"') || !html.includes('MIR_FMG_HOST'))
-    throw new Error('В mir.html не попал редактор Azgaar: шаблон не вшит.');
-
-  if (write) writeFileSync('mir.html', html);
-  return html;
+  if (write) writeFileSync('mir.html', game);
+  return game;
 }
 
 export { buildWeb as default };

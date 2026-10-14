@@ -3,11 +3,7 @@
    web    — `npm run build` → dist/: обычная модульная сборка с хешированными
             именами файлов; её раздаёт server/serve.mjs, хаб, Cloudflare и
             установщик .exe.
-   single — `npm run single` → mir.html: один файл, где JS и стили внутри
-            HTML; открывается двойным кликом, едет в .apk и на флешке.
-            Редактор карт Azgaar вшивается в него отдельной сборкой
-            (scripts/lib/fmg-offline.mjs), поэтому нужен `npm run fmg:install`.
-            Запускается программно с `write: false` — см. scripts/lib/build.mjs.
+   single — `npm run single` → mir.html: один файл, где JS и стили внутри HTML.
 
    Никаких правил «допиши версию в четырёх местах»: версия берётся из
    package.json, имя кэша service worker — из неё и хеша содержимого. */
@@ -26,8 +22,8 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
 
   return {
-    /* Версия доступна коду как __APP_VERSION__. Карта мира — Azgaar в обеих
-       сборках: в web/PWA он берётся из public/fmg, в mir.html вшит целиком. */
+    /* Версия доступна коду как __APP_VERSION__. Генератора мира в сборке
+       нет (удалён 2026-10-14) — экран карты показывает заглушку. */
     define: {
       __APP_VERSION__: JSON.stringify(version),
     },

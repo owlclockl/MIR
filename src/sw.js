@@ -81,13 +81,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate' || request.destination === 'document') {
-    /* Основной экран — SPA (`/`), но встроенный редактор Azgaar — отдельный
-       документ (`/fmg/index.html`). Не кладём её в ключ `/`: иначе обычная
-       страница игры при следующем офлайн-запуске превращается в карту. */
-    const documentPath =
-      url.pathname === '/fmg' || url.pathname === '/fmg/'
-        ? '/fmg/index.html'
-        : url.pathname.startsWith('/fmg/') ? url.pathname : '/';
+    const documentPath = '/';
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .then((response) => {
@@ -102,9 +96,7 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     (async () => {
-      /* Azgaar annotates fixed-path assets with ?v=...; the offline precache
-         stores their canonical path without that query. */
-      const cached = await caches.match(request, { ignoreSearch: url.pathname.startsWith('/fmg/') });
+      const cached = await caches.match(request);
       const fresh = fetch(request)
         .then((response) => {
           if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone())).catch(() => {});
