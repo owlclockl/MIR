@@ -327,8 +327,8 @@ if (view) {
   await wait(40);
   add(/Azgaar/i.test(sourceNote()), 'отказ пересъёма объяснён, а не проглочен', sourceNote());
 
-  /* Живой документ: те же поля, что читает воксельный мост, наклеены на окно
-     iframe — вид обязан подхватить географию и пересобрать мир. */
+  /* Живой документ: поля, которые читает мост снимка Azgaar, наклеены на окно
+     iframe — вид планеты обязан подхватить географию и пересобрать мир. */
   Object.assign(frame.contentWindow, fakeEditorWindow());
   resync.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   await wait(120);

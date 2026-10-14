@@ -37,7 +37,7 @@
   /* Связь через хаб — не ошибка, но и не идеал: тёплый оттенок. */
   --warn: #d9c08a;
   --warn-glow: rgba(217, 192, 138, 0.4);
-  --voxel-frame: rgba(8, 13, 14, 0.72); /* плашки над картой блоками: HUD, панель ярусов, пояснение */
+  --map-frame: rgba(8, 13, 14, 0.82); /* полупрозрачные панели и подписи поверх карты */
   --accent-glow: rgba(176, 208, 186, 0.45);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
   --dur: 160ms;
@@ -4603,8 +4603,7 @@ button.admin-file-row--active:hover {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  /* Фон карты — лесная ночь, не чистый чёрный: между открытием карты и
-     прорисовкой редактора чёрный прямоугольник мигает. */
+  /* Тот же фон, что у интерфейса карты, пока основной слой строится. */
   background: var(--world-bg);
 }
 
@@ -5231,31 +5230,14 @@ button.admin-file-row--active:hover {
   font-size: 13px;
 }
 
-/* ---------- карта: воксельный вид того же мира ---------------- */
-
-/* Режим — надстройка над редактором, а не новый экран: документ Azgaar живёт
-под холстом (его пересоздание перезапустило бы генерацию), поэтому карта
-просто скрывается visibility, а не вынимается из DOM. */
-
-.world-app.is-voxel .world-editor-frame {
-  visibility: hidden;
-}
-
-.world-app.is-voxel .world-attribution {
-  display: none;
-}
-
 .world-topbar-button.is-on {
   color: var(--world-bg);
   border-color: var(--accent);
   background: var(--accent);
 }
 
-/* Появление карты блоков: вся карта проявляется разом — из размытия и
-   лёгкого приближения к резкой картинке за один проход, без поэтапного
-   открытия. Кольцо света проходит по контуру, панели входят сразу после.
-   Включается классом is-reveal, который ставит world-view при монтировании. */
-@keyframes voxel-reveal {
+/* Появление основной карты: мягкое раскрытие полотна и управляющих панелей. */
+@keyframes world-map-reveal {
   0% {
     opacity: 0;
     transform: scale(1.07);
@@ -5272,7 +5254,7 @@ button.admin-file-row--active:hover {
   }
 }
 
-@keyframes voxel-ring {
+@keyframes world-map-ring {
   0% {
     opacity: 0.9;
     transform: translate(-50%, -50%) scale(0.05);
@@ -5283,7 +5265,7 @@ button.admin-file-row--active:hover {
   }
 }
 
-@keyframes voxel-rise {
+@keyframes world-map-rise {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -5294,12 +5276,12 @@ button.admin-file-row--active:hover {
   }
 }
 
-.world-voxel.is-reveal .world-voxel-canvas {
-  animation: voxel-reveal 1.5s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+.world-map-view.is-reveal .world-map-view-canvas {
+  animation: world-map-reveal 1.5s cubic-bezier(0.22, 0.8, 0.24, 1) both;
   will-change: transform, filter, opacity;
 }
 
-.world-voxel.is-reveal::before {
+.world-map-view.is-reveal::before {
   content: '';
   position: absolute;
   left: 50%;
@@ -5312,26 +5294,26 @@ button.admin-file-row--active:hover {
   pointer-events: none;
   z-index: 4;
   transform: translate(-50%, -50%) scale(0.05);
-  animation: voxel-ring 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) 0.05s both;
+  animation: world-map-ring 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) 0.05s both;
 }
 
-.world-voxel.is-reveal .world-voxel-layers,
-.world-voxel.is-reveal .world-voxel-toolbar,
-.world-voxel.is-reveal .world-voxel-note {
-  animation: voxel-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1s both;
+.world-map-view.is-reveal .world-map-view-layers,
+.world-map-view.is-reveal .world-map-view-toolbar,
+.world-map-view.is-reveal .world-map-view-note {
+  animation: world-map-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1s both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .world-voxel.is-reveal .world-voxel-canvas,
-  .world-voxel.is-reveal::before,
-  .world-voxel.is-reveal .world-voxel-layers,
-  .world-voxel.is-reveal .world-voxel-toolbar,
-  .world-voxel.is-reveal .world-voxel-note {
+  .world-map-view.is-reveal .world-map-view-canvas,
+  .world-map-view.is-reveal::before,
+  .world-map-view.is-reveal .world-map-view-layers,
+  .world-map-view.is-reveal .world-map-view-toolbar,
+  .world-map-view.is-reveal .world-map-view-note {
     animation: none;
   }
 }
 
-.world-voxel {
+.world-map-view {
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -5341,10 +5323,10 @@ button.admin-file-row--active:hover {
 }
 
 /* Полотно размером с окно: клетки карты считаются в маленький холст и
-растягиваются на экран, и только pixelated держит сетку блоков ровной
-(сглаживание превратило бы карту в кашу из полутонов). */
+растягиваются на экран, и только pixelated держит клетки карты чёткими
+(сглаживание превратило бы небольшие детали в кашу из полутонов). */
 
-.world-voxel-canvas {
+.world-map-view-canvas {
   flex: 1 1 auto;
   display: block;
   width: 100%;
@@ -5357,11 +5339,11 @@ button.admin-file-row--active:hover {
   touch-action: none;
 }
 
-.world-voxel-canvas:active {
+.world-map-view-canvas:active {
   cursor: grabbing;
 }
 
-.world-voxel-canvas:focus-visible {
+.world-map-view-canvas:focus-visible {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
@@ -5369,7 +5351,8 @@ button.admin-file-row--active:hover {
    Она внутри панели слоёв, а не поверх полотна: абсолютная плашка с
    фиксированным отступом неизбежно легла бы на ползунок и кнопки. */
 
-.world-voxel-hud {
+.world-map-view-hud {
+  margin: 0;
   padding: var(--sp-6) var(--sp-6) 0;
   border-top: 1px solid var(--world-line);
   color: var(--text-soft);
@@ -5377,7 +5360,7 @@ button.admin-file-row--active:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.world-voxel-toolbar {
+.world-map-view-toolbar {
   position: absolute;
   top: var(--sp-12);
   right: var(--sp-12);
@@ -5385,14 +5368,14 @@ button.admin-file-row--active:hover {
   gap: var(--sp-6);
 }
 
-.world-voxel-button {
+.world-map-view-button {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-6);
   height: var(--control-h-sm);
   padding: 0 var(--sp-12);
   border: 1px solid var(--world-line);
-  background: var(--voxel-frame);
+  background: var(--map-frame);
   color: var(--text-soft);
   font: 600 12px/1 var(--font-ui);
   white-space: nowrap;
@@ -5400,20 +5383,18 @@ button.admin-file-row--active:hover {
   transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-.world-voxel-button:hover,
+.world-map-view-button:hover,
 
-.world-voxel-button:focus-visible {
+.world-map-view-button:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
   background: var(--fill-hover);
   outline: none;
 }
 
-/* Панель ярусов: ползунок, пресеты, масштаб и наложения. Это единственный
-слой интерфейса режима, который ловит мышь, поэтому он прижат к низу и не
-тянется на всю ширину — карту можно таскать и под ним. */
+/* Панель слоёв и масштаба компактна, чтобы карта оставалась доступна для панорамирования. */
 
-.world-voxel-layers {
+.world-map-view-layers {
   position: absolute;
   left: var(--sp-12);
   bottom: var(--sp-12);
@@ -5423,28 +5404,28 @@ button.admin-file-row--active:hover {
   max-width: calc(100% - var(--sp-24));
   padding: var(--sp-8) var(--sp-10);
   border: 1px solid var(--world-line);
-  background: var(--voxel-frame);
+  background: var(--map-frame);
 }
 
-.world-voxel-row {
+.world-map-view-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-6);
 }
 
-.world-voxel-label {
+.world-map-view-label {
   color: var(--text-dim);
   font: 600 10px/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
-.world-voxel-label--right {
+.world-map-view-label--right {
   margin-left: var(--sp-8);
 }
 
-.world-voxel-step {
+.world-map-view-step {
   width: var(--control-h-mini);
   height: var(--control-h-mini);
   padding: 0;
@@ -5455,32 +5436,22 @@ button.admin-file-row--active:hover {
   cursor: pointer;
 }
 
-.world-voxel-step:hover,
+.world-map-view-step:hover,
 
-.world-voxel-step:focus-visible {
+.world-map-view-step:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
   background: var(--fill-hover);
   outline: none;
 }
 
-.world-voxel-value {
+.world-map-view-value {
   color: var(--text-soft);
   font: 500 11px/1.3 var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
 
-/* Ползунок яруса шире прочих: по нему водят мышью, ищут нужный срез. */
-
-.world-voxel-slider {
-  width: clamp(140px, 34vw, 420px);
-  height: var(--control-h-mini);
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: ew-resize;
-}
-
-.world-voxel-chip {
+.world-map-view-chip {
   height: var(--control-h-mini);
   padding: 0 var(--sp-8);
   border: 1px solid var(--world-line);
@@ -5491,32 +5462,31 @@ button.admin-file-row--active:hover {
   transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-.world-voxel-chip:hover,
+.world-map-view-chip:hover,
 
-.world-voxel-chip:focus-visible {
+.world-map-view-chip:focus-visible {
   color: var(--text);
   border-color: var(--world-line-strong);
   background: var(--fill-hover);
   outline: none;
 }
 
-.world-voxel-chip.is-on {
+.world-map-view-chip.is-on {
   color: var(--world-bg);
   border-color: var(--accent);
   background: var(--accent);
 }
 
-/* Пояснение режима: чем засеян мир, чего не хватает. Тонкая тёплая плашка —
-это не ошибка, это состояние. */
+/* Краткое пояснение к выбранному слою — тонкая тёплая плашка над картой. */
 
-.world-voxel-note {
+.world-map-view-note {
   position: absolute;
-  top: var(--sp-12);
+  top: calc(var(--sp-12) + var(--control-h-sm) + var(--sp-6));
   left: 50%;
   margin: 0;
   padding: var(--sp-6) var(--sp-14);
   border: 1px solid var(--warn-glow);
-  background: var(--voxel-frame);
+  background: var(--map-frame);
   color: var(--warn);
   font: 500 11px/1.45 var(--font-ui);
   text-align: center;
@@ -5528,7 +5498,7 @@ button.admin-file-row--active:hover {
    нижнем углу — напротив панели слоёв, которая слева, — и не ловит мышь:
    кликов по ней нет, это подпись к картинке. */
 
-.world-voxel-legend {
+.world-map-view-legend {
   position: absolute;
   right: var(--sp-12);
   bottom: var(--sp-12);
@@ -5540,7 +5510,7 @@ button.admin-file-row--active:hover {
   pointer-events: none;
 }
 
-.world-voxel-legend__item {
+.world-map-view-legend__item {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-6);
@@ -5548,7 +5518,7 @@ button.admin-file-row--active:hover {
   font: 500 10px/1.2 var(--font-ui);
 }
 
-.world-voxel-legend__item i {
+.world-map-view-legend__item i {
   width: 9px;
   height: 9px;
   border: 1px solid rgba(0, 0, 0, 0.45);
@@ -5557,7 +5527,7 @@ button.admin-file-row--active:hover {
 /* Полоска проявления: карта рисуется строками, и без неё не видно, что мир
    ещё считается, — кадр просто стоит недорисованным. */
 
-.world-voxel-progress {
+.world-map-view-progress {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -5568,11 +5538,11 @@ button.admin-file-row--active:hover {
   transition: opacity 0.2s ease;
 }
 
-.world-voxel-progress.is-on {
+.world-map-view-progress.is-on {
   opacity: 1;
 }
 
-.world-voxel-progress i {
+.world-map-view-progress i {
   display: block;
   width: 0;
   height: 100%;
@@ -5580,11 +5550,9 @@ button.admin-file-row--active:hover {
   transition: width 0.12s linear;
 }
 
-/* Ожидание мира: генератор строит материки и реки ступенями, и до готовности
-   среза показывать нечего. Это не ошибка и не пустая сцена — это состояние,
-   поэтому в центре спокойный пульс и сказано, чего именно ждём. */
+/* Ожидание мира: пока рассчитываются рельеф и реки, карта сообщает о ходе работы. */
 
-.world-voxel-wait {
+.world-map-view-wait {
   position: absolute;
   inset: 0;
   display: flex;
@@ -5596,36 +5564,81 @@ button.admin-file-row--active:hover {
   text-align: center;
 }
 
-.world-voxel-wait__pulse {
+.world-map-view-wait__pulse {
   width: 34px;
   height: 34px;
   border: 2px solid var(--world-line-strong);
   border-top-color: var(--world-accent);
   border-radius: 50%;
-  animation: voxel-wait-spin 1.1s linear infinite;
+  animation: world-map-wait-spin 1.1s linear infinite;
 }
 
-.world-voxel-wait__text {
+.world-map-view-wait__text {
   margin: 0;
   color: var(--world-muted);
   font: 500 var(--fs-base)/1.5 var(--font-ui);
   max-width: 46ch;
 }
 
-@keyframes voxel-wait-spin {
+@keyframes world-map-wait-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .world-voxel-wait__pulse {
+  .world-map-view-wait__pulse {
     animation: none;
   }
 }
 
-/* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.
-   Снимается, когда пошёл первый шаг генерации (generation-stage.js). */
+@media (max-width: 640px) {
+  .world-map-view-toolbar {
+    top: var(--sp-8);
+    right: var(--sp-8);
+  }
+
+  .world-map-view-button {
+    width: var(--control-h-sm);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .world-map-view-button > span,
+  .world-map-view-legend {
+    display: none;
+  }
+
+  .world-map-view-layers {
+    right: var(--sp-8);
+    bottom: var(--sp-8);
+    left: var(--sp-8);
+    max-width: none;
+    max-height: min(46dvh, 320px);
+    overflow: auto;
+    padding: var(--sp-6) var(--sp-8);
+    background: rgba(8, 13, 14, 0.94);
+  }
+
+  .world-map-view-row {
+    gap: var(--sp-4);
+  }
+
+  .world-map-view-row .world-map-view-label--right {
+    margin-left: auto;
+  }
+
+  .world-map-view-note {
+    top: calc(var(--sp-8) + var(--control-h-sm) + var(--sp-8));
+    max-width: calc(100% - var(--sp-16));
+    font-size: 10px;
+  }
+
+  .world-map-view-hud {
+    font-size: 10px;
+  }
+}
+
 /* ---------- лобби: экран, плашка статуса, вход из слотов ---------- */
 
 .world-lobby-entry {
@@ -5812,6 +5825,8 @@ button.admin-file-row--active:hover {
   margin-left: var(--sp-12);
 }
 
+/* Накладка на время подъёма редактора Azgaar: фон и печать, как у заставки.
+   Снимается, когда пошёл первый шаг генерации (generation-stage.js). */
 .world-editor-cover {
   position: absolute;
   inset: 0;
@@ -6031,7 +6046,7 @@ button.admin-file-row--active:hover {
   }
 }
 
-/* ---------- карта планеты: плоская карта вместо воксельного мира ---------- */
+/* ---------- дополнительный планетарный вид -------------------------- */
 
 /* Тот же хост, что у редактора (.world-editor), но вместо iframe — холст:
    карта планеты считается сама, документ Azgaar ей не нужен. Панель
@@ -6489,8 +6504,7 @@ button.admin-file-row--active:hover {
   }
 }
 
-/* ---------- тестовый процедурный 2D-генератор мира ---------- */
-
+/* Краткая подпись справа от кнопки «Играть» в навигации. */
 .sidenav__play-sub {
   margin-left: auto;
   font-size: var(--fs-micro);
@@ -6498,157 +6512,13 @@ button.admin-file-row--active:hover {
   opacity: 0.82;
 }
 
-.world-app.is-proc-gen .world-editor-frame,
+.world-app.is-world-map .world-editor-frame,
 .world-app.is-planet .world-editor-frame {
   visibility: hidden;
   pointer-events: none;
 }
 
-.proc-gen {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: #0c1826;
-  color: var(--text);
+.world-app.is-world-map .world-attribution,
+.world-app.is-planet .world-attribution {
+  display: none;
 }
-
-.proc-gen__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-8);
-  padding: var(--sp-8) var(--sp-12);
-  border-bottom: 1px solid var(--world-line);
-  background: rgba(10, 17, 22, 0.94);
-}
-
-.proc-gen__group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-6);
-}
-
-.proc-gen__field {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-}
-
-.proc-gen__label {
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.proc-gen__input,
-.proc-gen__select {
-  height: var(--control-h-sm);
-  padding-inline: var(--sp-8);
-  border: 1px solid var(--world-line);
-  background: rgba(15, 24, 34, 0.9);
-  color: var(--text);
-  font: 500 var(--fs-xs) var(--font-ui);
-}
-
-.proc-gen__input {
-  width: 148px;
-}
-
-.proc-gen__chip {
-  height: var(--control-h-sm);
-  padding-inline: var(--sp-10);
-  border: 1px solid var(--world-line);
-  background: rgba(18, 28, 38, 0.72);
-  color: var(--text-dim);
-  font: 600 var(--fs-xs) var(--font-ui);
-  cursor: pointer;
-}
-
-.proc-gen__chip.is-active {
-  border-color: var(--accent);
-  background: var(--accent-fill);
-  color: var(--accent);
-}
-
-.proc-gen__slider-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-}
-
-.proc-gen__slider-wrap input[type='range'] {
-  width: 84px;
-  accent-color: var(--accent);
-}
-
-.proc-gen__btn {
-  height: var(--control-h-sm);
-  padding-inline: var(--sp-10);
-  font-size: var(--fs-xs);
-}
-
-.proc-gen__icon-btn {
-  width: var(--control-h-sm);
-  height: var(--control-h-sm);
-  padding: 0;
-  justify-content: center;
-}
-
-.proc-gen__zoom-val {
-  min-width: 44px;
-  text-align: center;
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-}
-
-.proc-gen__stage {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-  background: #0b1929;
-}
-
-.proc-gen__canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  cursor: grab;
-}
-
-.proc-gen__canvas:active {
-  cursor: grabbing;
-}
-
-.proc-gen__hud {
-  position: absolute;
-  top: var(--sp-10);
-  left: var(--sp-12);
-  padding: var(--sp-6) var(--sp-10);
-  border: 1px solid var(--world-line);
-  background: rgba(8, 14, 20, 0.84);
-  color: var(--text);
-  font-size: var(--fs-xs);
-  pointer-events: none;
-}
-
-.proc-gen__inspector {
-  position: absolute;
-  bottom: var(--sp-10);
-  left: var(--sp-12);
-  right: var(--sp-12);
-  padding: var(--sp-8) var(--sp-12);
-  border: 1px solid var(--world-line);
-  background: rgba(8, 14, 20, 0.88);
-  color: var(--text);
-  font-size: var(--fs-xs);
-  pointer-events: none;
-}
-

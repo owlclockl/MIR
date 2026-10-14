@@ -248,8 +248,8 @@ for (let i = 0; i < deepTile.length; i += 1) if (!Number.isFinite(deepTile[i])) 
 add(sourcedNaN === 0, 'на глубоком уровне с картой тоже нет NaN', `${sourcedNaN} пикселей`);
 
 /* Мост в Azgaar — единственное место, где поле знает имена генератора.
-   Снимок с поддельного окна обязан быть годен планете: имена те же, что и у
-   воксельного мира, значит расхождение имён ловится здесь, а не в браузере. */
+   Снимок с поддельного окна обязан быть годен планете: расхождение имён
+   ловится здесь, а не в браузере. Основная карта от Azgaar не зависит. */
 const bridgeSource = readSource(fakeEditorWindow(), { seed: 'mir-2026', width: 96, height: 96 });
 const bridgeField = createSourceField(earth, bridgeSource);
 const bridgeSample = bridgeField.baseAt(earth.widthM / 2, earth.heightM / 2);

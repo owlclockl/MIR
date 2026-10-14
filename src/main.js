@@ -13,7 +13,7 @@ import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
-import { mountBlockWorldView } from './game/mc-world-view.js';
+import { mountWorldMapView } from './game/world-map-view.js';
 import { mountPlanetView } from './planet/view.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
@@ -2231,18 +2231,15 @@ const worldFrameKey = (session) =>
 
 const createWorldSession = () => ({
   open: false,
-  screen: 'slots', // slots — выбор слота, setup — настройка или вход, map — редактор Azgaar
+  screen: 'slots', // slots — выбор слота, setup — настройка или вход, map — карта мира
   tab: 'master', // вкладка экрана слотов: master | player
-  mode: 'master', // роль открытой карты: master — полный редактор, player — панели правки скрыты
+  mode: 'master', // master получает редактор Azgaar, player — режим просмотра
   slot: null, // { role, index } — слот, который заполняем или открыли
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  voxel: false, // режим «Карта блоками»: тот же мир ярусами, срез плоскостью
-  procGen: false, // режим «Тест-генератор»: тот же мир картой — биомы и рельеф
-  blockView: null, // смонтированный вид блочного мира; он один на оба режима
-  blockMode: '', // каким слоем открыт вид: 'map' или 'blocks'
-  planet: false, // надстройка «планетарный генератор 23 слоя»
+  viewMode: 'map', // основной вид — наша карта; доступны также Azgaar и планетарный просмотр
+  worldMapView: null, // смонтированная основная процедурная карта
   planetView: null, // смонтированный вид планеты
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // остановка синхронизации лобби для текущего iframe
@@ -2314,7 +2311,7 @@ const worldSlotsHtml = (session) => {
             <p class="world-card__eyebrow"><span>Картотека</span><span class="world-slots__total">${store.WORLD_SLOT_COUNT} ячеек</span></p>
             <h2>${player ? 'Выберите карту для входа' : 'Выберите мир для управления'}</h2>
             <p class="world-slots__lead">${player
-              ? 'Войдите по seed мастера или загрузите файл карты. В режиме игрока панели правки Azgaar скрыты.'
+              ? 'Войдите по seed мастера или загрузите файл карты. Карта доступна для просмотра; панели редактирования Azgaar скрыты.'
               : 'Создайте карту в свободном слоте или продолжите работу с сохранённым миром.'}</p>
             <p class="world-slots__progress" aria-label="Занято слотов: ${slots[role].filter(Boolean).length} из ${store.WORLD_SLOT_COUNT}"><span style="--filled:${slots[role].filter(Boolean).length / store.WORLD_SLOT_COUNT}"></span><small>${slots[role].filter(Boolean).length} / ${store.WORLD_SLOT_COUNT} занято</small></p>
           </div>
@@ -2340,18 +2337,18 @@ const worldModeToolsHtml = (player) => `
   <section class="world-card world-mode-panel">
     <header class="world-card__heading world-card__heading--compact">
       <div><p class="world-card__eyebrow">Роль доступа</p><h3>${icon(player ? 'eye' : 'crown', 'icon--sm')}<span>${WORLD_ROLE_LABELS[player ? 'player' : 'master']}</span></h3></div>
-      <span class="world-tag world-tag--mode">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ПАНЕЛИ СКРЫТЫ' : 'ПОЛНЫЙ РЕДАКТОР'}</span></span>
+      <span class="world-tag world-tag--mode">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ТОЛЬКО ПРОСМОТР' : 'ПОЛНЫЙ РЕДАКТОР'}</span></span>
     </header>
     <ul class="world-mode-list">
       ${(player
         ? [
-            ['check', 'Просмотр карты: перемещение и масштаб'],
-            ['x', 'Слои, генерация, экспорт и сохранение скрыты'],
-            ['x', 'Создание карты и смена seed'],
+            ['check', 'Основная карта и тематические слои доступны для просмотра'],
+            ['x', 'Редактирование карты Azgaar и экспорт изменений'],
+            ['x', 'Создание нового мира и смена seed'],
           ]
         : [
-            ['check', 'Быстрый 2D тест-генератор: рельеф, биомы, реки, государства'],
-            ['check', 'Мгновенная воксельная карта блоками и редактор Azgaar'],
+            ['check', 'Основная карта мира: биомы, рельеф, материки, климат и поселения'],
+            ['check', 'Дополнительно: редактор Azgaar и планетарный просмотр'],
             ['check', 'Экспорт seed и размера карты в файл'],
             ['check', 'Новый мир в один клик'],
           ])
@@ -2359,8 +2356,8 @@ const worldModeToolsHtml = (player) => `
         .join('')}
     </ul>
     <p class="world-mode-note">${player
-      ? 'Ограничение интерфейсное: панели скрыты, но не заблокированы.'
-      : 'Карта строится детерминированно по seed и размеру и доступна сразу в трёх режимах: Тест-генератор 2D, Карта блоками и Azgaar.'}</p>
+      ? 'Основную карту можно исследовать; панели правки Azgaar скрыты интерфейсом.'
+      : 'Основная карта строится по seed и размеру. Редактор Azgaar и планетарный просмотр доступны как дополнительные виды.'}</p>
   </section>`;
 
 const worldSetupHtml = (session) => {
@@ -2374,7 +2371,7 @@ const worldSetupHtml = (session) => {
         <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
         <p class="world-config__lead">${player
           ? 'Введите seed и размер, которые назвал мастер, или загрузите файл карты. Тогда мир будет тем же, что у мастера.'
-          : 'Карта займёт этот слот и построится по единому seed. Вы сможете переключаться между Тест-генератором, Картой блоками и редактором Azgaar.'}</p>
+          : 'Карта займёт этот слот и построится по единому seed. Сначала откроется наша основная карта; редактор Azgaar и планетарный просмотр доступны отдельно.'}</p>
         <label class="field world-field">
           <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
@@ -2384,7 +2381,7 @@ const worldSetupHtml = (session) => {
           </span>
           <span class="world-field__hint">${player
             ? 'Seed выдаёт мастер. Введите его без изменений.'
-            : 'Seed определяет рельеф, климат, реки, биомы, государства и города.'}</span>
+            : 'Seed определяет материки, биомы, рельеф, климат, реки и поселения основной карты.'}</span>
         </label>
         <div class="world-field">
           <span class="field__label" id="world-size-label">Размер карты</span>
@@ -2396,7 +2393,7 @@ const worldSetupHtml = (session) => {
           </div>
           <span class="world-field__hint">${player
             ? 'Выберите тот же размер, что у мастера, чтобы континенты и реки совпали.'
-            : 'Стандартная 1600×1000 генерируется мгновенно и подходит для всех режимов.'}</span>
+            : 'Стандартная 1600×1000 генерируется мгновенно и подходит для основной карты.'}</span>
         </div>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
           <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
@@ -2407,7 +2404,7 @@ const worldSetupHtml = (session) => {
     </div>`;
 };
 
-/* Экран карты: сам iframe создаёт mountWorldEditor, здесь только место под него. */
+/* Хост основной карты; дополнительные виды подключает syncWorldViews по запросу. */
 const worldMapHtml = () => `
   <div class="world-map">
     <div class="world-editor" data-role="world-editor-host"></div>
@@ -2452,11 +2449,12 @@ const worldPageHtml = () => {
     : screen === 'map' && session.lobby
       ? `<button class="world-topbar-button" type="button" data-action="world-lobby-back" aria-label="К лобби" title="К лобби">${icon('chevronLeft', 'icon--xs')}<span>К лобби</span></button>`
       : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
+  const editorLabel = player ? 'Карта Azgaar' : 'Редактор Azgaar';
   const mapViewButtons = screen === 'map'
     ? `
-        <button class="world-topbar-button" type="button" data-action="world-proc-gen" aria-label="Тест-генератор" title="Карта нового генератора: биомы, рельеф, климат — тот же мир, что и в карте блоками">${icon('compass', 'icon--xs')}<span>Тест-генератор</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-planet" aria-label="Планета 23 слоя" title="Планетарный генератор: 23 слоя, тектоника, атмосфера, гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Тот же мир ярус за ярусом: блок за блоком, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
+        <button class="world-topbar-button${session.viewMode === 'map' ? ' is-on' : ''}" type="button" data-action="world-map-view" aria-label="Основная карта" aria-pressed="${session.viewMode === 'map'}" title="Основная карта мира: биомы, рельеф, материки, климат и поселения">${icon('compass', 'icon--xs')}<span>Карта мира</span></button>
+        <button class="world-topbar-button${session.viewMode === 'editor' ? ' is-on' : ''}" type="button" data-action="world-editor" aria-label="${editorLabel}" aria-pressed="${session.viewMode === 'editor'}" title="${player ? 'Просмотр карты Azgaar в режиме игрока' : 'Открыть редактор Azgaar'}">${icon('map', 'icon--xs')}<span>${editorLabel}</span></button>
+        <button class="world-topbar-button${session.viewMode === 'planet' ? ' is-on' : ''}" type="button" data-action="world-planet" aria-label="Планетарный вид" aria-pressed="${session.viewMode === 'planet'}" title="Планетарный вид: тектоника, атмосфера, климат и гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -2517,26 +2515,29 @@ const renderWorldPage = ({ focus = false } = {}) => {
     renderedWorldPageHtml = html;
     if (focus) root.querySelector('[data-role="world-seed"]')?.focus();
   }
-  mountWorldEditor();
-  syncWorldVoxel();
+  syncWorldViews();
   paintLobbyChip();
 };
 
-/* Документ Azgaar создаётся один раз на сочетание роли, seed и размера.
-   Перерисовка страницы документ не трогает — он пересоздаётся только если
-   экран карты показан заново или параметры сменились. */
+/* Документ Azgaar нужен редактору, планетарному виду и синхронизации лобби.
+   Основная процедурная карта его не загружает: миллион точек не должен
+   генерироваться в фоне, пока игрок смотрит наш собственный мир. */
 const mountWorldEditor = () => {
   const session = ui.world;
   const host = worldRoot()?.querySelector('[data-role="world-editor-host"]');
-  if (!session?.open || session.screen !== 'map' || !host) return;
+  if (!session?.open || session.screen !== 'map' || !host) return null;
   const key = worldFrameKey(session);
-  if (session.frameKey === key && host.firstElementChild) return;
+  const existing = host.querySelector('[data-role="world-editor"]');
+  if (session.frameKey === key && existing) return existing;
+
   session.frameKey = key;
   session.syncStop?.();
   session.syncStop = null;
+  host.querySelector('[data-role="world-editor-error"]')?.remove();
   try {
     const frame = createEditorFrame(session.config, { restricted: session.mode === 'player' });
-    host.replaceChildren(frame);
+    existing?.remove();
+    host.prepend(frame);
     if (session.lobby) {
       session.syncStop = startLobbySync(frame, {
         lobbyId: session.lobby.id,
@@ -2544,138 +2545,131 @@ const mountWorldEditor = () => {
         fresh: session.lobby.fresh,
       });
     }
+    return frame;
   } catch (error) {
     session.frameKey = '';
-    host.innerHTML = `<p class="world-editor-error" role="alert">Редактор карты не открылся: ${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`;
+    const message = document.createElement('p');
+    message.className = 'world-editor-error';
+    message.dataset.role = 'world-editor-error';
+    message.setAttribute('role', 'alert');
+    existing?.remove();
+    message.textContent = `Редактор карты не открылся: ${error instanceof Error ? error.message : String(error)}`;
+    host.prepend(message);
+    toast(message.textContent, 'error');
+    return null;
   }
 };
 
-/* Вид блочного мира — надстройка над экраном карты, но не над документом
-   Azgaar: и «Тест-генератор», и «Карта блоками» показывают один и тот же мир
-   собственного генератора, только разными слоями. Редактор карты (iframe)
-   остаётся под видом и при переключении не перерисовывается: иначе каждый вход
-   в режим запускал бы генерацию Azgaar заново. */
-const syncWorldVoxel = () => {
+/* Основная карта — первый и обычный вид. Редактор Azgaar открывается только
+   по запросу; в лобби его документ всё же поднимается скрытым, чтобы работала
+   прежняя синхронизация карты и правок мастера. */
+const syncWorldViews = () => {
   const session = ui.world;
   const root = worldRoot();
   const app = root?.querySelector('.world-app');
   if (!session?.open || !app) return;
 
-  const wantedProc = session.screen === 'map' && session.procGen === true;
-  const wantedPlanet = session.screen === 'map' && session.planet === true && !wantedProc;
-  const wantedVoxel = session.screen === 'map' && session.voxel === true && !wantedProc && !wantedPlanet;
-  const mode = wantedProc ? 'map' : wantedVoxel ? 'blocks' : '';
+  const onMap = session.screen === 'map' && session.viewMode === 'map';
+  const onEditor = session.screen === 'map' && session.viewMode === 'editor';
+  const onPlanet = session.screen === 'map' && session.viewMode === 'planet';
+  app.classList.toggle('is-world-map', onMap);
+  app.classList.toggle('is-planet', onPlanet);
 
-  app.classList.toggle('is-proc-gen', wantedProc);
-  app.classList.toggle('is-planet', wantedPlanet);
-  app.classList.toggle('is-voxel', wantedVoxel);
-
-  const procBtn = app.querySelector('[data-action="world-proc-gen"]');
-  procBtn?.classList.toggle('is-on', wantedProc);
-  procBtn?.setAttribute('aria-pressed', wantedProc ? 'true' : 'false');
-
-  const planetBtn = app.querySelector('[data-action="world-planet"]');
-  planetBtn?.classList.toggle('is-on', wantedPlanet);
-  planetBtn?.setAttribute('aria-pressed', wantedPlanet ? 'true' : 'false');
-
-  const button = app.querySelector('[data-action="world-voxel"]');
-  button?.classList.toggle('is-on', wantedVoxel);
-  button?.setAttribute('aria-pressed', wantedVoxel ? 'true' : 'false');
+  const mapButton = app.querySelector('[data-action="world-map-view"]');
+  mapButton?.classList.toggle('is-on', onMap);
+  mapButton?.setAttribute('aria-pressed', onMap ? 'true' : 'false');
+  const editorButton = app.querySelector('[data-action="world-editor"]');
+  editorButton?.classList.toggle('is-on', onEditor);
+  editorButton?.setAttribute('aria-pressed', onEditor ? 'true' : 'false');
+  const planetButton = app.querySelector('[data-action="world-planet"]');
+  planetButton?.classList.toggle('is-on', onPlanet);
+  planetButton?.setAttribute('aria-pressed', onPlanet ? 'true' : 'false');
 
   const host = root.querySelector('[data-role="world-editor-host"]');
-
-  /* 1. Блочный мир: карта (биомы) или срез (ярусы) — смотря какой режим. */
-  if (!mode) {
-    session.blockView?.dispose();
-    session.blockView = null;
-    session.blockMode = '';
-  } else if (host && (!session.blockView || !session.blockView.element?.isConnected || session.blockMode !== mode)) {
-    session.blockView?.dispose();
-    session.blockMode = mode;
-    session.blockView = mountBlockWorldView(host, {
-      mode,
-      config: session.config,
-      onExit: () => {
-        if (mode === 'map') setWorldProcGen(false);
-        else setWorldVoxel(false);
-      },
-    });
-  }
-
-  /* 2. Планетарный 23-слойный генератор (тектоника, атмосфера, климат). */
-  if (!wantedPlanet) {
+  if (session.screen !== 'map' || !host) {
+    session.worldMapView?.dispose();
+    session.worldMapView = null;
     session.planetView?.dispose();
     session.planetView = null;
-  } else if (host && (!session.planetView || !session.planetView.element?.isConnected)) {
+    return;
+  }
+
+  /* Лобби использует Azgaar для синхронизации. В одиночном режиме основная
+     карта не загружает iframe, пока человек не выбрал редактор или планету. */
+  if (onEditor || onPlanet || session.lobby) mountWorldEditor();
+
+  if (onMap) {
+    if (!session.worldMapView || !session.worldMapView.element?.isConnected) {
+      session.worldMapView?.dispose();
+      session.worldMapView = null;
+      host.querySelector('[data-role="world-view-error"]')?.remove();
+      try {
+        session.worldMapView = mountWorldMapView(host, { config: session.config });
+        if (session.worldMapView?.error) toast(session.worldMapView.error, 'error');
+      } catch (error) {
+        host.querySelector('[data-role="world-map-view"]')?.remove();
+        const message = document.createElement('p');
+        message.className = 'world-editor-error';
+        message.dataset.role = 'world-view-error';
+        message.setAttribute('role', 'alert');
+        message.textContent = `Основная карта не открылась: ${error instanceof Error ? error.message : String(error)}`;
+        host.prepend(message);
+        toast(message.textContent, 'error');
+      }
+    }
+  } else {
+    session.worldMapView?.dispose();
+    session.worldMapView = null;
+    host.querySelector('[data-role="world-view-error"]')?.remove();
+  }
+
+  if (onPlanet) {
+    if (!session.planetView || !session.planetView.element?.isConnected) {
+      session.planetView?.dispose();
+      const frame = host.querySelector('[data-role="world-editor"]');
+      const sizeMult = session.config.width >= 150_000_000 ? 4 : session.config.width >= 75_000_000 ? 2 : 1;
+      session.planetView = mountPlanetView(host, {
+        seed: session.config.seed || 'mir-2026',
+        size: sizeMult,
+        frame,
+        config: session.config,
+        onExit: () => setWorldView('map'),
+      });
+      if (session.planetView?.error) toast(session.planetView.error, 'error');
+    }
+  } else {
     session.planetView?.dispose();
-    const frame = host.querySelector('[data-role="world-editor"]');
-    const sizeMult = session.config.width >= 150_000_000 ? 4 : session.config.width >= 75_000_000 ? 2 : 1;
-    session.planetView = mountPlanetView(host, {
-      seed: session.config.seed || 'mir-2026',
-      size: sizeMult,
-      frame,
-      config: session.config,
-      onExit: () => setWorldPlanet(false),
-    });
+    session.planetView = null;
   }
 };
 
-const setWorldProcGen = (on) => {
+const setWorldView = (mode) => {
   const session = ui.world;
-  if (!session?.open || session.screen !== 'map') return;
-  const wanted = Boolean(on);
-  if (session.procGen === wanted) return;
-  session.procGen = wanted;
-  if (wanted) {
-    session.planet = false;
-    session.voxel = false;
+  if (!session?.open || session.screen !== 'map' || !['map', 'editor', 'planet'].includes(mode)) return;
+  if (session.viewMode === mode) {
+    /* Повторный выбор основной карты даёт восстановиться, если браузер однажды
+       отказал в 2D-контексте холста. */
+    if (mode === 'map' && session.worldMapView?.error) {
+      session.worldMapView.dispose();
+      session.worldMapView = null;
+      syncWorldViews();
+    }
+    return;
   }
-  playSound(wanted ? 'open' : 'close');
-  syncWorldVoxel();
+  session.viewMode = mode;
+  playSound('open');
+  syncWorldViews();
 };
 
-const setWorldPlanet = (on) => {
-  const session = ui.world;
-  if (!session?.open || session.screen !== 'map') return;
-  const wanted = Boolean(on);
-  if (session.planet === wanted && !session.procGen) return;
-  session.planet = wanted;
-  if (wanted) {
-    session.procGen = false;
-    session.voxel = false;
-  }
-  playSound(wanted ? 'open' : 'close');
-  syncWorldVoxel();
-};
-
-const setWorldVoxel = (on) => {
-  const session = ui.world;
-  if (!session?.open || session.screen !== 'map') return;
-  const wanted = Boolean(on);
-  if (session.voxel === wanted && !session.procGen && !session.planet) return;
-  session.voxel = wanted;
-  if (wanted) {
-    session.procGen = false;
-    session.planet = false;
-  }
-  playSound(wanted ? 'open' : 'close');
-  syncWorldVoxel();
-  if (wanted && session.blockView?.error) toast(session.blockView.error, 'error');
-};
-
-/* Выход с экрана карты: режим гасим сразу, чтобы возврат в слоты не оставил
-   висящий GL-контекст и очередь чанков. */
-const dropWorldVoxel = () => {
+/* Снятие обоих видов освобождает кадры и очереди, прежде чем открыть другой слот. */
+const dropWorldViews = () => {
   const session = ui.world;
   if (!session) return;
-  session.blockView?.dispose();
-  session.blockView = null;
-  session.blockMode = '';
-  session.voxel = false;
-  session.procGen = false;
+  session.worldMapView?.dispose();
+  session.worldMapView = null;
   session.planetView?.dispose();
   session.planetView = null;
-  session.planet = false;
+  session.viewMode = 'map';
 };
 
 /* Слот получает параметры и открывается картой. Общий путь для «Создать»,
@@ -2688,9 +2682,9 @@ const enterWorldMap = (slot, config) => {
   session.tab = slot.role;
   session.slot = { role: slot.role, index: slot.index };
   session.importToSlot = null;
-  dropWorldVoxel();
+  dropWorldViews();
   session.screen = 'map';
-  session.voxel = true; // карта блоков — основной вид карты
+  session.viewMode = 'map';
   renderWorldPage();
 };
 
@@ -2718,9 +2712,9 @@ const openWorldSlot = (role, index) => {
   session.slot = { role, index };
   session.importToSlot = null;
   session.config = store.normalizeWorldConfig(entry);
-  dropWorldVoxel();
+  dropWorldViews();
   session.screen = 'map';
-  session.voxel = true; // карта блоков — основной вид карты
+  session.viewMode = 'map';
   renderWorldPage();
 };
 
@@ -2776,7 +2770,7 @@ const closeWorldPage = ({ history = true } = {}) => {
   if (!ui.world?.open) return;
   ui.world.open = false;
   ui.world.frameKey = '';
-  dropWorldVoxel();
+  dropWorldViews();
   ui.world.syncStop?.();
   ui.world.syncStop = null;
   ui.world.leaveArmed = false;
@@ -3038,7 +3032,7 @@ const menuCounts = () => {
 const sidenavHtml = () => {
   const { filled, hub } = menuCounts();
   const items = [
-    ['compass', 'Тестовый генератор', 'Быстрая процедурная 2D-карта', 'open-test-generator', ''],
+    ['compass', 'Карта мира', 'Новая процедурная карта по seed', 'open-world-map', ''],
     ['users', 'Лобби с друзьями', 'Общая карта · до 8 игроков', 'open-lobby', ''],
     ['globe', 'Общий хаб', hub, 'open-hub', ''],
     ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
@@ -3091,7 +3085,7 @@ const stageMenuHtml = () => {
         }).join('')}
       </div>
     </section>` : `
-    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — нажмите «Играть» или «Тестовый генератор» слева, чтобы создать первый мир.</span></p>`}`;
+    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — нажмите «Играть» или «Карта мира» слева, чтобы создать первый мир.</span></p>`}`;
 };
 
 /* ---------- правая панель: друзья ---------------------------- */
@@ -4195,9 +4189,9 @@ const openLobbyMap = (summary, config, { fresh }) => {
   session.importToSlot = null;
   session.config = config;
   session.leaveArmed = false;
-  dropWorldVoxel();
+  dropWorldViews();
   session.screen = 'map';
-  session.voxel = true; // карта блоков — основной вид карты
+  session.viewMode = 'map';
   renderWorldPage();
 };
 
@@ -4263,8 +4257,8 @@ const onLobbyEvent = (event) => {
 const actions = {
   'open-world': () => openWorldPage({ slots: true }),
 
-  /* Быстрый запуск тестового процедурного 2D-генератора из главного меню (песочница без перезаписи слотов). */
-  'open-test-generator': () => {
+  /* Быстрый запуск основной процедурной карты из меню (песочница без перезаписи слотов). */
+  'open-world-map': () => {
     openWorldPage({ slots: true });
     if (!ui.world?.open) return;
     const session = ui.world;
@@ -4273,10 +4267,9 @@ const actions = {
     session.tab = 'master';
     session.slot = null;
     session.importToSlot = null;
-    dropWorldVoxel();
+    dropWorldViews();
     session.screen = 'map';
-    session.procGen = true;
-    session.voxel = false;
+    session.viewMode = 'map';
     renderWorldPage();
   },
 
@@ -4442,40 +4435,16 @@ const actions = {
 
   'world-slots': () => {
     if (!ui.world?.open) return;
-    dropWorldVoxel();
+    dropWorldViews();
     ui.world.screen = 'slots';
     ui.world.slot = null;
     ui.world.importToSlot = null;
     renderWorldPage();
   },
 
-  'world-proc-gen': () => {
-    const session = ui.world;
-    if (!session?.open || session.screen !== 'map') return;
-    setWorldProcGen(!session.procGen);
-  },
-
-  'world-planet': () => {
-    const session = ui.world;
-    if (!session?.open || session.screen !== 'map') return;
-    setWorldPlanet(!session.planet);
-  },
-
-  'world-voxel': () => {
-    const session = ui.world;
-    if (!session?.open || session.screen !== 'map') return;
-    /* Режим уже включён, но холст не открылся (нет 2D-контекста) — повторное
-       нажатие пробует снова и говорит, что случилось, а не выключает режим. */
-    if (session.voxel && session.blockView?.error) {
-      session.blockView.dispose();
-      session.blockView = null;
-      session.blockMode = '';
-      syncWorldVoxel();
-      toast(session.blockView?.error ?? 'Карта блоками открыта.', session.blockView?.error ? 'error' : 'ok');
-      return;
-    }
-    setWorldVoxel(!session.voxel);
-  },
+  'world-map-view': () => setWorldView('map'),
+  'world-editor': () => setWorldView('editor'),
+  'world-planet': () => setWorldView(ui.world?.viewMode === 'planet' ? 'map' : 'planet'),
 
   'world-slot-tab': (el) => {
     const tab = el.dataset.tab;
@@ -4553,7 +4522,7 @@ const actions = {
     const config = store.normalizeWorldConfig({ ...session.config, seed: typed || worldSeed() });
     enterWorldMap(session.slot, config);
     toast(player
-      ? `Вы вошли в карту ${config.seed}. Панели правки скрыты.`
+      ? `Вы вошли в карту ${config.seed}. Основная карта доступна для просмотра.`
       : `Карта ${config.seed} заняла слот ${session.slot.index + 1}.`);
   },
 
@@ -4569,13 +4538,12 @@ const actions = {
     if (session.slot) {
       enterWorldMap(session.slot, config);
     } else {
-      /* Песочница без слота: мир пересобирается с новым seed, а режим остаётся
-         тем же — иначе «Новый мир» выбрасывал бы человека из карты. */
-      const wasProc = session.procGen;
-      dropWorldVoxel();
+      /* Песочница без слота: мир пересобирается с новым seed и возвращается
+         на основную карту. */
+      dropWorldViews();
       session.config = config;
-      session.procGen = wasProc;
-      session.voxel = !wasProc;
+      session.screen = 'map';
+      session.viewMode = 'map';
       renderWorldPage();
     }
     toast(`Новый мир: ${config.seed}.`);
@@ -5271,20 +5239,10 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Ступеньки: надстройка карты (тест-генератор или блоки) → карта → страница игры. */
-    if (ui.world.screen === 'map' && ui.world.procGen) {
+    /* Возврат из дополнительных видов сначала ведёт на основную карту. */
+    if (ui.world.screen === 'map' && ui.world.viewMode !== 'map') {
       event.preventDefault();
-      setWorldProcGen(false);
-      return;
-    }
-    if (ui.world.screen === 'map' && ui.world.planet) {
-      event.preventDefault();
-      setWorldPlanet(false);
-      return;
-    }
-    if (ui.world.screen === 'map' && ui.world.voxel) {
-      event.preventDefault();
-      setWorldVoxel(false);
+      setWorldView('map');
       return;
     }
     event.preventDefault();

@@ -1,4 +1,5 @@
-/* Мост: документ Azgaar → снимок карт для воксельного мира. Только чтение.
+/* Мост: документ Azgaar → снимок географии для дополнительного вида
+   планеты. Только чтение.
 
    iframe с редактором и игра живут на одном источнике (srcdoc или /fmg/),
    поэтому окна достают напрямую: `win.grid`, `win.pack`, `win.Rivers` — те же
@@ -12,13 +13,13 @@
      то есть рельеф, по которому вода реально потекла. Для клеток, которых в
      pack нет (открытый океан), остаётся grid-высота;
    • биомов — `pack.cells.biome` через `pack.cells.g` (родительская клетка
-     grid): воксельная палитра обязана совпасть с тем, что нарисовано на карте;
+     grid): планетарная раскраска должна совпадать с исходной картой;
    • температур и осадков — `grid.cells.temp/prec`: они считаются на grid и в
      pack не переноссятся;
    • рек — `Rivers.addMeandering(r.cells, r.points)` даёт точки [x, y, flux] с
      излучистостью, а `Rivers.getOffset` — полуширину русла в пикселях. Оба
-     метода — те же, чем генератор строит полилинию на экране, поэтому река в
-     блоках повторяет реку на карте;
+     метода — те же, чем генератор строит полилинию на экране, поэтому
+     планетарный слой рек повторяет русла исходной карты;
    • озёр — `pack.features` с `type:'lake'`: поверхность — `height` фичи, а не
      уровень моря, тип (`subtype`) задаёт материал (пресное/солёное/сухое/лава).
 
@@ -216,7 +217,7 @@ export const readSource = (win, hint = {}) => {
   if (!win) throw new VoxelSourceError('документ редактора не открыт');
   const grid = win.grid;
   const pack = win.pack;
-  if (!mapsReady(win)) throw new VoxelSourceError(`воксельный мир строить рано: ${missingMapsPart(win)}`);
+  if (!mapsReady(win)) throw new VoxelSourceError(`источник планеты читать рано: ${missingMapsPart(win)}`);
   const graph = win.options?.map?.graph ?? {};
   const cellsX = Math.max(2, Math.round(numberOr(grid.cellsX, 0)) || Math.ceil(numberOr(graph.width, hint.width || 1600) / grid.spacing));
   const cellsY = Math.max(2, Math.round(numberOr(grid.cellsY, 0)) || Math.ceil(numberOr(graph.height, hint.height || 1000) / grid.spacing));

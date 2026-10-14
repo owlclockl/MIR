@@ -45,7 +45,7 @@
     "test:build": "node scripts/test-build.mjs",
     "test:spacing": "node scripts/test-spacing.mjs",
     "test:gen": "node scripts/test-gen.mjs",
-    "test:blockworld": "node scripts/test-blockworld.mjs",
+    "test:world-map": "node scripts/test-world-map.mjs",
     "test:stage": "node scripts/test-stage.mjs",
     "test:planet": "node scripts/test-planet.mjs",
     "test:planet-view": "node scripts/test-planet-view.mjs",
