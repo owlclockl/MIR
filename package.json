@@ -39,7 +39,8 @@
     "test:avatar": "node scripts/test-avatar.mjs",
     "test:perf": "node scripts/test-perf.mjs",
     "test:build": "node scripts/test-build.mjs",
-    "test:spacing": "node scripts/test-spacing.mjs"
+    "test:spacing": "node scripts/test-spacing.mjs",
+    "test:gen": "node scripts/test-gen.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.9"

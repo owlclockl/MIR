@@ -12,6 +12,7 @@ import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import * as lobby from './data/lobby.js';
+import { mountContinentView } from './gen/continent.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
 import { seedArtOrIcon } from './ui/seed-art.js';
 
@@ -2186,9 +2187,8 @@ const adminModalHtml = () => {
 };
 
 /* ---------- мир: слоты, настройка и экран карты ----------
-   Генератор мира удалён (2026-10-14): собственный src/gen, планетарный
-   src/planet и Azgaar FMG вырезаны полностью. Экран карты — заглушка,
-   новый генератор планеты/terrain выбирается по docs/generator-replacement.md.
+   Прежние генераторы удалены (2026-10-14); новый — src/gen/continent.js
+   (чистая реализация: плиты → горы на границах → климат → биомы).
    Слоты по-прежнему хранят только seed и размер (см. store.js). */
 
 const WORLD_ROLE_LABELS = { master: 'Мастер', player: 'Игрок' };
@@ -2225,7 +2225,8 @@ const createWorldSession = () => ({
   slot: null, // { role, index } — слот, который заполняем или открыли
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
-  viewMode: 'map', // генератора пока нет: экран карты — заглушка
+  viewMode: 'map',
+  worldMapView: null, // смонтированный генератор континентов (src/gen/continent.js)
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // совместимость: синхронизации карты больше нет
   leaveArmed: false, // первый клик «Выйти» ждёт подтверждения
@@ -2333,7 +2334,7 @@ const worldModeToolsHtml = (player) => `
           ]
         : [
             ['check', 'Параметры мира: seed и размер карты'],
-            ['check', 'Карта появится после подключения нового генератора'],
+            ['check', 'Генератор континентов: плиты, горы, климат и биомы'],
             ['check', 'Экспорт seed и размера карты в файл'],
             ['check', 'Новый мир в один клик'],
           ])
@@ -2341,7 +2342,7 @@ const worldModeToolsHtml = (player) => `
         .join('')}
     </ul>
     <p class="world-mode-note">${player
-      ? 'Генератор удалён: пока доступны только параметры мира.'
+      ? 'Карта строится по seed; панели правки у игрока скрыты.'
       : 'Мир хранится как seed и размер; карта построится новым генератором, когда его подключим.'}</p>
   </section>`;
 
@@ -2356,7 +2357,7 @@ const worldSetupHtml = (session) => {
         <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
         <p class="world-config__lead">${player
           ? 'Введите seed и размер, которые назвал мастер, или загрузите файл карты.'
-          : 'Запись займёт этот слот и сохранит seed и размер. Генератор удалён — карта появится после подключения нового.'}</p>
+          : 'Запись займёт этот слот и сохранит seed и размер. Карта строится генератором континентов по seed и размеру.'}</p>
         <label class="field world-field">
           <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
@@ -2389,19 +2390,10 @@ const worldSetupHtml = (session) => {
     </div>`;
 };
 
-/* Генератора нет: вместо карты — честная заглушка с параметрами слота. */
+/* Карта мира: холст генератора континентов монтирует syncWorldViews. */
 const worldMapHtml = () => `
   <div class="world-map">
-    <div class="world-editor" data-role="world-editor-host">
-      <section class="world-card" style="margin:auto;max-width:560px;text-align:center" role="status">
-        <p class="world-card__eyebrow">Генератор удалён</p>
-        <h2>Карта временно не строится</h2>
-        <p>Прежние генераторы (свой, планетарный и Azgaar) удалены из проекта.
-           Новый генератор планеты выбирается из кандидатов в
-           <code>docs/generator-replacement.md</code> — после выбора этот экран снова оживёт.
-           Слот, seed и размер карты сохранены.</p>
-      </section>
-    </div>
+    <div class="world-editor" data-role="world-editor-host"></div>
   </div>`;
 
 /* Строка сеанса в верхней панели. Seed лобби берём из живого состояния хаба:
@@ -2503,10 +2495,30 @@ const renderWorldPage = ({ focus = false } = {}) => {
 
 /* Генератор удалён: монтировать нечего, функции оставлены как no-op,
    чтобы остальные экраны (слоты, лобби, меню) работали без карты. */
-const syncWorldViews = () => {};
+const syncWorldViews = () => {
+  const session = ui.world;
+  const host = worldRoot()?.querySelector('[data-role="world-editor-host"]');
+  if (!session?.open || session.screen !== 'map' || !host) {
+    session?.worldMapView?.dispose();
+    if (session) session.worldMapView = null;
+    return;
+  }
+  if (!session.worldMapView || !session.worldMapView.element?.isConnected) {
+    session.worldMapView?.dispose();
+    try {
+      session.worldMapView = mountContinentView(host, { config: session.config });
+      if (session.worldMapView?.error) toast(session.worldMapView.error, 'error');
+    } catch (error) {
+      toast(`Карта не открылась: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    }
+  }
+};
 const dropWorldViews = () => {
   const session = ui.world;
-  if (session) session.viewMode = 'map';
+  if (!session) return;
+  session.worldMapView?.dispose();
+  session.worldMapView = null;
+  session.viewMode = 'map';
 };
 
 /* Слот получает параметры и открывается картой. Общий путь для «Создать»,
