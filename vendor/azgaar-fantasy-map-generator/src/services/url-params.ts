@@ -12,6 +12,7 @@ import type { Burg } from "@/generators/burgs-generator";
 import { Services } from "@/services";
 import { pageURL } from "@/services/embed";
 import { getRequestedMapSize } from "@/services/map-size";
+import { readEarthWorldProfile } from "@/services/earth-world";
 import { ensureEl } from "@/utils/nodeUtils";
 
 const MAP_LINK_PATTERN = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/;
@@ -174,7 +175,10 @@ function findBurgForMFCG(params: URLSearchParams): void {
 export function copyMapURL(): void {
   const isRandomized = !document.querySelectorAll("i.icon-lock").length;
   const seedValue = ensureEl<HTMLInputElement>("seedInput").value;
-  const search = `?seed=${seedValue}&width=${options.map.graph.width}&height=${options.map.graph.height}${isRandomized ? "&options=default" : ""}`;
+  const earth = readEarthWorldProfile(searchParams());
+  const search = earth
+    ? `?${new URLSearchParams({ seed: seedValue, width: String(earth.widthKm * 1000), height: String(earth.heightKm * 1000), world: "earth", options: "default" })}`
+    : `?seed=${seedValue}&width=${options.map.graph.width}&height=${options.map.graph.height}${isRandomized ? "&options=default" : ""}`;
 
   navigator.clipboard
     .writeText(location.host + location.pathname + search)

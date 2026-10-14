@@ -13,8 +13,14 @@ import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
-import { mountWorldMapView } from './game/world-map-view.js';
 import { mountPlanetView } from './planet/view.js';
+import { mountSurfaceView } from './map/view.js';
+import { mountRtwgView, RTWG_NOTICES, sourceUrl as productSourceUrl } from './rtwg/view.js';
+import { loadPlanetSlot, savePlanetSlot, deletePlanetSlot } from './data/planet-store.js';
+import { PLANET_FORMAT, MAX_PLANET_BYTES, parsePlanet, stringifyPlanet, planetKey } from './world/planet-file.js';
+// Archived workbenches are opt-in diagnostics, never competing products.
+const EXPERT_MAP_TOOLS = new URLSearchParams(location.search).get('mapTools') === '1';
+
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
 import { seedArtOrIcon } from './ui/seed-art.js';
@@ -2238,8 +2244,9 @@ const createWorldSession = () => ({
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  viewMode: 'map', // основной вид — наша карта; доступны также Azgaar и планетарный просмотр
-  worldMapView: null, // смонтированная основная процедурная карта
+  viewMode: 'surface', // пиксельный просмотр географии Azgaar
+  surfaceCamera: null, // камера сохраняется при переключении режима
+  surfaceView: null, // read-only пиксельный рендерер
   planetView: null, // смонтированный вид планеты
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
   syncStop: null, // остановка синхронизации лобби для текущего iframe
@@ -2269,7 +2276,7 @@ const worldSlotCardHtml = (role, index, entry) => {
           <button class="mini-button mini-button--accent" type="button" data-action="world-slot-create" data-slot-index="${index}">
             ${icon(player ? 'eye' : 'plus', 'icon--xs')}<span>${player ? 'Войти в карту' : 'Создать карту'}</span>
           </button>
-          ${player ? `<button class="mini-button world-slot-import" type="button" data-action="world-slot-import" data-slot-index="${index}" aria-label="Загрузить файл карты в слот ${index + 1}" title="Загрузить файл карты">${icon('fileDown', 'icon--xs')}</button>` : ''}
+          <button class="mini-button world-slot-import" type="button" data-action="world-slot-import" data-slot-index="${index}" aria-label="Загрузить файл карты в слот ${index + 1}" title="Открыть файл планеты">${icon('fileDown', 'icon--xs')}</button>
         </div>
       </article>`;
   }
@@ -2342,22 +2349,22 @@ const worldModeToolsHtml = (player) => `
     <ul class="world-mode-list">
       ${(player
         ? [
-            ['check', 'Основная карта и тематические слои доступны для просмотра'],
+            ['check', 'Карта Azgaar доступна для просмотра'],
             ['x', 'Редактирование карты Azgaar и экспорт изменений'],
             ['x', 'Создание нового мира и смена seed'],
           ]
         : [
-            ['check', 'Основная карта мира: биомы, рельеф, материки, климат и поселения'],
-            ['check', 'Дополнительно: редактор Azgaar и планетарный просмотр'],
-            ['check', 'Экспорт seed и размера карты в файл'],
+            ['check', 'Единая карта всей планеты'],
+            ['check', 'Метровые координаты и рельеф'],
+            ['check', 'Сохранение географии и меток в один файл'],
             ['check', 'Новый мир в один клик'],
           ])
         .map(([mark, text]) => `<li class="world-mode-list__item world-mode-list__item--${mark}">${icon(mark === 'check' ? 'check' : 'x', 'icon--xs')}<span>${text}</span></li>`)
         .join('')}
     </ul>
     <p class="world-mode-note">${player
-      ? 'Основную карту можно исследовать; панели правки Azgaar скрыты интерфейсом.'
-      : 'Основная карта строится по seed и размеру. Редактор Azgaar и планетарный просмотр доступны как дополнительные виды.'}</p>
+      ? 'Одна карта планеты, личные метки и измерения. В лобби используется география мастера.'
+      : 'Земной мир: материки на планете 40 075 × 20 004 км, масштаб в километрах. География вымышленная; используется одна география, прочитанная из Azgaar, с периодической долготой и сведёнными полюсами. Метровые адреса не превращают исходные данные в измеренный метровый рельеф.'}</p>
   </section>`;
 
 const worldSetupHtml = (session) => {
@@ -2371,7 +2378,7 @@ const worldSetupHtml = (session) => {
         <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
         <p class="world-config__lead">${player
           ? 'Введите seed и размер, которые назвал мастер, или загрузите файл карты. Тогда мир будет тем же, что у мастера.'
-          : 'Карта займёт этот слот и построится по единому seed. Сначала откроется наша основная карта; редактор Azgaar и планетарный просмотр доступны отдельно.'}</p>
+          : 'Планета займёт этот слот и откроется как единая карта. Выберите «Земля», чтобы получить вымышленные материки земного масштаба, а не обзорный остров.'}</p>
         <label class="field world-field">
           <span class="field__label">Seed карты</span>
           <span class="world-seed-row">
@@ -2381,30 +2388,30 @@ const worldSetupHtml = (session) => {
           </span>
           <span class="world-field__hint">${player
             ? 'Seed выдаёт мастер. Введите его без изменений.'
-            : 'Seed определяет материки, биомы, рельеф, климат, реки и поселения основной карты.'}</span>
+            : 'Seed определяет географию Azgaar. Для той же карты нужны одинаковые seed и размер.'}</span>
         </label>
         <div class="world-field">
           <span class="field__label" id="world-size-label">Размер карты</span>
           <div class="world-size-list" role="radiogroup" aria-labelledby="world-size-label">
-            ${store.WORLD_SIZES.map((size) => {
+            ${store.WORLD_SIZES.filter(size => EXPERT_MAP_TOOLS || size.width >= 1_000_000).map((size) => {
               const active = size.width === config.width && size.height === config.height;
               return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width.toLocaleString('ru-RU')} × ${size.height.toLocaleString('ru-RU')}</span></button>`;
             }).join('')}
           </div>
           <span class="world-field__hint">${player
             ? 'Выберите тот же размер, что у мастера, чтобы континенты и реки совпали.'
-            : 'Стандартная 1600×1000 генерируется мгновенно и подходит для основной карты.'}</span>
+            : '«Земля» — мир 40 075 × 20 004 км с крупными материками. 2× и 4× увеличивают физический мир, а не детализацию; обзорные размеры — старый режим.'}</span>
         </div>
         <button class="solid-button world-generate" type="button" data-action="world-generate">
           <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
         </button>
-        <button class="ghost-button ghost-button--inline world-import-button" type="button" data-action="world-import">${icon('fileDown', 'icon--xs')}<span>${player ? 'Загрузить файл карты' : 'Загрузить параметры из файла'}</span></button>
+        <button class="ghost-button ghost-button--inline world-import-button" type="button" data-action="world-import">${icon('fileDown', 'icon--xs')}<span>${player ? 'Загрузить файл карты' : 'Открыть файл планеты'}</span></button>
       </section>
       ${worldModeToolsHtml(player)}
     </div>`;
 };
 
-/* Хост основной карты; дополнительные виды подключает syncWorldViews по запросу. */
+/* Хост Azgaar; дополнительный планетарный вид подключает syncWorldViews. */
 const worldMapHtml = () => `
   <div class="world-map">
     <div class="world-editor" data-role="world-editor-host"></div>
@@ -2450,16 +2457,18 @@ const worldPageHtml = () => {
       ? `<button class="world-topbar-button" type="button" data-action="world-lobby-back" aria-label="К лобби" title="К лобби">${icon('chevronLeft', 'icon--xs')}<span>К лобби</span></button>`
       : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
   const editorLabel = player ? 'Карта Azgaar' : 'Редактор Azgaar';
-  const mapViewButtons = screen === 'map'
+  const mapViewButtons = screen === 'map' && EXPERT_MAP_TOOLS
     ? `
-        <button class="world-topbar-button${session.viewMode === 'map' ? ' is-on' : ''}" type="button" data-action="world-map-view" aria-label="Основная карта" aria-pressed="${session.viewMode === 'map'}" title="Основная карта мира: биомы, рельеф, материки, климат и поселения">${icon('compass', 'icon--xs')}<span>Карта мира</span></button>
+        <button class="world-topbar-button${session.viewMode === 'surface' ? ' is-on' : ''}" type="button" data-action="world-surface" aria-label="Поверхность" aria-pressed="${session.viewMode === 'surface'}" title="Пиксельная карта рельефа, биомов и рек">${icon('layers', 'icon--xs')}<span>Поверхность</span></button>
         <button class="world-topbar-button${session.viewMode === 'editor' ? ' is-on' : ''}" type="button" data-action="world-editor" aria-label="${editorLabel}" aria-pressed="${session.viewMode === 'editor'}" title="${player ? 'Просмотр карты Azgaar в режиме игрока' : 'Открыть редактор Azgaar'}">${icon('map', 'icon--xs')}<span>${editorLabel}</span></button>
+        ${!player ? `<button class="world-topbar-button${session.viewMode === 'rtwg' ? ' is-on' : ''}" type="button" data-action="world-rtwg" aria-label="Генератор RTWG" aria-pressed="${session.viewMode === 'rtwg'}" title="RTWG: тектоника, вода, климат — отдельный симулятор">${icon('dices', 'icon--xs')}<span>RTWG</span></button>` : ''}
         <button class="world-topbar-button${session.viewMode === 'planet' ? ' is-on' : ''}" type="button" data-action="world-planet" aria-label="Планетарный вид" aria-pressed="${session.viewMode === 'planet'}" title="Планетарный вид: тектоника, атмосфера, климат и гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
         <button class="world-topbar-button" type="button" data-action="world-new" aria-label="Новый мир" title="Новый мир">${icon('dices', 'icon--xs')}<span>Новый мир</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-export" aria-label="Экспорт файла карты" title="Экспорт">${icon('fileDown', 'icon--xs')}<span>Экспорт</span></button>`
+        <button class="world-topbar-button" type="button" data-action="world-export" aria-label="Сохранить планету в файл" title="География, метки и настройки">${icon('fileDown', 'icon--xs')}<span>Сохранить планету</span></button>
+        <button class="world-topbar-button" type="button" data-action="world-import" aria-label="Открыть файл планеты" title="Открыть файл планеты">${icon('fileDown', 'icon--xs')}<span>Открыть</span></button>`
     : '';
   const body = screen === 'slots'
     ? worldSlotsHtml(session)
@@ -2519,9 +2528,8 @@ const renderWorldPage = ({ focus = false } = {}) => {
   paintLobbyChip();
 };
 
-/* Документ Azgaar нужен редактору, планетарному виду и синхронизации лобби.
-   Основная процедурная карта его не загружает: миллион точек не должен
-   генерироваться в фоне, пока игрок смотрит наш собственный мир. */
+/* Azgaar сохраняет рабочую карту, планетарный источник и синхронизацию лобби
+   на время подбора нового основного генератора. */
 const mountWorldEditor = () => {
   const session = ui.world;
   const host = worldRoot()?.querySelector('[data-role="world-editor-host"]');
@@ -2560,24 +2568,28 @@ const mountWorldEditor = () => {
   }
 };
 
-/* Основная карта — первый и обычный вид. Редактор Azgaar открывается только
-   по запросу; в лобби его документ всё же поднимается скрытым, чтобы работала
-   прежняя синхронизация карты и правок мастера. */
+/* Собственный генератор удалён: остаются Azgaar и дополнительная планета. */
+const planetSlotKey = (session, role = session.mode, index = session.slot?.index ?? 'sandbox') => `${store.getCurrentUser()?.id || 'guest'}:${role}:${index}`;
 const syncWorldViews = () => {
   const session = ui.world;
   const root = worldRoot();
   const app = root?.querySelector('.world-app');
   if (!session?.open || !app) return;
 
-  const onMap = session.screen === 'map' && session.viewMode === 'map';
   const onEditor = session.screen === 'map' && session.viewMode === 'editor';
   const onPlanet = session.screen === 'map' && session.viewMode === 'planet';
-  app.classList.toggle('is-world-map', onMap);
+  const onSurface = session.screen === 'map' && session.viewMode === 'surface';
+  const onRtwg = session.screen === 'map' && session.viewMode === 'rtwg';
+  app.classList.toggle('is-rtwg', onRtwg);
+  const rtwgButton = app.querySelector('[data-action="world-rtwg"]');
+  rtwgButton?.classList.toggle('is-on', onRtwg);
+  rtwgButton?.setAttribute('aria-pressed', String(onRtwg));
+  app.classList.toggle('is-surface', onSurface);
+  const surfaceButton = app.querySelector('[data-action="world-surface"]');
+  surfaceButton?.classList.toggle('is-on', onSurface);
+  surfaceButton?.setAttribute('aria-pressed', String(onSurface));
   app.classList.toggle('is-planet', onPlanet);
 
-  const mapButton = app.querySelector('[data-action="world-map-view"]');
-  mapButton?.classList.toggle('is-on', onMap);
-  mapButton?.setAttribute('aria-pressed', onMap ? 'true' : 'false');
   const editorButton = app.querySelector('[data-action="world-editor"]');
   editorButton?.classList.toggle('is-on', onEditor);
   editorButton?.setAttribute('aria-pressed', onEditor ? 'true' : 'false');
@@ -2587,40 +2599,102 @@ const syncWorldViews = () => {
 
   const host = root.querySelector('[data-role="world-editor-host"]');
   if (session.screen !== 'map' || !host) {
-    session.worldMapView?.dispose();
-    session.worldMapView = null;
+    session.rtwgView?.dispose();
+    session.rtwgView = null;
+    session.surfaceView?.dispose();
+    session.surfaceView = null;
     session.planetView?.dispose();
     session.planetView = null;
     return;
   }
 
-  /* Лобби использует Azgaar для синхронизации. В одиночном режиме основная
-     карта не загружает iframe, пока человек не выбрал редактор или планету. */
-  if (onEditor || onPlanet || session.lobby) mountWorldEditor();
-
-  if (onMap) {
-    if (!session.worldMapView || !session.worldMapView.element?.isConnected) {
-      session.worldMapView?.dispose();
-      session.worldMapView = null;
-      host.querySelector('[data-role="world-view-error"]')?.remove();
-      try {
-        session.worldMapView = mountWorldMapView(host, { config: session.config });
-        if (session.worldMapView?.error) toast(session.worldMapView.error, 'error');
-      } catch (error) {
-        host.querySelector('[data-role="world-map-view"]')?.remove();
-        const message = document.createElement('p');
-        message.className = 'world-editor-error';
-        message.dataset.role = 'world-view-error';
-        message.setAttribute('role', 'alert');
-        message.textContent = `Основная карта не открылась: ${error instanceof Error ? error.message : String(error)}`;
-        host.prepend(message);
-        toast(message.textContent, 'error');
+  if (session.planetRestoreError && !EXPERT_MAP_TOOLS && !session.lobby) {
+    if (!host.querySelector('[data-role="planet-recovery"]')) host.insertAdjacentHTML('beforeend', `<section class="world-editor-error planet-recovery" data-role="planet-recovery" role="alert"><h2>Сохранённая география недоступна</h2><p>Исходная карта по seed может отличаться от сохранённой. Мы не заменяем её автоматически. Откройте файл планеты или явно воссоздайте исходную карту.</p><button class="world-topbar-button" type="button" data-action="world-import">Открыть файл планеты</button><button class="world-topbar-button" type="button" data-action="world-restore-seed">Воссоздать по seed</button></section>`);
+    return;
+  }
+  host.querySelector('[data-role="planet-recovery"]')?.remove();
+  if (session.planetRestoring) return;
+  if (onSurface && !EXPERT_MAP_TOOLS && !session.lobby && !session.planetCacheChecked && !session.planetSnapshot) {
+    session.planetCacheChecked = true; session.planetRestoring = true;
+    const token = session.planetLoadToken = {};
+    const configKey = planetKey(session.config);
+    loadPlanetSlot(planetSlotKey(session)).then(record => {
+      if (ui.world !== session || session.planetLoadToken !== token || session.screen !== 'map') return;
+      if (record && planetKey(record.config) === configKey) {
+        if (record.version !== 1 || !(record.source?.cellH instanceof Float32Array) || record.source.cellH.length !== record.source.cellsX * record.source.cellsY) throw new Error('Повреждённый снимок слота');
+        session.planetSnapshot = record.source;
       }
+    }).catch(error => {
+      if (ui.world === session && session.planetLoadToken === token) session.planetRestoreError = error;
+    }).finally(() => {
+      if (ui.world === session && session.planetLoadToken === token && session.screen === 'map') { session.planetRestoring = false; syncWorldViews(); }
+    });
+    return;
+  }
+  const editorFrame = session.planetSnapshot && !session.lobby && !EXPERT_MAP_TOOLS ? null : mountWorldEditor();
+  if (onRtwg && session.mode !== 'player' && !session.rtwgView?.element?.isConnected) {
+    session.rtwgView?.dispose();
+    session.rtwgView = mountRtwgView(host, {
+      config: session.config, initialSnapshot: session.rtwgSnapshot,
+      onSnapshot: snapshot => { session.rtwgSnapshot = snapshot; },
+      onExit: () => setWorldView('surface'),
+      onApply: async engine => {
+        const win = editorFrame?.contentWindow;
+        if (!win?.HeightmapGenerator?.queueExternalHeightmap || !win.regenerateMap) throw new Error('Редактор ещё не готов к импорту RTWG. Подожди загрузки карты.');
+        const rock = engine.read(0), soil = engine.read(1);
+        const values = Float32Array.from({ length: engine.width * engine.height }, (_,i) => rock[i*4] + Math.max(0,soil[i*4]));
+        win.HeightmapGenerator.queueExternalHeightmap({width:engine.width,height:engine.height,values,sea:engine.parameters.water.sea_level,scale:4000});
+        await new Promise((resolve,reject) => {
+          const clean = () => { clearTimeout(timer); win.removeEventListener('map:generated', done); };
+          const done = () => { clean(); resolve(); };
+          const timer = setTimeout(() => { clean(); win.HeightmapGenerator.cancelExternalHeightmap(); reject(new Error('Импорт RTWG не завершён. Проверь сообщение редактора.')); },120000);
+          win.addEventListener('map:generated',done);
+          try { win.regenerateMap({seed:session.config.seed}); } catch(e) { clean(); win.HeightmapGenerator.cancelExternalHeightmap(); reject(e); }
+        });
+        toast('Рельеф RTWG перенесён. «Сохранить планету» сохраняет текущую географию; полный проект редактора сохраняется как .map.');
+        setWorldView('surface');
+      },
+    });
+  }
+  if (session.rtwgView?.element) session.rtwgView.element.hidden = !onRtwg;
+  if (onSurface && (editorFrame || session.planetSnapshot)) {
+    if (!session.surfaceView?.element?.isConnected) {
+      session.surfaceCamera = session.surfaceView?.getState().camera || session.surfaceCamera;
+      session.surfaceView?.dispose();
+      session.surfaceView = mountSurfaceView(host, {
+        frame: editorFrame, config: session.config, initialCamera: session.surfaceCamera,
+        sourceSnapshot: !session.lobby && !EXPERT_MAP_TOOLS ? session.planetSnapshot : null,
+        unified: !EXPERT_MAP_TOOLS, showWorkbench: EXPERT_MAP_TOOLS, freezeSource: !EXPERT_MAP_TOOLS && !session.lobby,
+        onSource: source => {
+          if (session !== ui.world || session.screen !== 'map' || session.lobby || EXPERT_MAP_TOOLS) return;
+          session.planetSnapshot = source;
+          const config = { ...session.config };
+          savePlanetSlot(planetSlotKey(session), { version: 1, config, source }).then(() => {
+            if (session === ui.world && planetKey(session.config) === planetKey(config)) {
+              session.surfaceView?.element?.setAttribute('data-persisted', 'true');
+              const label = session.surfaceView?.element?.querySelector('[data-role="planet-persistence"]');
+              if (label) label.textContent = 'География сохранена на устройстве. Файл планеты — переносимая резервная копия.';
+            }
+          }).catch(() => {
+            if (session !== ui.world || planetKey(session.config) !== planetKey(config)) return;
+            const label = session.surfaceView?.element?.querySelector('[data-role="planet-persistence"]');
+            if (label) label.textContent = 'География не сохранена браузером.';
+            toast(session.mode === 'master' ? 'Браузер не сохранил географию. Скачайте файл кнопкой «Сохранить планету».' : 'Браузер не сохранил географию. Для повторного входа используйте файл планеты мастера или лобби.', 'error');
+          });
+          editorFrame?.remove();
+        },
+        loadPins: store.loadSurfacePins, savePins: store.saveSurfacePins,
+        loadDrawings: store.loadSurfaceDrawings, saveDrawings: store.saveSurfaceDrawings,
+        loadSettings: store.loadSurfaceSettings, saveSettings: store.saveSurfaceSettings,
+        onExit: () => EXPERT_MAP_TOOLS ? setWorldView('editor') : closeWorldPage(),
+      });
+      session.surfaceView.element.querySelector('.surface-drawing').insertAdjacentHTML('beforeend', `<p data-role="planet-persistence" role="status">${session.lobby ? 'Общая география лобби. Личные рисунки остаются на устройстве.' : EXPERT_MAP_TOOLS ? 'Архивный источник. Файл планеты сохраняется вручную.' : 'География: подготовка'}</p><details><summary>Лицензия продукта · исходный код</summary><a data-role="product-source" download="sages-complete-source.zip">Скачать полный соответствующий исходный код (GPLv3)</a><pre>${escapeHtml(RTWG_NOTICES)}</pre></details>`);
+      session.surfaceView.element.querySelector('[data-role="product-source"]').href = productSourceUrl;
     }
   } else {
-    session.worldMapView?.dispose();
-    session.worldMapView = null;
-    host.querySelector('[data-role="world-view-error"]')?.remove();
+    session.surfaceCamera = session.surfaceView?.getState().camera || session.surfaceCamera;
+    session.surfaceView?.dispose();
+    session.surfaceView = null;
   }
 
   if (onPlanet) {
@@ -2633,7 +2707,7 @@ const syncWorldViews = () => {
         size: sizeMult,
         frame,
         config: session.config,
-        onExit: () => setWorldView('map'),
+        onExit: () => setWorldView('editor'),
       });
       if (session.planetView?.error) toast(session.planetView.error, 'error');
     }
@@ -2645,31 +2719,29 @@ const syncWorldViews = () => {
 
 const setWorldView = (mode) => {
   const session = ui.world;
-  if (!session?.open || session.screen !== 'map' || !['map', 'editor', 'planet'].includes(mode)) return;
-  if (session.viewMode === mode) {
-    /* Повторный выбор основной карты даёт восстановиться, если браузер однажды
-       отказал в 2D-контексте холста. */
-    if (mode === 'map' && session.worldMapView?.error) {
-      session.worldMapView.dispose();
-      session.worldMapView = null;
-      syncWorldViews();
-    }
-    return;
-  }
+  if (!session?.open || session.screen !== 'map' || !['editor', 'planet', 'surface', 'rtwg'].includes(mode)) return;
+  if (!EXPERT_MAP_TOOLS && mode !== 'surface') return;
+  if (mode === 'rtwg' && session.mode === 'player') return;
+  if (session.viewMode === mode) return;
   session.viewMode = mode;
   playSound('open');
   syncWorldViews();
 };
 
-/* Снятие обоих видов освобождает кадры и очереди, прежде чем открыть другой слот. */
+/* Снятие планетарного вида освобождает кадры и очереди перед сменой слота. */
 const dropWorldViews = () => {
   const session = ui.world;
   if (!session) return;
-  session.worldMapView?.dispose();
-  session.worldMapView = null;
+  session.rtwgView?.dispose();
+  session.rtwgView = null;
+  session.rtwgSnapshot = null;
+  session.surfaceView?.dispose();
+  session.surfaceView = null;
   session.planetView?.dispose();
   session.planetView = null;
-  session.viewMode = 'map';
+  session.surfaceCamera = null;
+  session.planetSnapshot = null; session.planetRestoreError = null; session.planetRestoring = false; session.planetCacheChecked = false; session.planetLoadToken = null;
+  session.viewMode = 'surface';
 };
 
 /* Слот получает параметры и открывается картой. Общий путь для «Создать»,
@@ -2684,7 +2756,7 @@ const enterWorldMap = (slot, config) => {
   session.importToSlot = null;
   dropWorldViews();
   session.screen = 'map';
-  session.viewMode = 'map';
+  session.viewMode = 'surface';
   renderWorldPage();
 };
 
@@ -2714,7 +2786,7 @@ const openWorldSlot = (role, index) => {
   session.config = store.normalizeWorldConfig(entry);
   dropWorldViews();
   session.screen = 'map';
-  session.viewMode = 'map';
+  session.viewMode = 'surface';
   renderWorldPage();
 };
 
@@ -2724,6 +2796,23 @@ const importWorldFile = (text, target) => {
   const session = ui.world;
   if (!session?.open) return;
   const imported = JSON.parse(text);
+  if (imported?.format === PLANET_FORMAT) {
+    if (session.lobby) throw new Error('Файл планеты открывается в личном слоте, не поверх живого лобби.');
+    const planet = parsePlanet(text);
+    const normalized = store.normalizeWorldConfig(planet.config);
+    if (normalized.width !== planet.config.width || normalized.height !== planet.config.height) throw new Error('Неизвестный размер планеты.');
+    const slot = target || session.slot;
+    if (slot) store.saveWorldSlot(slot.role, slot.index, normalized);
+    const role = slot?.role || session.mode;
+    dropWorldViews();
+    session.config = normalized; session.mode = role; session.tab = role; session.slot = slot ? { ...slot } : null;
+    session.planetSnapshot = planet.source; session.planetCacheChecked = true; session.surfaceCamera = planet.camera;
+    const key = `${normalized.seed}|${Math.round(planet.source.physicalWidth)}x${Math.round(planet.source.physicalHeight)}`;
+    store.saveSurfacePins(key, planet.pins); store.saveSurfaceDrawings(key, planet.annotations); store.saveSurfaceSettings(planet.settings);
+    session.screen = 'map'; renderWorldPage();
+    toast('Планета открыта: география, метки и рисунки восстановлены из файла.');
+    return;
+  }
   const config = store.normalizeWorldConfig(imported?.config ?? imported);
   if (!config.seed) throw new Error('В файле нет seed карты.');
   if (target) {
@@ -3029,7 +3118,7 @@ const menuCounts = () => {
 const sidenavHtml = () => {
   const { filled, hub } = menuCounts();
   const items = [
-    ['compass', 'Карта мира', 'Новая процедурная карта по seed', 'open-world-map', ''],
+    ['compass', 'Карта мира', 'Пиксельная карта по seed', 'open-world-map', ''],
     ['users', 'Лобби с друзьями', 'Общая карта · до 8 игроков', 'open-lobby', ''],
     ['globe', 'Общий хаб', hub, 'open-hub', ''],
     ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
@@ -4078,9 +4167,10 @@ document.addEventListener('change', (event) => {
     event.target.value = '';
     if (ui.world) ui.world.importToSlot = null;
     if (!file) return;
+    if (file.size > MAX_PLANET_BYTES) { toast('Файл планеты больше 32 МиБ.', 'error'); return; }
     file.text()
       .then((text) => importWorldFile(text, target))
-      .catch(() => toast('Файл мира повреждён или имеет неверный формат.', 'error'));
+      .catch(error => toast(error.message || 'Файл мира повреждён или имеет неверный формат.', 'error'));
     return;
   }
 
@@ -4188,7 +4278,7 @@ const openLobbyMap = (summary, config, { fresh }) => {
   session.leaveArmed = false;
   dropWorldViews();
   session.screen = 'map';
-  session.viewMode = 'map';
+  session.viewMode = 'surface';
   renderWorldPage();
 };
 
@@ -4254,7 +4344,7 @@ const onLobbyEvent = (event) => {
 const actions = {
   'open-world': () => openWorldPage({ slots: true }),
 
-  /* Быстрый запуск основной процедурной карты из меню (песочница без перезаписи слотов). */
+  /* Быстрый запуск карты Azgaar из меню (песочница без перезаписи слотов). */
   'open-world-map': () => {
     openWorldPage({ slots: true });
     if (!ui.world?.open) return;
@@ -4266,7 +4356,7 @@ const actions = {
     session.importToSlot = null;
     dropWorldViews();
     session.screen = 'map';
-    session.viewMode = 'map';
+    session.viewMode = 'surface';
     renderWorldPage();
   },
 
@@ -4439,9 +4529,10 @@ const actions = {
     renderWorldPage();
   },
 
-  'world-map-view': () => setWorldView('map'),
+  'world-surface': () => setWorldView('surface'),
   'world-editor': () => setWorldView('editor'),
-  'world-planet': () => setWorldView(ui.world?.viewMode === 'planet' ? 'map' : 'planet'),
+  'world-rtwg': () => setWorldView('rtwg'),
+  'world-planet': () => setWorldView(ui.world?.viewMode === 'planet' ? 'editor' : 'planet'),
 
   'world-slot-tab': (el) => {
     const tab = el.dataset.tab;
@@ -4465,6 +4556,7 @@ const actions = {
   'world-slot-clear': (el) => {
     const index = worldSlotIndex(el);
     if (!ui.world?.open || index === null) return;
+    deletePlanetSlot(planetSlotKey(ui.world, ui.world.tab, index)).catch(() => {});
     store.clearWorldSlot(ui.world.tab, index);
     renderWorldPage();
   },
@@ -4481,9 +4573,16 @@ const actions = {
      параметры в форму и решает сам, создавать ли карту. */
   'world-import': () => {
     const session = ui.world;
-    if (!session?.open || session.screen !== 'setup') return;
-    session.importToSlot = session.mode === 'player' && session.slot ? { ...session.slot } : null;
+    if (!session?.open || !['setup', 'map'].includes(session.screen)) return;
+    if (session.lobby) { toast('Откройте файл в личном слоте, вне лобби.', 'error'); return; }
+    session.importToSlot = session.screen === 'map' && session.slot ? { ...session.slot } : session.mode === 'player' && session.slot ? { ...session.slot } : null;
     worldRoot()?.querySelector('[data-role="world-file"]')?.click();
+  },
+
+  'world-restore-seed': () => {
+    if (!ui.world?.open || ui.world.screen !== 'map' || !ui.world.planetRestoreError) return;
+    ui.world.planetRestoreError = null;
+    syncWorldViews();
   },
 
   'world-random-seed': () => {
@@ -4519,7 +4618,7 @@ const actions = {
     const config = store.normalizeWorldConfig({ ...session.config, seed: typed || worldSeed() });
     enterWorldMap(session.slot, config);
     toast(player
-      ? `Вы вошли в карту ${config.seed}. Основная карта доступна для просмотра.`
+      ? `Вы вошли в карту ${config.seed}. Открыта единая карта планеты.`
       : `Карта ${config.seed} заняла слот ${session.slot.index + 1}.`);
   },
 
@@ -4540,7 +4639,7 @@ const actions = {
       dropWorldViews();
       session.config = config;
       session.screen = 'map';
-      session.viewMode = 'map';
+      session.viewMode = 'surface';
       renderWorldPage();
     }
     toast(`Новый мир: ${config.seed}.`);
@@ -4550,22 +4649,20 @@ const actions = {
     const session = ui.world;
     if (!session?.open || session.mode !== 'master') return;
     try {
-      const { seed, width, height } = session.config;
-      const payload = JSON.stringify({
-        format: 'MIR world seed',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        config: { seed, width, height },
-      }, null, 2);
+      const { seed } = session.config;
+      const source = session.surfaceView?.getSource();
+      if (!source) { toast('Дождитесь подготовки географии планеты.', 'error'); return; }
+      const state = session.surfaceView.getState();
+      const payload = stringifyPlanet({ config: session.config, source, ...state });
       const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${seed.replace(/[^a-z0-9-]/gi, '_')}.sages-world.json`;
+      link.download = `${seed.replace(/[^a-z0-9-]/gi, '_')}.sages-planet.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      toast('Seed и размер карты экспортированы.');
-    } catch {
-      toast('Экспорт недоступен в этом браузере.', 'error');
+      toast('Сохранены сама география, метки, рисунки и настройки планеты.');
+    } catch (error) {
+      toast(error.message || 'Экспорт недоступен в этом браузере.', 'error');
     }
   },
 
@@ -5236,10 +5333,10 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (ui.world?.open && event.key === 'Escape') {
-    /* Возврат из дополнительных видов сначала ведёт на основную карту. */
-    if (ui.world.screen === 'map' && ui.world.viewMode !== 'map') {
+    /* Из планеты сначала возвращаемся к карте Azgaar. */
+    if (EXPERT_MAP_TOOLS && ui.world.screen === 'map' && ['planet', 'surface', 'rtwg'].includes(ui.world.viewMode)) {
       event.preventDefault();
-      setWorldView('map');
+      setWorldView('editor');
       return;
     }
     event.preventDefault();

@@ -1,5 +1,6 @@
+// Legacy workbench regression is explicitly opt-in; default unified UI is checked by test:unified-planet-browser.
 /* Смоук-проверка интерфейса: настоящий `mir.html` открывается в jsdom,
-   и по нему кликают, как человек, — основную карту мира, окна меню и настройки,
+   и по нему кликают, как человек, — карту Azgaar, окна меню и настройки,
    общий хаб, подключение по адресу, регистрацию, профиль и отключение.
 
    Зачем: собранный файл — это то, что получает игрок. Проверки логики
@@ -36,22 +37,41 @@ const fetchStub = (w) => (input, init) =>
     : globalThis.fetch(input, init);
 
 const html = readFileSync(fromRoot('mir.html'), 'utf8');
-const testCanvasContext = () => ({
+const testCanvasContext = (canvas) => new Proxy({
+  canvas,
+  measureText: (text) => ({ width: String(text).length * 7 }),
+  getImageData: (x, y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4), width, height }),
   createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
   createLinearGradient: () => ({ addColorStop() {} }),
+  createRadialGradient: () => ({ addColorStop() {} }),
+  createConicGradient: () => ({ addColorStop() {} }),
+  createPattern: () => null,
   clearRect() {}, fillRect() {}, drawImage() {}, putImageData() {},
   save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
   stroke() {}, strokeRect() {}, strokeText() {}, arc() {}, fill() {}, fillText() {},
+}, {
+  get: (target, key) => key in target ? target[key] : () => {},
+  set: (target, key, value) => { target[key] = value; return true; },
 });
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
-  url: 'http://127.0.0.1:9999/',   // «страница» не хаб: его на этом порту нет
+  url: 'http://127.0.0.1:9999/?mapTools=1',   // «страница» не хаб: его на этом порту нет
   pretendToBeVisual: true,
   /* fetch нужен уже на старте: приложение сразу проверяет новую сборку. */
   beforeParse(w) {
+    /* Приложение использует кодеки уже при выполнении скрипта, не после boot. */
+    w.TextEncoder = globalThis.TextEncoder;
+    w.TextDecoder = globalThis.TextDecoder;
+    w.ResizeObserver = class ResizeObserver { observe() {} disconnect() {} };
+    w.ImageData = class ImageData {
+      constructor(width, height) {
+        this.width = width; this.height = height;
+        this.data = new Uint8ClampedArray(width * height * 4);
+      }
+    };
     w.fetch = fetchStub(w);
     w.HTMLCanvasElement.prototype.getContext = function () {
-      return this.__testCanvasContext ??= testCanvasContext();
+      return this.__testCanvasContext ??= testCanvasContext(this);
     };
   },
 });
@@ -80,7 +100,7 @@ const bootPage2 = (saved, pageUrl = `${HUB}/`) => {
   const origin = new URL(pageUrl).origin;
   return new JSDOM(htmlReload, {
     runScripts: 'dangerously',
-    url: pageUrl,
+    url: (() => { const u = new URL(pageUrl); u.searchParams.set('mapTools', '1'); return u.href; })(),
     pretendToBeVisual: true,
     beforeParse(w) {
       w.HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -186,12 +206,12 @@ const webMarkup = webIndex
   .replace('</body>', () => `<script>${webCode.replaceAll('</script', '<\\/script')}</script>\n  </body>`);
 const webDom = new JSDOM(webMarkup, {
   runScripts: 'dangerously',
-  url: `${HUB}/?fmg-smoke=${Date.now()}`,
+  url: `${HUB}/?mapTools=1&fmg-smoke=${Date.now()}`,
   pretendToBeVisual: true,
   beforeParse(w) {
     w.fetch = (input, init) => fetchStub(w)(new URL(String(input), w.location.href).href, init);
     w.HTMLCanvasElement.prototype.getContext = function () {
-      return this.__testCanvasContext ??= testCanvasContext();
+      return this.__testCanvasContext ??= testCanvasContext(this);
     };
     w.AbortSignal = globalThis.AbortSignal;
     w.crypto.subtle = globalThis.crypto.subtle;
@@ -216,42 +236,38 @@ try {
   if (webSeed) webSeed.value = 'MIR-UI-TEST';
   webClick('[data-action="world-generate"]');
   await wait(60);
-  const webMap = webWindow.document.querySelector('[data-role="world-map-view"]');
   ok(
-    'веб-сборка: после создания первой открывается основная процедурная карта',
-    !!webMap && webWindow.document.querySelector('.world-app')?.classList.contains('is-world-map')
-      && !webWindow.document.querySelector('.world-editor-frame'),
+    'веб-сборка: поверхность открыта поверх Azgaar, собственного генератора нет',
+    !!webWindow.document.querySelector('.world-editor-frame')
+      && !webWindow.document.querySelector('[data-role="world-map-view"]')
+      && !webWindow.document.querySelector('[data-action="world-map-view"]')
+      && webWindow.document.querySelector('[data-action="world-surface"]')?.getAttribute('aria-pressed') === 'true'
+      && !!webWindow.document.querySelector('[data-role="surface-view"]'),
   );
-  webClick('[data-action="world-editor"]');
-  await wait(60);
   const webFrame = webWindow.document.querySelector('.world-editor-frame');
   const webSrc = webFrame?.getAttribute('src') ?? '';
   const webUrl = new URL(webSrc, webWindow.location.href);
   ok(
-    'веб-сборка: дополнительный Azgaar подключается по запросу через fmg/index.html',
+    'веб-сборка: Azgaar подключён через fmg/index.html',
     webUrl.pathname.endsWith('/fmg/index.html') && !webFrame?.srcdoc,
     webSrc,
   );
   ok(
-    'веб-сборка: Azgaar получает seed, земной размер, 1000000 точек и options=default',
+    'веб-сборка: Azgaar получает seed, земной размер, 100000 точек и options=default',
     webUrl.searchParams.get('seed') === 'MIR-UI-TEST'
       && webUrl.searchParams.get('width') === '40075017'
       && webUrl.searchParams.get('height') === '20003932'
-      && webUrl.searchParams.get('points') === '1000000'
-      && webUrl.searchParams.get('options') === 'default',
+      && webUrl.searchParams.get('points') === '100000'
+      && webUrl.searchParams.get('options') === 'default'
+      && webUrl.searchParams.get('world') === 'earth',
     webSrc,
   );
-  /* Escape из дополнительного редактора возвращает к основной карте, затем закрывает игру. */
   webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   await wait(30);
-  ok(
-    'веб-сборка: первый Escape возвращает к основной карте',
-    !!webWindow.document.querySelector('[data-role="world-map-view"]')
-      && webWindow.document.querySelector('.world-app')?.classList.contains('is-world-map'),
-  );
+  ok('веб-сборка: Escape из поверхности возвращает в редактор', webWindow.document.querySelector('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
   webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   await wait(30);
-  ok('веб-сборка: второй Escape закрывает игру', !webWindow.document.querySelector('#world-page-root .world-app'));
+  ok('веб-сборка: второй Escape закрывает карту', !webWindow.document.querySelector('#world-page-root .world-app'));
 } finally {
   webWindow.close();
 }
@@ -272,46 +288,39 @@ ok(
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
-/* Основная карта мира открывается прямо из меню; других картографических
-   режимов у неё нет, только дополнительные виды Azgaar и планеты. */
+/* Быстрый запуск временно открывает существующий Azgaar, не старый движок. */
 click('[data-action="open-world-map"]');
-await wait(1100);
-const primaryMap = $('[data-role="world-map-view"]');
+await wait(100);
 ok(
-  'из меню открывается основная процедурная карта с шестью тематическими слоями',
-  !!primaryMap
-    && $('.world-app')?.classList.contains('is-world-map')
-    && $$('[data-layer]').length === 6
-    && /[0-9]/.test($('[data-role="world-map-hud"]')?.textContent || ''),
-  $('[data-role="world-map-hud"]')?.textContent?.trim(),
+  'из меню открывается пиксельная поверхность без удалённого основного генератора',
+  !!$('.world-editor-frame') && !$('[data-role="world-map-view"]')
+    && !$('[data-action="world-map-view"]')
+    && $('[data-action="world-surface"]')?.getAttribute('aria-pressed') === 'true'
+    && !!$('[data-role="surface-view"]'),
 );
-ok(
-  'на основной карте нет слоя блоков, ползунка яруса или среза',
-  !$('[data-layer="blocks"]') && !$('[data-tier]') && !$('[data-role="world-map-level"]'),
-);
-click('[data-layer="relief"]');
-click('[data-map-action="earth"]');
-await wait(60);
-ok(
-  'слой рельефа и действие «Весь мир» работают на основной карте',
-  $('[data-layer="relief"]')?.getAttribute('aria-pressed') === 'true'
-    && /Весь мир/.test($('[data-role="world-map-note"]')?.textContent || ''),
-  $('[data-role="world-map-note"]')?.textContent?.trim(),
-);
+const quickFrame = $('.world-editor-frame');
 click('[data-action="world-editor"]');
-await wait(100);
-ok(
-  'Azgaar — отдельный вид, открываемый по запросу',
-  !!$('.world-editor-frame') && ! $('[data-role="world-map-view"]')
-    && $('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true',
-);
-click('[data-action="world-map-view"]');
-await wait(100);
-ok(
-  'кнопка «Карта мира» возвращает основной вид',
-  !!$('[data-role="world-map-view"]') && $('.world-app')?.classList.contains('is-world-map')
-    && $('[data-action="world-map-view"]')?.getAttribute('aria-pressed') === 'true',
-);
+await wait(30);
+ok('переход в редактор снимает поверхность, но сохраняет географию', !$('[data-role="surface-view"]') && $('.world-editor-frame') === quickFrame);
+click('[data-action="world-surface"]');
+await wait(30);
+ok('поверхность возвращается на том же iframe', !!$('[data-role="surface-view"]') && $('.world-editor-frame') === quickFrame);
+window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+await wait(30);
+ok('Escape из поверхности возвращает в Azgaar', !$('[data-role="surface-view"]') && $('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
+click('[data-action="world-editor"]');
+await wait(30);
+ok('повторный выбор Azgaar не пересоздаёт документ карты', $('.world-editor-frame') === quickFrame);
+ok('планетарный просмотр остался доступен', !!$('[data-action="world-planet"]'));
+click('[data-action="world-planet"]');
+await wait(40);
+ok('планетарный вид открывается поверх того же документа Azgaar',
+  $('.world-app')?.classList.contains('is-planet') && $('.world-editor-frame') === quickFrame);
+window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+await wait(30);
+ok('Escape из планеты возвращает к Azgaar и снимает планетарный вид',
+  !$('.world-app')?.classList.contains('is-planet') && $('.world-editor-frame') === quickFrame
+    && $('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
 click('[data-action="world-exit"]');
 await wait(40);
 
@@ -366,10 +375,10 @@ await wait(30);
 const masterFrame = $('.world-editor-frame');
 const masterDoc = masterFrame?.srcdoc ?? '';
 ok(
-  'карта мастера: Azgaar встроен с тем же seed, планетарным размером 40075017×20003932, 1000000 точек и options=default',
-  masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=40075017') && masterDoc.includes('height=20003932') && masterDoc.includes('points=1000000') && masterDoc.includes('options=default'),
+  'карта мастера: Azgaar встроен с тем же seed, планетарным размером 40075017×20003932, 100000 точек и options=default',
+  masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=40075017') && masterDoc.includes('height=20003932') && masterDoc.includes('points=100000') && masterDoc.includes('options=default') && masterDoc.includes('world=earth'),
 );
-ok('топбар мастера: основная карта, редактор Azgaar, планета, «Новый мир» и «Экспорт»', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !!$('[data-action="world-map-view"]') && !!$('[data-action="world-editor"]') && !!$('[data-action="world-planet"]') && !$('[data-action="world-voxel"]') && !$('[data-action="world-proc-gen"]') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
+ok('топбар мастера: Azgaar, планета, «Новый мир» и «Экспорт», без удалённого вида', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-map-view"]') && !!$('[data-action="world-editor"]') && !!$('[data-action="world-planet"]') && !$('[data-action="world-voxel"]') && !$('[data-action="world-proc-gen"]') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
 ok('однофайловая копия вшивает шаблон Azgaar', !!window.document.getElementById('mir-fmg-template'));
 click('[data-action="world-slots"]');
 const storedAfterCreate = JSON.parse(window.localStorage.getItem('mir-world-slots') || '{}');
@@ -394,7 +403,7 @@ await wait(30);
 click('[data-action="world-editor"]');
 await wait(30);
 const playerDoc = $('.world-editor-frame')?.srcdoc ?? '';
-ok('игрок: Azgaar открыт с тем же seed, размером 40075017×20003932 и 1000000 точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=1000000'));
+ok('игрок: Azgaar открыт с тем же seed, размером 40075017×20003932 и 100000 точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=100000') && playerDoc.includes('world=earth'));
 ok('игрок: режим «РЕЖИМ ИГРОКА», без «Нового мира» и «Экспорта»', /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-new"]') && !$('[data-action="world-export"]'));
 
 /* Импорт файла карты в пустой слот игрока. */
@@ -421,8 +430,8 @@ ok('«Продолжить» открывает карту напрямую, б�
 click('[data-action="world-exit"]');
 await wait(50);
 click('.play-button');
-/* Карта блоков открывается сразу: первый Esc гасит её, второй закрывает мир. */
-for (let press = 0; press < 2; press += 1) {
+/* Со страницы слотов достаточно одного Escape. */
+for (let press = 0; press < 1; press += 1) {
   window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   await wait(30);
 }

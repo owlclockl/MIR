@@ -1,7 +1,7 @@
-/* Дополнительный редактор карт Azgaar внутри игры.
+/* Редактор карт Azgaar внутри игры.
 
-   Основная процедурная карта живёт в src/gen/ и не зависит от этого модуля.
-   Azgaar открывается отдельным видом; здесь описаны его URL и ограничения:
+   Рабочая карта после удаления собственного основного генератора MIR.
+   Здесь описаны URL и ограничения Azgaar:
 
    • в mir.html редактор вшит шаблоном — JSON-блок #mir-fmg-template
      (сборка: scripts/lib/fmg-offline.mjs). Документ открывается через
@@ -39,14 +39,9 @@ const readEmbeddedTemplate = () => {
   return embeddedTemplate;
 };
 
-/**
- * Строка запроса для Azgaar. options=default отключает сохранённые в браузере
- * настройки редактора: карта зависит только от seed и размера. Число точек
- * задаётся явно — миллион (`points` читает vendored Azgaar, см.
- * src/services/url-params.ts в нём): при options=default плотность иначе
- * сбрасывалась бы к стандартным 10 000 точкам, и земной холст остался бы
- * почти пустым.
- */
+/** Параметры слота — физические метры; world=earth включает в Azgaar
+ * материковый профиль, нормализованный граф и километровую шкалу.
+ * Малые обзорные слоты сохраняют прежнюю семантику координат. */
 export const editorQuery = ({ seed, width, height }) =>
   `?${new URLSearchParams({
     seed,
@@ -54,6 +49,7 @@ export const editorQuery = ({ seed, width, height }) =>
     height: String(height),
     points: String(WORLD_MAP_POINTS),
     options: 'default',
+    ...(width >= 1_000_000 && height >= 1_000_000 ? { world: 'earth' } : {}),
   })}`;
 
 const restrictEditor = (frame) => {

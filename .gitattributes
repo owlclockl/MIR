@@ -1,0 +1,7 @@
+# Pinned third-party snapshots must retain upstream bytes, including CRLF and
+# historical whitespace; SHA-256 manifests verify these files unchanged.
+vendor/xaeroplus/upstream/** -text -whitespace
+vendor/rtwg/** -text -whitespace
+vendor/rtplatec/** -text -whitespace
+vendor/libnoise/** -text -whitespace
+vendor/geographiclib-geodesic/** -text -whitespace

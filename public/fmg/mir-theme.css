@@ -1,17 +1,14 @@
-/* The civilization of the sages cartography UI layered over Azgaar's original editor.
-   Keep the generated map user-stylable; unify only the surrounding controls and surfaces. */
+/* The civilization of the sages cartography palette layered over Azgaar's original map/editor styles.
+   The generated map remains user-stylable; these rules only recolor the UI. */
 :root {
   color-scheme: dark;
   --mir-ink: #080d0e;
-  --mir-panel: #0d1415;
-  --mir-panel-raised: #121c1b;
-  --mir-line: rgba(230, 240, 233, 0.12);
-  --mir-text: #eef2ef;
-  --mir-muted: #9ca8a0;
-  --mir-sage: #c2d9c9;
+  --mir-panel: #0d1515;
+  --mir-panel-raised: #14201e;
+  --mir-line: rgba(201, 221, 208, 0.16);
+  --mir-text: #e6ece8;
+  --mir-muted: #9eaea6;
   --mir-gold: #d8c184;
-  --mir-radius-sm: 10px;
-  --mir-radius-md: 14px;
 }
 
 html,
@@ -44,8 +41,8 @@ body {
 #options,
 #optionsContainer,
 .ui-dialog.ui-widget-content {
-  border-radius: var(--mir-radius-md);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  border-radius: 0;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48);
 }
 
 #options p,
@@ -75,13 +72,12 @@ body {
   color: var(--mir-text);
   background-color: #091111;
   border: 1px solid var(--mir-line);
-  border-radius: var(--mir-radius-sm);
-  accent-color: var(--mir-sage);
+  accent-color: var(--mir-gold);
 }
 
 #options input[type="range"],
 .ui-dialog input[type="range"] {
-  accent-color: var(--mir-sage);
+  accent-color: var(--mir-gold);
 }
 
 #options button,
@@ -91,12 +87,7 @@ button.options {
   color: var(--mir-text);
   background-color: var(--mir-panel-raised);
   border-color: var(--mir-line);
-  border-radius: var(--mir-radius-sm);
-  font-family: inherit;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  border-radius: 0;
 }
 
 #options button:hover,
@@ -104,9 +95,9 @@ button.options {
 .ui-dialog .ui-button:hover,
 button.options:hover,
 button.options.active {
-  color: var(--mir-text);
-  background-color: rgba(194, 217, 201, 0.09);
-  border-color: rgba(194, 217, 201, 0.32);
+  color: #fff8e7;
+  background-color: #20352e;
+  border-color: rgba(216, 193, 132, 0.42);
 }
 
 #options button:focus-visible,
@@ -114,7 +105,7 @@ button.options.active {
 .ui-dialog button:focus-visible,
 #options input:focus-visible,
 #options select:focus-visible {
-  outline: 2px solid var(--mir-sage);
+  outline: 2px solid var(--mir-gold);
   outline-offset: 2px;
 }
 
@@ -147,7 +138,7 @@ div.tab {
 .tabcontent li {
   color: var(--mir-text);
   background-color: var(--mir-panel-raised);
-  border-radius: var(--mir-radius-sm);
+  border-radius: 0;
 }
 
 .tabcontent li.buttonoff {
@@ -164,7 +155,7 @@ div.tab {
 }
 
 #optionsTrigger {
-  color: var(--mir-sage);
+  color: var(--mir-gold);
   background: #0d1515;
   border-color: var(--mir-line);
 }
@@ -178,8 +169,8 @@ div.tab {
   box-shadow: none;
 }
 
-/* Состояние кнопки меню остаётся заметным, но не превращает подсказку
-   в яркую пульсирующую кнопку редактора. */
+/* Пульс у кнопки меню («Click to show the Menu») — золотом палитры,
+   а не алым цветом Azgaar. Отдельное имя анимации: порядок стилей не важен. */
 #optionsTrigger.glow {
   animation: mir-glowing 3s infinite ease-in-out;
 }
@@ -187,10 +178,10 @@ div.tab {
 @keyframes mir-glowing {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(194, 217, 201, 0.08);
+    box-shadow: 0 0 1px rgba(216, 193, 132, 0.5);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(194, 217, 201, 0.06);
+    box-shadow: 0 0 10px rgba(216, 193, 132, 0.7);
   }
 }
 
@@ -208,13 +199,17 @@ div.tab {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 26px;
   padding: 24px;
   overflow: hidden;
   pointer-events: none;
   color: var(--mir-text);
   background-color: var(--mir-ink);
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(194, 217, 201, 0.05), transparent 58%);
+  background-image:
+    radial-gradient(120% 78% at 50% 0%, rgba(194, 217, 201, 0.09), transparent 60%),
+    radial-gradient(90% 60% at 50% 112%, rgba(216, 193, 132, 0.08), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(194, 217, 201, 0.05) 0 1px, transparent 1px 76px),
+    repeating-linear-gradient(90deg, rgba(194, 217, 201, 0.05) 0 1px, transparent 1px 76px);
 }
 
 /* upstream фиксирует каждого ребёнка по центру экрана: возвращаем их в поток,
@@ -239,29 +234,38 @@ div.tab {
   place-items: center;
 }
 
-/* Логотип сохраняется сам по себе: декоративное кольцо убрано. */
+/* Кольцо вокруг печати: идёт медленно, как картушка компаса. */
 #loading-mark::before {
-  content: none;
+  content: "";
+  position: absolute;
+  inset: -22px;
+  border: 1px dashed rgba(194, 217, 201, 0.26);
+  border-radius: 50%;
+  animation: mir-loader-ring 28s linear infinite;
 }
 
 #loading-mark::after {
-  content: none;
+  content: "";
+  position: absolute;
+  inset: -56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(194, 217, 201, 0.14), transparent 66%);
 }
 
 #loading #loading-logo {
-  width: 64px;
-  height: 64px;
-  stroke: var(--mir-sage);
+  width: 78px;
+  height: 78px;
+  stroke: #c2d9c9;
   animation: mir-loader-breath 3.6s ease-in-out infinite alternate;
 }
 
 #loading #loading-logo circle {
   fill: none;
-  stroke: var(--mir-sage);
+  stroke: #c2d9c9;
 }
 
 #loading #loading-logo circle:nth-of-type(2) {
-  fill: var(--mir-sage);
+  fill: #c2d9c9;
   stroke: none;
 }
 
@@ -288,18 +292,18 @@ div.tab {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
-  letter-spacing: 0.12em;
-  text-indent: 0.12em;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
   text-align: center;
   text-transform: uppercase;
 }
 
 #loading #titleName {
-  color: var(--mir-text);
+  color: #e6ece8;
 }
 
 #loading #title {
-  color: var(--mir-sage);
+  color: #c2d9c9;
 }
 
 /* Ключевая фраза игры — тихим камнем, без разрядки. */
@@ -319,13 +323,13 @@ div.tab {
 #loading #loading-text {
   margin: 0;
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: 0.12em;
-  text-indent: 0.12em;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
   text-transform: uppercase;
-  color: var(--mir-sage);
+  color: #c2d9c9;
 }
 
 #loading #loading-text > span {
@@ -353,6 +357,12 @@ div.tab {
   display: none;
 }
 
+@keyframes mir-loader-ring {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes mir-loader-breath {
   from {
     transform: scale(0.97);
@@ -376,7 +386,6 @@ div.tab {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #optionsTrigger.glow,
   #loading-mark::before,
   #loading #loading-logo,
   #loading #loading-typography::after {
@@ -402,8 +411,8 @@ div.tab {
   content: "";
   position: absolute;
   inset: 24px;
-  border: 1px solid rgba(194, 217, 201, 0.24);
-  border-radius: var(--mir-radius-md);
+  border: 1px dashed rgba(194, 217, 201, 0.3);
+  border-radius: 2px;
 }
 
 #mapOverlay > span {
@@ -419,7 +428,7 @@ div.tab {
     max-height: min(70vh, 46em);
     overflow: auto;
     border-width: 1px 0 0;
-    border-radius: var(--mir-radius-md) var(--mir-radius-md) 0 0;
+    border-radius: 0;
     padding-bottom: calc(0.3em + env(safe-area-inset-bottom));
   }
 

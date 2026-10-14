@@ -14,6 +14,7 @@ import { writeFileSync } from 'node:fs';
 import { build as viteBuild } from 'vite';
 import './root.mjs';
 import { buildEmbeddedEditor, embedTemplate } from './fmg-offline.mjs';
+import { buildRtwgSourceArchive } from './rtwg-source.mjs';
 import { singleFileHtml } from './vite-mir.mjs';
 
 /**
@@ -21,6 +22,7 @@ import { singleFileHtml } from './vite-mir.mjs';
  * @param {{ logLevel?: string }} [options]
  */
 export async function buildWeb({ logLevel = 'warn' } = {}) {
+  buildRtwgSourceArchive();
   /* Режим ровно тот же, что у `npm run build`: от него зависит значение
      import.meta.env.MODE внутри бандла. Разные режимы давали разные файлы
      при одном и том же коде — и лишнюю пересборку у игроков. */
@@ -38,6 +40,7 @@ export async function buildWeb({ logLevel = 'warn' } = {}) {
  *   по умолчанию файл ещё и обновляется на диске.
  */
 export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) {
+  buildRtwgSourceArchive();
   const editor = await buildEmbeddedEditor();
 
   /* Сборка идёт в память: на диск попадает ровно один файл — mir.html. */

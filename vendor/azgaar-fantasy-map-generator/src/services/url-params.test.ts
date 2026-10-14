@@ -36,3 +36,18 @@ describe("getRequestedMapSize", () => {
     expect(getRequestedMapSize(new URLSearchParams("points=heavy")).points).toBeUndefined();
   });
 });
+
+describe("MIR physical whole-world profile", () => {
+  it("keeps metre-sized planet extents out of the SVG / Voronoi graph", () => {
+    const size = getRequestedMapSize(new URLSearchParams("world=earth&width=40075017&height=20003932&points=1000000"));
+    expect(size.width).toBe(2000);
+    expect(size.height).toBeCloseTo(2000 * 20003932 / 40075017, 8);
+    expect(size.points).toBe(100000);
+  });
+
+  it("retains the same graph resolution on a planet twice the physical size", () => {
+    const normal = getRequestedMapSize(new URLSearchParams("world=earth&width=40075017&height=20003932"));
+    const larger = getRequestedMapSize(new URLSearchParams("world=earth&width=80150034&height=40007864"));
+    expect(larger).toEqual(normal);
+  });
+});

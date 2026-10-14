@@ -1,3 +1,4 @@
+import { cleanDrawings, cleanSettings, serializeDrawOrder } from '../map/xaeroplus/schema.js';
 /* ===========================================================
    Слой данных: аккаунты, друзья, заявки, код-приглашения.
 
@@ -2163,20 +2164,10 @@ export const WORLD_ROLES = ['master', 'player'];
 export const WORLD_SLOT_COUNT = 6;
 export const WORLD_SEED_MAX = 48;
 
-/* Размер мира — планета Земля в метрах, а не обзорное окно. Один блок мира
-   равен одному метру, поэтому земной размер даёт земной мир блочного
-   генератора: 40 075 017 × 20 003 932 блока, без всякого коэффициента.
-   Тот же размер получает и редактор карты Azgaar — он рисует свою карту на
-   земном холсте, и его собственный мир остаётся обзорным ориентиром.
-
-   Раньше карта была обзором 1280×800…1920×1080 «пикселей», блочный мир
-   выходил крошечным. Теперь край мира — край планеты, и вид
-   (src/game/world-map-view.js) не выпускает камеру за него.
-
-   Точек у карты Azgaar — миллион: на земном холсте это клетка решётки
-   около 28 км. Генерация такой карты заметно тяжелее прежней — это честная
-   цена масштаба, и экран создания мира об этом предупреждает. */
-export const WORLD_MAP_POINTS = 1_000_000;
+/* Размеры планет — физические метры, не размеры SVG Azgaar. Профиль world=earth
+   нормализует рабочую сетку и задаёт километровую шкалу. 100K — верхняя плотность,
+   для которой upstream калибрует формы материков, вместо отката к 10K при 1M. */
+export const WORLD_MAP_POINTS = 100_000;
 export const WORLD_SIZES = [
   { id: 'earth', label: 'Земля (40 075 × 20 004 км)', width: 40_075_017, height: 20_003_932 },
   { id: 'super_earth', label: 'Суперземля 2× (80 150 × 40 008 км)', width: 80_150_034, height: 40_007_864 },
@@ -2243,4 +2234,45 @@ export const clearWorldSlot = (role, index) => {
   slots[role][index] = null;
   writeJSON(KEYS.worlds, { version: 2, ...slots });
   return true;
+};
+
+
+/* Local personal waypoints, separate from world slots and never sent to hub.
+   Bounded storage: 24 recent worlds × 64 normalized positions. */
+const SURFACE_PINS_KEY = 'mir:surface-pins';
+const cleanSurfacePins = (pins) => Array.isArray(pins) ? pins.filter((p) =>
+  p && Number.isFinite(p.u) && Number.isFinite(p.v) && p.u >= 0 && p.u <= 1 && p.v >= 0 && p.v <= 1,
+).slice(0, 64).map((p) => ({ u: p.u, v: p.v, name: String(p.name || 'Метка').slice(0, 40) })) : [];
+export const loadSurfacePins = (key) => {
+  const maps = readJSON(SURFACE_PINS_KEY, []);
+  const found = Array.isArray(maps) ? maps.find((m) => m?.key === String(key)) : null;
+  return cleanSurfacePins(found?.pins);
+};
+export const saveSurfacePins = (key, pins) => {
+  key = String(key).slice(0, 180);
+  const maps = readJSON(SURFACE_PINS_KEY, []);
+  const rest = Array.isArray(maps) ? maps.filter((m) => m?.key !== key && typeof m?.key === 'string') : [];
+  writeJSON(SURFACE_PINS_KEY, [{ key, pins: cleanSurfacePins(pins) }, ...rest].slice(0, 24));
+};
+
+
+/* XaeroPlus browser drawing adapter: independent personal annotation storage. */
+const SURFACE_DRAWINGS_KEY = 'mir:surface-drawings';
+const cleanSurfaceDrawings = cleanDrawings;
+export const loadSurfaceDrawings = (key) => {
+  const worlds = readJSON(SURFACE_DRAWINGS_KEY, []);
+  return cleanSurfaceDrawings(Array.isArray(worlds) ? worlds.find((w) => w?.key === String(key))?.shapes : []);
+};
+export const saveSurfaceDrawings = (key, shapes) => {
+  key = String(key).slice(0, 180);
+  const worlds = readJSON(SURFACE_DRAWINGS_KEY, []);
+  const rest = Array.isArray(worlds) ? worlds.filter((w) => w?.key !== key && typeof w?.key === 'string') : [];
+  writeJSON(SURFACE_DRAWINGS_KEY, [{ key, shapes: cleanSurfaceDrawings(shapes) }, ...rest].slice(0, 24));
+};
+
+/* Personal cartography preferences; never included in hub payloads. */
+export const loadSurfaceSettings = () => cleanSettings(readJSON('mir:surface-settings', {}));
+export const saveSurfaceSettings = (settings) => {
+  const valid = cleanSettings(settings);
+  writeJSON('mir:surface-settings', { ...valid, order: serializeDrawOrder(valid.order) });
 };
