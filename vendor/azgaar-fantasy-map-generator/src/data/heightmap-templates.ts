@@ -56,10 +56,10 @@ const continents = `Hill 1 80-85 60-80 40-60
   Mask 4 0 0 0`;
 
 // MIR's whole-world preset, composed exclusively from Azgaar terrain tools.
-// Lower-variance Hill growth forms coherent continental interiors instead of
-// the old branching, pointed hill tops. Lower land before adding ranges: plains, then mountain
-// belts. The Earth-only Range coast guard in fromTemplate keeps ocean ridges
-// from becoming thin land bridges between continents.
+// Keep six distinct continental nuclei, then cut offset coastal Pits after
+// smoothing to form bays, capes and uneven shoulders instead of six polished
+// ovals. Add mountain belts afterwards. The Earth-only Range coast
+// guard in fromTemplate prevents ocean ridges from bridging separate continents.
 const earthContinents = `Hill 1 68-76 12-20 20-32
   Hill 1 60-70 44-52 18-30
   Hill 1 64-72 76-84 20-32
@@ -75,6 +75,10 @@ const earthContinents = `Hill 1 68-76 12-20 20-32
   Smooth 1 0 0 0
   Smooth 1 0 0 0
   Smooth 1 0 0 0
+  Pit 1 16-26 14-20 29-36
+  Pit 1 16-26 77-84 25-33
+  Pit 1 14-24 17-24 70-77
+  Pit 1 15-26 80-87 70-78
   Mask 4 0 0 0
   Multiply 0.6 land 0 0
   Range 1 48-68 15-22 23-35

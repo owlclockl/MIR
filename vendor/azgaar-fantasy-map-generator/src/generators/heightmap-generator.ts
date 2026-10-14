@@ -608,10 +608,11 @@ class HeightmapModule {
     if (!steps.length) throw new Error(`Heightmap template: no steps. Template: ${id}. Steps: ${steps}`);
     this.setGraph(graph, config);
     if (id === "earthContinents") {
-      // Less branching per frontier; repeated upstream smoothing below
-      // removes tiny inlets before the coastline is locked for mountain belts.
+      // Keep the broad Hill nuclei stable: too much frontier noise makes their
+      // random walk percolate into a single supercontinent. Irregular bays are
+      // cut explicitly by the preset's seeded Pits instead.
       this.blobPower = Math.min(this.blobPower + 0.0005, 0.9978);
-      this.hillNoise = 0.08;
+      this.hillNoise = 0.1;
     }
 
     let mountainStage = false;

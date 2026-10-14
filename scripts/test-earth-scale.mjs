@@ -92,15 +92,28 @@ try {
     for (let first = 0; first < heights.length; first += 1) {
       if (seen[first] || heights[first] < threshold) continue;
       const queue = [first]; seen[first] = 1;
-      let area = 0; let west = Infinity; let east = -Infinity; let north = Infinity; let south = -Infinity;
+      let area = 0, boundaryCells = 0;
+      let west = Infinity, east = -Infinity, north = Infinity, south = -Infinity;
       for (let head = 0; head < queue.length; head += 1) {
         const cell = queue[head];
         const [x, y] = graph.points[cell];
+        const neighbors = graph.cells.c[cell];
         area += cellKm2 * Math.cos((y / world.graphHeight - 0.5) * Math.PI);
         west = Math.min(west, x); east = Math.max(east, x); north = Math.min(north, y); south = Math.max(south, y);
-        for (const n of graph.cells.c[cell]) if (!seen[n] && heights[n] >= threshold) { seen[n] = 1; queue.push(n); }
+        let touchesSea = false;
+        for (const n of neighbors) {
+          if (heights[n] < threshold) touchesSea = true;
+          else if (!seen[n]) { seen[n] = 1; queue.push(n); }
+        }
+        if (touchesSea) boundaryCells += 1;
       }
-      result.push({ area, spanKm: (east - west) * world.widthKm / world.graphWidth, spanYKm: (south - north) * world.heightKm / world.graphHeight });
+      const spanKm = (east - west) * world.widthKm / world.graphWidth;
+      const spanYKm = (south - north) * world.heightKm / world.graphHeight;
+      result.push({
+        area, spanKm, spanYKm,
+        aspect: Math.min(spanKm, spanYKm) / Math.max(spanKm, spanYKm),
+        coastComplexity: boundaryCells / Math.sqrt(queue.length),
+      });
     }
     return result.sort((a, b) => b.area - a.area);
   };
@@ -132,6 +145,12 @@ try {
     assert.ok(land.filter((c) => c.area >= 3_000_000).length >= 2, `${seed}: нужны отдельные материки, не только острова`);
     assert.ok(land[0].area >= 10_000_000 && land[0].area < 100_000_000, `${seed}: ${land[0].area} км²`);
     assert.ok(land[0].spanKm >= 3000, `${seed}: материк должен быть тысячи км в поперечнике`);
+    if (seed === 'earth-test') {
+      const major = land.filter((c) => c.area >= 3_000_000).slice(0, 2);
+      assert.ok(major.every((c) => c.aspect >= 0.6 && c.coastComplexity >= 8.5),
+        `${seed}: два крупнейших материка должны быть менее овальными и иметь разнообразный берег`);
+      checks += 1;
+    }
     const fraction = heights.filter((h) => h >= 20).length / heights.length;
     assert.ok(fraction > 0.05 && fraction < 0.5, `${seed}: должны быть и океаны, и суша`);
     if (seed === 'earth-test') {
