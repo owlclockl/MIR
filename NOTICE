@@ -1,0 +1,24 @@
+RTWG-enabled MIR distribution
+
+The combined RTWG-enabled program is distributed under GNU GPL version 3
+(or, for MIR's new browser adapter files, any later version). See COPYING.
+This does not replace third-party authors' existing licenses or claim ownership
+of their work. Azgaar, XaeroPlus, Lucide, CC0 media, RTplatec and libnoise keep
+all original copyright and license notices in vendor/ and src/.
+
+RTWG is by tarTG, GPLv3, revision 6cbf782c47c360dcf4bf5ca9b0d1b999d85dac38.
+RTplatec is revision c75d9605858d1f65bf1cc283834149ab009b2880;
+inherited plate-tectonics source files retain LGPL-2.1-or-later headers.
+libnoise is revision 9ce0737b55812f7de907e86dc633724524e3a8e8, LGPL-2.1.
+The MIR browser port was created/modified on 2026-10-14.
+
+Corresponding source and build scripts are included in this repository and
+in the downloadable source archive offered inside the RTWG workbench.
+The archive excludes generated web/editor bundles and local credentials/data.
+See docs/rtwg-browser.md for rebuild/relink instructions and adaptation limits.
+Do not redistribute a standalone executable/HTML without the corresponding
+source and all notices. This software comes without warranty.
+
+GeographicLib Geodesic 2.2.0, copyright (c) 2011-2022 Charles Karney, MIT.
+Pinned npm dependency; original JS/license snapshot in vendor/geographiclib-geodesic.
+The full MIT notice is also accessible in the unified map cartography panel.

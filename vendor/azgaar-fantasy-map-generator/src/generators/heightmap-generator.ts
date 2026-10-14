@@ -16,6 +16,7 @@ class HeightmapModule {
   heights: Uint8Array | null = null;
   blobPower: number = 0;
   linePower: number = 0;
+  private hillNoise = 0.2;
   private width = 0;
   private height = 0;
 
@@ -81,6 +82,7 @@ class HeightmapModule {
     this.height = config.height;
     this.heights = Uint8Array.from(graph.cells.h);
     this.blobPower = this.getBlobPower(cellsDesired);
+    this.hillNoise = 0.2;
     this.linePower = this.getLinePower(cellsDesired);
     this.grid = graph;
   }
@@ -107,7 +109,7 @@ class HeightmapModule {
 
         for (const c of this.grid.cells.c[q]) {
           if (change[c]) continue;
-          change[c] = change[q] ** this.blobPower * (Math.random() * 0.2 + 0.9);
+          change[c] = change[q] ** this.blobPower * (Math.random() * this.hillNoise + (1 - this.hillNoise / 2));
           if (change[c] > 1) queue.push(c);
         }
       }
@@ -553,11 +555,46 @@ class HeightmapModule {
     return options.generation.template;
   }
 
+  // MIR: explicit one-shot RTWG import, never used for ordinary seed generation.
+  private externalHeightmap: { width: number; height: number; values: Float32Array; sea: number; scale: number } | null = null;
+
+  queueExternalHeightmap(data: { width: number; height: number; values: ArrayLike<number>; sea: number; scale: number }) {
+    const { width, height, sea, scale } = data;
+    if (![64, 128, 256, 512].includes(width) || height !== width / 2 || data.values.length !== width * height ||
+        !Number.isFinite(sea) || sea < 0 || sea > 10 || !Number.isFinite(scale) || scale < 1 || scale > 10000) throw new Error("Invalid external heightmap");
+    const values = Float32Array.from(data.values);
+    if (!values.every(v => Number.isFinite(v) && v >= 0.001 && v <= 30)) throw new Error("Invalid external heights");
+    const land = values.reduce((sum, v) => sum + Number(v >= sea), 0);
+    if (land < values.length * 0.01 || land > values.length * 0.99) throw new Error("External map needs both land and ocean (at least 1% each)");
+    this.externalHeightmap = { width, height, values, sea, scale };
+  }
+
+  cancelExternalHeightmap() { this.externalHeightmap = null; }
+
+  private consumeExternalHeightmap(graph: GridGraph): Uint8Array | null {
+    const source = this.externalHeightmap;
+    this.externalHeightmap = null;
+    if (!source) return null;
+    const { width, height, values, sea, scale } = source;
+    const exponent = options.map.units.height.exponent || 2.05;
+    const sample = (x: number, y: number) => values[Math.max(0, Math.min(height - 1, y)) * width + Math.max(0, Math.min(width - 1, x))];
+    return Uint8Array.from(graph.points, ([px, py]) => {
+      const x = Math.max(0, Math.min(width - 1, px / options.map.graph.width * width - 0.5));
+      // RTWG textures have a bottom-left origin; Azgaar uses top-left.
+      const y = Math.max(0, Math.min(height - 1, (1 - py / options.map.graph.height) * height - 0.5));
+      const ix = Math.floor(x), iy = Math.floor(y), tx = x - ix, ty = y - iy;
+      const a = sample(ix, iy) * (1 - tx) + sample(ix + 1, iy) * tx;
+      const b = sample(ix, iy + 1) * (1 - tx) + sample(ix + 1, iy + 1) * tx;
+      const meters = (a * (1 - ty) + b * ty - sea) * scale;
+      return meters >= 0 ? Math.min(100, Math.max(20, Math.round(18 + meters ** (1 / exponent)))) : Math.max(0, Math.min(19, Math.floor(950 / (50 - meters))));
+    });
+  }
+
   /** build the heightmap from the selected template or image and store it as the graph cell heights */
   async generate(graph: GridGraph = grid, id: string = this.getSelectedId()): Promise<Uint8Array> {
     Math.random = Alea(options.map.seed); // reset PRNG
     const isTemplate = id in heightmapTemplates;
-    const heights = isTemplate ? this.fromTemplate(graph, id) : await this.fromPrecreated(graph, id);
+    const heights = this.consumeExternalHeightmap(graph) ?? (isTemplate ? this.fromTemplate(graph, id) : await this.fromPrecreated(graph, id));
 
     this.clearData();
     graph.cells.h = heights;
@@ -570,11 +607,25 @@ class HeightmapModule {
 
     if (!steps.length) throw new Error(`Heightmap template: no steps. Template: ${id}. Steps: ${steps}`);
     this.setGraph(graph, config);
+    if (id === "earthContinents") {
+      // Less branching per frontier; repeated upstream smoothing below
+      // removes tiny inlets before the coastline is locked for mountain belts.
+      this.blobPower = Math.min(this.blobPower + 0.0005, 0.9978);
+      this.hillNoise = 0.08;
+    }
 
+    let mountainStage = false;
     for (const step of steps) {
       const elements = step.trim().split(" ");
       if (elements.length < 2) throw new Error(`Heightmap template: steps < 2. Template: ${id}. Step: ${elements}`);
+      // MIR Earth profile: reuse upstream Range on land, without spawning
+      // mountain islands/bridges in the oceans; final smoothing cannot drown
+      // the low coastal plains. All other templates keep
+      // their original semantics, PRNG and execution order.
+      if (elements[0] === "Range") mountainStage = true;
+      const coast = id === "earthContinents" && mountainStage ? this.heights!.slice() : null;
       this.addStep(...(elements as [Tool, string, string, string, string]));
+      if (coast) for (let i = 0; i < coast.length; i++) this.heights![i] = coast[i] < 20 ? coast[i] : Math.max(20, this.heights![i]);
     }
 
     return this.heights!;

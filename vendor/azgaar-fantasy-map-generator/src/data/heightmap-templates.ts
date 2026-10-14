@@ -55,6 +55,37 @@ const continents = `Hill 1 80-85 60-80 40-60
   Pit 3-4 10-20 15-85 20-80
   Mask 4 0 0 0`;
 
+// MIR's whole-world preset, composed exclusively from Azgaar terrain tools.
+// Lower-variance Hill growth forms coherent continental interiors instead of
+// the old branching, pointed hill tops. Lower land before adding ranges: plains, then mountain
+// belts. The Earth-only Range coast guard in fromTemplate keeps ocean ridges
+// from becoming thin land bridges between continents.
+const earthContinents = `Hill 1 68-76 12-20 20-32
+  Hill 1 60-70 44-52 18-30
+  Hill 1 64-72 76-84 20-32
+  Hill 1 60-70 18-26 68-80
+  Hill 1 54-64 50-58 65-77
+  Hill 1 58-68 78-86 68-80
+  Add -25 all 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Smooth 1 0 0 0
+  Mask 4 0 0 0
+  Multiply 0.6 land 0 0
+  Range 1 48-68 15-22 23-35
+  Range 1 42-60 48-55 26-38
+  Range 1 34-52 78-84 22-35
+  Range 1 42-60 22-28 66-77
+  Range 1 34-52 52-57 68-79
+  Range 1 38-56 77-84 68-78
+  Smooth 2 0 0 0
+  Smooth 2 0 0 0`;
+
 const archipelago = `Add 11 all 0 0
   Range 2-3 40-60 20-80 20-80
   Hill 5 15-20 10-90 30-70
@@ -159,6 +190,7 @@ export const heightmapTemplates: Record<string, HeightmapTemplate> = {
   volcano: { id: 0, name: "Volcano", template: volcano, probability: 3 },
   highIsland: { id: 1, name: "High Island", template: highIsland, probability: 19 },
   lowIsland: { id: 2, name: "Low Island", template: lowIsland, probability: 9 },
+  earthContinents: { id: 14, name: "Earth-scale continents", template: earthContinents, probability: 0 },
   continents: { id: 3, name: "Continents", template: continents, probability: 16 },
   archipelago: { id: 4, name: "Archipelago", template: archipelago, probability: 18 },
   atoll: { id: 5, name: "Atoll", template: atoll, probability: 1 },

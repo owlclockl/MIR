@@ -273,6 +273,7 @@ export const readSource = (win, hint = {}) => {
     cellsX,
     cellsY,
     seaLevel,
+    heightExponent: Math.max(1, Math.min(3, numberOr(win.options?.map?.units?.height?.exponent, 1.8))),
     seedSalt: hashString(`${hint.seed ?? ''}|${width}x${height}|${cellsX}x${cellsY}|${spacing.toFixed(3)}`),
     cellH,
     cellBiome,

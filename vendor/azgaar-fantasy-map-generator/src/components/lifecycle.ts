@@ -22,6 +22,8 @@ import { initiateAutosave } from "@/services/autosave";
 import { logStats } from "@/services/logging";
 import { registerServiceWorker } from "@/services/platform";
 import { checkLoadParameters } from "@/services/url-params";
+import { applyEarthWorldProfile, readEarthWorldProfile } from "@/services/earth-world";
+import { pageURL } from "@/services/embed";
 import { cleanupData } from "@/services/versioning";
 import type { GridGraph } from "@/types/GridGraph";
 import { debounce, ensureEl, findEl, parseError } from "@/utils";
@@ -58,10 +60,12 @@ export async function generate(config?: GenerationConfig): Promise<void> {
     Options.setGraphSize(width, height);
     setSeed(precreatedSeed);
     Options.randomize();
+    const earthWorld = readEarthWorldProfile(pageURL().searchParams);
+    if (earthWorld) applyEarthWorldProfile(options, earthWorld);
     Icons.syncCustom(); // the carried-over custom icons, and the stored ones at startup
-    if (points !== undefined) {
-      // An exact count asked for by the link (MIR passes points=1000000 for
-      // its Earth-sized maps) wins over the density slider, with or without
+    if (points !== undefined && !earthWorld) {
+      // An exact count asked for by a legacy / standalone link wins over
+      // the density slider, with or without
       // a precreated graph. Where a slider step stands for the same count,
       // adopt it as the generation density, so a later regeneration from
       // the editor keeps the requested count instead of falling back to

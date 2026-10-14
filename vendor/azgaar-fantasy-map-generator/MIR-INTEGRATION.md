@@ -5,7 +5,21 @@ The civilization of the sages includes the complete web source and static assets
 ## Adaptations for The civilization of the sages
 
 - The full editor is hosted at `/fmg/` and shown from the full-screen world studio, not opened in a small dialog.
-- The world seed, size and point count are passed in the query: `?seed=…&width=…&height=…&points=1000000&options=default`. MIR maps are Earth-sized (40 075 017 × 20 003 932, one pixel = one metre = one block in the game's block view), so MIR always asks for a million points: at that extent a million cells is a ~28 km grid. `getRequestedMapSize` (`src/services/map-size.ts`) reads the exact `points` value, `generate()` (`src/components/lifecycle.ts`) applies it over the density slider and adopts the matching density step (14 in `src/data/graph-density.ts`, added for this) so editor regenerations keep the count. `options=default` ignores the editor's saved browser options, so a slot always opens the same map. Maps saved from the editor are Azgaar `.map` files; a MIR slot does not keep them.
+- Planet slots pass physical metre extents as `?seed=…&width=40075017&height=20003932&points=100000&options=default&world=earth`.
+  `services/earth-world.ts` separates this physical extent from the SVG/Voronoi graph (2000 units wide, same aspect ratio),
+  fixes generation at the supported 100K density, selects the `earthContinents` template, sets whole-world geography,
+  kilometre distances with scale `physicalWidthKm / graphWidth`, square distance units for area, metre heights and Celsius.
+  `lifecycle.generate` reapplies the profile after options randomization, before each generation pipeline. `map-size.ts`
+  resolves the normalized initial graph. `url-params.copyMapURL` retains physical dimensions and the opt-in profile.
+  The extra template is MIR-authored data using upstream Hill/Range/Smooth/Mask/Multiply tools, not a new generator.
+  Its Hill variance is reduced to 0.08, eight smoothing passes shape the coast, then land-only mountain belts
+  preserve the coastline through the final smoothing stage. Hill parameters reset in setGraph for other templates.
+  Planet height exponent is fixed at 2.05. These are Earth-profile-only HeightmapGenerator adaptations. Six cores do not
+  promise exactly six connected landmasses or Earth's 29% land. See `../../docs/earth-scale-map.md` for projection limits.
+  Legacy overview slots and standalone links without the flag retain coordinate-size semantics. Step 14 (1M points)
+  remains readable for compatibility but is no longer the MIR default: upstream shape coefficients only cover up to 100K,
+  and raw metre-sized graph coordinates also saturated the pack's Uint16 cell areas. MIR slots still store physical size
+  and seed; `.map` files store the actual graph and physical distance units.
 - The first map uses Azgaar's built-in `night` style. UI controls use a forest-green / warm-gold palette from `public/mir-theme.css`; other map styles remain selectable in the editor.
 - The nested Azgaar service worker is disabled under `/fmg/`. The root service worker caches the full editor offline, avoids conflicting worker scopes, and avoids the upstream Workbox CDN request. The `electron` Vite mode also removes upstream Google Analytics from the built page.
 - The Azgaar interface is fully localized into Russian by a build-time substitution layer (`locale/`), described below. The game wrapper, navigation, seed hand-off and attribution are Russian as well.
@@ -62,7 +76,7 @@ stay in Latin script because they are saved into map files.
 
 `mir.html` carries the editor as a `srcdoc` frame. The editor's HTML is stored once, as a JSON string in `<script type="application/json" id="mir-fmg-template">`, and the game fills in the load parameters at runtime:
 
-- MIR builds `iframe.srcdoc` from the template and replaces `__FMG_QUERY__` with the JSON-encoded query string (`?seed=…&width=…&height=…&points=1000000&options=default`; `<` is escaped as `\u003c`).
+- MIR builds `iframe.srcdoc` from the template and replaces `__FMG_QUERY__` with the JSON-encoded query string (`?seed=…&width=…&height=…&points=100000&options=default&world=earth`; `<` is escaped as `\u003c`).
 - Inside that frame, `src/services/embed.ts` sees `globalThis.MIR_FMG_HOST = { query }`. `isEmbedded()` returns true, and `pageURL()` reads the query from that object, because a srcdoc frame has no address of its own.
 - Behaviour that changes in embedded mode:
   - `seed.ts` takes the seed from the query.

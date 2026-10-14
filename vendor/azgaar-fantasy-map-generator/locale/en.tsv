@@ -937,2412 +937,2413 @@
 0936	e.g. wagon, barrel
 0937	Each namebase should be on its own line and follow the format:
 0938	Earldom
-0939	Easterling
-0940	Eastern
-0941	Economy
-0942	edge
-0943	Edit
-0944	Edit ${label} multipliers
-0945	Edit a database used for names generation
-0946	Edit biome baseline production
-0947	Edit biomes style in Style Editor
-0948	Edit burg
-0949	Edit Burg
-0950	Edit burg groups
-0951	Edit cultures style in Style Editor
-0952	Edit demand coverage
-0953	Edit emblem
-0954	Edit Emblem
-0955	Edit free text notes (legend) for ${subject}
-0956	Edit good
-0957	Edit group style in Style Editor
-0958	Edit Heightmap
-0959	Edit icon and anchor style for the burg group in Style Editor
-0960	Edit in Armoria
-0961	Edit individual selected icon
-0962	Edit journey
-0963	Edit Journey
-0964	Edit journeys style in Style Editor
-0965	Edit Label
-0966	Edit label group style in Style Editor
-0967	Edit label style for burg group in Style Editor
-0968	Edit Lake
-0969	Edit lake group style in Style Editor
-0970	Edit marker
-0971	Edit Marker
-0972	Edit Military units
-0973	Edit Military Units
-0974	Edit mode:
-0975	Edit path points
-0976	Edit provinces style in Style Editor
-0977	Edit regiment
-0978	Edit Regiment
-0979	Edit Relief Icons
-0980	Edit Relief Icons style in Style Editor
-0981	Edit religions style in Style Editor
-0982	Edit river
-0983	Edit River
-0984	Edit route
-0985	Edit Route
-0986	Edit route groups
-0987	Edit Route groups
-0988	Edit states style in Style Editor
-0989	Edit style
-0990	Edit style for all rivers in Style Editor
-0991	Edit style for the route group
-0992	Edit style in Style Editor
-0993	Edit style or remove group
-0994	Edit Templates
-0995	Edit the COA string by hand, or paste an Armoria edit link, API link or COA string
-0996	Edit the feature's own coastline settings
-0997	Edit the Heightmap
-0998	Edit the lake
-0999	Edit the note as HTML
-1000	Edit the relief rules: hills, mountains and other relief placed by elevation
-1001	Edit this burg label
-1002	Edit transport types
-1003	Edit transport types (add custom modes like Magic Carpet)
-1004	Edit visual style
-1005	Edit zones style in Style Editor
-1006	Element not found
-1007	Element with this id already exists. Please provide a unique name
-1008	Element with this name already exists. Provide a unique name
-1009	Elevate brush: drag to gradually increase height of cells in radius by Power value
-1010	Elevation
-1011	Elevation profile
-1012	Elevation profile: no data
-1013	eli
-1014	Embellishment
-1015	emblem
-1016	Emblem shape
-1017	Emblem shape associated with culture. Click to change
-1018	Emblems
-1019	Embowed
-1020	Enable or disable coastline fractalization. When disabled, coastlines are simple arcs between feature vertices. Enabling adds naturalistic roughness but can increase rendering time
-1021	End battle: apply current results and close the screen
-1022	End of the last segment
-1023	endBurgId
-1024	endpoints must be in water, on a coast touching water, or on a navigable river
-1025	endpoints must be on land (coastal is fine)
-1026	Enemies are states at war with each other
-1027	Engagement progression:
-1028	English
-1029	Enter a model and API key.
-1030	Enter a model name.
-1031	Enter a valid treasury amount
-1032	Enter API key
-1033	Enter API key. Note: the Generator doesn't store the key or any generated data
-1034	Enter average number of people in crew (for total personnel calculation)
-1035	Enter conscription percentage for rural population
-1036	Enter conscription percentage for urban population
-1037	Enter custom form name
-1038	Enter military power (used for battle simulation)
-1039	Enter seed for template to generate the same heightmap each time
-1040	Enter style preset name
-1041	Equirectangular projection is used
-1042	Equirectangular projection is used: distortion is maximum on poles. Use map with aspect ratio 2:1 for best result
-1043	Erase
-1044	Erebor
-1045	Erode terrain
-1046	Eroded terrain is not supported on this device
-1047	Erupting
-1048	European
-1049	Evaporation from lake surface. If evaporation > supply, the lake water is saline. If difference is high, the lake becomes dry
-1050	Evening
-1051	Every Nth Cell
-1052	Examples. Click to re-generate
-1053	Exclude neutral
-1054	Exclude zero element from the results (id 0, e.g. the neutral state)
-1055	Execute the template
-1056	existing
-1057	Exit Customization
-1058	Expansion
-1059	Expansionism
-1060	Expansionism (defines competitive size). Change to re-calculate states based on new value
-1061	Export
-1062	Export as JPEG
-1063	Export as PNG
-1064	Export as PNG Tiles
-1065	Export as SVG
-1066	Export Biomes as CSV
-1067	Export Burgs as CSV
-1068	Export Cells as GeoJSON
-1069	Export Full JSON
-1070	Export Goods as CSV
-1071	Export Grid Cells JSON
-1072	Export in JSON format can be used as an API replacement.
-1073	Export map data
-1074	Export Markers as CSV
-1075	Export Markers as GeoJSON
-1076	Export Markets as CSV
-1077	Export Military as CSV
-1078	Export Minimal JSON
-1079	Export Notes as CSV
-1080	Export Options
-1081	Export Pack Cells JSON
-1082	Export Regiments as CSV
-1083	Export Relations as CSV
-1084	Export Rivers as GeoJSON
-1085	Export Routes as GeoJSON
-1086	Export the in-range markers as a text file (.csv)
-1087	Export to GeoJSON
-1088	Export To JSON
-1089	Export Zones as CSV
-1090	Export Zones as GeoJSON
-1091	Extreme climate warning
-1092	False
-1093	Family
-1094	Fantasy
-1095	Fantasy Map Generator map
-1096	Fantasy Map Generator update
-1097	Fantasy world Meridian length relative to real-world Earth (20k km)
-1098	Fantasy1
-1099	Fantasy2
-1100	Fantasy3
-1101	Fantasy4
-1102	Fantasy5
-1103	Favors higher elevated cells
-1104	Favors more habitable cells
-1105	Feature
-1106	Feature area
-1107	Feature name
-1108	Feature type, defined by the heightmap
-1109	Feature type. Generators read it, changing it does not regenerate them
-1110	Features
-1111	Features are added and removed in the Heightmap Editor
-1112	Features displayed
-1113	Field
-1114	Field Battle: a standard type of combat
-1115	Figure ${figureNo}
-1116	file and load it in the app.
-1117	Fill brush is not available with 'only water cells' filter
-1118	Fill: click enclosed water or same-height land area to create a cone blob
-1119	Filter
-1120	Filter by journey name, type or endpoint
-1121	Filter by name or group
-1122	Filter by name, province, state, culture, or group
-1123	Filter by name, type or basin
-1124	Filter by name, type or subtype
-1125	Filter by type
-1126	Filter deals by scope
-1127	Filter elements and groups by name
-1128	Filter goods by tags
-1129	Filter visible goods by tags
-1130	Filter…
-1131	Finalize the heightmap and exit the edit mode
-1132	Find a built-in icon or emoji by name
-1133	Find or share custom namesbase on Cartography Assets portal
-1134	Find or share custom style preset on Cartography Assets portal
-1135	Find or share custom template on Cartography Assets portal
-1136	Fine detail
-1137	Fine ripples along the banks, fading into open water and scaled down for small lakes
-1138	Finish editing path points
-1139	First match wins. Land no rule claims takes its biome's relief pool
-1140	Fit
-1141	Fit the frame to the picture's visible content
-1142	Fit the viewport to the browser window
-1143	Flag
-1144	Flee phase. Units strength reduced
-1145	Fleet
-1146	flex
-1147	Flux
-1148	Focus on selected object
-1149	Folded paper big
-1150	Folded paper small
-1151	follows the map settings
-1152	Font
-1153	Font and size
-1154	font family
-1155	font file URL
-1156	Font URL
-1157	Fontdesk
-1158	for guidance.
-1159	For manufactured goods: recipes define which other goods are required to produce this good
-1160	For raw resources: controls where and how this good is produced directly from the environment (e.g. biome, elevation, temperature)
-1161	For raw resources: sets the baseline production per biome
-1162	forces
-1163	fork
-1164	Form
-1165	Form name:
-1166	format, that can be loaded back via the
-1167	Fractious
-1168	Free icons:
-1169	French
-1170	Freshwater Lake
-1171	from
-1172	From
-1173	Frozen Lake
-1174	ft
-1175	Full name:
-1176	Function Reference
-1177	g.selectAll
-1178	General
-1179	Generate
-1180	Generate a new era
-1181	Generate a new map based on options
-1182	Generate a new map name
-1183	generate a new random map or cancel the loading.
-1184	Generate a random journey
-1185	Generate culture-specific name
-1186	Generate culture-specific name for place and battle
-1187	Generate culture-specific name for the burg
-1188	Generate culture-specific name for the lake
-1189	Generate culture-specific name for the province
-1190	Generate culture-specific name for the river
-1191	Generate new map
-1192	Generate New Map
-1193	Generate random map
-1194	Generate random name
-1195	Generate random name for place and battle
-1196	Generate random name for the burg
-1197	Generate random name for the lake
-1198	Generate random name for the river
-1199	Generate route name
-1200	Generated by ${FMG}. The tool is free, but images may be copyrighted, see ${license}
-1201	Generated examples:
-1202	Generated text will appear here
-1203	Generation error
-1204	Generation Options
-1205	Generator uses pop-up window to download files. Please ensure your browser does not block popups.
-1206	Generic
-1207	Geographical features
-1208	Geographical Features Overview
-1209	Geometric precision
-1210	Get Desktop App
-1211	Give the icon a new picture: every use follows
-1212	Glacier
-1213	global
-1214	Global
-1215	globe
-1216	Globe
-1217	Go Back
-1218	Gondor
-1219	Gonfalon
-1220	Good
-1221	Good answer
-1222	Good icon
-1223	Good is added
-1224	Good is updated
-1225	Good name
-1226	Good price
-1227	Good stock
-1228	Good stock in this market. Click to sort
-1229	Good types
-1230	Goods
-1231	Goods Editor
-1232	Google font
-1233	Google Fonts
-1234	Governorate
-1235	grab
-1236	Grass
-1237	Gray paper
-1238	Grayscale
-1239	Grid
-1240	grid cells
-1241	Gross Product is local sale revenue minus purchased ingredient costs during the production.
-1242	Gross product per population point, daily average
-1243	Gross Product: local sale revenue minus purchased ingredient costs during the production.
-1244	Group
-1245	Group by culture
-1246	Group by province
-1247	Group by province and state
-1248	Group by state
-1249	group name
-1250	Group name must start with a letter or underscore and not contain special characters
-1251	Group name should be unique
-1252	Group name should start with a letter
-1253	Group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes
-1254	Group to assign the selected labels to
-1255	grouped by
-1256	Groups referenced by labels but not defined here. Such labels are not rendered until they are reassigned to an existing group
-1257	Growth rate
-1258	guest
-1259	Guest
-1260	Guidon
-1261	gules
-1262	Gully strength:
-1263	H
-1264	h ≥
-1265	H:
-1266	h/day
-1267	Habitability
-1268	has an invalid relation to
-1269	Heater
-1270	Height
-1271	Height range, 20 (sea level) to 100
-1272	Height range: ${getHeight(rule.height.min)} to ${getHeight(rule.height.max)}
-1273	Height scale:
-1274	Height unit:
-1275	Heightmap
-1276	Heightmap customization tools:
-1277	Heightmap edit mode
-1278	Heightmap Editor
-1279	Heightmap is already cleared, please do not click twice if not required
-1280	heightmap preview
-1281	Heightmap preview. Click to download a screen-sized image
-1282	Heightmap templates
-1283	Heptagon
-1284	Here you can set temperatures at the equator and poles, control wind direction and precipitation, and position the map on the globe. Changes affect biome and climate generation.
-1285	Hessen
-1286	Hex
-1287	Hex grid (flat)
-1288	Hex grid (pointy)
-1289	Hexagon
-1290	Hexy
-1291	hidden
-1292	Hidden
-1293	hide
-1294	Hide
-1295	Hide on map
-1296	Hide rescaler
-1297	Hide rescaler slider
-1298	Hide style edit section
-1299	Hide the battle name section
-1300	Hide the edit label text section
-1301	Hide the font size section
-1302	Hide the group selection
-1303	Hide the label offset section
-1304	Hide the label. You can toggle it on later in Labels Overview
-1305	Hide the letter spacing section
-1306	Hide the regeneration menu
-1307	High Fantasy
-1308	High Island
-1309	Highest mean precipitation of the year
-1310	Highest mean temperature of the year
-1311	highest score among ${candidates.length} feasible options:
-1312	Highland
-1313	Highlight color
-1314	Hill
-1315	Hill: small blob
-1316	Historical
-1317	History
-1318	Horizontal rule
-1319	Horizontal shift in icon-size units (positive moves right)
-1320	Horsehead
-1321	Horsehead Edgy
-1322	Hours a day of waiting covers: 24 means a full day passes
-1323	Hours of travel a day sustains with this transport
-1324	Hours of travel a day sustains: a caravan walks ~8 h/day, a ship sails 24
-1325	Hover Tooltips
-1326	How closely embellishments are spaced, relative to the default
-1327	How closely ripple rows are spaced
-1328	How closely the strokes are packed, relative to the default. Steep ground packs them tighter
-1329	How far the coast bends in and out. 0 keeps the smooth arcs, high values carve deep bays and headlands
-1330	How fine the shore detail is. Higher adds ever smaller bays and points but makes the map slower to draw
-1331	How long a calm or rough stretch of coast is. Small mixes them along a single isle, large gives a continent a few long coasts of each kind
-1332	How much calmer lake shores are than the sea. 1 is the same, higher gives glassy lakes, 0 makes every lake shore rough
-1333	How much of each demand category this good satisfies. Click the pencil icon to edit.
-1334	How much of the coast stays calm. 0 makes every shore rough, high values leave only a few rough stretches
-1335	How packed the relief is. 0 places none
-1336	How sharply calm shores turn into rough ones. Low blends them, high gives clear-cut calm and rough coasts
-1337	http://www.example.com/image.jpg
-1338	https://e-cloud.com/test.map
-1339	Huge
-1340	Hunting
-1341	I
-1342	ia
-1343	Ice
-1344	Iceberg
-1345	icon
-1346	Icon
-1347	Icon colors:
-1348	Icon fill and stroke colors: they paint the parts the icon leaves uncolored. Emoji keep their own colors
-1349	Icon Lines
-1350	Icon shift:
-1351	Icon size
-1352	Icon size at the lowest height, growing with height up to the second value
-1353	Icon size at the lowest height, growing with height. Each pool entry scales it
-1354	Icon size at the rule's lowest height, growing with height up to the second value. Each entry's size scales it
-1355	icon-anchor
-1356	icon-bezier-curve
-1357	icon-dot-circled
-1358	icon-eye
-1359	icon-eye-off
-1360	icon-lock
-1361	icon-lock-open
-1362	icon-lock-open inactive
-1363	icon-map-signs
-1364	icon-resize-horizontal
-1365	icon-right-big
-1366	icon-store
-1367	icon-tree
-1368	icon-users
-1369	Icon*
-1370	Icons
-1371	Id
-1372	If error is critical, clear the stored data and try again.
-1373	If height is greater or equal to X and less or equal to Y, then perform an operation Z with operand V
-1374	Ignore
-1375	Ignore zoom bounds and show all labels regardless of the current zoom level
-1376	Image
-1377	Image Converter
-1378	Image Converter is opened. Upload image and assign height value for each color
-1379	Image scale relative to image size (e.g. 5x)
-1380	Image size in pixels
-1381	Import custom icons
-1382	Import custom icons from a downloaded zip archive. An icon whose id the map uses for another picture is replaced only on confirmation
-1383	Import Heightmap
-1384	Import zip
-1385	in
-1386	In case of errors reload the page to update the code.
-1387	in menu. There is no way to restore the progress if file is lost. Please keep old save files on your machine or cloud storage as backups.
-1388	In range:
-1389	in the fragment, where a text/html document would hoist it into
-1390	inactive
-1391	Income
-1392	Increase indent
-1393	Increases the polygon count to smooth the sharp points. Please note that it can take some time to calculate
-1394	Indented 3
-1395	Independent burgs
-1396	Individual Style Settings
-1397	Initial Demand:
-1398	Initial forces
-1399	inline
-1400	inline-block
-1401	inn
-1402	Input
-1403	Input /
-1404	Insert
-1405	Insert a symbol
-1406	Insert a table or edit the one under the cursor
-1407	Insert an image from a file
-1408	Insert or edit a link (Ctrl+K)
-1409	Insert table
-1410	installed on your computer
-1411	Insufficient land area. There should be at least 200 land cells!
-1412	Interface preferences saved in this browser. Changes apply immediately
-1413	Interface settings:
-1414	Interface size
-1415	Invalid
-1416	Invalid burg. The selected burg does not exist or was removed.
-1417	Invalid file
-1418	Invalid file format
-1419	Invalid group name
-1420	Invalid market. The selected market does not exist
-1421	Invalid market. The selected market has no center burg
-1422	Invalid relation
-1423	Invert columns visibility
-1424	Invert heightmap along the axes
-1425	Iran small
-1426	Iron Hills
-1427	is
-1428	is a rival of
-1429	is a vassal of
-1430	is an ally of
-1431	is at war with
-1432	is friendly to
-1433	is goods-
-1434	is neutral to
-1435	is suspicious of
-1436	is suzerain to
-1437	Island
-1438	Islands
-1439	isolated
-1440	Isthmus
-1441	It
-1442	It will turn all separable provinces into independent states.
-1443	italic
-1444	Italic
-1445	Iterate battle
-1446	Its map is not open
-1447	its path has to stay on land
-1448	its path has to stay on water or a navigable river
-1449	Join our
-1450	Join routes
-1451	Journey
-1452	Journey color. Click to change
-1453	Journey name
-1454	Journey name: ${escapeHtml(journey.name)}
-1455	Journey not found
-1456	Journeys
-1457	Journeys number
-1458	Journeys Overview
-1459	JPG
-1460	JSON string is not valid, please check the format
-1461	Jump to page
-1462	Keep each removed state as a province of ${ruler}, replacing its own provinces
-1463	Keep the map's
-1464	Keep the proposed label placement
-1465	keeps a leading
-1466	Key
-1467	Kind of travel this is
-1468	Kind of travel this is: a quest, a caravan, a campaign
-1469	Kite
-1470	Kiwiroo
-1471	km
-1472	l
-1473	L
-1474	L:
-1475	label
-1476	Label
-1477	Label Group Configurator
-1478	Label group, select to reassign the label
-1479	Label text
-1480	Label type
-1481	Label type, cannot be changed after creation
-1482	Label type, fixed after creation
-1483	Labels
-1484	Labels Overview
-1485	lake
-1486	Lake
-1487	Lake area in selected units
-1488	Lake average depth in selected units
-1489	Lake elevation in selected units
-1490	Lake maximum depth in selected units
-1491	Lake outlet river
-1492	Lake shore length in selected units
-1493	Lake subtype. Generators read it: burgs cannot port on dry, frozen or lava lakes
-1494	Lake water supply. If supply > evaporation and there is an outlet, the lake water is fresh. If supply is very low, the lake becomes dry
-1495	lake_island
-1496	lakes
-1497	Lakes
-1498	land
-1499	Land
-1500	Land area
-1501	Land cells:
-1502	Land filter is active, water areas cannot be filled
-1503	land only
-1504	Land slowdown
-1505	Landgrave
-1506	landing
-1507	Landing phase. Amphibious attack. Units are vulnerable against prepared defense
-1508	Landing: amphibious attack
-1509	Language
-1510	Large
-1511	lastSaved
-1512	Latest changes:
-1513	Launch UI Tour
-1514	Lava Lake
-1515	Layer dependency
-1516	Layer Presets
-1517	Layer that must be toggled on for this group to be shown
-1518	Layers
-1519	Layers preset:
-1520	Layers reduction rate. Increase to improve performance
-1521	Layers Tab
-1522	Legend
-1523	Length
-1524	Length of Meridian in pixels
-1525	Length of Meridian is friendly units (depends on user configuration)
-1526	Length of Meridian. Almost half of the equator length
-1527	Limit group
-1528	Limit group by features
-1529	Limit rule
-1530	Limit unit
-1531	Line ${id}:
-1532	Line simplification rate. Increase to slightly improve performance
-1533	Line style
-1534	Line: select two points to change heights along the line
-1535	Linear
-1536	Linecap
-1537	Linejoin
-1538	Lines only
-1539	Link is copied to the clipboard
-1540	Link or upload the new picture of the selected icon.
-1541	Linux
-1542	List below shows relations to ${selectedName}
-1543	Load
-1544	Load custom texture
-1545	Load fully-functional map (.map or .gz formats)
-1546	Load Google Translate
-1547	Load Google Translate and select a language. Automatic translation can break some page functions. If this happens, reset the language to English or refresh the page
-1548	Load image to convert
-1549	Load map
-1550	Load Map
-1551	Load map file (.map or .gz) file from URL. Note that the server should allow CORS
-1552	Load map file (.map or .gz) from your Dropbox
-1553	Load map file (.map or .gz) from your local disk
-1554	Load map from
-1555	Load map from browser storage (if saved before)
-1556	Load Map from File
-1557	Load map from URL
-1558	Load Map from URL
-1559	Load saved map
-1560	Loaded data is not a valid JSON, please check the format
-1561	LOADING
-1562	Loading error
-1563	Loading…
-1564	local
-1565	Local
-1566	LOCAL
-1567	Local bonus resource
-1568	Local font
-1569	Local market purchase
-1570	Local production
-1571	Locate
-1572	Locate on map
-1573	Locate the culture
-1574	Locate the feature
-1575	Locate the journey
-1576	Locate the label
-1577	Locate the marker
-1578	Locate the province
-1579	Locate the religion
-1580	Locate the river
-1581	Locate the route
-1582	Locate the state
-1583	Location
-1584	Lock
-1585	Lock culture
-1586	Lock marker
-1587	Lock or unlock all burgs
-1588	Lock or unlock all journeys
-1589	Lock or unlock all routes
-1590	Lock the province
-1591	Lock the state to protect it from re-generation
-1592	Lock this religion
-1593	Locked. Click to unlock the element and allow it to be changed by regeneration tools
-1594	locks pointer icon-lock
-1595	locks pointer icon-lock-open inactive
-1596	Looting phase. Plunder the town. Units strength increased
-1597	Lossless raster image with a transparent background
-1598	Low Island
-1599	Lower brush: drag to decrease height of cells in radius by Power value
-1600	Lowest mean precipitation of the year
-1601	Lowest mean temperature of the year
-1602	m
-1603	M
-1604	Mac with Apple silicon
-1605	Mac with Intel
-1606	main
-1607	Mandate
-1608	Maneuvering phase. Units strength reduced
-1609	Manually assign goods to cells
-1610	Manually re-assign biomes to not follow the default moisture/temperature pattern
-1611	Manually re-assign cultures
-1612	Manually re-assign market territories
-1613	Manually re-assign provinces
-1614	Manually re-assign religions
-1615	Manually re-assign states
-1616	Manufactured goods are produced in burgs
-1617	Manufacturing from ${allInputs}
-1618	Manufacturing step
-1619	Map cannot be saved in EDIT mode, please complete the edit and retry
-1620	Map coordinates on globe
-1621	Map is saved to the browser storage
-1622	Map is saved to your Dropbox
-1623	Map is successfully loaded
-1624	Map minimap
-1625	Map name:
-1626	Map presentation in 3D scene. Works best for heightmap. Cannot be used for editing
-1627	Map read failed
-1628	Map seed
-1629	Map seed number. Press 'Enter' to apply. A seed reproduces the same map only if the map size and the settings are the same
-1630	Map size
-1631	Map size:
-1632	Map URL is copied to clipboard
-1633	Map version: ${mapVersion}. Generator version: ${VERSION}.
-1634	Map will be split into tiles and downloaded as a single zip file. Avoid saving too large images
-1635	Maps are saved in
-1636	Mar<u>k</u>ers
-1637	Marble big
-1638	Marble Blue
-1639	Marble Blue big
-1640	Marble small
-1641	Margrave
-1642	Marker
-1643	Marker element size in pixels
-1644	Marker icon
-1645	Marker icon shift (by X and by Y axis), percent. Set to 50 to position icon in center
-1646	Marker icon size in map units. Wagons render at half this size. Higher = bigger icons
-1647	Marker icon sizes in pixels
-1648	Marker marker element and icon sizes in pixels
-1649	Marker name, shown in the notes editor and overviews
-1650	Marker number multiplier
-1651	Marker pin shape
-1652	Marker size
-1653	Marker type
-1654	Marker type name
-1655	Marker type. Style changes will apply to all markers of the same type. Leave blank if the marker is unique
-1656	Markers
-1657	Markers generation settings
-1658	Markers in Radius
-1659	Markers number
-1660	Markers Overview
-1661	Market
-1662	Market center burg name. Click to sort
-1663	Market name. Click to view details
-1664	Market value: net trading flow plus unsold inventory value minus tax
-1665	Market value: net trading flow plus unsold inventory value minus tax. Click to sort
-1666	Markets
-1667	Markets Overview
-1668	Mars big
-1669	Mars small
-1670	Mask: lower cells near edges or in map center
-1671	Mauritania small
-1672	max
-1673	Max depth:
-1674	Max Height
-1675	Max Temperature
-1676	Maximal length should be greater than minimal
-1677	Maximum depression filling iterations:
-1678	Maximum mean elevation
-1679	Maximum number of biomes reached (255), data cleansing is required
-1680	Maximum number of iterations to fill depressions. Increase if rivers end without reaching a lake or the sea
-1681	Maximum possible zoom level (should be > 1)
-1682	Maximum zoom level to show the group
-1683	Maximum zoom to show the group, leave empty for no limit
-1684	Mean height:
-1685	means names like "Kalla", "Mikkor", "Dalddur" are possible. This parameter can be empty.
-1686	Measurers
-1687	Measurers Editor
-1688	Mediterranean
-1689	melee
-1690	Melee phase. Melee units excel
-1691	member
-1692	Member
-1693	Mercury big
-1694	Mercury small
-1695	Merge
-1696	Merge provinces
-1697	Merge Provinces
-1698	Merge several provinces into one
-1699	Merge several states into one
-1700	Merge states
-1701	Meridian length:
-1702	mesh
-1703	Mesh detail:
-1704	metals
-1705	MFG
-1706	mi
-1707	Middle Earth
-1708	Military
-1709	Military Overview
-1710	Military personnel rate (% of state population). Depends on war alert
-1711	Military personnel rate (% of state population). Depends on war alert. Click to sort
-1712	Milliseconds per map unit travelled. Lower = faster animations
-1713	min
-1714	Min Habitability
-1715	Min Height
-1716	Min Temperature
-1717	Minimal length cannot be greater than maximal
-1718	Minimap
-1719	Minimum mean elevation
-1720	Minimum possible zoom level (should be > 0)
-1721	Minimum zoom level to show the group
-1722	Minimum zoom to show the group, leave empty for no limit
-1723	Mirror
-1724	Mirror heightmap along axis
-1725	Missing groups:
-1726	Miter
-1727	Mode
-1728	mode also allows you Convert an Image into a heightmap or use Template Editor.
-1729	mode to change the coastline and keep the data. The data will be restored as much as possible, but it can cause unpredictable errors.
-1730	Model
-1731	Model name
-1732	Money flow for deal rows: negative for BUY, positive for SELL. Pure production rows are blank.
-1733	Monotone X
-1734	Moria Orc
-1735	Mountain
-1736	Mouth width:
-1737	Move down
-1738	Move selected relief icon back
-1739	Move selected relief icon to front
-1740	Move the segment up
-1741	Move up
-1742	Move your mouse over the map (when the tour is over), the tooltip bar at the bottom updates with information about cells, burgs, states, and more. Click Next when you're ready to continue.
-1743	moveToTop
-1744	Multiplier
-1745	Multiplier applied to travel duration on land segments. Higher = slower land animations
-1746	Multipliers
-1747	Multiply all cells Height by the value
-1748	Multiply all heights in range by factor
-1749	Municipality
-1750	Must start in a cell with a route in it
-1751	N
-1752	n/a
-1753	name
-1754	Name
-1755	Name bases
-1756	Name cannot be empty
-1757	Name display mode is only applicable to States and Provinces
-1758	Name display mode: auto picks the best fit, short/full force a specific name form
-1759	Name display mode. Only applicable to States and Provinces
-1760	Name of the era the current year belongs to, and its abbreviation
-1761	Name of the map. Used to name the files it is downloaded as
-1762	Name*
-1763	Namebase is not found
-1764	Names data should not be empty
-1765	Names data:
-1766	Names data: a comma separated list of source names used for names generation
-1767	Names used more than one time
-1768	Namesbase
-1769	Namesbase Editor
-1770	Namesbase is not defined, please select a valid namesbase
-1771	Natural
-1772	Naval
-1773	Naval Battle: naval units combat
-1774	Navigate the Map
-1775	near
-1776	Near Coast Land
-1777	Negate — match cells where this condition is FALSE
-1778	Net burg treasury after local buying, local sales, and final local demand fill.
-1779	Net flow for this market
-1780	Net Flow:
-1781	Neutral culture name. Click and type to change
-1782	Neutral lands area
-1783	Neutral lands name. Click to change
-1784	Neutral means states relations are neither positive nor negative
-1785	Neutrals collect no taxes
-1786	new
-1787	New chat
-1788	New Map
-1789	New map cannot be generated when edit mode is active, please exit the mode and retry
-1790	New Map!
-1791	New memory
-1792	New Name
-1793	New version released
-1794	Newer file
-1795	Next page
-1796	next to each province you want to merge. Use the
-1797	next to each state you want to merge. Use the
-1798	Night
-1799	no
-1800	No
-1801	No biomes to show
-1802	No burgs produced ${good.name}.
-1803	No burgs to show
-1804	No changes found in the file. Please change some names to get a result
-1805	No chats yet.
-1806	No cultures to show
-1807	No cultures, states and burgs will be created.
-1808	No emblems to edit, please generate states and burgs first
-1809	No enclosed area found to fill
-1810	No goods data available.
-1811	No historical records
-1812	No longer on this map
-1813	No map stored. Save map to browser storage first
-1814	No market
-1815	No market. This burg is not connected to any market.
-1816	No note matched an element on this map. Nothing was loaded
-1817	No notes yet. Click a burg, marker, state or other element on the map and add a note from its editor
-1818	No outline
-1819	No pattern
-1820	No production chains found: add manufactured goods with recipes first.
-1821	No production data for this burg.
-1822	No religions to show
-1823	No result to apply
-1824	No routes to join with. Route must start or end at current route's start or end cell
-1825	No rules: all land takes its biome's relief pool
-1826	No states to show
-1827	No stock of ${good.name} found in any market or burg inventory.
-1828	No tags available
-1829	No texture
-1830	No unassigned colors. Please load an image and click the button again
-1831	No unlocked journeys to remove
-1832	No valid burg in this cell. Click on a cell with a burg
-1833	No zones to show
-1834	Noldor
-1835	Nomadic
-1836	Non-basic chars: ${nonBasicLatinChars}
-1837	none
-1838	None
-1839	Noon
-1840	normal
-1841	Normal
-1842	Normalized Bar
-1843	Northern
-1844	Not a layer
-1845	Not allowed when 'only land cells' filter is set
-1846	Not allowed when 'only water cells' filter is set
-1847	Not enough forces to split
-1848	Not now
-1849	Note element is not found
-1850	Note element is not found. Would you like to remove the note?
-1851	Note formatting
-1852	Notes
-1853	Notes Editor
-1854	Notes without an element
-1855	number
-1856	Number
-1857	Number of bands around the coast
-1858	Number of burgs
-1859	Number of burgs in group
-1860	Number of burgs in market territory
-1861	Number of burgs with no market
-1862	Number of cells in market territory
-1863	Number of cells with no market
-1864	Number of coastal cells
-1865	Number of columns
-1866	Number of goods (displayed / total)
-1867	Number of labels currently assigned to this group
-1868	Number of labels currently assigned to this group. Click the list icon to see them
-1869	Number of lake inlet rivers
-1870	Number of land biomes
-1871	Number of land cells
-1872	Number of listed labels
-1873	Number of markers of that type on the current map
-1874	Number of names provided
-1875	Number of river cells
-1876	Number of rows
-1877	Number of selected labels
-1878	Number of zones
-1879	number): Generator
-1880	number): Record
-1881	Numbered list
-1882	Occupation zone
-1883	ocean
-1884	Ocean
-1885	Ocean / Sea
-1886	Ocean embellishment
-1887	Ocean layers
-1888	of the sages
-1889	off
-1890	Off
-1891	Ok
-1892	OK
-1893	ol
-1894	Old French
-1895	Old World
-1896	on
-1897	on GitHub.
-1898	On load
-1899	One page dungeon
-1900	Only ${count} out of ${options.generation.cultures.limit} requested cultures will be generated.
-1901	Only an emblem with a charge can show it without a shield
-1902	Only goods with at least one selected tag remain visible in the editor list
-1903	only land cells
-1904	Only paint cells whose current value is 0 (neutral)
-1905	only water cells
-1906	Opacity
-1907	Opacity of the contour lines
-1908	Opacity of the hachure strokes
-1909	Opacity of the lake ripples
-1910	open
-1911	Open 3D Scene
-1912	Open Azgaar Assistant
-1913	Open Battle Simulation Tutorial
-1914	Open Biomes Editor
-1915	Open Burg Groups Editor
-1916	Open burg map in a new tab
-1917	Open Burgs Overview
-1918	Open Cell Details
-1919	Open Coastline Editor
-1920	Open Cultures Editor
-1921	Open Data Charts
-1922	Open Diplomacy Overview
-1923	Open Emblems Editor
-1924	Open Geographical Features Overview
-1925	Open Globe View
-1926	Open Goods Editor
-1927	Open Image Converter
-1928	Open Journeys Overview
-1929	Open Label Groups Editor
-1930	Open Labels Overview
-1931	Open last saved map
-1932	Open Layers Tab
-1933	Open Map Lore
-1934	Open Markers Overview
-1935	Open Markets Overview
-1936	Open Measurers Editor
-1937	Open Military Forces Tutorial
-1938	Open Military Overview
-1939	Open Minimap
-1940	Open Namesbase Editor
-1941	Open Notes Editor
-1942	Open Options Tab
-1943	Open previously downloaded style file
-1944	Open previously downloaded template
-1945	Open Production Chains
-1946	Open Provinces Editor
-1947	Open Regiments Overview
-1948	Open Relief Rules Editor
-1949	Open Religions Editor
-1950	Open Rivers Overview
-1951	Open route creation dialog
-1952	Open Route Groups Editor
-1953	Open Routes Overview
-1954	Open States Editor
-1955	Open Style Tab
-1956	Open template editor
-1957	Open Template Editor
-1958	Open Template Editor Tutorial
-1959	Open the Distribution visual editor
-1960	Open the emblem in Armoria, the heraldry editor: your changes show on the map as you make them
-1961	Open the Heightmap editor to manually sculpt terrain by raising or lowering elevation. Changes here reshape coastlines, rivers, and biomes.
-1962	Open the Label Groups Configurator to create, edit and reorder groups
-1963	Open the Options Menu
-1964	Open the performance settings
-1965	Open the World Configurator to set the map position on the globe and the world climate
-1966	Open Tools Tab
-1967	Open Trade Animation Editor
-1968	Open Transports Editor
-1969	Open Units Editor
-1970	Open wiki article scale and distance to know about grid scale
-1971	Open Wikipedia article about the biome
-1972	Open World Configurator
-1973	Open Wrap Tool
-1974	Open Zones Editor
-1975	Opening the tool will erase the current map. Are you sure you want to proceed?
-1976	Operand should be a number
-1977	Operand should be an integer
-1978	Optimize speed
-1979	Options
-1980	Options Tab
-1981	or
-1982	Or load from your Dropbox account
-1983	Order
-1984	Oriental
-1985	Other systems
-1986	out
-1987	Output
-1988	Oval
-1989	Over colors
-1990	Overlay opacity:
-1991	Overwrite custom path?
-1992	Owner
-1993	Owning state
-1994	P
-1995	p-port
-1996	pack cells
-1997	Paint Biomes
-1998	Paint Brushes
-1999	Paint Cultures
-2000	Paint Market Cells
-2001	Paint Provinces
-2002	Paint Religions
-2003	Paint States
-2004	Paint Zones
-2005	Palm
-2006	panel.querySelector
-2007	Pangea
-2008	Paragraph formatting
-2009	Parish
-2010	Parsing error
-2011	Paste a link to an image
-2012	Paste any valid style data in JSON format
-2013	path
-2014	path.reduce
-2015	Patreon
-2016	Pattern 1
-2017	Pattern 2
-2018	Pattern 3
-2019	Pattern 4
-2020	Pattern 5
-2021	Pattern 6
-2022	Pause between land and water legs of a trip, in milliseconds. Higher = longer pause
-2023	paused
-2024	Pavise
-2025	Peninsula
-2026	Pennant
-2027	Pennon
-2028	Pentagon
-2029	Per-dimension production multipliers. 1 = no effect, 0 = fully suppressed.
-2030	percentage
-2031	Percentage of names containing space character
-2032	Performance
-2033	Performance Settings
-2034	Pergamena small
-2035	Pick different endpoints first, then change the transport type or use an
-2036	Pin
-2037	Pin colors:
-2038	Pin fill and stroke colors
-2039	Pin marker
-2040	Pin marker (display only pinned markers)
-2041	Pin shape:
-2042	Pirate ships have been spotted in these waters.
-2043	Pit: round depression
-2044	Place icons in a bulk
-2045	Placement
-2046	Placement range percentage along X axis (minX-maxX)
-2047	Placement range percentage along Y axis (minY-maxY)
-2048	Plaster
-2049	Plate size
-2050	plaza,
-2051	Please
-2052	Please assign colors to heights first
-2053	Please click on a regiment
-2054	Please click on a regiment to attack
-2055	Please enter a prompt
-2056	Please enter an API key
-2057	Please exit the customization mode first
-2058	Please exit the Image Conversion mode first
-2059	Please fill in the biome name
-2060	Please note server should allow CORS for file to be loaded. If CORS is not allowed, save file to Dropbox and provide a direct link
-2061	Please provide a font name
-2062	Please provide a preset name
-2063	Please provide a style JSON
-2064	Please provide a valid group name
-2065	Please provide a valid number in range 0-9999
-2066	Please provide a valid URL
-2067	Please select a model
-2068	Please select a province to merge into
-2069	Please select a regiment first
-2070	Please select a relief icon on the map
-2071	Please select a state to merge into
-2072	Please select an icon
-2073	Please select several provinces to merge
-2074	Please select several states to merge
-2075	Please select state from the list
-2076	Please upload a map file (<i>.map</i> or <i>.gz</i> formats) you have previously downloaded
-2077	Plot
-2078	PNG
-2079	PNG / JPEG scale:
-2080	pointer
-2081	Points number
-2082	Policy
-2083	Polish
-2084	Poll Tax:
-2085	pool
-2086	Populate with letters that can be used twice in a row (geminates)
-2087	Populatio<u>n</u>
-2088	Population
-2089	port,
-2090	Position
-2091	Position icon
-2092	Position x
-2093	Position y
-2094	Potential religion extent
-2095	Power
-2096	Power should not be zero
-2097	Precipit<u>a</u>tion
-2098	Precreated heightmaps
-2099	Prefecture
-2100	Preset
-2101	Preset name
-2102	Preset name:
-2103	Preview
-2104	Preview generator
-2105	Preview the heightmap in a 3D scene
-2106	Previous page
-2107	previous versions
-2108	Price
-2109	Price for this good. Click to sort
-2110	Primary
-2111	primary province
-2112	Probability of inversion, range 0-1
-2113	Probability to receive the good
-2114	Proceed
-2115	Produced
-2116	Product
-2117	Product per capita: gross product divided by population.
-2118	Production
-2119	Production Chains
-2120	Production multiplier by ${label.toLowerCase()}. 1 = no effect, 0 = fully suppressed.
-2121	Production value
-2122	Production volume
-2123	Project map on globe. Cannot be used for editing
-2124	Promise
-2125	Propose one batch of registered operations. It never changes the map: the user previews the batch and applies or discards it.
-2126	Propose this change
-2127	Provide a name for the new group
-2128	Provide a names data: a comma separated list of source names
-2129	Provide custom URL to the burg map. It can be a link to a generator or just an image. Leave empty to use the default map preview
-2130	Provider
-2131	province
-2132	Province
-2133	Province area
-2134	Province capital. Click to select from burgs within the state. No capital means the province is governed from the state capital
-2135	Province capital. Click to zoom into view
-2136	Province center cannot be assigned to a different region. Please remove the province first
-2137	Province does not have any cells, cannot change population
-2138	Province form name
-2139	Province form name. Click to change
-2140	Province full name
-2141	Province name. Click to change
-2142	Province owner
-2143	Province short name
-2144	Provinces
-2145	Provinces chart
-2146	Provinces displayed
-2147	Provinces Editor
-2148	Provinces ratio
-2149	pursue
-2150	Pursue phase. Mounted units excel
-2151	Pursue phase. Try to intercept fleeing attackers. Mounted units excel
-2152	Pursue phase. Units strength increased
-2153	px
-2154	px =
-2155	Quality
-2156	Quick Load Map
-2157	Quick preset lighting for different times of day
-2158	Quote
-2159	R
-2160	radio button
-2161	Radius around the marker, in the map's distance unit — markers inside it are listed and shown on the map
-2162	Radius x
-2163	Radius y
-2164	Radius:
-2165	Raise brush: increase height of cells in radius by Power value
-2166	random
-2167	Random
-2168	Random Chance
-2169	Random factor for attackers. Click to re-roll
-2170	Random factor for defenders. Click to re-roll
-2171	Randomize Iceberg shape
-2172	Randomize states Expansion value and re-calculate states and provinces
-2173	Range: elongated elevation
-2174	Rate
-2175	RAW
-2176	Raw goods are produced by rural population in cells based on biome availability and in cells and burgs when bonus resource is assigned to cells
-2177	Raw Production
-2178	Re-assign zones
-2179	Re-generate examples based on provided data
-2180	Re-place
-2181	Re-place relief
-2182	Re-place the relief the rules claim, to apply the edits
-2183	Re-place this good and recompute production, trade and taxes. Uncheck to update the good only, without disturbing the current economy.
-2184	Read the map
-2185	Rebuild market territories, production, trade deals, and taxes from the current goods and markets
-2186	Recalculate
-2187	Recalculate cultures based on current values of growth-related attributes
-2188	Recalculate military
-2189	Recalculate military forces based on current options
-2190	Recalculate religions based on current values of growth-related attributes
-2191	Recalculate states based on current values of growth-related attributes
-2192	Recipes
-2193	Recolor listed provinces based on state color
-2194	Recommended maximum name length
-2195	Recommended minimum name length
-2196	Record
-2197	Rectangular
-2198	Reddit community
-2199	Redo
-2200	Redo the action
-2201	Redo the action (Ctrl + Y)
-2202	Redo the stroke (Ctrl + Y)
-2203	Redraw on zoom
-2204	Redraw preview
-2205	Reduce layers
-2206	Refresh
-2207	Refresh the Deals screen
-2208	Refresh the Editor
-2209	Refresh the overview
-2210	Refresh the Overview
-2211	Refresh the overview screen
-2212	Refresh the Overview screen
-2213	Regenerate
-2214	Regenerate bonus goods
-2215	Regenerate bonus goods placement
-2216	Regenerate burg names based on assigned culture
-2217	Regenerate Burgs
-2218	Regenerate culture name
-2219	Regenerate Cultures
-2220	Regenerate diplomatical relations
-2221	Regenerate Economy
-2222	regenerate economy on apply
-2223	Regenerate element
-2224	Regenerate Emblems
-2225	Regenerate Goods
-2226	Regenerate Ice
-2227	Regenerate legend for this regiment
-2228	Regenerate Markers
-2229	Regenerate markets
-2230	Regenerate Markets
-2231	Regenerate markets and their territories
-2232	Regenerate Military
-2233	Regenerate Population
-2234	Regenerate preview
-2235	Regenerate production
-2236	Regenerate Production
-2237	Regenerate production and trade
-2238	Regenerate production and trade deals
-2239	Regenerate Provinces
-2240	Regenerate relations
-2241	Regenerate Relief
-2242	Regenerate Religions
-2243	Regenerate Rivers
-2244	Regenerate rivers and allow water flow to change heights and form new lakes. Recommended
-2245	Regenerate Routes
-2246	Regenerate State Labels
-2247	Regenerate States
-2248	Regenerate the emblem
-2249	Regenerate unlocked markers
-2250	Regenerate Zones
-2251	Regiment
-2252	Regiment base. Drag to re-base the regiment
-2253	Regiment cannot attack itself
-2254	Regiment has no troops to battle
-2255	Regiment icon
-2256	Regiment is already in the battle
-2257	Regiment type (land or naval). Click to change
-2258	Regiment's emblem
-2259	Regiment's name
-2260	regiments
-2261	Regiments
-2262	Regiments Overview
-2263	Region
-2264	Regional
-2265	regs.reduce
-2266	Regular distribution pattern
-2267	Relations
-2268	Relations are unknown if states do not have enough information about each other
-2269	Relations change
-2270	Relations history
-2271	Relations matrix
-2272	Relations severance
-2273	Relations to
-2274	Release
-2275	Release all provinces. It will make all provinces with burgs independent
-2276	Release provinces
-2277	releases page
-2278	Relie<u>f</u>
-2279	Relief
-2280	Relief icons
-2281	Relief Rules
-2282	Relief set the icons are drawn in: the style's, or one pinned for the icon
-2283	Religion
-2284	Religion area
-2285	Religion does not have any cells, cannot change population
-2286	Religion expansionism. Defines competitive size
-2287	Religion expansionism. Defines competitive size. Click to change, then click Recalculate to apply change
-2288	Religion form
-2289	Religion name. Click and type to change
-2290	Religion supreme deity
-2291	Religion type
-2292	Religions
-2293	Religions Editor
-2294	Religions number
-2295	Reload
-2296	Relocate burg. Click on map to move the burg
-2297	Relocate market. Click on a burg on the map to move the market center
-2298	remove
-2299	Remove
-2300	Remove all
-2301	Remove all journeys
-2302	Remove all markers
-2303	Remove all measurers
-2304	Remove all measurers from the map
-2305	Remove all provinces
-2306	Remove all provinces. States will remain as they are
-2307	Remove all rivers
-2308	Remove all routes
-2309	Remove all unlocked burgs except for capitals. To remove a capital remove its state first
-2310	Remove all unlocked journeys
-2311	Remove all unlocked markers
-2312	Remove all unlocked routes (locked routes are kept)
-2313	Remove burg
-2314	Remove color stop
-2315	Remove culture
-2316	Remove custom icon
-2317	Remove from the pool
-2318	Remove good
-2319	Remove group
-2320	Remove icons in a bulk
-2321	Remove image ${index + 1}
-2322	Remove ingredient
-2323	Remove journey
-2324	Remove label
-2325	Remove Label Group
-2326	Remove lake group
-2327	Remove marker
-2328	Remove market
-2329	Remove Market
-2330	Remove non-capital burg
-2331	Remove note
-2332	Remove province
-2333	Remove recipe
-2334	Remove regiment
-2335	Remove relief icons
-2336	Remove religion
-2337	Remove resource
-2338	Remove river
-2339	Remove river and tributaries
-2340	Remove route
-2341	Remove route group
-2342	Remove segment
-2343	Remove selected relief icon or icon type
-2344	Remove state
-2345	Remove style preset
-2346	Remove the cell
-2347	Remove the chart
-2348	Remove the custom biome
-2349	Remove the element
-2350	Remove the group
-2351	Remove the group? This won't affect labels unless the changes are applied.
-2352	Remove the icon from the map
-2353	Remove the journey
-2354	Remove the label
-2355	Remove the label path, render the label as a straight text
-2356	Remove the marker
-2357	Remove the measurer
-2358	Remove the point
-2359	Remove the province
-2360	Remove the rule
-2361	Remove the segment
-2362	Remove the state
-2363	Remove the step
-2364	Remove the transport type
-2365	Remove the unit
-2366	Remove this condition
-2367	Remove this custom preset
-2368	Remove this market
-2369	Remove this note
-2370	Remove transport type
-2371	Remove unit type
-2372	Remove unlocked routes
-2373	Remove zone
-2374	Renaissance
-2375	Rename
-2376	Rename burgs in bulk
-2377	Render cells below sea level (with a height less than 20)
-2378	Render heightmap data as a small monochrome image
-2379	Render ocean cells
-2380	Render ocean heights
-2381	Rendering group
-2382	Rendering group: the svg group the lake is drawn in. Create groups in the Lake Editor
-2383	Rendering group: the svg group the lake is drawn in. Does not affect generation
-2384	Rendering order: higher values are rendered on top
-2385	Rendering order: lower groups are rendered on top
-2386	Rendering preset: visual quality traded for speed. Pick 'Speed' if the map feels slow
-2387	Replace
-2388	Replace the relief rules with the default hills and mountains?
-2389	Replace the whole emblem with a picture: choose, link or upload an image, such as a ready coat of arms
-2390	Republic
-2391	required
-2392	Rerender all preview images
-2393	Rescale burg styles
-2394	Rescaler: change height if condition is fulfilled
-2395	Reservation
-2396	Reset
-2397	Reset custom override and follow the global map settings
-2398	Reset language to English
-2399	Reset map zoom
-2400	Reset Options
-2401	Reset preview zoom
-2402	Reset the dialog: restore its default position, columns and sorting
-2403	Reset the segment: recompute the path and restore the default color, speed and time
-2404	Reset to default
-2405	Reset to map settings
-2406	Reset to the Balance preset value
-2407	Reset to the default name (center burg name)
-2408	Reset to the map globals
-2409	Reset Zoom
-2410	Reshuffles where the calm and rough stretches fall
-2411	Restore
-2412	Restore default columns visibility
-2413	Restore default data
-2414	Restore default goods
-2415	Restore default list and regenerate goods
-2416	Restore default map size: the window size
-2417	Restore default military units and settings
-2418	Restore default namesbase
-2419	Restore default transport types
-2420	Restore default units settings
-2421	Restore label placement from before the spread
-2422	Restore relief rules
-2423	Restore the default hills and mountains
-2424	Restore the default label
-2425	Restore the default transport types, removing custom ones
-2426	Restore the default transport types? Custom ones will be removed. Segments referencing a removed type keep its name but will no longer resolve.
-2427	Restore the default zoom extent
-2428	Restore the defaults and re-define biomes based on current moisture and temperature
-2429	Restore the icon's default colors
-2430	Restore the MIR forest-green theme
-2431	Restore winds
-2432	Restrict brush to specific cell types
-2433	Retreat phase. Units strength reduced
-2434	Retry
-2435	Revert
-2436	Revert all vertex edits ever made on this map
-2437	Revert vertex edits
-2438	Rhombille grid
-2439	Ri<u>v</u>ers
-2440	Ripple length, fitted to the available water width
-2441	Ripple stroke width in map pixels
-2442	Ripples
-2443	Rivalization
-2444	Rivalry is a state of competing for dominance in the region
-2445	River
-2446	River basin (name of the main stem)
-2447	River discharge (flux power)
-2448	River drainage basin (watershed)
-2449	River length from source to mouth
-2450	River length in selected units
-2451	River mouth width
-2452	River mouth width in selected units
-2453	River name
-2454	River source additional width. Default value is 0
-2455	River type name
-2456	River valleys:
-2457	River width multiplier. Default value is 1
-2458	Rivers
-2459	Rivers number
-2460	Rivers Overview
-2461	Ro<u>u</u>tes
-2462	Roll dice to update random factor
-2463	Roman
-2464	Rotate
-2465	Round
-2466	Route
-2467	Route group
-2468	Route length
-2469	Route length in selected units
-2470	Route links
-2471	Route name
-2472	Route to join with:
-2473	Routes
-2474	Routes joined
-2475	Routes number
-2476	Routes Overview
-2477	row.querySelector
-2478	Ruggedness
-2479	rule
-2480	Rule name
-2481	Rulers
-2482	ruling state
-2483	running
-2484	Rural
-2485	Rural population
-2486	Rural production
-2487	S
-2488	S:
-2489	Sale to local market
-2490	Sales
-2491	Sales tax is applied to deals with a seller from the state. Poll tax is applied to all population of the state. Tax changes take effect on Production regeneration
-2492	Sales Tax is paid by the seller on local sale deals. It is deducted from gross sale value and transferred to the state treasury.
-2493	Sales Tax:
-2494	Salt Lake
-2495	Sample
-2496	Satellite texture
-2497	Save
-2498	Save and Load Maps
-2499	Save biomes-related data as a text file (.csv)
-2500	Save burgs-related data as a text file (.csv)
-2501	Save current JSON as a new style preset
-2502	Save data as a CSV file
-2503	Save features-related data as a text file (.csv)
-2504	Save files to Dropbox first
-2505	Save fully-functional map file
-2506	Save journey segments as a text file (.csv)
-2507	Save journeys-related data as a text file (.csv)
-2508	Save layer preset
-2509	Save Layers Preset
-2510	Save map
-2511	Save Map As…
-2512	Save Map File
-2513	Save map file to your Dropbox
-2514	Save map to
-2515	Save Map to browser storage
-2516	Save Map to Dropbox
-2517	Save markers data as a text file (.csv)
-2518	Save market deals data as a text file (.csv)
-2519	Save markets data as a CSV file
-2520	Save military-related data as a text file (.csv)
-2521	Save OBJ file of the 3d scene
-2522	Save provinces-related data as a text file (.csv)
-2523	Save reminder is turned off. Press CTRL+Q again to re-initiate
-2524	Save reminder is turned on. Press CTRL+Q to turn off
-2525	Save rivers-related data as a text file (.csv)
-2526	Save routes-related data as a text file (.csv)
-2527	Save screenshot of the 3d scene
-2528	Save state relations matrix as a text file (.csv)
-2529	Save state-related data as a text file (.csv)
-2530	save the map
-2531	Save the project to browser storage only
-2532	Save to the chosen file; Shift-click to choose another filename or location
-2533	Saving error
-2534	Scalable vector image: best quality, opens in a browser or Inkscape
-2535	Scale
-2536	Scale Bar
-2537	Scale bar bottom edge, in percents
-2538	Scale bar right edge, in percents
-2539	Scroll the mouse wheel to zoom in and out. Click and drag on the map to pan. Double-click a location to center on it.
-2540	sea_island
-2541	Search
-2542	Search built-in icons
-2543	Search fonts
-2544	Search map and commands
-2545	Search results
-2546	Secondary
-2547	See the emblem (coat of arms) of a state, province or burg as an image, to describe it or match lore to it. The user sees it too.
-2548	Seed history
-2549	segment
-2550	Segment color. Click to change
-2551	Segment distance
-2552	Segment name: ${escapeHtml(segment.name)}
-2553	Segment pause
-2554	segments
-2555	Select
-2556	Select ${label}
-2557	Select a color below and assign a height value for it
-2558	Select a color to assign a height value
-2559	Select a color to re-assign the height value
-2560	Select a distance unit or provide a custom name
-2561	Select a group for this label
-2562	Select a map layers preset
-2563	Select a set of cultures to be used for names and cultures generation
-2564	Select a specific map element from this dropdown to adjust its colors, opacity, stroke width, and other visual properties.
-2565	Select a style preset. State labels may required regeneration if font is changed
-2566	Select allowed ${attr}
-2567	Select allowed biomes
-2568	Select allowed cultures
-2569	Select allowed features
-2570	Select allowed religions
-2571	Select allowed states
-2572	Select an altitude unit or provide a custom name
-2573	Select an element to edit its style
-2574	Select an element to edit its style (list is ordered alphabetically)
-2575	Select any type of icons
-2576	Select at least one element
-2577	Select at least one label
-2578	Select base template
-2579	Select base to edit
-2580	Select base:
-2581	Select biomes
-2582	Select Biomes
-2583	Select burg group. Groups defines burg icon, label size and style
-2584	Select burg in province or state
-2585	Select burg type. Type slightly affects emblem generation
-2586	Select chart type
-2587	Select color scheme for the element
-2588	Select dominant culture
-2589	Select element group
-2590	Select emblem shape. Can be changed individually in the Emblem Editor
-2591	Select entity (y axis)
-2592	Select entity to group by. If you don't need grouping, set it the same as the entity
-2593	Select feature types
-2594	Select Feature Types
-2595	Select feature. Features with custom settings are bullet-marked
-2596	Select file and create a link to share with your friends
-2597	Select filter for element. Filters may cause performance issues!
-2598	Select font
-2599	Select font adding method
-2600	Select form name
-2601	Select format to download image or export map data
-2602	Select good line in editor, click on cells to remove or add a bonus resource
-2603	Select good to compare stock across markets
-2604	Select grid overlay type
-2605	Select group to be assigned if burg doesn't pass the criteria for other groups
-2606	Select group to be assigned if other groups are not passed
-2607	Select Heightmap
-2608	Select Heightmap Template
-2609	Select heightmap template – template provides unique, but similar-looking maps on generation
-2610	Select how many distance units are in one pixel
-2611	Select icon
-2612	Select lake rendering group
-2613	Select lake subtype
-2614	Select limitation for burg feature: ${name}
-2615	Select line interpolation type
-2616	Select marker type for newly added markers.
-2617	Select metric to plot (x axis)
-2618	Select ocean pattern
-2619	Select or deselect all listed labels
-2620	Select origins
-2621	Select own your own relief icon
-2622	Select parent river
-2623	Select precreated heightmap – it will be the same for each map
-2624	Select province in state
-2625	Select route group
-2626	Select set of relief icons. Existing icons are restyled, not regenerated
-2627	Select shape of the emblem
-2628	Select shore proximity
-2629	Select Shore Proximity
-2630	Select speech synthesis voice to pronounce generated names
-2631	Select state
-2632	Select Temperature scale
-2633	Select template or precreated heightmap to be used on generation
-2634	Select template:
-2635	Select texture image. Big textures can highly affect performance
-2636	Select the element the note belongs to
-2637	Select the good's icon
-2638	Select the label for bulk assignment
-2639	Select unit type to apply special rules on forces recalculation
-2640	Selected paint color
-2641	Selected water area is open to map border and is not enclosed
-2642	SELL
-2643	Seller
-2644	Send
-2645	Send (Enter)
-2646	Seneschalty
-2647	Separate
-2648	Sepia
-2649	Server
-2650	Set a filter to be applied to the map in general
-2651	Set a height interval. Avoid space, use hyphen as a separator
-2652	Set a North-South map shift, set to 50 to make map center lie on Equator
-2653	Set a stroke color
-2654	Set a West-East map shift, set to 50 to make map center lie on Prime meridian
-2655	Set as primary origin
-2656	Set autosave interval in minutes. Set 0 to disable autosave. Map is saved to browser memory
-2657	Set bar size
-2658	Set battle name
-2659	Set burg population
-2660	Set burg production plate icon size in pixels. Plate and font scale together with it
-2661	Set clipping. Only non-clipped part will be visible
-2662	Set curve profile
-2663	Set custom burg map URL
-2664	Set dialog and tool windows transparency
-2665	Set emblems size multiplier
-2666	Set eroded mesh detail level (vertices on the long side)
-2667	Set fill color
-2668	Set fill opacity. 0: transparent, 1: solid
-2669	Set flux affects river width
-2670	Set font size in pixels
-2671	Set font size, relative to the labels layer
-2672	Set font style
-2673	Set font weight
-2674	Set globe rotation speed. Set to 0 is you want to toggle off the rotation
-2675	Set globe texture resolution
-2676	Set good marker (icon and circle) size in pixels
-2677	Set grid cells scale multiplier
-2678	Set height exponent, i.e. a value for altitude change sharpness. Altitude affects temperature and hence biomes
-2679	Set height for all cells to 0 (erase the map)
-2680	Set height scale
-2681	Set height:
-2682	Set how deep the valleys are carved along the rivers
-2683	Set how many people are in one population point
-2684	Set icon size
-2685	Set letter spacing
-2686	Set Lore
-2687	Set map rotation speed. Set to 0 is you want to toggle off the rotation
-2688	Set map size relative to the world size
-2689	Set market marker (circle) size in pixels
-2690	Set market marker icon size in pixels
-2691	Set masking fraction. 1 - full insulation (prevent land on map edges), 2 - half-insulation, etc. Negative number to inverse the effect
-2692	Set max population constraint in population points (see the multiplier in Units Editor)
-2693	Set maximum number of colors
-2694	Set maximum number of items in one column
-2695	Set mesh texture resolution
-2696	Set min and max population constraint in population points (see the multiplier in Units Editor)
-2697	Set min population constraint in population points (see the multiplier in Units Editor)
-2698	Set minimum and maximum possible zoom level
-2699	Set number of points to be used for graph generation. Highly affects performance. 10K is the only recommended value
-2700	Set opacity of the loaded image
-2701	Set opacity. 0: transparent, 1: solid
-2702	Set palette hue
-2703	Set palette lightness
-2704	Set palette saturation
-2705	Set points (cells) number of the submap
-2706	Set population percentile: 0-100, where 90 means the burg must have a population higher than 90% of all burgs
-2707	Set precipitation - water amount clouds can bring. Defines rivers and biomes generation. Keep around 100% for default generation
-2708	Set regiment box size. All regiments will be redrawn on change (position will defaulted)
-2709	Set relative size for the particular label
-2710	Set relative size for the particular label (% of group default)
-2711	Set scene lightness
-2712	Set sky and water color
-2713	Set smooth fraction. 1 - full smooth, 2 - half-smooth, etc.
-2714	Set starting offset for the particular label
-2715	Set starting offset for the particular label (% along the path)
-2716	Set starting offset numerically
-2717	Set stroke color
-2718	Set stroke dash array, e.g. 5 2
-2719	Set stroke linecap
-2720	Set stroke linejoin
-2721	Set stroke opacity. 0: transparent, 1: solid
-2722	Set stroke width
-2723	Set sun position (x, y) and color
-2724	Set text shadow, case and shift
-2725	Set the charge: choose, link or upload a picture to place on the field
-2726	Set the growth rate of states and cultures. Determines how much land stays neutral
-2727	Set the icon shown inside the market marker
-2728	Set the letter spacing size for this label
-2729	Set the number of erosion detail layers. More octaves add finer gullies
-2730	Set the strength of erosion gullies and ridges
-2731	Set theme hue for dialogs and tool windows
-2732	Set tooltip size
-2733	Set treasury balance. Production won't be changed automatically
-2734	Set urban density: average population per building in Medieval Fantasy City Generator
-2735	Set urban population modifier. Change to increase or decrease burgs population
-2736	Set user interface size. Please note browser zoom also affects interface size (Ctrl + or Ctrl - to change)
-2737	Set view mode
-2738	Set vignette blur propagation, in pixels
-2739	Set what Generator should do on load
-2740	Set what share of eligible burgs in each state will become province centers. Higher values create more provinces
-2741	Set wind (compass) rose shift and size
-2742	Set world parameters like the number of cultures, states, and religions before generating a new map. UI preferences like tooltips and autosave are also here.
-2743	Settings for the next map. Generate a new map to apply them
-2744	Setup Lore
-2745	Shading
-2746	Shallow Ocean (adjacent to land)
-2747	shanty town,
-2748	Shape
-2749	Shape preview
-2750	Shape rendering
-2751	Share
-2752	Share of the pool's relief
-2753	Shattered
-2754	Shelling phase. Naval artillery bombardment of enemy fleet
-2755	Sheltering phase. Hide behind the walls and wait
-2756	Shield
-2757	Shieldy
-2758	Shift
-2759	Shift x
-2760	Shift y
-2761	Shire
-2762	shock
-2763	Shock phase. Units are not prepared for a defense
-2764	Shock phase. Units strength reduced
-2765	Shore gap
-2766	Shore length:
-2767	Shore Proximity
-2768	Shore tint
-2769	Short name:
-2770	show
-2771	Show
-2772	Show ${count}
-2773	Show 3D labels
-2774	Show a state's profile card: emblem, full name and form, capital, population, area, burgs, culture, religion and the start of its note. Use it whenever one state is the subject (tell me about, describe, overview, who rules), then add only what the card does not say.
-2775	Show all labels
-2776	Show burgs bubble chart
-2777	Show Burgs Chart
-2778	Show circle
-2779	Show Cultures Hierarchy
-2780	Show cultures hierarchy tree
-2781	Show drainage
-2782	Show Export Panel
-2783	Show labels of the ${name} group in Labels Overview to reassign them
-2784	Show labels of this group in Labels Overview
-2785	Show markers within a radius of this one
-2786	Show on map
-2787	Show on the map
-2788	Show only labels containing the entered text
-2789	Show only labels of the selected group
-2790	Show only labels of the selected type
-2791	Show only markers located in the selected culture
-2792	Show only markers located in the selected state
-2793	Show only markers of the selected type
-2794	Show only zones of selected type
-2795	Show or hide all goods matching the current filter
-2796	Show or hide circle around good icons
-2797	Show or hide columns
-2798	Show production chains graph
-2799	Show production overview for this burg
-2800	Show provinces chart
-2801	Show Provinces Chart
-2802	Show regiments list
-2803	Show relations history
-2804	Show Relations History
-2805	Show relations matrix
-2806	Show Religions Hierarchy
-2807	Show religions hierarchy tree
-2808	Show rescaler slider
-2809	Show Save Panel
-2810	Show Seed History
-2811	Show seed history to apply a previous seed
-2812	Show several map entities as a list the user can locate and ring on the map. Use it instead of a Markdown list whenever an answer names 3 or more entities (which, list, find, where are…).
-2813	Show sky and extend water
-2814	Show states bubble chart
-2815	Show States Chart
-2816	Show style edit section
-2817	Show temperature graph for the burg
-2818	Show the area or place of the emblem
-2819	Show the charts in 1, 2, 3 or 4 columns
-2820	Show the edit label text section
-2821	Show the elevation profile for the river
-2822	Show the elevation profile for the route
-2823	Show the font size section
-2824	Show the group selection
-2825	Show the label
-2826	Show the label offset section
-2827	Show the letter spacing section
-2828	Show the regeneration menu and more data
-2829	Show where water flows: arrows point downhill, hatching marks depressions that get filled, blue hatching marks the ones deep enough to become lakes
-2830	Show wireframe
-2831	Show/hide extinct religions (religions without cells)
-2832	Shown
-2833	Shows whether the burg has a citadel (castle). Click to toggle
-2834	Shows whether the burg has a shanty town. Click to toggle
-2835	Shows whether the burg is a port. Click to toggle
-2836	Shows whether the burg is a religious center. Click to toggle
-2837	Shows whether the burg is a state capital. Click to toggle
-2838	Shows whether the burg is a trade center (market center). Click to toggle
-2839	Shows whether the burg is walled. Click to toggle
-2840	Shows whether there is already a preset with this name
-2841	Siege: burg blockade and storming
-2842	Sign in
-2843	Sign out
-2844	simple
-2845	Simple
-2846	Simplify
-2847	Sinkhole
-2848	Size
-2849	Size of the main charge
-2850	Size of the map window on screen. Independent of the map size: it is how much of the map you see at once. Set by hand it is remembered, until you fit it back to the window
-2851	Size variety
-2852	Size: the entry's icons as a multiple of the pool's size
-2853	Skip
-2854	Skirmish phase. Ranged units excel
-2855	slider
-2856	small
-2857	Small
-2858	small shape adjustments only
-2859	Smallest edge
-2860	Smooth 6
-2861	Smooth 9
-2862	Smooth all heights a bit
-2863	Smooth brush: drag to level height of cells in radius to height of adjacent cells
-2864	Smooth geometry
-2865	Smooth the map replacing cell heights by an average values of its neighbors
-2866	Snowy conifer
-2867	Snowy mountain
-2868	Soiled paper horizontal
-2869	Soiled paper vertical
-2870	some
-2871	Sortie phase. Make a sortie from besieged town. Melee units excel
-2872	Sorting type
-2873	Source
-2874	Source width:
-2875	Southern
-2876	Spacing
-2877	Spain small
-2878	Spanish
-2879	Speak the examples. You can change voice and language in options
-2880	Speak the name. You can change voice and language in options
-2881	Speaker voice
-2882	Specific
-2883	Speed
-2884	Split map into smaller png tiles and download as zip archive
-2885	Split regiment into 2 separate ones
-2886	Spread currently displayed labels to not collide
-2887	Square
-2888	Square 45 degrees grid
-2889	Square grid
-2890	Squarish
-2891	Stacked Bar
-2892	Standard
-2893	Standard 3
-2894	Standard 4
-2895	Standard view mode for editing the map
-2896	Start a new chat
-2897	Start a new chat to continue
-2898	Start Interactive Tour
-2899	Start of the first segment
-2900	startBurgId
-2901	state
-2902	State
-2903	State ${unit.name} units number
-2904	State area
-2905	State capital. Click to zoom into view
-2906	State does not have any cells, cannot change population
-2907	State expansionism
-2908	State form name
-2909	State form name. Click to change
-2910	State full name
-2911	State halos
-2912	State is friendly to another state when they share some common interests
-2913	State Labels
-2914	State name. Click to change
-2915	State population
-2916	State short name
-2917	State type. Defines growth model. Click to change
-2918	State-specific
-2919	States
-2920	States bubble chart
-2921	States Editor
-2922	States number
-2923	States Number
-2924	States you click get the chosen relation to this state. Shift + click on the map to select another state
-2925	stationed
-2926	Stock
-2927	Stop
-2928	Storming phase. Storm enemy town. Melee units excel
-2929	Straight strokes
-2930	Strait direction
-2931	Strait width, use hyphen to get a random number in range
-2932	Strait: centered vertical or horizontal depression
-2933	Stretch length
-2934	Strikethrough
-2935	string, suggestedName: string, saveAs = false ): Promise
-2936	string, suggestedName: string, saveAs: boolean): Promise
-2937	Stroke length, relative to the default
-2938	Stroke length, relative to the default. Strokes stop early where the slope levels off
-2939	Stroke Width
-2940	Stroke width at its root, relative to the default. Gentler ground draws lighter strokes
-2941	Strokes only
-2942	Style
-2943	Style elements
-2944	Style JSON is getting formed based the current settings, but can be entered manually
-2945	Style JSON:
-2946	Style preset is saved and applied
-2947	Style preset is uploaded
-2948	Style presets
-2949	Style Presets
-2950	Style Saver
-2951	Style Tab
-2952	Submap
-2953	Sun position and color:
-2954	Supply line length, affects morale
-2955	Surprice attack phase. Units strength increased, ranged units excel
-2956	Surrendering phase. Give up the defense. Units strength reduced
-2957	Survivors
-2958	Suspicion means state has a cautious distrust of another state
-2959	Suzerain is a state having some control over its vassal (selected state)
-2960	SVG shape-rendering hint for the map. Crisp edges drops anti-aliasing. Chromium-based browsers rasterize on the GPU and ignore the hint for speed purposes, so it makes no difference there
-2961	Swamp
-2962	Swiss
-2963	T
-2964	Table
-2965	table-row
-2966	Tags
-2967	Take an interactive tour of the map generator
-2968	Taklamakan
-2969	Targe
-2970	Targe2
-2971	Target number of trade animations visible at once. New ones spawn as old ones finish. Higher = more simultaneous animations, can cause lag on slower devices
-2972	tavern
-2973	Te<u>x</u>ture
-2974	Temperature
-2975	Temperature controls response randomness; higher values mean more creativity, lower values mean more predictability
-2976	Temperature must be a number
-2977	Temperature range in °C
-2978	Temperature range in °C. An empty bound is open
-2979	Temperature scale:
-2980	Template Editor
-2981	temple,
-2982	Terracing power. Set to 0 to toggle off
-2983	Territory
-2984	Tetrakis square grid
-2985	text
-2986	Text
-2987	Text color
-2988	Text formatting
-2989	Text size
-2990	Texture resolution:
-2991	Texture the terrain as a satellite image. Replaces the standard map texture
-2992	Thanks for all supporters on
-2993	that will absorb all others. Hover over a row to highlight the province on the map.
-2994	that works offline.
-2995	The app and this page keep their maps and settings apart, so what you have here does not appear there. To move a map over, save it as a
-2996	The civilization
-2997	The civilization of the sages — редактор карт
-2998	The coordinate extent this map was generated on. The next map's is set in Options
-2999	The current map already has this seed
-3000	the data, but you won't be able to change the coastline.
-3001	The Desktop App is made for computers, there is no phone or tablet version.
-3002	The Desktop App is not published yet.
-3003	The edits not applied yet will be discarded. Apply them first to keep them
-3004	The element name, edited in the element's own editor
-3005	The emblem's COA string: edit it, or replace it with an Armoria link or COA string, then Apply
-3006	The file does not look like a valid save file.<br>Please check the data format
-3007	The file is not a style preset - the current style is kept
-3008	The following provinces will be
-3009	The following states will be
-3010	The font is already added
-3011	The frame is fitted to the picture
-3012	The Generator is also available as a
-3013	The Heightmap editor panel lets you paint terrain directly on the map. You can raise or lower land, apply templates, convert an image into a heightmap, or preview the terrain in 3D.
-3014	The icon at map sizes
-3015	The JSON is not a style preset - nothing was saved
-3016	The Layer control is not available in the heightmap edit mode
-3017	The Layers tab controls which map elements are visible on the map.
-3018	the license
-3019	The list of downloads could not be loaded right now.
-3020	The longest name length
-3021	The names data provided is too short or incorrect
-3022	The note has markup the rich text editor cannot keep, so it stays in HTML mode
-3023	The Noun Project
-3024	the open sea
-3025	the open water
-3026	The Options tab lets you configure world generation parameters like the number of states, cultures, religions, and other settings that shape the generated world.
-3027	The preset on the Options tab these settings amount to
-3028	The shortest name length
-3029	The Style tab controls the visual appearance of the map — color schemes, opacity, line weights, and other properties for each map element.
-3030	The Tools tab gives you direct access to all of the map's editors: terrain, biomes, states, cultures, religions, routes, and more.
-3031	Theme color
-3032	There are 3 ways to add a custom font:
-3033	There are no routes to remove
-3034	There are no states to show
-3035	There should be at least 2 states to edit the diplomacy
-3036	These entities have no map location
-3037	They
-3038	This burg is a NOT state capital
-3039	This burg is a port
-3040	This burg is a state capital
-3041	This burg is already a center of another market
-3042	This burg is already a market center
-3043	This burg is already the center of this market
-3044	This burg is NOT a port
-3045	This button opens the World Configurator where you can set the map's position on the globe, adjust equatorial and polar temperatures, and configure precipitation to shape the world's climate.
-3046	This chat is getting long — each question re-sends all of it.
-3047	This element has no map location
-3048	This element is not drawn on the map on its own
-3049	This is one of the default groups, it cannot be removed
-3050	This legendary water source is whispered about in ancient tales and believed to possess mystical properties. The spring emanates crystal-clear water, shimmering with an otherworldly iridescence that sparkles even in the dimmest light.
-3051	This map carries no custom icons yet.
-3052	This operation is destructive and irreversible. It will create a completely new map based on the current one. Don't forget to save the .map file to your machine first!
-3053	This part of the app failed to load because a new version was released while the page was open.<br />Reload the page to get the new version. If you have unsaved changes, save the map first
-3054	This part of the app was not downloaded before the connection was lost. Reconnect and try again
-3055	This quick tour covers the essential controls. Use Next/Previous to navigate, or press Esc to exit at any time.
-3056	This scheme already exists
-3057	This transport type is
-3058	Timber Cut big
-3059	Timber Cut small
-3060	Time
-3061	Time from start to finish, travel days counted at each transport's travel hours
-3062	Time of day:
-3063	Tincture of the field
-3064	Tincture of the main charge. A raster picture keeps its own colours
-3065	Tint
-3066	Tint over the existing ocean, strongest near the shore
-3067	tlan
-3068	to
-3069	To
-3070	to ask questions, share maps, discuss the Generator and Worldbuilding, report bugs and propose new features.
-3071	To change Burg Groups open
-3072	To change capital please assign a capital status to another burg of this state
-3073	to open the last saved map.
-3074	to pick the
-3075	To remove a capital you have to remove its state first
-3076	Toggle 3d labels
-3077	Toggle Azgaar Assistant (help bubble on the bottom right corner)
-3078	Toggle basin highlight mode
-3079	Toggle fullscreen
-3080	Toggle Individual Layers
-3081	Toggle journey visibility on the map
-3082	Toggle Legend box
-3083	Toggle Legend box (shows all non-hidden zones)
-3084	Toggle Menu
-3085	Toggle notes box display: hide or do not hide the box on mouse move
-3086	Toggle percentage / absolute values display mode
-3087	Toggle percentage / absolute values views
-3088	Toggle province focus
-3089	Toggle Save Reminder
-3090	Toggle segment visibility
-3091	Toggle sky mode
-3092	Toggle state focus
-3093	Toggle this good on the Goods map
-3094	Toggle wireframe mode
-3095	Toggle zone focus
-3096	Toggle zone visibility
-3097	Tools
-3098	Tools Tab
-3099	Tooltip size
-3100	Top level
-3101	Total
-3102	Total area of the displayed features
-3103	Total burgs number
-3104	Total cells number
-3105	Total deal value
-3106	Total distance
-3107	Total gross sales revenue
-3108	Total land area
-3109	Total land cells number
-3110	Total map area
-3111	Total map population
-3112	Total military
-3113	Total military forces
-3114	Total military personnel (considering crew). Click to sort
-3115	Total military personnel (not considering crew)
-3116	Total military personnel (not considering crew). Click to sort
-3117	Total number of believers (population)
-3118	Total number of cults
-3119	Total number of folk religions
-3120	Total number of heresies
-3121	Total number of markets
-3122	Total number of organized religions
-3123	Total population
-3124	Total purchase spending
-3125	Total size:
-3126	Total state military personnel (considering crew)
-3127	Total stock of all goods in this market
-3128	Total stock of this good across all markets
-3129	Total Tax:
-3130	Total time
-3131	Total time: ${Journeys.formatTravelTimeFull(elapsedHours)}. Travel time: ${Journeys.formatHours(totalHours)}${hiddenNote}
-3132	Total traded units
-3133	Total units in stock across all markets and burg inventories
-3134	Total units in stock across all markets and burg inventories. Click to sort
-3135	Total units produced daily by all cells and burgs
-3136	Total units produced daily in cells (raw) and burgs (manufactured). Click to sort
-3137	Trade
-3138	Trade Animation Editor
-3139	Trade type
-3140	Transform
-3141	Transform map
-3142	Transform Map
-3143	Transparency
-3144	Transport
-3145	Transport type added — rename it and set the speed, travel hours and domain.
-3146	Transport type name
-3147	Transport type, sets the default speed and where the segment may go
-3148	Transport Types
-3149	Transport types number
-3150	Transports
-3151	Travel duration
-3152	Travel time
-3153	Treasury
-3154	Treasury: accumulated cash balance
-3155	Triangle grid (horizontal)
-3156	Triangle grid (vertical)
-3157	Tribe
-3158	Trihexagonal grid
-3159	Tropical
-3160	Trough: elongated depression
-3161	True
-3162	Truncated square grid
-3163	Try
-3164	Type
-3165	Type a prompt here
-3166	Type any short text
-3167	type form name
-3168	Type full battle name
-3169	Type group name
-3170	Type group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes. Spaces are not allowed
-3171	Type place name
-3172	Type scale bar label, leave blank to hide label
-3173	Type to change a base name
-3174	Type to change river type (e.g. fork, creek, river, brook, stream)
-3175	Type to change the full name
-3176	Type to change the short name
-3177	Type to edit. Press Enter to add a new line, empty the element to remove it
-3178	Type to rename the burg
-3179	Type to rename the lake
-3180	Type to rename the market. Clear the field to reset to the default name
-3181	Type to rename the regiment
-3182	Type to rename the river
-3183	Type to rename the route
-3184	Type unit name. If name is changed for existing unit, old unit will be replaced
-3185	type value
-3186	ul
-3187	Uncheck to not update state label on name change
-3188	Uncovered Demand:
-3189	Underline
-3190	Undiscovered dungeon. See
-3191	Undo
-3192	Undo last brush stroke
-3193	Undo last change
-3194	Undo the last stroke (Ctrl + Z)
-3195	Undo the latest action
-3196	Undo the latest action (Ctrl + Z)
-3197	Unit
-3198	Unit icon
-3199	Unit military power (used for battle simulation)
-3200	Unit name
-3201	Unit name. If name is changed for existing unit, old unit will be replaced
-3202	Unit of production
-3203	Unit of production. Click to sort
-3204	Unit type to apply special rules on forces recalculation
-3205	Units
-3206	Units Editor
-3207	Units of goods produced
-3208	Unlimited questions, and I can read and edit this map. Your key stays in this browser and goes only to the provider. I run scripts in this page to read your map. Only use me on maps from sources you trust.
-3209	Unlocked. Click to lock the element and prevent changes to it by regeneration tools
-3210	Unselect
-3211	up
-3212	Update label on Apply
-3213	Update the scene
-3214	Upload
-3215	Upload a namesbase from PC, extending the current set
-3216	Upload a namesbase from PC, replacing the current set
-3217	Upload cultures-related data
-3218	Upload notes from PC
-3219	Urban
-3220	Urban density:
-3221	Urban population
-3222	Urbanization rate:
-3223	URL
-3224	url(#land)
-3225	url(#water)
-3226	Use for
-3227	Use key
-3228	Use Provinces Editor to change the actual province name, not just a label
-3229	Use States Editor to change the actual state name, not just a label
-3230	Value
-3231	value * population_point * urbanization_rate
-3232	Variant
-3233	Vassal is a state having obligation to its suzerain (selected state)
-3234	Vassalization
-3235	Vertical shift in icon-size units (positive moves down)
-3236	Vesica Piscis
-3237	View market deals
-3238	View mode:
-3239	Viewport size
-3240	Vignette
-3241	Vignette rectangle height, in percents
-3242	Vignette rectangle width, in percents
-3243	Vignette rectangle x, in percents
-3244	Vignette rectangle y, in percents
-3245	Vignette X radius, in percents
-3246	Vignette Y radius, in percents
-3247	visible
-3248	Visible
-3249	void, signal: AbortSignal ): Promise
-3250	void): Promise
-3251	Volcano
-3252	W
-3253	waiting
-3254	Waiting phase. Cannot pursue fleeing naval
-3255	walls,
-3256	War Alert
-3257	War Alert. Editable modifier to military forces number, depends on political situation
-3258	War Alert. Modifier to military forces number, depends on political situation. Click to sort
-3259	War declaration
-3260	Warning
-3261	Warning!
-3262	Watabou City
-3263	Watabou Dwelling
-3264	Watabou Village
-3265	water
-3266	Water flux
-3267	Waterbody Type
-3268	Waves
-3269	WE
-3270	Wealth
-3271	Wealth: gross product divided by population
-3272	Wedged
-3273	Weight
-3274	Weight: how often the entry is picked, relative to the others
-3275	Welcome to Fantasy Map Generator
-3276	Western
-3277	When labels, icons and relief are redrawn and text re-sized during a zoom or pan. 'After zoom' does it once per gesture: faster on big maps, but new content appears all at once
-3278	When supported by your browser, Save updates the chosen file. Shift-click machine or press Ctrl + Shift + S to save a separate copy.
-3279	Where to get one
-3280	Which trade types to display: local (burg-market), global (market-market), or both
-3281	While zooming
-3282	white
-3283	Whitecaps
-3284	Whole map
-3285	Whole world
-3286	Width
-3287	Width modifier:
-3288	Width of minor contours. Every fifth contour is twice as wide
-3289	Width of the dark lines separating bands
-3290	Wikimedia Commons
-3291	window.innerWidth
-3292	Windows
-3293	Windows and macOS will warn about an unknown developer the first time, because the app is not signed yet: on Windows click "More info" and then "Run anyway", on macOS right-click the app and choose "Open".
-3294	Windows on ARM
-3295	Winter Era
-3296	Withdrawal phase. Naval units try to escape enemy fleet
-3297	World Configurator
-3298	Worth of produced goods
-3299	Wrap
-3300	Wrap Tool
-3301	Wrap tool: drag to reshape cells, Shift + drag to resize the brush, Space + drag to pan the map
-3302	write
-3303	Write the note here. It shows up in the notes box when the element is hovered or clicked
-3304	x
-3305	X
-3306	X axis position in percentage (minX-maxX or X)
-3307	x1 - x0
-3308	XIV
-3309	y
-3310	Y
-3311	Y axis position in percentage (minY-maxY or Y)
-3312	yes
-3313	You are offline
-3314	You can
-3315	You cannot change the coastline in 'Keep' edit mode
-3316	You cannot overwrite default preset, please change the name
-3317	You cannot remove a market center burg. Please remove the market first
-3318	You cannot remove the capital. Please change the state capital first
-3319	You have encountered a character.
-3320	You must provide a correct value
-3321	Your own description of this world. Free text, carried in the map file
-3322	Your question
-3323	Your system is ${primaryLabel}:
-3324	yurt
-3325	z-burg
-3326	Zone
-3327	Zone area
-3328	Zone description. Click and type to change
-3329	Zone does not have any land cells, cannot change population
-3330	Zone type. Click and type to change
-3331	Zones
-3332	Zones Editor
-3333	Zoom
-3334	Zoom and pan the picture in its frame
-3335	Zoom extent
-3336	Zoom In
-3337	Zoom map and center view in the burg
-3338	Zoom max
-3339	Zoom min
-3340	Zoom out
-3341	Zoom Out
-3342	Zoom to end
-3343	Zoom to start
-3344	Zoom to the marker
-3345	Zoom to the measurer
-3346	zoomExtent.min must not exceed max
-3347	Сhase phase. Naval units pursue and rarely shell enemy fleet
+0939	Earth-scale continents
+0940	Easterling
+0941	Eastern
+0942	Economy
+0943	edge
+0944	Edit
+0945	Edit ${label} multipliers
+0946	Edit a database used for names generation
+0947	Edit biome baseline production
+0948	Edit biomes style in Style Editor
+0949	Edit burg
+0950	Edit Burg
+0951	Edit burg groups
+0952	Edit cultures style in Style Editor
+0953	Edit demand coverage
+0954	Edit emblem
+0955	Edit Emblem
+0956	Edit free text notes (legend) for ${subject}
+0957	Edit good
+0958	Edit group style in Style Editor
+0959	Edit Heightmap
+0960	Edit icon and anchor style for the burg group in Style Editor
+0961	Edit in Armoria
+0962	Edit individual selected icon
+0963	Edit journey
+0964	Edit Journey
+0965	Edit journeys style in Style Editor
+0966	Edit Label
+0967	Edit label group style in Style Editor
+0968	Edit label style for burg group in Style Editor
+0969	Edit Lake
+0970	Edit lake group style in Style Editor
+0971	Edit marker
+0972	Edit Marker
+0973	Edit Military units
+0974	Edit Military Units
+0975	Edit mode:
+0976	Edit path points
+0977	Edit provinces style in Style Editor
+0978	Edit regiment
+0979	Edit Regiment
+0980	Edit Relief Icons
+0981	Edit Relief Icons style in Style Editor
+0982	Edit religions style in Style Editor
+0983	Edit river
+0984	Edit River
+0985	Edit route
+0986	Edit Route
+0987	Edit route groups
+0988	Edit Route groups
+0989	Edit states style in Style Editor
+0990	Edit style
+0991	Edit style for all rivers in Style Editor
+0992	Edit style for the route group
+0993	Edit style in Style Editor
+0994	Edit style or remove group
+0995	Edit Templates
+0996	Edit the COA string by hand, or paste an Armoria edit link, API link or COA string
+0997	Edit the feature's own coastline settings
+0998	Edit the Heightmap
+0999	Edit the lake
+1000	Edit the note as HTML
+1001	Edit the relief rules: hills, mountains and other relief placed by elevation
+1002	Edit this burg label
+1003	Edit transport types
+1004	Edit transport types (add custom modes like Magic Carpet)
+1005	Edit visual style
+1006	Edit zones style in Style Editor
+1007	Element not found
+1008	Element with this id already exists. Please provide a unique name
+1009	Element with this name already exists. Provide a unique name
+1010	Elevate brush: drag to gradually increase height of cells in radius by Power value
+1011	Elevation
+1012	Elevation profile
+1013	Elevation profile: no data
+1014	eli
+1015	Embellishment
+1016	emblem
+1017	Emblem shape
+1018	Emblem shape associated with culture. Click to change
+1019	Emblems
+1020	Embowed
+1021	Enable or disable coastline fractalization. When disabled, coastlines are simple arcs between feature vertices. Enabling adds naturalistic roughness but can increase rendering time
+1022	End battle: apply current results and close the screen
+1023	End of the last segment
+1024	endBurgId
+1025	endpoints must be in water, on a coast touching water, or on a navigable river
+1026	endpoints must be on land (coastal is fine)
+1027	Enemies are states at war with each other
+1028	Engagement progression:
+1029	English
+1030	Enter a model and API key.
+1031	Enter a model name.
+1032	Enter a valid treasury amount
+1033	Enter API key
+1034	Enter API key. Note: the Generator doesn't store the key or any generated data
+1035	Enter average number of people in crew (for total personnel calculation)
+1036	Enter conscription percentage for rural population
+1037	Enter conscription percentage for urban population
+1038	Enter custom form name
+1039	Enter military power (used for battle simulation)
+1040	Enter seed for template to generate the same heightmap each time
+1041	Enter style preset name
+1042	Equirectangular projection is used
+1043	Equirectangular projection is used: distortion is maximum on poles. Use map with aspect ratio 2:1 for best result
+1044	Erase
+1045	Erebor
+1046	Erode terrain
+1047	Eroded terrain is not supported on this device
+1048	Erupting
+1049	European
+1050	Evaporation from lake surface. If evaporation > supply, the lake water is saline. If difference is high, the lake becomes dry
+1051	Evening
+1052	Every Nth Cell
+1053	Examples. Click to re-generate
+1054	Exclude neutral
+1055	Exclude zero element from the results (id 0, e.g. the neutral state)
+1056	Execute the template
+1057	existing
+1058	Exit Customization
+1059	Expansion
+1060	Expansionism
+1061	Expansionism (defines competitive size). Change to re-calculate states based on new value
+1062	Export
+1063	Export as JPEG
+1064	Export as PNG
+1065	Export as PNG Tiles
+1066	Export as SVG
+1067	Export Biomes as CSV
+1068	Export Burgs as CSV
+1069	Export Cells as GeoJSON
+1070	Export Full JSON
+1071	Export Goods as CSV
+1072	Export Grid Cells JSON
+1073	Export in JSON format can be used as an API replacement.
+1074	Export map data
+1075	Export Markers as CSV
+1076	Export Markers as GeoJSON
+1077	Export Markets as CSV
+1078	Export Military as CSV
+1079	Export Minimal JSON
+1080	Export Notes as CSV
+1081	Export Options
+1082	Export Pack Cells JSON
+1083	Export Regiments as CSV
+1084	Export Relations as CSV
+1085	Export Rivers as GeoJSON
+1086	Export Routes as GeoJSON
+1087	Export the in-range markers as a text file (.csv)
+1088	Export to GeoJSON
+1089	Export To JSON
+1090	Export Zones as CSV
+1091	Export Zones as GeoJSON
+1092	Extreme climate warning
+1093	False
+1094	Family
+1095	Fantasy
+1096	Fantasy Map Generator map
+1097	Fantasy Map Generator update
+1098	Fantasy world Meridian length relative to real-world Earth (20k km)
+1099	Fantasy1
+1100	Fantasy2
+1101	Fantasy3
+1102	Fantasy4
+1103	Fantasy5
+1104	Favors higher elevated cells
+1105	Favors more habitable cells
+1106	Feature
+1107	Feature area
+1108	Feature name
+1109	Feature type, defined by the heightmap
+1110	Feature type. Generators read it, changing it does not regenerate them
+1111	Features
+1112	Features are added and removed in the Heightmap Editor
+1113	Features displayed
+1114	Field
+1115	Field Battle: a standard type of combat
+1116	Figure ${figureNo}
+1117	file and load it in the app.
+1118	Fill brush is not available with 'only water cells' filter
+1119	Fill: click enclosed water or same-height land area to create a cone blob
+1120	Filter
+1121	Filter by journey name, type or endpoint
+1122	Filter by name or group
+1123	Filter by name, province, state, culture, or group
+1124	Filter by name, type or basin
+1125	Filter by name, type or subtype
+1126	Filter by type
+1127	Filter deals by scope
+1128	Filter elements and groups by name
+1129	Filter goods by tags
+1130	Filter visible goods by tags
+1131	Filter…
+1132	Finalize the heightmap and exit the edit mode
+1133	Find a built-in icon or emoji by name
+1134	Find or share custom namesbase on Cartography Assets portal
+1135	Find or share custom style preset on Cartography Assets portal
+1136	Find or share custom template on Cartography Assets portal
+1137	Fine detail
+1138	Fine ripples along the banks, fading into open water and scaled down for small lakes
+1139	Finish editing path points
+1140	First match wins. Land no rule claims takes its biome's relief pool
+1141	Fit
+1142	Fit the frame to the picture's visible content
+1143	Fit the viewport to the browser window
+1144	Flag
+1145	Flee phase. Units strength reduced
+1146	Fleet
+1147	flex
+1148	Flux
+1149	Focus on selected object
+1150	Folded paper big
+1151	Folded paper small
+1152	follows the map settings
+1153	Font
+1154	Font and size
+1155	font family
+1156	font file URL
+1157	Font URL
+1158	Fontdesk
+1159	for guidance.
+1160	For manufactured goods: recipes define which other goods are required to produce this good
+1161	For raw resources: controls where and how this good is produced directly from the environment (e.g. biome, elevation, temperature)
+1162	For raw resources: sets the baseline production per biome
+1163	forces
+1164	fork
+1165	Form
+1166	Form name:
+1167	format, that can be loaded back via the
+1168	Fractious
+1169	Free icons:
+1170	French
+1171	Freshwater Lake
+1172	from
+1173	From
+1174	Frozen Lake
+1175	ft
+1176	Full name:
+1177	Function Reference
+1178	g.selectAll
+1179	General
+1180	Generate
+1181	Generate a new era
+1182	Generate a new map based on options
+1183	Generate a new map name
+1184	generate a new random map or cancel the loading.
+1185	Generate a random journey
+1186	Generate culture-specific name
+1187	Generate culture-specific name for place and battle
+1188	Generate culture-specific name for the burg
+1189	Generate culture-specific name for the lake
+1190	Generate culture-specific name for the province
+1191	Generate culture-specific name for the river
+1192	Generate new map
+1193	Generate New Map
+1194	Generate random map
+1195	Generate random name
+1196	Generate random name for place and battle
+1197	Generate random name for the burg
+1198	Generate random name for the lake
+1199	Generate random name for the river
+1200	Generate route name
+1201	Generated by ${FMG}. The tool is free, but images may be copyrighted, see ${license}
+1202	Generated examples:
+1203	Generated text will appear here
+1204	Generation error
+1205	Generation Options
+1206	Generator uses pop-up window to download files. Please ensure your browser does not block popups.
+1207	Generic
+1208	Geographical features
+1209	Geographical Features Overview
+1210	Geometric precision
+1211	Get Desktop App
+1212	Give the icon a new picture: every use follows
+1213	Glacier
+1214	global
+1215	Global
+1216	globe
+1217	Globe
+1218	Go Back
+1219	Gondor
+1220	Gonfalon
+1221	Good
+1222	Good answer
+1223	Good icon
+1224	Good is added
+1225	Good is updated
+1226	Good name
+1227	Good price
+1228	Good stock
+1229	Good stock in this market. Click to sort
+1230	Good types
+1231	Goods
+1232	Goods Editor
+1233	Google font
+1234	Google Fonts
+1235	Governorate
+1236	grab
+1237	Grass
+1238	Gray paper
+1239	Grayscale
+1240	Grid
+1241	grid cells
+1242	Gross Product is local sale revenue minus purchased ingredient costs during the production.
+1243	Gross product per population point, daily average
+1244	Gross Product: local sale revenue minus purchased ingredient costs during the production.
+1245	Group
+1246	Group by culture
+1247	Group by province
+1248	Group by province and state
+1249	Group by state
+1250	group name
+1251	Group name must start with a letter or underscore and not contain special characters
+1252	Group name should be unique
+1253	Group name should start with a letter
+1254	Group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes
+1255	Group to assign the selected labels to
+1256	grouped by
+1257	Groups referenced by labels but not defined here. Such labels are not rendered until they are reassigned to an existing group
+1258	Growth rate
+1259	guest
+1260	Guest
+1261	Guidon
+1262	gules
+1263	Gully strength:
+1264	H
+1265	h ≥
+1266	H:
+1267	h/day
+1268	Habitability
+1269	has an invalid relation to
+1270	Heater
+1271	Height
+1272	Height range, 20 (sea level) to 100
+1273	Height range: ${getHeight(rule.height.min)} to ${getHeight(rule.height.max)}
+1274	Height scale:
+1275	Height unit:
+1276	Heightmap
+1277	Heightmap customization tools:
+1278	Heightmap edit mode
+1279	Heightmap Editor
+1280	Heightmap is already cleared, please do not click twice if not required
+1281	heightmap preview
+1282	Heightmap preview. Click to download a screen-sized image
+1283	Heightmap templates
+1284	Heptagon
+1285	Here you can set temperatures at the equator and poles, control wind direction and precipitation, and position the map on the globe. Changes affect biome and climate generation.
+1286	Hessen
+1287	Hex
+1288	Hex grid (flat)
+1289	Hex grid (pointy)
+1290	Hexagon
+1291	Hexy
+1292	hidden
+1293	Hidden
+1294	hide
+1295	Hide
+1296	Hide on map
+1297	Hide rescaler
+1298	Hide rescaler slider
+1299	Hide style edit section
+1300	Hide the battle name section
+1301	Hide the edit label text section
+1302	Hide the font size section
+1303	Hide the group selection
+1304	Hide the label offset section
+1305	Hide the label. You can toggle it on later in Labels Overview
+1306	Hide the letter spacing section
+1307	Hide the regeneration menu
+1308	High Fantasy
+1309	High Island
+1310	Highest mean precipitation of the year
+1311	Highest mean temperature of the year
+1312	highest score among ${candidates.length} feasible options:
+1313	Highland
+1314	Highlight color
+1315	Hill
+1316	Hill: small blob
+1317	Historical
+1318	History
+1319	Horizontal rule
+1320	Horizontal shift in icon-size units (positive moves right)
+1321	Horsehead
+1322	Horsehead Edgy
+1323	Hours a day of waiting covers: 24 means a full day passes
+1324	Hours of travel a day sustains with this transport
+1325	Hours of travel a day sustains: a caravan walks ~8 h/day, a ship sails 24
+1326	Hover Tooltips
+1327	How closely embellishments are spaced, relative to the default
+1328	How closely ripple rows are spaced
+1329	How closely the strokes are packed, relative to the default. Steep ground packs them tighter
+1330	How far the coast bends in and out. 0 keeps the smooth arcs, high values carve deep bays and headlands
+1331	How fine the shore detail is. Higher adds ever smaller bays and points but makes the map slower to draw
+1332	How long a calm or rough stretch of coast is. Small mixes them along a single isle, large gives a continent a few long coasts of each kind
+1333	How much calmer lake shores are than the sea. 1 is the same, higher gives glassy lakes, 0 makes every lake shore rough
+1334	How much of each demand category this good satisfies. Click the pencil icon to edit.
+1335	How much of the coast stays calm. 0 makes every shore rough, high values leave only a few rough stretches
+1336	How packed the relief is. 0 places none
+1337	How sharply calm shores turn into rough ones. Low blends them, high gives clear-cut calm and rough coasts
+1338	http://www.example.com/image.jpg
+1339	https://e-cloud.com/test.map
+1340	Huge
+1341	Hunting
+1342	I
+1343	ia
+1344	Ice
+1345	Iceberg
+1346	icon
+1347	Icon
+1348	Icon colors:
+1349	Icon fill and stroke colors: they paint the parts the icon leaves uncolored. Emoji keep their own colors
+1350	Icon Lines
+1351	Icon shift:
+1352	Icon size
+1353	Icon size at the lowest height, growing with height up to the second value
+1354	Icon size at the lowest height, growing with height. Each pool entry scales it
+1355	Icon size at the rule's lowest height, growing with height up to the second value. Each entry's size scales it
+1356	icon-anchor
+1357	icon-bezier-curve
+1358	icon-dot-circled
+1359	icon-eye
+1360	icon-eye-off
+1361	icon-lock
+1362	icon-lock-open
+1363	icon-lock-open inactive
+1364	icon-map-signs
+1365	icon-resize-horizontal
+1366	icon-right-big
+1367	icon-store
+1368	icon-tree
+1369	icon-users
+1370	Icon*
+1371	Icons
+1372	Id
+1373	If error is critical, clear the stored data and try again.
+1374	If height is greater or equal to X and less or equal to Y, then perform an operation Z with operand V
+1375	Ignore
+1376	Ignore zoom bounds and show all labels regardless of the current zoom level
+1377	Image
+1378	Image Converter
+1379	Image Converter is opened. Upload image and assign height value for each color
+1380	Image scale relative to image size (e.g. 5x)
+1381	Image size in pixels
+1382	Import custom icons
+1383	Import custom icons from a downloaded zip archive. An icon whose id the map uses for another picture is replaced only on confirmation
+1384	Import Heightmap
+1385	Import zip
+1386	in
+1387	In case of errors reload the page to update the code.
+1388	in menu. There is no way to restore the progress if file is lost. Please keep old save files on your machine or cloud storage as backups.
+1389	In range:
+1390	in the fragment, where a text/html document would hoist it into
+1391	inactive
+1392	Income
+1393	Increase indent
+1394	Increases the polygon count to smooth the sharp points. Please note that it can take some time to calculate
+1395	Indented 3
+1396	Independent burgs
+1397	Individual Style Settings
+1398	Initial Demand:
+1399	Initial forces
+1400	inline
+1401	inline-block
+1402	inn
+1403	Input
+1404	Input /
+1405	Insert
+1406	Insert a symbol
+1407	Insert a table or edit the one under the cursor
+1408	Insert an image from a file
+1409	Insert or edit a link (Ctrl+K)
+1410	Insert table
+1411	installed on your computer
+1412	Insufficient land area. There should be at least 200 land cells!
+1413	Interface preferences saved in this browser. Changes apply immediately
+1414	Interface settings:
+1415	Interface size
+1416	Invalid
+1417	Invalid burg. The selected burg does not exist or was removed.
+1418	Invalid file
+1419	Invalid file format
+1420	Invalid group name
+1421	Invalid market. The selected market does not exist
+1422	Invalid market. The selected market has no center burg
+1423	Invalid relation
+1424	Invert columns visibility
+1425	Invert heightmap along the axes
+1426	Iran small
+1427	Iron Hills
+1428	is
+1429	is a rival of
+1430	is a vassal of
+1431	is an ally of
+1432	is at war with
+1433	is friendly to
+1434	is goods-
+1435	is neutral to
+1436	is suspicious of
+1437	is suzerain to
+1438	Island
+1439	Islands
+1440	isolated
+1441	Isthmus
+1442	It
+1443	It will turn all separable provinces into independent states.
+1444	italic
+1445	Italic
+1446	Iterate battle
+1447	Its map is not open
+1448	its path has to stay on land
+1449	its path has to stay on water or a navigable river
+1450	Join our
+1451	Join routes
+1452	Journey
+1453	Journey color. Click to change
+1454	Journey name
+1455	Journey name: ${escapeHtml(journey.name)}
+1456	Journey not found
+1457	Journeys
+1458	Journeys number
+1459	Journeys Overview
+1460	JPG
+1461	JSON string is not valid, please check the format
+1462	Jump to page
+1463	Keep each removed state as a province of ${ruler}, replacing its own provinces
+1464	Keep the map's
+1465	Keep the proposed label placement
+1466	keeps a leading
+1467	Key
+1468	Kind of travel this is
+1469	Kind of travel this is: a quest, a caravan, a campaign
+1470	Kite
+1471	Kiwiroo
+1472	km
+1473	l
+1474	L
+1475	L:
+1476	label
+1477	Label
+1478	Label Group Configurator
+1479	Label group, select to reassign the label
+1480	Label text
+1481	Label type
+1482	Label type, cannot be changed after creation
+1483	Label type, fixed after creation
+1484	Labels
+1485	Labels Overview
+1486	lake
+1487	Lake
+1488	Lake area in selected units
+1489	Lake average depth in selected units
+1490	Lake elevation in selected units
+1491	Lake maximum depth in selected units
+1492	Lake outlet river
+1493	Lake shore length in selected units
+1494	Lake subtype. Generators read it: burgs cannot port on dry, frozen or lava lakes
+1495	Lake water supply. If supply > evaporation and there is an outlet, the lake water is fresh. If supply is very low, the lake becomes dry
+1496	lake_island
+1497	lakes
+1498	Lakes
+1499	land
+1500	Land
+1501	Land area
+1502	Land cells:
+1503	Land filter is active, water areas cannot be filled
+1504	land only
+1505	Land slowdown
+1506	Landgrave
+1507	landing
+1508	Landing phase. Amphibious attack. Units are vulnerable against prepared defense
+1509	Landing: amphibious attack
+1510	Language
+1511	Large
+1512	lastSaved
+1513	Latest changes:
+1514	Launch UI Tour
+1515	Lava Lake
+1516	Layer dependency
+1517	Layer Presets
+1518	Layer that must be toggled on for this group to be shown
+1519	Layers
+1520	Layers preset:
+1521	Layers reduction rate. Increase to improve performance
+1522	Layers Tab
+1523	Legend
+1524	Length
+1525	Length of Meridian in pixels
+1526	Length of Meridian is friendly units (depends on user configuration)
+1527	Length of Meridian. Almost half of the equator length
+1528	Limit group
+1529	Limit group by features
+1530	Limit rule
+1531	Limit unit
+1532	Line ${id}:
+1533	Line simplification rate. Increase to slightly improve performance
+1534	Line style
+1535	Line: select two points to change heights along the line
+1536	Linear
+1537	Linecap
+1538	Linejoin
+1539	Lines only
+1540	Link is copied to the clipboard
+1541	Link or upload the new picture of the selected icon.
+1542	Linux
+1543	List below shows relations to ${selectedName}
+1544	Load
+1545	Load custom texture
+1546	Load fully-functional map (.map or .gz formats)
+1547	Load Google Translate
+1548	Load Google Translate and select a language. Automatic translation can break some page functions. If this happens, reset the language to English or refresh the page
+1549	Load image to convert
+1550	Load map
+1551	Load Map
+1552	Load map file (.map or .gz) file from URL. Note that the server should allow CORS
+1553	Load map file (.map or .gz) from your Dropbox
+1554	Load map file (.map or .gz) from your local disk
+1555	Load map from
+1556	Load map from browser storage (if saved before)
+1557	Load Map from File
+1558	Load map from URL
+1559	Load Map from URL
+1560	Load saved map
+1561	Loaded data is not a valid JSON, please check the format
+1562	LOADING
+1563	Loading error
+1564	Loading…
+1565	local
+1566	Local
+1567	LOCAL
+1568	Local bonus resource
+1569	Local font
+1570	Local market purchase
+1571	Local production
+1572	Locate
+1573	Locate on map
+1574	Locate the culture
+1575	Locate the feature
+1576	Locate the journey
+1577	Locate the label
+1578	Locate the marker
+1579	Locate the province
+1580	Locate the religion
+1581	Locate the river
+1582	Locate the route
+1583	Locate the state
+1584	Location
+1585	Lock
+1586	Lock culture
+1587	Lock marker
+1588	Lock or unlock all burgs
+1589	Lock or unlock all journeys
+1590	Lock or unlock all routes
+1591	Lock the province
+1592	Lock the state to protect it from re-generation
+1593	Lock this religion
+1594	Locked. Click to unlock the element and allow it to be changed by regeneration tools
+1595	locks pointer icon-lock
+1596	locks pointer icon-lock-open inactive
+1597	Looting phase. Plunder the town. Units strength increased
+1598	Lossless raster image with a transparent background
+1599	Low Island
+1600	Lower brush: drag to decrease height of cells in radius by Power value
+1601	Lowest mean precipitation of the year
+1602	Lowest mean temperature of the year
+1603	m
+1604	M
+1605	Mac with Apple silicon
+1606	Mac with Intel
+1607	main
+1608	Mandate
+1609	Maneuvering phase. Units strength reduced
+1610	Manually assign goods to cells
+1611	Manually re-assign biomes to not follow the default moisture/temperature pattern
+1612	Manually re-assign cultures
+1613	Manually re-assign market territories
+1614	Manually re-assign provinces
+1615	Manually re-assign religions
+1616	Manually re-assign states
+1617	Manufactured goods are produced in burgs
+1618	Manufacturing from ${allInputs}
+1619	Manufacturing step
+1620	Map cannot be saved in EDIT mode, please complete the edit and retry
+1621	Map coordinates on globe
+1622	Map is saved to the browser storage
+1623	Map is saved to your Dropbox
+1624	Map is successfully loaded
+1625	Map minimap
+1626	Map name:
+1627	Map presentation in 3D scene. Works best for heightmap. Cannot be used for editing
+1628	Map read failed
+1629	Map seed
+1630	Map seed number. Press 'Enter' to apply. A seed reproduces the same map only if the map size and the settings are the same
+1631	Map size
+1632	Map size:
+1633	Map URL is copied to clipboard
+1634	Map version: ${mapVersion}. Generator version: ${VERSION}.
+1635	Map will be split into tiles and downloaded as a single zip file. Avoid saving too large images
+1636	Maps are saved in
+1637	Mar<u>k</u>ers
+1638	Marble big
+1639	Marble Blue
+1640	Marble Blue big
+1641	Marble small
+1642	Margrave
+1643	Marker
+1644	Marker element size in pixels
+1645	Marker icon
+1646	Marker icon shift (by X and by Y axis), percent. Set to 50 to position icon in center
+1647	Marker icon size in map units. Wagons render at half this size. Higher = bigger icons
+1648	Marker icon sizes in pixels
+1649	Marker marker element and icon sizes in pixels
+1650	Marker name, shown in the notes editor and overviews
+1651	Marker number multiplier
+1652	Marker pin shape
+1653	Marker size
+1654	Marker type
+1655	Marker type name
+1656	Marker type. Style changes will apply to all markers of the same type. Leave blank if the marker is unique
+1657	Markers
+1658	Markers generation settings
+1659	Markers in Radius
+1660	Markers number
+1661	Markers Overview
+1662	Market
+1663	Market center burg name. Click to sort
+1664	Market name. Click to view details
+1665	Market value: net trading flow plus unsold inventory value minus tax
+1666	Market value: net trading flow plus unsold inventory value minus tax. Click to sort
+1667	Markets
+1668	Markets Overview
+1669	Mars big
+1670	Mars small
+1671	Mask: lower cells near edges or in map center
+1672	Mauritania small
+1673	max
+1674	Max depth:
+1675	Max Height
+1676	Max Temperature
+1677	Maximal length should be greater than minimal
+1678	Maximum depression filling iterations:
+1679	Maximum mean elevation
+1680	Maximum number of biomes reached (255), data cleansing is required
+1681	Maximum number of iterations to fill depressions. Increase if rivers end without reaching a lake or the sea
+1682	Maximum possible zoom level (should be > 1)
+1683	Maximum zoom level to show the group
+1684	Maximum zoom to show the group, leave empty for no limit
+1685	Mean height:
+1686	means names like "Kalla", "Mikkor", "Dalddur" are possible. This parameter can be empty.
+1687	Measurers
+1688	Measurers Editor
+1689	Mediterranean
+1690	melee
+1691	Melee phase. Melee units excel
+1692	member
+1693	Member
+1694	Mercury big
+1695	Mercury small
+1696	Merge
+1697	Merge provinces
+1698	Merge Provinces
+1699	Merge several provinces into one
+1700	Merge several states into one
+1701	Merge states
+1702	Meridian length:
+1703	mesh
+1704	Mesh detail:
+1705	metals
+1706	MFG
+1707	mi
+1708	Middle Earth
+1709	Military
+1710	Military Overview
+1711	Military personnel rate (% of state population). Depends on war alert
+1712	Military personnel rate (% of state population). Depends on war alert. Click to sort
+1713	Milliseconds per map unit travelled. Lower = faster animations
+1714	min
+1715	Min Habitability
+1716	Min Height
+1717	Min Temperature
+1718	Minimal length cannot be greater than maximal
+1719	Minimap
+1720	Minimum mean elevation
+1721	Minimum possible zoom level (should be > 0)
+1722	Minimum zoom level to show the group
+1723	Minimum zoom to show the group, leave empty for no limit
+1724	Mirror
+1725	Mirror heightmap along axis
+1726	Missing groups:
+1727	Miter
+1728	Mode
+1729	mode also allows you Convert an Image into a heightmap or use Template Editor.
+1730	mode to change the coastline and keep the data. The data will be restored as much as possible, but it can cause unpredictable errors.
+1731	Model
+1732	Model name
+1733	Money flow for deal rows: negative for BUY, positive for SELL. Pure production rows are blank.
+1734	Monotone X
+1735	Moria Orc
+1736	Mountain
+1737	Mouth width:
+1738	Move down
+1739	Move selected relief icon back
+1740	Move selected relief icon to front
+1741	Move the segment up
+1742	Move up
+1743	Move your mouse over the map (when the tour is over), the tooltip bar at the bottom updates with information about cells, burgs, states, and more. Click Next when you're ready to continue.
+1744	moveToTop
+1745	Multiplier
+1746	Multiplier applied to travel duration on land segments. Higher = slower land animations
+1747	Multipliers
+1748	Multiply all cells Height by the value
+1749	Multiply all heights in range by factor
+1750	Municipality
+1751	Must start in a cell with a route in it
+1752	N
+1753	n/a
+1754	name
+1755	Name
+1756	Name bases
+1757	Name cannot be empty
+1758	Name display mode is only applicable to States and Provinces
+1759	Name display mode: auto picks the best fit, short/full force a specific name form
+1760	Name display mode. Only applicable to States and Provinces
+1761	Name of the era the current year belongs to, and its abbreviation
+1762	Name of the map. Used to name the files it is downloaded as
+1763	Name*
+1764	Namebase is not found
+1765	Names data should not be empty
+1766	Names data:
+1767	Names data: a comma separated list of source names used for names generation
+1768	Names used more than one time
+1769	Namesbase
+1770	Namesbase Editor
+1771	Namesbase is not defined, please select a valid namesbase
+1772	Natural
+1773	Naval
+1774	Naval Battle: naval units combat
+1775	Navigate the Map
+1776	near
+1777	Near Coast Land
+1778	Negate — match cells where this condition is FALSE
+1779	Net burg treasury after local buying, local sales, and final local demand fill.
+1780	Net flow for this market
+1781	Net Flow:
+1782	Neutral culture name. Click and type to change
+1783	Neutral lands area
+1784	Neutral lands name. Click to change
+1785	Neutral means states relations are neither positive nor negative
+1786	Neutrals collect no taxes
+1787	new
+1788	New chat
+1789	New Map
+1790	New map cannot be generated when edit mode is active, please exit the mode and retry
+1791	New Map!
+1792	New memory
+1793	New Name
+1794	New version released
+1795	Newer file
+1796	Next page
+1797	next to each province you want to merge. Use the
+1798	next to each state you want to merge. Use the
+1799	Night
+1800	no
+1801	No
+1802	No biomes to show
+1803	No burgs produced ${good.name}.
+1804	No burgs to show
+1805	No changes found in the file. Please change some names to get a result
+1806	No chats yet.
+1807	No cultures to show
+1808	No cultures, states and burgs will be created.
+1809	No emblems to edit, please generate states and burgs first
+1810	No enclosed area found to fill
+1811	No goods data available.
+1812	No historical records
+1813	No longer on this map
+1814	No map stored. Save map to browser storage first
+1815	No market
+1816	No market. This burg is not connected to any market.
+1817	No note matched an element on this map. Nothing was loaded
+1818	No notes yet. Click a burg, marker, state or other element on the map and add a note from its editor
+1819	No outline
+1820	No pattern
+1821	No production chains found: add manufactured goods with recipes first.
+1822	No production data for this burg.
+1823	No religions to show
+1824	No result to apply
+1825	No routes to join with. Route must start or end at current route's start or end cell
+1826	No rules: all land takes its biome's relief pool
+1827	No states to show
+1828	No stock of ${good.name} found in any market or burg inventory.
+1829	No tags available
+1830	No texture
+1831	No unassigned colors. Please load an image and click the button again
+1832	No unlocked journeys to remove
+1833	No valid burg in this cell. Click on a cell with a burg
+1834	No zones to show
+1835	Noldor
+1836	Nomadic
+1837	Non-basic chars: ${nonBasicLatinChars}
+1838	none
+1839	None
+1840	Noon
+1841	normal
+1842	Normal
+1843	Normalized Bar
+1844	Northern
+1845	Not a layer
+1846	Not allowed when 'only land cells' filter is set
+1847	Not allowed when 'only water cells' filter is set
+1848	Not enough forces to split
+1849	Not now
+1850	Note element is not found
+1851	Note element is not found. Would you like to remove the note?
+1852	Note formatting
+1853	Notes
+1854	Notes Editor
+1855	Notes without an element
+1856	number
+1857	Number
+1858	Number of bands around the coast
+1859	Number of burgs
+1860	Number of burgs in group
+1861	Number of burgs in market territory
+1862	Number of burgs with no market
+1863	Number of cells in market territory
+1864	Number of cells with no market
+1865	Number of coastal cells
+1866	Number of columns
+1867	Number of goods (displayed / total)
+1868	Number of labels currently assigned to this group
+1869	Number of labels currently assigned to this group. Click the list icon to see them
+1870	Number of lake inlet rivers
+1871	Number of land biomes
+1872	Number of land cells
+1873	Number of listed labels
+1874	Number of markers of that type on the current map
+1875	Number of names provided
+1876	Number of river cells
+1877	Number of rows
+1878	Number of selected labels
+1879	Number of zones
+1880	number): Generator
+1881	number): Record
+1882	Numbered list
+1883	Occupation zone
+1884	ocean
+1885	Ocean
+1886	Ocean / Sea
+1887	Ocean embellishment
+1888	Ocean layers
+1889	of the sages
+1890	off
+1891	Off
+1892	Ok
+1893	OK
+1894	ol
+1895	Old French
+1896	Old World
+1897	on
+1898	on GitHub.
+1899	On load
+1900	One page dungeon
+1901	Only ${count} out of ${options.generation.cultures.limit} requested cultures will be generated.
+1902	Only an emblem with a charge can show it without a shield
+1903	Only goods with at least one selected tag remain visible in the editor list
+1904	only land cells
+1905	Only paint cells whose current value is 0 (neutral)
+1906	only water cells
+1907	Opacity
+1908	Opacity of the contour lines
+1909	Opacity of the hachure strokes
+1910	Opacity of the lake ripples
+1911	open
+1912	Open 3D Scene
+1913	Open Azgaar Assistant
+1914	Open Battle Simulation Tutorial
+1915	Open Biomes Editor
+1916	Open Burg Groups Editor
+1917	Open burg map in a new tab
+1918	Open Burgs Overview
+1919	Open Cell Details
+1920	Open Coastline Editor
+1921	Open Cultures Editor
+1922	Open Data Charts
+1923	Open Diplomacy Overview
+1924	Open Emblems Editor
+1925	Open Geographical Features Overview
+1926	Open Globe View
+1927	Open Goods Editor
+1928	Open Image Converter
+1929	Open Journeys Overview
+1930	Open Label Groups Editor
+1931	Open Labels Overview
+1932	Open last saved map
+1933	Open Layers Tab
+1934	Open Map Lore
+1935	Open Markers Overview
+1936	Open Markets Overview
+1937	Open Measurers Editor
+1938	Open Military Forces Tutorial
+1939	Open Military Overview
+1940	Open Minimap
+1941	Open Namesbase Editor
+1942	Open Notes Editor
+1943	Open Options Tab
+1944	Open previously downloaded style file
+1945	Open previously downloaded template
+1946	Open Production Chains
+1947	Open Provinces Editor
+1948	Open Regiments Overview
+1949	Open Relief Rules Editor
+1950	Open Religions Editor
+1951	Open Rivers Overview
+1952	Open route creation dialog
+1953	Open Route Groups Editor
+1954	Open Routes Overview
+1955	Open States Editor
+1956	Open Style Tab
+1957	Open template editor
+1958	Open Template Editor
+1959	Open Template Editor Tutorial
+1960	Open the Distribution visual editor
+1961	Open the emblem in Armoria, the heraldry editor: your changes show on the map as you make them
+1962	Open the Heightmap editor to manually sculpt terrain by raising or lowering elevation. Changes here reshape coastlines, rivers, and biomes.
+1963	Open the Label Groups Configurator to create, edit and reorder groups
+1964	Open the Options Menu
+1965	Open the performance settings
+1966	Open the World Configurator to set the map position on the globe and the world climate
+1967	Open Tools Tab
+1968	Open Trade Animation Editor
+1969	Open Transports Editor
+1970	Open Units Editor
+1971	Open wiki article scale and distance to know about grid scale
+1972	Open Wikipedia article about the biome
+1973	Open World Configurator
+1974	Open Wrap Tool
+1975	Open Zones Editor
+1976	Opening the tool will erase the current map. Are you sure you want to proceed?
+1977	Operand should be a number
+1978	Operand should be an integer
+1979	Optimize speed
+1980	Options
+1981	Options Tab
+1982	or
+1983	Or load from your Dropbox account
+1984	Order
+1985	Oriental
+1986	Other systems
+1987	out
+1988	Output
+1989	Oval
+1990	Over colors
+1991	Overlay opacity:
+1992	Overwrite custom path?
+1993	Owner
+1994	Owning state
+1995	P
+1996	p-port
+1997	pack cells
+1998	Paint Biomes
+1999	Paint Brushes
+2000	Paint Cultures
+2001	Paint Market Cells
+2002	Paint Provinces
+2003	Paint Religions
+2004	Paint States
+2005	Paint Zones
+2006	Palm
+2007	panel.querySelector
+2008	Pangea
+2009	Paragraph formatting
+2010	Parish
+2011	Parsing error
+2012	Paste a link to an image
+2013	Paste any valid style data in JSON format
+2014	path
+2015	path.reduce
+2016	Patreon
+2017	Pattern 1
+2018	Pattern 2
+2019	Pattern 3
+2020	Pattern 4
+2021	Pattern 5
+2022	Pattern 6
+2023	Pause between land and water legs of a trip, in milliseconds. Higher = longer pause
+2024	paused
+2025	Pavise
+2026	Peninsula
+2027	Pennant
+2028	Pennon
+2029	Pentagon
+2030	Per-dimension production multipliers. 1 = no effect, 0 = fully suppressed.
+2031	percentage
+2032	Percentage of names containing space character
+2033	Performance
+2034	Performance Settings
+2035	Pergamena small
+2036	Pick different endpoints first, then change the transport type or use an
+2037	Pin
+2038	Pin colors:
+2039	Pin fill and stroke colors
+2040	Pin marker
+2041	Pin marker (display only pinned markers)
+2042	Pin shape:
+2043	Pirate ships have been spotted in these waters.
+2044	Pit: round depression
+2045	Place icons in a bulk
+2046	Placement
+2047	Placement range percentage along X axis (minX-maxX)
+2048	Placement range percentage along Y axis (minY-maxY)
+2049	Plaster
+2050	Plate size
+2051	plaza,
+2052	Please
+2053	Please assign colors to heights first
+2054	Please click on a regiment
+2055	Please click on a regiment to attack
+2056	Please enter a prompt
+2057	Please enter an API key
+2058	Please exit the customization mode first
+2059	Please exit the Image Conversion mode first
+2060	Please fill in the biome name
+2061	Please note server should allow CORS for file to be loaded. If CORS is not allowed, save file to Dropbox and provide a direct link
+2062	Please provide a font name
+2063	Please provide a preset name
+2064	Please provide a style JSON
+2065	Please provide a valid group name
+2066	Please provide a valid number in range 0-9999
+2067	Please provide a valid URL
+2068	Please select a model
+2069	Please select a province to merge into
+2070	Please select a regiment first
+2071	Please select a relief icon on the map
+2072	Please select a state to merge into
+2073	Please select an icon
+2074	Please select several provinces to merge
+2075	Please select several states to merge
+2076	Please select state from the list
+2077	Please upload a map file (<i>.map</i> or <i>.gz</i> formats) you have previously downloaded
+2078	Plot
+2079	PNG
+2080	PNG / JPEG scale:
+2081	pointer
+2082	Points number
+2083	Policy
+2084	Polish
+2085	Poll Tax:
+2086	pool
+2087	Populate with letters that can be used twice in a row (geminates)
+2088	Populatio<u>n</u>
+2089	Population
+2090	port,
+2091	Position
+2092	Position icon
+2093	Position x
+2094	Position y
+2095	Potential religion extent
+2096	Power
+2097	Power should not be zero
+2098	Precipit<u>a</u>tion
+2099	Precreated heightmaps
+2100	Prefecture
+2101	Preset
+2102	Preset name
+2103	Preset name:
+2104	Preview
+2105	Preview generator
+2106	Preview the heightmap in a 3D scene
+2107	Previous page
+2108	previous versions
+2109	Price
+2110	Price for this good. Click to sort
+2111	Primary
+2112	primary province
+2113	Probability of inversion, range 0-1
+2114	Probability to receive the good
+2115	Proceed
+2116	Produced
+2117	Product
+2118	Product per capita: gross product divided by population.
+2119	Production
+2120	Production Chains
+2121	Production multiplier by ${label.toLowerCase()}. 1 = no effect, 0 = fully suppressed.
+2122	Production value
+2123	Production volume
+2124	Project map on globe. Cannot be used for editing
+2125	Promise
+2126	Propose one batch of registered operations. It never changes the map: the user previews the batch and applies or discards it.
+2127	Propose this change
+2128	Provide a name for the new group
+2129	Provide a names data: a comma separated list of source names
+2130	Provide custom URL to the burg map. It can be a link to a generator or just an image. Leave empty to use the default map preview
+2131	Provider
+2132	province
+2133	Province
+2134	Province area
+2135	Province capital. Click to select from burgs within the state. No capital means the province is governed from the state capital
+2136	Province capital. Click to zoom into view
+2137	Province center cannot be assigned to a different region. Please remove the province first
+2138	Province does not have any cells, cannot change population
+2139	Province form name
+2140	Province form name. Click to change
+2141	Province full name
+2142	Province name. Click to change
+2143	Province owner
+2144	Province short name
+2145	Provinces
+2146	Provinces chart
+2147	Provinces displayed
+2148	Provinces Editor
+2149	Provinces ratio
+2150	pursue
+2151	Pursue phase. Mounted units excel
+2152	Pursue phase. Try to intercept fleeing attackers. Mounted units excel
+2153	Pursue phase. Units strength increased
+2154	px
+2155	px =
+2156	Quality
+2157	Quick Load Map
+2158	Quick preset lighting for different times of day
+2159	Quote
+2160	R
+2161	radio button
+2162	Radius around the marker, in the map's distance unit — markers inside it are listed and shown on the map
+2163	Radius x
+2164	Radius y
+2165	Radius:
+2166	Raise brush: increase height of cells in radius by Power value
+2167	random
+2168	Random
+2169	Random Chance
+2170	Random factor for attackers. Click to re-roll
+2171	Random factor for defenders. Click to re-roll
+2172	Randomize Iceberg shape
+2173	Randomize states Expansion value and re-calculate states and provinces
+2174	Range: elongated elevation
+2175	Rate
+2176	RAW
+2177	Raw goods are produced by rural population in cells based on biome availability and in cells and burgs when bonus resource is assigned to cells
+2178	Raw Production
+2179	Re-assign zones
+2180	Re-generate examples based on provided data
+2181	Re-place
+2182	Re-place relief
+2183	Re-place the relief the rules claim, to apply the edits
+2184	Re-place this good and recompute production, trade and taxes. Uncheck to update the good only, without disturbing the current economy.
+2185	Read the map
+2186	Rebuild market territories, production, trade deals, and taxes from the current goods and markets
+2187	Recalculate
+2188	Recalculate cultures based on current values of growth-related attributes
+2189	Recalculate military
+2190	Recalculate military forces based on current options
+2191	Recalculate religions based on current values of growth-related attributes
+2192	Recalculate states based on current values of growth-related attributes
+2193	Recipes
+2194	Recolor listed provinces based on state color
+2195	Recommended maximum name length
+2196	Recommended minimum name length
+2197	Record
+2198	Rectangular
+2199	Reddit community
+2200	Redo
+2201	Redo the action
+2202	Redo the action (Ctrl + Y)
+2203	Redo the stroke (Ctrl + Y)
+2204	Redraw on zoom
+2205	Redraw preview
+2206	Reduce layers
+2207	Refresh
+2208	Refresh the Deals screen
+2209	Refresh the Editor
+2210	Refresh the overview
+2211	Refresh the Overview
+2212	Refresh the overview screen
+2213	Refresh the Overview screen
+2214	Regenerate
+2215	Regenerate bonus goods
+2216	Regenerate bonus goods placement
+2217	Regenerate burg names based on assigned culture
+2218	Regenerate Burgs
+2219	Regenerate culture name
+2220	Regenerate Cultures
+2221	Regenerate diplomatical relations
+2222	Regenerate Economy
+2223	regenerate economy on apply
+2224	Regenerate element
+2225	Regenerate Emblems
+2226	Regenerate Goods
+2227	Regenerate Ice
+2228	Regenerate legend for this regiment
+2229	Regenerate Markers
+2230	Regenerate markets
+2231	Regenerate Markets
+2232	Regenerate markets and their territories
+2233	Regenerate Military
+2234	Regenerate Population
+2235	Regenerate preview
+2236	Regenerate production
+2237	Regenerate Production
+2238	Regenerate production and trade
+2239	Regenerate production and trade deals
+2240	Regenerate Provinces
+2241	Regenerate relations
+2242	Regenerate Relief
+2243	Regenerate Religions
+2244	Regenerate Rivers
+2245	Regenerate rivers and allow water flow to change heights and form new lakes. Recommended
+2246	Regenerate Routes
+2247	Regenerate State Labels
+2248	Regenerate States
+2249	Regenerate the emblem
+2250	Regenerate unlocked markers
+2251	Regenerate Zones
+2252	Regiment
+2253	Regiment base. Drag to re-base the regiment
+2254	Regiment cannot attack itself
+2255	Regiment has no troops to battle
+2256	Regiment icon
+2257	Regiment is already in the battle
+2258	Regiment type (land or naval). Click to change
+2259	Regiment's emblem
+2260	Regiment's name
+2261	regiments
+2262	Regiments
+2263	Regiments Overview
+2264	Region
+2265	Regional
+2266	regs.reduce
+2267	Regular distribution pattern
+2268	Relations
+2269	Relations are unknown if states do not have enough information about each other
+2270	Relations change
+2271	Relations history
+2272	Relations matrix
+2273	Relations severance
+2274	Relations to
+2275	Release
+2276	Release all provinces. It will make all provinces with burgs independent
+2277	Release provinces
+2278	releases page
+2279	Relie<u>f</u>
+2280	Relief
+2281	Relief icons
+2282	Relief Rules
+2283	Relief set the icons are drawn in: the style's, or one pinned for the icon
+2284	Religion
+2285	Religion area
+2286	Religion does not have any cells, cannot change population
+2287	Religion expansionism. Defines competitive size
+2288	Religion expansionism. Defines competitive size. Click to change, then click Recalculate to apply change
+2289	Religion form
+2290	Religion name. Click and type to change
+2291	Religion supreme deity
+2292	Religion type
+2293	Religions
+2294	Religions Editor
+2295	Religions number
+2296	Reload
+2297	Relocate burg. Click on map to move the burg
+2298	Relocate market. Click on a burg on the map to move the market center
+2299	remove
+2300	Remove
+2301	Remove all
+2302	Remove all journeys
+2303	Remove all markers
+2304	Remove all measurers
+2305	Remove all measurers from the map
+2306	Remove all provinces
+2307	Remove all provinces. States will remain as they are
+2308	Remove all rivers
+2309	Remove all routes
+2310	Remove all unlocked burgs except for capitals. To remove a capital remove its state first
+2311	Remove all unlocked journeys
+2312	Remove all unlocked markers
+2313	Remove all unlocked routes (locked routes are kept)
+2314	Remove burg
+2315	Remove color stop
+2316	Remove culture
+2317	Remove custom icon
+2318	Remove from the pool
+2319	Remove good
+2320	Remove group
+2321	Remove icons in a bulk
+2322	Remove image ${index + 1}
+2323	Remove ingredient
+2324	Remove journey
+2325	Remove label
+2326	Remove Label Group
+2327	Remove lake group
+2328	Remove marker
+2329	Remove market
+2330	Remove Market
+2331	Remove non-capital burg
+2332	Remove note
+2333	Remove province
+2334	Remove recipe
+2335	Remove regiment
+2336	Remove relief icons
+2337	Remove religion
+2338	Remove resource
+2339	Remove river
+2340	Remove river and tributaries
+2341	Remove route
+2342	Remove route group
+2343	Remove segment
+2344	Remove selected relief icon or icon type
+2345	Remove state
+2346	Remove style preset
+2347	Remove the cell
+2348	Remove the chart
+2349	Remove the custom biome
+2350	Remove the element
+2351	Remove the group
+2352	Remove the group? This won't affect labels unless the changes are applied.
+2353	Remove the icon from the map
+2354	Remove the journey
+2355	Remove the label
+2356	Remove the label path, render the label as a straight text
+2357	Remove the marker
+2358	Remove the measurer
+2359	Remove the point
+2360	Remove the province
+2361	Remove the rule
+2362	Remove the segment
+2363	Remove the state
+2364	Remove the step
+2365	Remove the transport type
+2366	Remove the unit
+2367	Remove this condition
+2368	Remove this custom preset
+2369	Remove this market
+2370	Remove this note
+2371	Remove transport type
+2372	Remove unit type
+2373	Remove unlocked routes
+2374	Remove zone
+2375	Renaissance
+2376	Rename
+2377	Rename burgs in bulk
+2378	Render cells below sea level (with a height less than 20)
+2379	Render heightmap data as a small monochrome image
+2380	Render ocean cells
+2381	Render ocean heights
+2382	Rendering group
+2383	Rendering group: the svg group the lake is drawn in. Create groups in the Lake Editor
+2384	Rendering group: the svg group the lake is drawn in. Does not affect generation
+2385	Rendering order: higher values are rendered on top
+2386	Rendering order: lower groups are rendered on top
+2387	Rendering preset: visual quality traded for speed. Pick 'Speed' if the map feels slow
+2388	Replace
+2389	Replace the relief rules with the default hills and mountains?
+2390	Replace the whole emblem with a picture: choose, link or upload an image, such as a ready coat of arms
+2391	Republic
+2392	required
+2393	Rerender all preview images
+2394	Rescale burg styles
+2395	Rescaler: change height if condition is fulfilled
+2396	Reservation
+2397	Reset
+2398	Reset custom override and follow the global map settings
+2399	Reset language to English
+2400	Reset map zoom
+2401	Reset Options
+2402	Reset preview zoom
+2403	Reset the dialog: restore its default position, columns and sorting
+2404	Reset the segment: recompute the path and restore the default color, speed and time
+2405	Reset to default
+2406	Reset to map settings
+2407	Reset to the Balance preset value
+2408	Reset to the default name (center burg name)
+2409	Reset to the map globals
+2410	Reset Zoom
+2411	Reshuffles where the calm and rough stretches fall
+2412	Restore
+2413	Restore default columns visibility
+2414	Restore default data
+2415	Restore default goods
+2416	Restore default list and regenerate goods
+2417	Restore default map size: the window size
+2418	Restore default military units and settings
+2419	Restore default namesbase
+2420	Restore default transport types
+2421	Restore default units settings
+2422	Restore label placement from before the spread
+2423	Restore relief rules
+2424	Restore the default hills and mountains
+2425	Restore the default label
+2426	Restore the default transport types, removing custom ones
+2427	Restore the default transport types? Custom ones will be removed. Segments referencing a removed type keep its name but will no longer resolve.
+2428	Restore the default zoom extent
+2429	Restore the defaults and re-define biomes based on current moisture and temperature
+2430	Restore the icon's default colors
+2431	Restore the MIR forest-green theme
+2432	Restore winds
+2433	Restrict brush to specific cell types
+2434	Retreat phase. Units strength reduced
+2435	Retry
+2436	Revert
+2437	Revert all vertex edits ever made on this map
+2438	Revert vertex edits
+2439	Rhombille grid
+2440	Ri<u>v</u>ers
+2441	Ripple length, fitted to the available water width
+2442	Ripple stroke width in map pixels
+2443	Ripples
+2444	Rivalization
+2445	Rivalry is a state of competing for dominance in the region
+2446	River
+2447	River basin (name of the main stem)
+2448	River discharge (flux power)
+2449	River drainage basin (watershed)
+2450	River length from source to mouth
+2451	River length in selected units
+2452	River mouth width
+2453	River mouth width in selected units
+2454	River name
+2455	River source additional width. Default value is 0
+2456	River type name
+2457	River valleys:
+2458	River width multiplier. Default value is 1
+2459	Rivers
+2460	Rivers number
+2461	Rivers Overview
+2462	Ro<u>u</u>tes
+2463	Roll dice to update random factor
+2464	Roman
+2465	Rotate
+2466	Round
+2467	Route
+2468	Route group
+2469	Route length
+2470	Route length in selected units
+2471	Route links
+2472	Route name
+2473	Route to join with:
+2474	Routes
+2475	Routes joined
+2476	Routes number
+2477	Routes Overview
+2478	row.querySelector
+2479	Ruggedness
+2480	rule
+2481	Rule name
+2482	Rulers
+2483	ruling state
+2484	running
+2485	Rural
+2486	Rural population
+2487	Rural production
+2488	S
+2489	S:
+2490	Sale to local market
+2491	Sales
+2492	Sales tax is applied to deals with a seller from the state. Poll tax is applied to all population of the state. Tax changes take effect on Production regeneration
+2493	Sales Tax is paid by the seller on local sale deals. It is deducted from gross sale value and transferred to the state treasury.
+2494	Sales Tax:
+2495	Salt Lake
+2496	Sample
+2497	Satellite texture
+2498	Save
+2499	Save and Load Maps
+2500	Save biomes-related data as a text file (.csv)
+2501	Save burgs-related data as a text file (.csv)
+2502	Save current JSON as a new style preset
+2503	Save data as a CSV file
+2504	Save features-related data as a text file (.csv)
+2505	Save files to Dropbox first
+2506	Save fully-functional map file
+2507	Save journey segments as a text file (.csv)
+2508	Save journeys-related data as a text file (.csv)
+2509	Save layer preset
+2510	Save Layers Preset
+2511	Save map
+2512	Save Map As…
+2513	Save Map File
+2514	Save map file to your Dropbox
+2515	Save map to
+2516	Save Map to browser storage
+2517	Save Map to Dropbox
+2518	Save markers data as a text file (.csv)
+2519	Save market deals data as a text file (.csv)
+2520	Save markets data as a CSV file
+2521	Save military-related data as a text file (.csv)
+2522	Save OBJ file of the 3d scene
+2523	Save provinces-related data as a text file (.csv)
+2524	Save reminder is turned off. Press CTRL+Q again to re-initiate
+2525	Save reminder is turned on. Press CTRL+Q to turn off
+2526	Save rivers-related data as a text file (.csv)
+2527	Save routes-related data as a text file (.csv)
+2528	Save screenshot of the 3d scene
+2529	Save state relations matrix as a text file (.csv)
+2530	Save state-related data as a text file (.csv)
+2531	save the map
+2532	Save the project to browser storage only
+2533	Save to the chosen file; Shift-click to choose another filename or location
+2534	Saving error
+2535	Scalable vector image: best quality, opens in a browser or Inkscape
+2536	Scale
+2537	Scale Bar
+2538	Scale bar bottom edge, in percents
+2539	Scale bar right edge, in percents
+2540	Scroll the mouse wheel to zoom in and out. Click and drag on the map to pan. Double-click a location to center on it.
+2541	sea_island
+2542	Search
+2543	Search built-in icons
+2544	Search fonts
+2545	Search map and commands
+2546	Search results
+2547	Secondary
+2548	See the emblem (coat of arms) of a state, province or burg as an image, to describe it or match lore to it. The user sees it too.
+2549	Seed history
+2550	segment
+2551	Segment color. Click to change
+2552	Segment distance
+2553	Segment name: ${escapeHtml(segment.name)}
+2554	Segment pause
+2555	segments
+2556	Select
+2557	Select ${label}
+2558	Select a color below and assign a height value for it
+2559	Select a color to assign a height value
+2560	Select a color to re-assign the height value
+2561	Select a distance unit or provide a custom name
+2562	Select a group for this label
+2563	Select a map layers preset
+2564	Select a set of cultures to be used for names and cultures generation
+2565	Select a specific map element from this dropdown to adjust its colors, opacity, stroke width, and other visual properties.
+2566	Select a style preset. State labels may required regeneration if font is changed
+2567	Select allowed ${attr}
+2568	Select allowed biomes
+2569	Select allowed cultures
+2570	Select allowed features
+2571	Select allowed religions
+2572	Select allowed states
+2573	Select an altitude unit or provide a custom name
+2574	Select an element to edit its style
+2575	Select an element to edit its style (list is ordered alphabetically)
+2576	Select any type of icons
+2577	Select at least one element
+2578	Select at least one label
+2579	Select base template
+2580	Select base to edit
+2581	Select base:
+2582	Select biomes
+2583	Select Biomes
+2584	Select burg group. Groups defines burg icon, label size and style
+2585	Select burg in province or state
+2586	Select burg type. Type slightly affects emblem generation
+2587	Select chart type
+2588	Select color scheme for the element
+2589	Select dominant culture
+2590	Select element group
+2591	Select emblem shape. Can be changed individually in the Emblem Editor
+2592	Select entity (y axis)
+2593	Select entity to group by. If you don't need grouping, set it the same as the entity
+2594	Select feature types
+2595	Select Feature Types
+2596	Select feature. Features with custom settings are bullet-marked
+2597	Select file and create a link to share with your friends
+2598	Select filter for element. Filters may cause performance issues!
+2599	Select font
+2600	Select font adding method
+2601	Select form name
+2602	Select format to download image or export map data
+2603	Select good line in editor, click on cells to remove or add a bonus resource
+2604	Select good to compare stock across markets
+2605	Select grid overlay type
+2606	Select group to be assigned if burg doesn't pass the criteria for other groups
+2607	Select group to be assigned if other groups are not passed
+2608	Select Heightmap
+2609	Select Heightmap Template
+2610	Select heightmap template – template provides unique, but similar-looking maps on generation
+2611	Select how many distance units are in one pixel
+2612	Select icon
+2613	Select lake rendering group
+2614	Select lake subtype
+2615	Select limitation for burg feature: ${name}
+2616	Select line interpolation type
+2617	Select marker type for newly added markers.
+2618	Select metric to plot (x axis)
+2619	Select ocean pattern
+2620	Select or deselect all listed labels
+2621	Select origins
+2622	Select own your own relief icon
+2623	Select parent river
+2624	Select precreated heightmap – it will be the same for each map
+2625	Select province in state
+2626	Select route group
+2627	Select set of relief icons. Existing icons are restyled, not regenerated
+2628	Select shape of the emblem
+2629	Select shore proximity
+2630	Select Shore Proximity
+2631	Select speech synthesis voice to pronounce generated names
+2632	Select state
+2633	Select Temperature scale
+2634	Select template or precreated heightmap to be used on generation
+2635	Select template:
+2636	Select texture image. Big textures can highly affect performance
+2637	Select the element the note belongs to
+2638	Select the good's icon
+2639	Select the label for bulk assignment
+2640	Select unit type to apply special rules on forces recalculation
+2641	Selected paint color
+2642	Selected water area is open to map border and is not enclosed
+2643	SELL
+2644	Seller
+2645	Send
+2646	Send (Enter)
+2647	Seneschalty
+2648	Separate
+2649	Sepia
+2650	Server
+2651	Set a filter to be applied to the map in general
+2652	Set a height interval. Avoid space, use hyphen as a separator
+2653	Set a North-South map shift, set to 50 to make map center lie on Equator
+2654	Set a stroke color
+2655	Set a West-East map shift, set to 50 to make map center lie on Prime meridian
+2656	Set as primary origin
+2657	Set autosave interval in minutes. Set 0 to disable autosave. Map is saved to browser memory
+2658	Set bar size
+2659	Set battle name
+2660	Set burg population
+2661	Set burg production plate icon size in pixels. Plate and font scale together with it
+2662	Set clipping. Only non-clipped part will be visible
+2663	Set curve profile
+2664	Set custom burg map URL
+2665	Set dialog and tool windows transparency
+2666	Set emblems size multiplier
+2667	Set eroded mesh detail level (vertices on the long side)
+2668	Set fill color
+2669	Set fill opacity. 0: transparent, 1: solid
+2670	Set flux affects river width
+2671	Set font size in pixels
+2672	Set font size, relative to the labels layer
+2673	Set font style
+2674	Set font weight
+2675	Set globe rotation speed. Set to 0 is you want to toggle off the rotation
+2676	Set globe texture resolution
+2677	Set good marker (icon and circle) size in pixels
+2678	Set grid cells scale multiplier
+2679	Set height exponent, i.e. a value for altitude change sharpness. Altitude affects temperature and hence biomes
+2680	Set height for all cells to 0 (erase the map)
+2681	Set height scale
+2682	Set height:
+2683	Set how deep the valleys are carved along the rivers
+2684	Set how many people are in one population point
+2685	Set icon size
+2686	Set letter spacing
+2687	Set Lore
+2688	Set map rotation speed. Set to 0 is you want to toggle off the rotation
+2689	Set map size relative to the world size
+2690	Set market marker (circle) size in pixels
+2691	Set market marker icon size in pixels
+2692	Set masking fraction. 1 - full insulation (prevent land on map edges), 2 - half-insulation, etc. Negative number to inverse the effect
+2693	Set max population constraint in population points (see the multiplier in Units Editor)
+2694	Set maximum number of colors
+2695	Set maximum number of items in one column
+2696	Set mesh texture resolution
+2697	Set min and max population constraint in population points (see the multiplier in Units Editor)
+2698	Set min population constraint in population points (see the multiplier in Units Editor)
+2699	Set minimum and maximum possible zoom level
+2700	Set number of points to be used for graph generation. Highly affects performance. 10K is the only recommended value
+2701	Set opacity of the loaded image
+2702	Set opacity. 0: transparent, 1: solid
+2703	Set palette hue
+2704	Set palette lightness
+2705	Set palette saturation
+2706	Set points (cells) number of the submap
+2707	Set population percentile: 0-100, where 90 means the burg must have a population higher than 90% of all burgs
+2708	Set precipitation - water amount clouds can bring. Defines rivers and biomes generation. Keep around 100% for default generation
+2709	Set regiment box size. All regiments will be redrawn on change (position will defaulted)
+2710	Set relative size for the particular label
+2711	Set relative size for the particular label (% of group default)
+2712	Set scene lightness
+2713	Set sky and water color
+2714	Set smooth fraction. 1 - full smooth, 2 - half-smooth, etc.
+2715	Set starting offset for the particular label
+2716	Set starting offset for the particular label (% along the path)
+2717	Set starting offset numerically
+2718	Set stroke color
+2719	Set stroke dash array, e.g. 5 2
+2720	Set stroke linecap
+2721	Set stroke linejoin
+2722	Set stroke opacity. 0: transparent, 1: solid
+2723	Set stroke width
+2724	Set sun position (x, y) and color
+2725	Set text shadow, case and shift
+2726	Set the charge: choose, link or upload a picture to place on the field
+2727	Set the growth rate of states and cultures. Determines how much land stays neutral
+2728	Set the icon shown inside the market marker
+2729	Set the letter spacing size for this label
+2730	Set the number of erosion detail layers. More octaves add finer gullies
+2731	Set the strength of erosion gullies and ridges
+2732	Set theme hue for dialogs and tool windows
+2733	Set tooltip size
+2734	Set treasury balance. Production won't be changed automatically
+2735	Set urban density: average population per building in Medieval Fantasy City Generator
+2736	Set urban population modifier. Change to increase or decrease burgs population
+2737	Set user interface size. Please note browser zoom also affects interface size (Ctrl + or Ctrl - to change)
+2738	Set view mode
+2739	Set vignette blur propagation, in pixels
+2740	Set what Generator should do on load
+2741	Set what share of eligible burgs in each state will become province centers. Higher values create more provinces
+2742	Set wind (compass) rose shift and size
+2743	Set world parameters like the number of cultures, states, and religions before generating a new map. UI preferences like tooltips and autosave are also here.
+2744	Settings for the next map. Generate a new map to apply them
+2745	Setup Lore
+2746	Shading
+2747	Shallow Ocean (adjacent to land)
+2748	shanty town,
+2749	Shape
+2750	Shape preview
+2751	Shape rendering
+2752	Share
+2753	Share of the pool's relief
+2754	Shattered
+2755	Shelling phase. Naval artillery bombardment of enemy fleet
+2756	Sheltering phase. Hide behind the walls and wait
+2757	Shield
+2758	Shieldy
+2759	Shift
+2760	Shift x
+2761	Shift y
+2762	Shire
+2763	shock
+2764	Shock phase. Units are not prepared for a defense
+2765	Shock phase. Units strength reduced
+2766	Shore gap
+2767	Shore length:
+2768	Shore Proximity
+2769	Shore tint
+2770	Short name:
+2771	show
+2772	Show
+2773	Show ${count}
+2774	Show 3D labels
+2775	Show a state's profile card: emblem, full name and form, capital, population, area, burgs, culture, religion and the start of its note. Use it whenever one state is the subject (tell me about, describe, overview, who rules), then add only what the card does not say.
+2776	Show all labels
+2777	Show burgs bubble chart
+2778	Show Burgs Chart
+2779	Show circle
+2780	Show Cultures Hierarchy
+2781	Show cultures hierarchy tree
+2782	Show drainage
+2783	Show Export Panel
+2784	Show labels of the ${name} group in Labels Overview to reassign them
+2785	Show labels of this group in Labels Overview
+2786	Show markers within a radius of this one
+2787	Show on map
+2788	Show on the map
+2789	Show only labels containing the entered text
+2790	Show only labels of the selected group
+2791	Show only labels of the selected type
+2792	Show only markers located in the selected culture
+2793	Show only markers located in the selected state
+2794	Show only markers of the selected type
+2795	Show only zones of selected type
+2796	Show or hide all goods matching the current filter
+2797	Show or hide circle around good icons
+2798	Show or hide columns
+2799	Show production chains graph
+2800	Show production overview for this burg
+2801	Show provinces chart
+2802	Show Provinces Chart
+2803	Show regiments list
+2804	Show relations history
+2805	Show Relations History
+2806	Show relations matrix
+2807	Show Religions Hierarchy
+2808	Show religions hierarchy tree
+2809	Show rescaler slider
+2810	Show Save Panel
+2811	Show Seed History
+2812	Show seed history to apply a previous seed
+2813	Show several map entities as a list the user can locate and ring on the map. Use it instead of a Markdown list whenever an answer names 3 or more entities (which, list, find, where are…).
+2814	Show sky and extend water
+2815	Show states bubble chart
+2816	Show States Chart
+2817	Show style edit section
+2818	Show temperature graph for the burg
+2819	Show the area or place of the emblem
+2820	Show the charts in 1, 2, 3 or 4 columns
+2821	Show the edit label text section
+2822	Show the elevation profile for the river
+2823	Show the elevation profile for the route
+2824	Show the font size section
+2825	Show the group selection
+2826	Show the label
+2827	Show the label offset section
+2828	Show the letter spacing section
+2829	Show the regeneration menu and more data
+2830	Show where water flows: arrows point downhill, hatching marks depressions that get filled, blue hatching marks the ones deep enough to become lakes
+2831	Show wireframe
+2832	Show/hide extinct religions (religions without cells)
+2833	Shown
+2834	Shows whether the burg has a citadel (castle). Click to toggle
+2835	Shows whether the burg has a shanty town. Click to toggle
+2836	Shows whether the burg is a port. Click to toggle
+2837	Shows whether the burg is a religious center. Click to toggle
+2838	Shows whether the burg is a state capital. Click to toggle
+2839	Shows whether the burg is a trade center (market center). Click to toggle
+2840	Shows whether the burg is walled. Click to toggle
+2841	Shows whether there is already a preset with this name
+2842	Siege: burg blockade and storming
+2843	Sign in
+2844	Sign out
+2845	simple
+2846	Simple
+2847	Simplify
+2848	Sinkhole
+2849	Size
+2850	Size of the main charge
+2851	Size of the map window on screen. Independent of the map size: it is how much of the map you see at once. Set by hand it is remembered, until you fit it back to the window
+2852	Size variety
+2853	Size: the entry's icons as a multiple of the pool's size
+2854	Skip
+2855	Skirmish phase. Ranged units excel
+2856	slider
+2857	small
+2858	Small
+2859	small shape adjustments only
+2860	Smallest edge
+2861	Smooth 6
+2862	Smooth 9
+2863	Smooth all heights a bit
+2864	Smooth brush: drag to level height of cells in radius to height of adjacent cells
+2865	Smooth geometry
+2866	Smooth the map replacing cell heights by an average values of its neighbors
+2867	Snowy conifer
+2868	Snowy mountain
+2869	Soiled paper horizontal
+2870	Soiled paper vertical
+2871	some
+2872	Sortie phase. Make a sortie from besieged town. Melee units excel
+2873	Sorting type
+2874	Source
+2875	Source width:
+2876	Southern
+2877	Spacing
+2878	Spain small
+2879	Spanish
+2880	Speak the examples. You can change voice and language in options
+2881	Speak the name. You can change voice and language in options
+2882	Speaker voice
+2883	Specific
+2884	Speed
+2885	Split map into smaller png tiles and download as zip archive
+2886	Split regiment into 2 separate ones
+2887	Spread currently displayed labels to not collide
+2888	Square
+2889	Square 45 degrees grid
+2890	Square grid
+2891	Squarish
+2892	Stacked Bar
+2893	Standard
+2894	Standard 3
+2895	Standard 4
+2896	Standard view mode for editing the map
+2897	Start a new chat
+2898	Start a new chat to continue
+2899	Start Interactive Tour
+2900	Start of the first segment
+2901	startBurgId
+2902	state
+2903	State
+2904	State ${unit.name} units number
+2905	State area
+2906	State capital. Click to zoom into view
+2907	State does not have any cells, cannot change population
+2908	State expansionism
+2909	State form name
+2910	State form name. Click to change
+2911	State full name
+2912	State halos
+2913	State is friendly to another state when they share some common interests
+2914	State Labels
+2915	State name. Click to change
+2916	State population
+2917	State short name
+2918	State type. Defines growth model. Click to change
+2919	State-specific
+2920	States
+2921	States bubble chart
+2922	States Editor
+2923	States number
+2924	States Number
+2925	States you click get the chosen relation to this state. Shift + click on the map to select another state
+2926	stationed
+2927	Stock
+2928	Stop
+2929	Storming phase. Storm enemy town. Melee units excel
+2930	Straight strokes
+2931	Strait direction
+2932	Strait width, use hyphen to get a random number in range
+2933	Strait: centered vertical or horizontal depression
+2934	Stretch length
+2935	Strikethrough
+2936	string, suggestedName: string, saveAs = false ): Promise
+2937	string, suggestedName: string, saveAs: boolean): Promise
+2938	Stroke length, relative to the default
+2939	Stroke length, relative to the default. Strokes stop early where the slope levels off
+2940	Stroke Width
+2941	Stroke width at its root, relative to the default. Gentler ground draws lighter strokes
+2942	Strokes only
+2943	Style
+2944	Style elements
+2945	Style JSON is getting formed based the current settings, but can be entered manually
+2946	Style JSON:
+2947	Style preset is saved and applied
+2948	Style preset is uploaded
+2949	Style presets
+2950	Style Presets
+2951	Style Saver
+2952	Style Tab
+2953	Submap
+2954	Sun position and color:
+2955	Supply line length, affects morale
+2956	Surprice attack phase. Units strength increased, ranged units excel
+2957	Surrendering phase. Give up the defense. Units strength reduced
+2958	Survivors
+2959	Suspicion means state has a cautious distrust of another state
+2960	Suzerain is a state having some control over its vassal (selected state)
+2961	SVG shape-rendering hint for the map. Crisp edges drops anti-aliasing. Chromium-based browsers rasterize on the GPU and ignore the hint for speed purposes, so it makes no difference there
+2962	Swamp
+2963	Swiss
+2964	T
+2965	Table
+2966	table-row
+2967	Tags
+2968	Take an interactive tour of the map generator
+2969	Taklamakan
+2970	Targe
+2971	Targe2
+2972	Target number of trade animations visible at once. New ones spawn as old ones finish. Higher = more simultaneous animations, can cause lag on slower devices
+2973	tavern
+2974	Te<u>x</u>ture
+2975	Temperature
+2976	Temperature controls response randomness; higher values mean more creativity, lower values mean more predictability
+2977	Temperature must be a number
+2978	Temperature range in °C
+2979	Temperature range in °C. An empty bound is open
+2980	Temperature scale:
+2981	Template Editor
+2982	temple,
+2983	Terracing power. Set to 0 to toggle off
+2984	Territory
+2985	Tetrakis square grid
+2986	text
+2987	Text
+2988	Text color
+2989	Text formatting
+2990	Text size
+2991	Texture resolution:
+2992	Texture the terrain as a satellite image. Replaces the standard map texture
+2993	Thanks for all supporters on
+2994	that will absorb all others. Hover over a row to highlight the province on the map.
+2995	that works offline.
+2996	The app and this page keep their maps and settings apart, so what you have here does not appear there. To move a map over, save it as a
+2997	The civilization
+2998	The civilization of the sages — редактор карт
+2999	The coordinate extent this map was generated on. The next map's is set in Options
+3000	The current map already has this seed
+3001	the data, but you won't be able to change the coastline.
+3002	The Desktop App is made for computers, there is no phone or tablet version.
+3003	The Desktop App is not published yet.
+3004	The edits not applied yet will be discarded. Apply them first to keep them
+3005	The element name, edited in the element's own editor
+3006	The emblem's COA string: edit it, or replace it with an Armoria link or COA string, then Apply
+3007	The file does not look like a valid save file.<br>Please check the data format
+3008	The file is not a style preset - the current style is kept
+3009	The following provinces will be
+3010	The following states will be
+3011	The font is already added
+3012	The frame is fitted to the picture
+3013	The Generator is also available as a
+3014	The Heightmap editor panel lets you paint terrain directly on the map. You can raise or lower land, apply templates, convert an image into a heightmap, or preview the terrain in 3D.
+3015	The icon at map sizes
+3016	The JSON is not a style preset - nothing was saved
+3017	The Layer control is not available in the heightmap edit mode
+3018	The Layers tab controls which map elements are visible on the map.
+3019	the license
+3020	The list of downloads could not be loaded right now.
+3021	The longest name length
+3022	The names data provided is too short or incorrect
+3023	The note has markup the rich text editor cannot keep, so it stays in HTML mode
+3024	The Noun Project
+3025	the open sea
+3026	the open water
+3027	The Options tab lets you configure world generation parameters like the number of states, cultures, religions, and other settings that shape the generated world.
+3028	The preset on the Options tab these settings amount to
+3029	The shortest name length
+3030	The Style tab controls the visual appearance of the map — color schemes, opacity, line weights, and other properties for each map element.
+3031	The Tools tab gives you direct access to all of the map's editors: terrain, biomes, states, cultures, religions, routes, and more.
+3032	Theme color
+3033	There are 3 ways to add a custom font:
+3034	There are no routes to remove
+3035	There are no states to show
+3036	There should be at least 2 states to edit the diplomacy
+3037	These entities have no map location
+3038	They
+3039	This burg is a NOT state capital
+3040	This burg is a port
+3041	This burg is a state capital
+3042	This burg is already a center of another market
+3043	This burg is already a market center
+3044	This burg is already the center of this market
+3045	This burg is NOT a port
+3046	This button opens the World Configurator where you can set the map's position on the globe, adjust equatorial and polar temperatures, and configure precipitation to shape the world's climate.
+3047	This chat is getting long — each question re-sends all of it.
+3048	This element has no map location
+3049	This element is not drawn on the map on its own
+3050	This is one of the default groups, it cannot be removed
+3051	This legendary water source is whispered about in ancient tales and believed to possess mystical properties. The spring emanates crystal-clear water, shimmering with an otherworldly iridescence that sparkles even in the dimmest light.
+3052	This map carries no custom icons yet.
+3053	This operation is destructive and irreversible. It will create a completely new map based on the current one. Don't forget to save the .map file to your machine first!
+3054	This part of the app failed to load because a new version was released while the page was open.<br />Reload the page to get the new version. If you have unsaved changes, save the map first
+3055	This part of the app was not downloaded before the connection was lost. Reconnect and try again
+3056	This quick tour covers the essential controls. Use Next/Previous to navigate, or press Esc to exit at any time.
+3057	This scheme already exists
+3058	This transport type is
+3059	Timber Cut big
+3060	Timber Cut small
+3061	Time
+3062	Time from start to finish, travel days counted at each transport's travel hours
+3063	Time of day:
+3064	Tincture of the field
+3065	Tincture of the main charge. A raster picture keeps its own colours
+3066	Tint
+3067	Tint over the existing ocean, strongest near the shore
+3068	tlan
+3069	to
+3070	To
+3071	to ask questions, share maps, discuss the Generator and Worldbuilding, report bugs and propose new features.
+3072	To change Burg Groups open
+3073	To change capital please assign a capital status to another burg of this state
+3074	to open the last saved map.
+3075	to pick the
+3076	To remove a capital you have to remove its state first
+3077	Toggle 3d labels
+3078	Toggle Azgaar Assistant (help bubble on the bottom right corner)
+3079	Toggle basin highlight mode
+3080	Toggle fullscreen
+3081	Toggle Individual Layers
+3082	Toggle journey visibility on the map
+3083	Toggle Legend box
+3084	Toggle Legend box (shows all non-hidden zones)
+3085	Toggle Menu
+3086	Toggle notes box display: hide or do not hide the box on mouse move
+3087	Toggle percentage / absolute values display mode
+3088	Toggle percentage / absolute values views
+3089	Toggle province focus
+3090	Toggle Save Reminder
+3091	Toggle segment visibility
+3092	Toggle sky mode
+3093	Toggle state focus
+3094	Toggle this good on the Goods map
+3095	Toggle wireframe mode
+3096	Toggle zone focus
+3097	Toggle zone visibility
+3098	Tools
+3099	Tools Tab
+3100	Tooltip size
+3101	Top level
+3102	Total
+3103	Total area of the displayed features
+3104	Total burgs number
+3105	Total cells number
+3106	Total deal value
+3107	Total distance
+3108	Total gross sales revenue
+3109	Total land area
+3110	Total land cells number
+3111	Total map area
+3112	Total map population
+3113	Total military
+3114	Total military forces
+3115	Total military personnel (considering crew). Click to sort
+3116	Total military personnel (not considering crew)
+3117	Total military personnel (not considering crew). Click to sort
+3118	Total number of believers (population)
+3119	Total number of cults
+3120	Total number of folk religions
+3121	Total number of heresies
+3122	Total number of markets
+3123	Total number of organized religions
+3124	Total population
+3125	Total purchase spending
+3126	Total size:
+3127	Total state military personnel (considering crew)
+3128	Total stock of all goods in this market
+3129	Total stock of this good across all markets
+3130	Total Tax:
+3131	Total time
+3132	Total time: ${Journeys.formatTravelTimeFull(elapsedHours)}. Travel time: ${Journeys.formatHours(totalHours)}${hiddenNote}
+3133	Total traded units
+3134	Total units in stock across all markets and burg inventories
+3135	Total units in stock across all markets and burg inventories. Click to sort
+3136	Total units produced daily by all cells and burgs
+3137	Total units produced daily in cells (raw) and burgs (manufactured). Click to sort
+3138	Trade
+3139	Trade Animation Editor
+3140	Trade type
+3141	Transform
+3142	Transform map
+3143	Transform Map
+3144	Transparency
+3145	Transport
+3146	Transport type added — rename it and set the speed, travel hours and domain.
+3147	Transport type name
+3148	Transport type, sets the default speed and where the segment may go
+3149	Transport Types
+3150	Transport types number
+3151	Transports
+3152	Travel duration
+3153	Travel time
+3154	Treasury
+3155	Treasury: accumulated cash balance
+3156	Triangle grid (horizontal)
+3157	Triangle grid (vertical)
+3158	Tribe
+3159	Trihexagonal grid
+3160	Tropical
+3161	Trough: elongated depression
+3162	True
+3163	Truncated square grid
+3164	Try
+3165	Type
+3166	Type a prompt here
+3167	Type any short text
+3168	type form name
+3169	Type full battle name
+3170	Type group name
+3171	Type group name. Must start with a letter or underscore, followed by letters, digits, underscores, or dashes. Spaces are not allowed
+3172	Type place name
+3173	Type scale bar label, leave blank to hide label
+3174	Type to change a base name
+3175	Type to change river type (e.g. fork, creek, river, brook, stream)
+3176	Type to change the full name
+3177	Type to change the short name
+3178	Type to edit. Press Enter to add a new line, empty the element to remove it
+3179	Type to rename the burg
+3180	Type to rename the lake
+3181	Type to rename the market. Clear the field to reset to the default name
+3182	Type to rename the regiment
+3183	Type to rename the river
+3184	Type to rename the route
+3185	Type unit name. If name is changed for existing unit, old unit will be replaced
+3186	type value
+3187	ul
+3188	Uncheck to not update state label on name change
+3189	Uncovered Demand:
+3190	Underline
+3191	Undiscovered dungeon. See
+3192	Undo
+3193	Undo last brush stroke
+3194	Undo last change
+3195	Undo the last stroke (Ctrl + Z)
+3196	Undo the latest action
+3197	Undo the latest action (Ctrl + Z)
+3198	Unit
+3199	Unit icon
+3200	Unit military power (used for battle simulation)
+3201	Unit name
+3202	Unit name. If name is changed for existing unit, old unit will be replaced
+3203	Unit of production
+3204	Unit of production. Click to sort
+3205	Unit type to apply special rules on forces recalculation
+3206	Units
+3207	Units Editor
+3208	Units of goods produced
+3209	Unlimited questions, and I can read and edit this map. Your key stays in this browser and goes only to the provider. I run scripts in this page to read your map. Only use me on maps from sources you trust.
+3210	Unlocked. Click to lock the element and prevent changes to it by regeneration tools
+3211	Unselect
+3212	up
+3213	Update label on Apply
+3214	Update the scene
+3215	Upload
+3216	Upload a namesbase from PC, extending the current set
+3217	Upload a namesbase from PC, replacing the current set
+3218	Upload cultures-related data
+3219	Upload notes from PC
+3220	Urban
+3221	Urban density:
+3222	Urban population
+3223	Urbanization rate:
+3224	URL
+3225	url(#land)
+3226	url(#water)
+3227	Use for
+3228	Use key
+3229	Use Provinces Editor to change the actual province name, not just a label
+3230	Use States Editor to change the actual state name, not just a label
+3231	Value
+3232	value * population_point * urbanization_rate
+3233	Variant
+3234	Vassal is a state having obligation to its suzerain (selected state)
+3235	Vassalization
+3236	Vertical shift in icon-size units (positive moves down)
+3237	Vesica Piscis
+3238	View market deals
+3239	View mode:
+3240	Viewport size
+3241	Vignette
+3242	Vignette rectangle height, in percents
+3243	Vignette rectangle width, in percents
+3244	Vignette rectangle x, in percents
+3245	Vignette rectangle y, in percents
+3246	Vignette X radius, in percents
+3247	Vignette Y radius, in percents
+3248	visible
+3249	Visible
+3250	void, signal: AbortSignal ): Promise
+3251	void): Promise
+3252	Volcano
+3253	W
+3254	waiting
+3255	Waiting phase. Cannot pursue fleeing naval
+3256	walls,
+3257	War Alert
+3258	War Alert. Editable modifier to military forces number, depends on political situation
+3259	War Alert. Modifier to military forces number, depends on political situation. Click to sort
+3260	War declaration
+3261	Warning
+3262	Warning!
+3263	Watabou City
+3264	Watabou Dwelling
+3265	Watabou Village
+3266	water
+3267	Water flux
+3268	Waterbody Type
+3269	Waves
+3270	WE
+3271	Wealth
+3272	Wealth: gross product divided by population
+3273	Wedged
+3274	Weight
+3275	Weight: how often the entry is picked, relative to the others
+3276	Welcome to Fantasy Map Generator
+3277	Western
+3278	When labels, icons and relief are redrawn and text re-sized during a zoom or pan. 'After zoom' does it once per gesture: faster on big maps, but new content appears all at once
+3279	When supported by your browser, Save updates the chosen file. Shift-click machine or press Ctrl + Shift + S to save a separate copy.
+3280	Where to get one
+3281	Which trade types to display: local (burg-market), global (market-market), or both
+3282	While zooming
+3283	white
+3284	Whitecaps
+3285	Whole map
+3286	Whole world
+3287	Width
+3288	Width modifier:
+3289	Width of minor contours. Every fifth contour is twice as wide
+3290	Width of the dark lines separating bands
+3291	Wikimedia Commons
+3292	window.innerWidth
+3293	Windows
+3294	Windows and macOS will warn about an unknown developer the first time, because the app is not signed yet: on Windows click "More info" and then "Run anyway", on macOS right-click the app and choose "Open".
+3295	Windows on ARM
+3296	Winter Era
+3297	Withdrawal phase. Naval units try to escape enemy fleet
+3298	World Configurator
+3299	Worth of produced goods
+3300	Wrap
+3301	Wrap Tool
+3302	Wrap tool: drag to reshape cells, Shift + drag to resize the brush, Space + drag to pan the map
+3303	write
+3304	Write the note here. It shows up in the notes box when the element is hovered or clicked
+3305	x
+3306	X
+3307	X axis position in percentage (minX-maxX or X)
+3308	x1 - x0
+3309	XIV
+3310	y
+3311	Y
+3312	Y axis position in percentage (minY-maxY or Y)
+3313	yes
+3314	You are offline
+3315	You can
+3316	You cannot change the coastline in 'Keep' edit mode
+3317	You cannot overwrite default preset, please change the name
+3318	You cannot remove a market center burg. Please remove the market first
+3319	You cannot remove the capital. Please change the state capital first
+3320	You have encountered a character.
+3321	You must provide a correct value
+3322	Your own description of this world. Free text, carried in the map file
+3323	Your question
+3324	Your system is ${primaryLabel}:
+3325	yurt
+3326	z-burg
+3327	Zone
+3328	Zone area
+3329	Zone description. Click and type to change
+3330	Zone does not have any land cells, cannot change population
+3331	Zone type. Click and type to change
+3332	Zones
+3333	Zones Editor
+3334	Zoom
+3335	Zoom and pan the picture in its frame
+3336	Zoom extent
+3337	Zoom In
+3338	Zoom map and center view in the burg
+3339	Zoom max
+3340	Zoom min
+3341	Zoom out
+3342	Zoom Out
+3343	Zoom to end
+3344	Zoom to start
+3345	Zoom to the marker
+3346	Zoom to the measurer
+3347	zoomExtent.min must not exceed max
+3348	Сhase phase. Naval units pursue and rarely shell enemy fleet

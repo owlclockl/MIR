@@ -21,3 +21,9 @@ server/data/
 
 # Картинка-черновик генератора планеты (scripts/planet-preview.mjs)
 planet-preview.png
+
+# Generated corresponding-source archive; rebuilt before web/single/dev.
+/src/rtwg/mir-source.zip
+
+# Local compiler/toolchain downloads and caches; reproducible from pinned locks.
+/.cache/

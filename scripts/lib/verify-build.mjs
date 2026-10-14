@@ -22,27 +22,10 @@ import { BUILD_INFO_FILE } from './vite-mir.mjs';
 
 const ROOT_FILES = ['dist', 'mir.html'];
 
-/* Бюджеты веса — сигнал о случайно попавших ресурсах, не запрет на продуктовые
-   функции. В основной бандл входят свой процедурный генератор (`src/gen/`),
-   основная поверхность (`src/game/world-map-view.js`) и дополнительный вид
-   планеты (`src/planet/`). Azgaar остаётся отдельным, лениво открываемым
-   редактором: его CSS — 262 КБ (бюджет 280 КБ), а однофайловая сборка вшивает
-   весь редактор — около 27 МиБ, бюджет 30 МиБ. Звуки web-версии по-прежнему
-   отдельными файлами, не в JS.
-
-   Пользовательского режима блочного среза нет: вертикальная модель генератора
-   остаётся внутренним источником высот, геологии и будущих игровых данных.
-   Основная карта рисует поверхность клетками и укладывается в общий бюджет JS.
-
-   Земной масштаб и основная карта (2026-10-14): карта использует размеры
-   40 075 017 × 20 003 932 м и детерминирована seed/размером. Варианты Azgaar
-   и планеты доступны дополнительно; точка входа приложения загружает карту
-   собственного генератора первой.
-
-   Редизайн главного меню: сцена получила сводку, навигацию и «Продолжить» по
-   последним мирам. Это продуктовая разметка и стили, а не случайно попавший
-   ресурс. Редактор Azgaar и его автономная сборка проверяются отдельно.
-*/
+/* Бюджеты ловят случайно попавшие ресурсы. Собственный основной генератор
+   удалён; в JS остаются приложение и дополнительный планетарный вид.
+   Azgaar в web загружается из /fmg/, а в mir.html вшивается целиком.
+   Звуки web-версии остаются отдельными файлами. */
 export const BUDGETS = {
   js: 16 * 1024 * 1024,
   css: 4 * 1024 * 1024,
@@ -150,6 +133,12 @@ export function checkWeb() {
   const jsFiles = files.filter((name) => /^assets\/.*\.js$/.test(name));
   add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
   const appCode = jsFiles.map((name) => readFileSync(join('dist', name), 'utf8')).join('\n');
+  add(appCode.includes('data-drawing-mode') && appCode.includes('Copyright (c) 2022 rfresh2'), 'браузерный порт XaeroPlus и MIT-уведомление включены в web-бандл');
+  add(
+    !existsSync('src/gen') && !existsSync('src/game/world-map-view.js')
+      && !/world-map-view|is-world-map/.test(appCode),
+    'собственный основной генератор удалён из исходников и веб-бандла',
+  );
   add(
     appCode.includes('fmg/index.html') && appCode.includes('world-editor-frame') && appCode.includes('mir-world-slots'),
     'мир открывает Azgaar во встроенном редакторе и хранит слоты',
@@ -331,6 +320,8 @@ export function checkSingle() {
   const html = readFileSync('mir.html', 'utf8');
   const bytes = Buffer.byteLength(html);
   add(true, 'mir.html собран', kb(bytes));
+  add(html.includes('data-drawing-mode') && html.includes('Copyright (c) 2022 rfresh2'), 'XaeroPlus работает автономно и сохраняет MIT-уведомление');
+  add(!/world-map-view|is-world-map/.test(html), 'автономная сборка не содержит удалённого вида карты');
   add(
     html.includes('<title>The civilization of the sages — Главное меню</title>')
       && html.includes('Мудрость создаёт миры.'),

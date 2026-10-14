@@ -1,0 +1,20 @@
+add_library(RTplatec
+	bounds.cpp       
+	mass.cpp       
+	plate_functions.cpp  
+	simplerandom.cpp
+	movement.cpp   
+	rectangle.cpp        
+	geometry.cpp     
+	segment_creator.cpp  
+	heightmap.cpp    
+	platecapi.cpp  
+	segment_data.cpp     
+	utils.cpp
+	lithosphere.cpp  
+	plate.cpp      
+	segments.cpp         
+	world_point.cpp
+        FractalGenerator.cpp
+        $<TARGET_OBJECTS:noiseUtils>)
+

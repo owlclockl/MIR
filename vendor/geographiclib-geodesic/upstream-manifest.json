@@ -1,0 +1,21 @@
+{
+  "package": "geographiclib-geodesic",
+  "version": "2.2.0",
+  "source": "https://github.com/geographiclib/geographiclib-js/tree/main/geodesic",
+  "license": "MIT",
+  "distribution": "Complete npm runtime/source/types/tests package, unchanged",
+  "files": {
+    "LICENSE.txt": "8df0455c90f6bb3efbabf3e225122654c438a09c2be5635cdd79472a0970247e",
+    "README.md": "e83cd40f6a72b0a522fae51ea10f5cbbfc13bd98f3b36b49d962fdad7e9537e8",
+    "geographiclib-geodesic.js": "ec534643e8790a3bacfff1191206f514eb7741586f0a5e37c6afaa8394ed3d89",
+    "geographiclib-geodesic.min.js": "06e3512904b346575f475f14d0b27ea0979dbcd2b0eddebf5f1eeefd234395b5",
+    "package.json": "ddf80383f48f77ca5793b80935e3c0cc945c0a9ef5f0f454d83aab5d25342924",
+    "src/Geodesic.js": "71d03b6a80741fcdd6eb59216504f4e7af454ece230c642cb8f3b8a80077c93f",
+    "src/GeodesicLine.js": "5e7ed431ec93d9e9c76f7c2561d35a97c7fdf001536bc754567ff2bfca903001",
+    "src/Math.js": "d55e15f716312b2119fbe48a7e4135fdbb256f5841f15ad2834d5be6594c68d2",
+    "src/PolygonArea.js": "efee9cdda18690aaececf3711186677281cea10f835cf38747cc9a638e66ce86",
+    "test/geodesictest.js": "febf935107923786118cd63c617c41c29cc6f32ebee34701da454d30368f93c7",
+    "test/signtest.js": "798e08858fcae812dc07050acb92f70030d6384d22aa5c79d248462d9a6565a9",
+    "types/geographiclib-geodesic.d.ts": "2274fe485faf6e000799099b6009bbcf5a59385c036883dc3639825ea296928f"
+  }
+}

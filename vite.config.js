@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /* Конфигурация сборки. Две сборки из одного кода:
 
    web    — `npm run build` → dist/: обычная модульная сборка с хешированными
@@ -38,8 +39,8 @@ export default defineConfig(({ mode }) => {
     publicDir: single ? false : 'public',
 
     plugins: single
-      ? [mirBuildInfo({ version }), mirSingleFile()]
-      : [mirBuildInfo({ version }), mirServiceWorker({ version })],
+      ? [rtwgRawSources(), mirBuildInfo({ version }), mirSingleFile()]
+      : [rtwgRawSources(), mirBuildInfo({ version }), mirServiceWorker({ version })],
 
     build: {
       /* Однофайловая сборка пишется в память (write: false), каталог нужен
@@ -74,3 +75,14 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+
+// Keep upstream files byte-identical while avoiding trailing whitespace in
+// generated JS template literals (including the standalone HTML patch).
+function rtwgRawSources() {
+  return { name: 'mir:rtwg-raw-sources', enforce: 'pre', load(id) {
+    if (!id.endsWith('?raw') || !/\/vendor\/(rtwg|rtplatec|libnoise|rtwg-browser)\//.test(id)) return null;
+    const source=readFileSync(id.slice(0,-4),'utf8').replace(/\r\n/g,'\n').replace(/[ \t]+$/gm,'');
+    return `export default ${JSON.stringify(source)};`;
+  }};
+}
