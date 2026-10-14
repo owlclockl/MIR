@@ -43,6 +43,30 @@ export const GRID_W = 384;
 export const GRID_H = 192;
 const PLATES = 14;
 
+/* Все параметры четырёх отреверсированных конвейеров одним объектом.
+   Дефолты = прежнее поведение; панель в виде карты меняет их на лету. */
+export const DEFAULT_OPTIONS = {
+  plates: PLATES,        // spectrum-art: plate count
+  landShare: 0.38,       // spectrum-art: land threshold (доля суши)
+  mountainHeight: 1,     // spectrum-art/Jimbly: высота гор и пиков (×)
+  mountainRadius: 14,    // spectrum-art: ширина зоны гор у границ плит
+  warp: 1,               // spectrum-art/Jimbly: сила domain warp берегов (×)
+  roughness: 1,          // spectrum-art/ianjsikes: вес ridged/детального шума (×)
+  fossil: 0.35,          // spectrum-art: древние (fossil) хребты внутри плит
+  plumes: 3,             // spectrum-art: число мантийных плюмов-поднятий
+  rainshadow: 0.35,      // Jimbly: сила дождевой тени (0..1)
+  riverThreshold: 60,    // ianjsikes/Jimbly: мин. аккумуляция потока для реки
+  lakeMoisture: 0.45,    // Jimbly: мин. влажность озёр во впадинах
+  sunAngle: 1,           // spectrum-art: сила затенённого рельефа (×)
+};
+
+/* Стадийность в духе blslade: конвейер — именованный список стадий;
+   HUD и тесты показывают, что мир прошёл все этапы. */
+export const GENERATOR_STAGES = [
+  'plates', 'stress', 'elevation', 'sea-level', 'simplify-coast',
+  'distance-fields', 'climate', 'wind', 'rainfall', 'rivers', 'lakes', 'biomes',
+];
+
 const hashSeed = (text) => {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1) {
@@ -150,11 +174,13 @@ const distanceField = (isSource) => {
  * Сгенерировать мир. Возвращает поля и RGBA-буферы слоёв GRID_W×GRID_H.
  * @param {{ seed: string }} config
  */
-export function generateContinent({ seed = 'mir-2026' } = {}) {
+export function generateContinent({ seed = 'mir-2026', options = {} } = {}) {
+  const opt = { ...DEFAULT_OPTIONS, ...options };
+  const plateCount = Math.max(4, Math.min(32, Math.round(opt.plates)));
   const rand = mulberry32(hashSeed(String(seed)));
 
   /* --- плиты (spectrum-art: plates first) --- */
-  const plates = Array.from({ length: PLATES }, (_, id) => ({
+  const plates = Array.from({ length: plateCount }, (_, id) => ({
     id,
     x: rand(),
     y: 0.08 + rand() * 0.84,
@@ -166,6 +192,11 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
   const elevationNoise = fbm([3, 6, 12, 24, 48, 96].map((p) => makeNoise(rand, p, Math.max(1, p >> 1))));
   const moistureNoise = fbm([2, 4, 8, 16].map((p) => makeNoise(rand, p, Math.max(1, p >> 1))));
   const ridgeNoise = ridged([12, 24, 48].map((p) => makeNoise(rand, p, Math.max(1, p >> 1))));
+  const fossilNoise = ridged([3, 6].map((p) => makeNoise(rand, p, Math.max(1, p >> 1))));
+  const trenchNoise = fbm([24, 48].map((p) => makeNoise(rand, p, Math.max(1, p >> 1))));
+  const windNoise = makeNoise(rand, 6, 3);
+  /* мантийные плюмы spectrum-art: точки поднятий внутри плит */
+  const plumes = Array.from({ length: Math.max(0, Math.round(opt.plumes)) }, () => ({ x: rand(), y: 0.15 + rand() * 0.7, r: 0.05 + rand() * 0.07, h: 0.04 + rand() * 0.05 }));
   const warpNoiseX = makeNoise(rand, 3, 2);
   const warpNoiseY = makeNoise(rand, 3, 2);
 
@@ -175,6 +206,9 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
   const temperature = new Float32Array(N);
   const plateId = new Int16Array(N);
   const stress = new Float32Array(N); // конвергенция на границе: + горы, − впадины
+  const rainfall = new Float32Array(N);
+  const wind = new Float32Array(N); // угол ветра, радианы
+  const faultDist = new Int32Array(N); // расстояние до границы плит (аналог JFA/SDF)
 
   for (let gy = 0; gy < GRID_H; gy += 1) {
     const ny = gy / GRID_H;
@@ -198,7 +232,7 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
       }
       plateId[i] = first.plate.id;
       const border = Math.sqrt(second.d) - Math.sqrt(first.d);
-      const nearBorder = Math.max(0, 1 - border * 14);
+      const nearBorder = Math.max(0, 1 - border * opt.mountainRadius);
 
       const relVx = second.plate.vx - first.plate.vx;
       const relVy = second.plate.vy - first.plate.vy;
@@ -210,18 +244,28 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
       const convergence = -((relVx * axisX + relVy * axisY) / axisLen);
       stress[i] = nearBorder * convergence;
 
-      const wx = nx + (warpNoiseX(nx, ny) - 0.5) * 0.14;
-      const wy = ny + (warpNoiseY(nx, ny) - 0.5) * 0.22;
+      const wx = nx + (warpNoiseX(nx, ny) - 0.5) * 0.14 * opt.warp;
+      const wy = ny + (warpNoiseY(nx, ny) - 0.5) * 0.22 * opt.warp;
       const base = elevationNoise((wx + 1) % 1, Math.min(0.999, Math.max(0.001, wy)));
       let e = base + (first.plate.continental ? 0.07 : -0.03);
       /* горы: стресс границы × гребни ridged-шума (хребты, а не плато) */
-      e += nearBorder * Math.max(0, convergence) * (0.05 + ridgeNoise(nx, ny) * 0.16);
+      e += nearBorder * Math.max(0, convergence) * (0.05 + ridgeNoise(nx, ny) * 0.16 * opt.roughness) * opt.mountainHeight;
       e -= nearBorder * Math.max(0, -convergence) * 0.07; // рифты/впадины
+      /* древние хребты внутри плит (fossil ranges) и плюмы */
+      e += (1 - nearBorder) * fossilNoise(nx, ny) * 0.05 * opt.fossil * opt.roughness;
+      for (const plume of plumes) {
+        let pdx = Math.abs(nx - plume.x);
+        if (pdx > 0.5) pdx = 1 - pdx;
+        const pd = Math.hypot(pdx, (ny - plume.y) * 1.6);
+        if (pd < plume.r) e += plume.h * (1 - pd / plume.r);
+      }
+      /* океанические впадины: дивергенция × шум траншей */
+      if (!first.plate.continental) e -= nearBorder * Math.max(0, -convergence) * trenchNoise(nx, ny) * 0.12;
       elevation[i] = e;
     }
   }
 
-  /* нормализация в [0,1] и уровень моря — 62-й процентиль (~38% суши) */
+  /* нормализация в [0,1]; уровень моря — процентиль под долю суши из опций */
   let min = Infinity;
   let max = -Infinity;
   for (const e of elevation) {
@@ -231,7 +275,7 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
   const range = max - min || 1;
   for (let i = 0; i < N; i += 1) elevation[i] = (elevation[i] - min) / range;
   const sorted = Float32Array.from(elevation).sort();
-  const seaLevel = sorted[Math.floor(sorted.length * 0.62)];
+  const seaLevel = sorted[Math.floor(sorted.length * (1 - opt.landShare))];
 
   /* --- клеточное сглаживание берегов (идея simplifyLand из blslade) ---
      Два прохода с порогами (6,3) и (5,4): одинокие мысы тонут, заливы-«иголки»
@@ -261,6 +305,17 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
   /* --- поля расстояний (Jimbly: coast/ocean distance fields) --- */
   const distToOcean = distanceField((i) => elevation[i] < seaLevel);
   const distToLand = distanceField((i) => elevation[i] >= seaLevel);
+  /* SDF до разломов: источники — клетки, у которых сосед из другой плиты */
+  const faultDistField = distanceField((i) => {
+    const gx = i % GRID_W;
+    const gy = (i / GRID_W) | 0;
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      const j = neighborIndex(gx, gy, dx, dy);
+      if (j >= 0 && plateId[j] !== plateId[i]) return true;
+    }
+    return false;
+  });
+  faultDist.set(faultDistField);
   /* шельф: мелкий океан у берегов приподнимаем, дальний — углубляем */
   for (let i = 0; i < N; i += 1) {
     if (elevation[i] < seaLevel && distToLand[i] > 0) {
@@ -283,21 +338,32 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
     for (let gx = 0; gx < GRID_W; gx += 1) {
       const i = gy * GRID_W + gx;
       const e = elevation[i];
+      /* ветер: поясное направление + шумовая дисторсия (ianjsikes) */
+      const baseAngle = upwind > 0 ? Math.PI : 0; // поток идёт против upwind-выборки
+      wind[i] = baseAngle + (windNoise(nxSafe(gx), ny) - 0.5) * 1.2;
       let m = moistureNoise(nxSafe(gx), ny) * 0.8 + belt * 0.22 - 0.06;
+      let rain = m;
       if (e >= seaLevel) {
-        m += Math.exp(-Math.max(0, distToOcean[i]) / 18) * 0.25; // океан кормит влагой
+        const coastal = Math.exp(-Math.max(0, distToOcean[i]) / 18) * 0.25;
+        m += coastal; // океан кормит влагой
         const up = elevation[gy * GRID_W + ((gx + upwind + GRID_W) % GRID_W)];
-        m -= clamp01((up - e) * 1.6) * 0.35; // за хребтом — суше
+        const shadow = clamp01((up - e) * 1.6) * opt.rainshadow; // за хребтом — суше
+        m -= shadow;
+        /* осадки: влажность + орографический подъём на наветренном склоне */
+        rain = clamp01(m + clamp01((e - up) * 1.6) * 0.25);
       } else {
         m += 0.15;
+        rain = clamp01(m + 0.1);
       }
       moisture[i] = clamp01(m);
+      rainfall[i] = rain;
       temperature[i] = clamp01(1.04 - lat * 1.08 - Math.max(0, e - seaLevel) * 0.55 + (moistureNoise(nxSafe(gx), ny) - 0.5) * 0.14);
     }
   }
 
   /* --- гидрология (ianjsikes + Jimbly: сток вниз, аккумуляция, озёра) --- */
-  const { river, lake, riverCells, lakeCells } = hydrology(elevation, moisture, seaLevel);
+  mountainify(elevation, seaLevel, opt);
+  const { river, lake, riverCells, lakeCells } = hydrology(elevation, moisture, seaLevel, opt);
 
   let land = 0;
   for (const e of elevation) if (e >= seaLevel) land += 1;
@@ -313,11 +379,16 @@ export function generateContinent({ seed = 'mir-2026' } = {}) {
     stress,
     river,
     lake,
+    rainfall,
+    wind,
+    faultDist,
+    options: opt,
+    stages: GENERATOR_STAGES,
     seaLevel,
     landShare: land / N,
     riverCells,
     lakeCells,
-    plates: PLATES,
+    plates: plateCount,
   };
   world.rgba = paint(world, 'biomes');
   return world;
@@ -328,7 +399,7 @@ const nxSafe = (gx) => gx / GRID_W;
 /* D8-сток: каждая суша-клетка течёт в самого низкого соседа; аккумуляция —
    проходом от высоких к низким. Река — поток выше порога. Яма без стока
    (нет соседа ниже) при влажности > 0.4 — озеро. */
-function hydrology(elevation, moisture, seaLevel) {
+function hydrology(elevation, moisture, seaLevel, opt = DEFAULT_OPTIONS) {
   const N = GRID_W * GRID_H;
   const flowTo = new Int32Array(N).fill(-1);
   const accumulation = new Float32Array(N).fill(1);
@@ -365,16 +436,76 @@ function hydrology(elevation, moisture, seaLevel) {
   let riverCells = 0;
   let lakeCells = 0;
   for (const i of order) {
-    if (accumulation[i] >= 60 && elevation[i] >= seaLevel) {
+    if (accumulation[i] >= opt.riverThreshold && elevation[i] >= seaLevel) {
       river[i] = 1;
       riverCells += 1;
     }
-    if (isPit[i] && moisture[i] > 0.45 && accumulation[i] >= 8) {
+    if (isPit[i] && moisture[i] > opt.lakeMoisture && accumulation[i] >= 25) {
       lake[i] = 1;
       lakeCells += 1;
     }
   }
+  /* заполнение озёр: соседи ниже кромки ямы тоже уходят под воду (Jimbly fillLakes).
+     Расширяемся только от исходных ям в один ободок, иначе потоп каскадится. */
+  const lakeSeeds = [];
+  for (let i = 0; i < N; i += 1) if (lake[i]) lakeSeeds.push(i);
+  for (const i of lakeSeeds) {
+      const gx = i % GRID_W;
+      const gy = (i / GRID_W) | 0;
+      for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+        const j = neighborIndex(gx, gy, dx, dy);
+        if (j >= 0 && elevation[j] >= seaLevel && elevation[j] < elevation[i] + 0.01 && !lake[j]) {
+          lake[j] = 1;
+          lakeCells += 1;
+        }
+      }
+  }
+  /* прунинг рек: одиночные клетки-притоки без соседних рек срезаем */
+  for (let i = 0; i < N; i += 1) {
+    if (!river[i]) continue;
+    const gx = i % GRID_W;
+    const gy = (i / GRID_W) | 0;
+    let near = 0;
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      const j = neighborIndex(gx, gy, dx, dy);
+      if (j >= 0 && river[j]) near += 1;
+    }
+    if (!near && !lake[i]) {
+      river[i] = 0;
+      riverCells -= 1;
+    }
+  }
   return { river, lake, riverCells, lakeCells };
+}
+
+/* Mountainify (идея Jimbly): самые высокие локальные пики с минимальной
+   дистанцией между ними (poisson-отбор по убыванию высоты) поднимаем конусом. */
+function mountainify(elevation, seaLevel, opt) {
+  if (opt.mountainHeight <= 0) return;
+  const candidates = [];
+  for (let i = 0; i < elevation.length; i += 1) {
+    if (elevation[i] > seaLevel + 0.28) candidates.push(i);
+  }
+  candidates.sort((a, b) => elevation[b] - elevation[a]);
+  const peaks = [];
+  const minSep = 16;
+  for (const i of candidates) {
+    if (peaks.length >= 48) break;
+    const gx = i % GRID_W;
+    const gy = (i / GRID_W) | 0;
+    if (peaks.every(([px, py]) => Math.hypot(Math.min(Math.abs(px - gx), GRID_W - Math.abs(px - gx)), py - gy) >= minSep)) peaks.push([gx, gy, i]);
+  }
+  const radius = 9;
+  for (const [px, py, pi] of peaks) {
+    const lift = 0.1 * opt.mountainHeight * (0.6 + elevation[pi]);
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const j = neighborIndex(px, py, dx, dy);
+        const d = Math.hypot(dx, dy);
+        if (j >= 0 && d <= radius && elevation[j] >= seaLevel) elevation[j] = Math.min(1, elevation[j] + lift * (1 - d / radius));
+      }
+    }
+  }
 }
 
 /* ---------- слои-раскраски ---------- */
@@ -426,7 +557,7 @@ const plateRgb = (id) => {
 
 /** Раскрасить мир в одном из слоёв: biomes|elevation|moisture|temperature|plates. */
 export function paint(world, mode = 'biomes') {
-  const { elevation, moisture, temperature, plateId, river, lake, seaLevel } = world;
+  const { elevation, moisture, temperature, plateId, river, lake, seaLevel, rainfall, wind, stress, faultDist } = world;
   const rgba = new Uint8ClampedArray(GRID_W * GRID_H * 4);
   for (let gy = 0; gy < GRID_H; gy += 1) {
     for (let gx = 0; gx < GRID_W; gx += 1) {
@@ -443,6 +574,19 @@ export function paint(world, mode = 'biomes') {
       } else if (mode === 'temperature') {
         const t = temperature[i];
         rgb = e < seaLevel ? [14, 32, 66] : [Math.round(230 * t + 20), Math.round(120 * (1 - Math.abs(t - 0.5) * 2) + 40), Math.round(230 * (1 - t))];
+      } else if (mode === 'rainfall') {
+        const r = rainfall ? rainfall[i] : moisture[i];
+        rgb = e < seaLevel ? [14, 32, 66] : [Math.round(230 * (1 - r)), Math.round(180 * (1 - Math.abs(r - 0.5))), Math.round(60 + 190 * r)];
+      } else if (mode === 'wind') {
+        const a = wind ? wind[i] : 0;
+        const v = 0.5 + 0.5 * Math.sin(a * 3);
+        rgb = e < seaLevel ? [Math.round(20 + 40 * v), Math.round(50 + 50 * v), 110] : [Math.round(90 + 120 * v), Math.round(140 - 60 * v), 90];
+      } else if (mode === 'stress') {
+        const st = stress ? stress[i] : 0;
+        rgb = st > 0.02 ? [Math.round(120 + 130 * Math.min(1, st)), 70, 50] : st < -0.02 ? [50, 80, Math.round(120 + 130 * Math.min(1, -st))] : [e < seaLevel ? 24 : 90, e < seaLevel ? 50 : 95, e < seaLevel ? 90 : 80];
+      } else if (mode === 'faults') {
+        const d = faultDist ? Math.min(30, faultDist[i]) / 30 : 0;
+        rgb = [Math.round(30 + 200 * d), Math.round(30 + 170 * d), Math.round(40 + 120 * d)];
       } else if (mode === 'plates') {
         rgb = plateRgb(plateId[i]);
         if (e < seaLevel) rgb = rgb.map((v) => Math.round(v * 0.55));
@@ -453,7 +597,8 @@ export function paint(world, mode = 'biomes') {
       }
       const left = elevation[gy * GRID_W + ((gx - 1 + GRID_W) % GRID_W)];
       const up = elevation[Math.max(0, gy - 1) * GRID_W + gx];
-      const shade = Math.max(0.72, Math.min(1.22, 1 + (left - e) * 5 + (up - e) * 3));
+      const sun = world.options?.sunAngle ?? 1;
+      const shade = Math.max(0.6, Math.min(1.35, 1 + ((left - e) * 5 + (up - e) * 3) * sun));
       const o = i * 4;
       rgba[o] = rgb[0] * shade;
       rgba[o + 1] = rgb[1] * shade;
@@ -470,8 +615,27 @@ const LAYERS = [
   ['biomes', 'Биомы'],
   ['elevation', 'Высота'],
   ['moisture', 'Влажность'],
+  ['rainfall', 'Осадки'],
   ['temperature', 'Температура'],
+  ['wind', 'Ветер'],
   ['plates', 'Плиты'],
+  ['stress', 'Границы плит'],
+  ['faults', 'До разломов'],
+];
+
+/* Панель параметров (spectrum-art UI controls + стадии blslade):
+   [ключ, подпись, min, max, step] — всё в единицах DEFAULT_OPTIONS. */
+const CONTROLS = [
+  ['plates', 'Плит', 6, 24, 1],
+  ['landShare', 'Доля суши', 0.2, 0.55, 0.01],
+  ['mountainHeight', 'Высота гор', 0, 2, 0.1],
+  ['mountainRadius', 'Ширина гор у границ', 6, 26, 1],
+  ['warp', 'Излом берегов (warp)', 0, 2, 0.1],
+  ['roughness', 'Рельефность', 0, 2, 0.1],
+  ['fossil', 'Древние хребты', 0, 1, 0.05],
+  ['rainshadow', 'Дождевая тень', 0, 1, 0.05],
+  ['riverThreshold', 'Порог рек', 20, 160, 5],
+  ['sunAngle', 'Тень рельефа', 0, 2, 0.1],
 ];
 
 /**
@@ -489,26 +653,52 @@ export function mountContinentView(host, { config } = {}) {
     <div class="world-map-view-toolbar" role="group" aria-label="Слой карты">
       ${LAYERS.map(([id, label]) => `<button class="world-map-view-button" type="button" data-layer="${id}" aria-pressed="${id === 'biomes'}">${label}</button>`).join('')}
     </div>
+    <details class="world-map-view-settings">
+      <summary>Параметры генератора</summary>
+      ${CONTROLS.map(([key, label, min, max, step]) => `
+        <label class="world-map-view-setting">${label}
+          <input type="range" data-opt="${key}" min="${min}" max="${max}" step="${step}" value="${DEFAULT_OPTIONS[key]}" />
+          <output data-opt-out="${key}">${DEFAULT_OPTIONS[key]}</output>
+        </label>`).join('')}
+      <p class="world-map-view-note">Стадии: ${GENERATOR_STAGES.join(' → ')}</p>
+    </details>
     <p class="world-map-view-hud" data-role="world-map-hud" role="status"></p>`;
   host.append(root);
 
   let world = null;
+  let layer = 'biomes';
   const canvas = root.querySelector('[data-role="world-map-canvas"]');
   const hud = root.querySelector('[data-role="world-map-hud"]');
-  try {
-    world = generateContinent({ seed: config?.seed || 'mir-2026' });
-    const draw = (mode) => {
-      canvas.getContext('2d').putImageData(new ImageData(paint(world, mode), world.width, world.height), 0, 0);
-      root.querySelectorAll('[data-layer]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.layer === mode)));
-    };
-    draw('biomes');
-    root.querySelectorAll('[data-layer]').forEach((b) => b.addEventListener('click', () => draw(b.dataset.layer)));
-    hud.textContent =
-      `Мир ${world.seed}: суша ${(world.landShare * 100).toFixed(0)}%, рек ${world.riverCells}, озёр ${world.lakeCells}, ` +
-      `плит ${world.plates}. Плиты → горы на границах → ветер и осадки → реки → биомы.`;
-  } catch (error) {
-    hud.textContent = `Карта не построилась: ${error instanceof Error ? error.message : String(error)}`;
-  }
+  const currentOptions = () => {
+    const out = {};
+    root.querySelectorAll('[data-opt]').forEach((input) => { out[input.dataset.opt] = Number(input.value); });
+    return out;
+  };
+  const draw = () => {
+    if (!world) return;
+    canvas.getContext('2d').putImageData(new ImageData(paint(world, layer), world.width, world.height), 0, 0);
+    root.querySelectorAll('[data-layer]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.layer === layer)));
+  };
+  const regenerate = () => {
+    try {
+      world = generateContinent({ seed: config?.seed || 'mir-2026', options: currentOptions() });
+      draw();
+      hud.textContent =
+        `Мир ${world.seed}: суша ${(world.landShare * 100).toFixed(0)}%, рек ${world.riverCells}, озёр ${world.lakeCells}, ` +
+        `плит ${world.plates}. Стадии: ${GENERATOR_STAGES.join(' → ')}.`;
+    } catch (error) {
+      hud.textContent = `Карта не построилась: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
+  root.querySelectorAll('[data-layer]').forEach((b) => b.addEventListener('click', () => { layer = b.dataset.layer; draw(); }));
+  let timer = 0;
+  root.querySelectorAll('[data-opt]').forEach((input) => input.addEventListener('input', () => {
+    const out = root.querySelector(`[data-opt-out="${input.dataset.opt}"]`);
+    if (out) out.textContent = input.value;
+    clearTimeout(timer);
+    timer = setTimeout(regenerate, 180);
+  }));
+  regenerate();
 
   return {
     element: root,

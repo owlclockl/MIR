@@ -7098,3 +7098,11 @@ button.admin-file-row--active:hover {
 
 @media (prefers-reduced-motion: reduce) {
   }
+
+/* Панель параметров генератора континентов */
+.world-map-view-settings { margin: var(--sp-8, 8px); padding: var(--sp-8, 8px); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(8,13,14,.72); color: #ededf0; }
+.world-map-view-settings summary { cursor: pointer; font-weight: 600; }
+.world-map-view-setting { display: grid; grid-template-columns: 150px 1fr 44px; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; }
+.world-map-view-setting input[type="range"] { width: 100%; }
+.world-map-view-setting output { text-align: right; font-variant-numeric: tabular-nums; }
+.world-map-view-note { margin: 8px 0 0; font-size: 11px; opacity: .75; overflow-wrap: anywhere; }
