@@ -62,6 +62,14 @@ const ROOT_FILES = ['dist', 'mir.html'];
    процедурный 2D-генератор до 1 000 000 клеток (src/game/procedural-generator.js)
    и воксельный мир планетарного масштаба. Бюджеты подняты с запасом:
    16 МБ JS, 4 МБ CSS, 4 МБ FMG CSS и 120 МиБ для автономного mir.html.
+
+   Свой генератор вместо двух прежних (2026-10-13): «Тест-генератор» и «Карта
+   блоками» показывают один и тот же мир собственного генератора
+   (src/gen/* + src/game/mc-world-view.js), поэтому из сборки ушли и
+   процедурный 2D-генератор (src/game/procedural-generator.js), и воксельный
+   слой по снимку Azgaar (src/world/field.js, chunk.js, atlas.js, layers.js,
+   world.js, blocks.js, math.js, src/game/world-view.js). Мост к документу
+   Azgaar (src/world/bridge.js) остался: им пользуется только карта планеты.
 */
 export const BUDGETS = {
   js: 16 * 1024 * 1024,

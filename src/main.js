@@ -13,15 +13,8 @@ import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import { createEditorFrame } from './game/azgaar.js';
 import { startLobbySync } from './game/lobby-sync.js';
-import { mountWorldView } from './game/world-view.js';
+import { mountBlockWorldView } from './game/mc-world-view.js';
 import { mountPlanetView } from './planet/view.js';
-import {
-  WORLD_TEMPLATES,
-  generateProceduralWorld,
-  mountProceduralGenerator,
-  toAzgaarWindow,
-} from './game/procedural-generator.js';
-import { mapsReady } from './world/bridge.js';
 import * as lobby from './data/lobby.js';
 import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
 import { seedArtOrIcon } from './ui/seed-art.js';
@@ -2245,11 +2238,10 @@ const createWorldSession = () => ({
   importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
   config: store.normalizeWorldConfig({ seed: worldSeed() }),
   frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  voxel: false, // надстройка «карта блоками» (плоские ярусы) над экраном карты
-  voxelView: null, // смонтированный вид: dispose при выходе из режима
-  procGen: false, // надстройка «тестовый процедурный генератор 2D»
-  procView: null, // смонтированный тестовый генератор
-  procWindow: null, // синтетическое окно { grid, pack } от процедурного генератора
+  voxel: false, // режим «Карта блоками»: тот же мир ярусами, срез плоскостью
+  procGen: false, // режим «Тест-генератор»: тот же мир картой — биомы и рельеф
+  blockView: null, // смонтированный вид блочного мира; он один на оба режима
+  blockMode: '', // каким слоем открыт вид: 'map' или 'blocks'
   planet: false, // надстройка «планетарный генератор 23 слоя»
   planetView: null, // смонтированный вид планеты
   lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
@@ -2462,9 +2454,9 @@ const worldPageHtml = () => {
       : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
   const mapViewButtons = screen === 'map'
     ? `
-        <button class="world-topbar-button" type="button" data-action="world-proc-gen" aria-label="Тест-генератор 2D" title="Высокодетальный процедурный 2D-генератор (до 1 000 000 клеток)">${icon('compass', 'icon--xs')}<span>Тест-генератор</span></button>
+        <button class="world-topbar-button" type="button" data-action="world-proc-gen" aria-label="Тест-генератор" title="Карта нового генератора: биомы, рельеф, климат — тот же мир, что и в карте блоками">${icon('compass', 'icon--xs')}<span>Тест-генератор</span></button>
         <button class="world-topbar-button" type="button" data-action="world-planet" aria-label="Планета 23 слоя" title="Планетарный генератор: 23 слоя, тектоника, атмосфера, гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Карта блоками: тот же мир ярус за ярусом, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
+        <button class="world-topbar-button" type="button" data-action="world-voxel" aria-label="Карта блоками" title="Тот же мир ярус за ярусом: блок за блоком, срез плоскостью">${icon('layers', 'icon--xs')}<span>Карта блоками</span></button>`
     : '';
   const masterMapActions = screen === 'map' && !player
     ? `
@@ -2558,10 +2550,11 @@ const mountWorldEditor = () => {
   }
 };
 
-/* Блочная карта — надстройка над экраном карты: тот же iframe, тот же
-   документ Azgaar. Страницу при переключении не перерисовываем: это создало бы
-   новый iframe и запустило генерацию заново. Поэтому только класс на .world-app
-   и монтирование/снятие вида. */
+/* Вид блочного мира — надстройка над экраном карты, но не над документом
+   Azgaar: и «Тест-генератор», и «Карта блоками» показывают один и тот же мир
+   собственного генератора, только разными слоями. Редактор карты (iframe)
+   остаётся под видом и при переключении не перерисовывается: иначе каждый вход
+   в режим запускал бы генерацию Azgaar заново. */
 const syncWorldVoxel = () => {
   const session = ui.world;
   const root = worldRoot();
@@ -2571,6 +2564,7 @@ const syncWorldVoxel = () => {
   const wantedProc = session.screen === 'map' && session.procGen === true;
   const wantedPlanet = session.screen === 'map' && session.planet === true && !wantedProc;
   const wantedVoxel = session.screen === 'map' && session.voxel === true && !wantedProc && !wantedPlanet;
+  const mode = wantedProc ? 'map' : wantedVoxel ? 'blocks' : '';
 
   app.classList.toggle('is-proc-gen', wantedProc);
   app.classList.toggle('is-planet', wantedPlanet);
@@ -2590,27 +2584,20 @@ const syncWorldVoxel = () => {
 
   const host = root.querySelector('[data-role="world-editor-host"]');
 
-  /* 1. Тестовый процедурный 2D-генератор (до 1 000 000 клеток). */
-  if (!wantedProc) {
-    session.procView?.dispose();
-    session.procView = null;
-  } else if (host && (!session.procView || !session.procView.element?.isConnected)) {
-    session.procView?.dispose();
-    session.procView = mountProceduralGenerator(host, {
+  /* 1. Блочный мир: карта (биомы) или срез (ярусы) — смотря какой режим. */
+  if (!mode) {
+    session.blockView?.dispose();
+    session.blockView = null;
+    session.blockMode = '';
+  } else if (host && (!session.blockView || !session.blockView.element?.isConnected || session.blockMode !== mode)) {
+    session.blockView?.dispose();
+    session.blockMode = mode;
+    session.blockView = mountBlockWorldView(host, {
+      mode,
       config: session.config,
-      onWorldChange: (world, azWin) => {
-        session.procWindow = azWin;
-        session.config = { ...session.config, seed: world.seed };
-        const seedNode = app.querySelector('.world-topbar__seed');
-        if (seedNode) seedNode.textContent = worldSessionInfo(session);
-      },
-      onOpenVoxel: (_world, azWin) => {
-        session.procWindow = azWin;
-        session.procGen = false;
-        session.planet = false;
-        session.voxel = true;
-        playSound('open');
-        syncWorldVoxel();
+      onExit: () => {
+        if (mode === 'map') setWorldProcGen(false);
+        else setWorldVoxel(false);
       },
     });
   }
@@ -2631,36 +2618,6 @@ const syncWorldVoxel = () => {
       onExit: () => setWorldPlanet(false),
     });
   }
-
-  /* 3. Воксельная карта блоками (с мгновенным мостом от процедурного генератора). */
-  if (!wantedVoxel) {
-    worldVoxelWatch?.disconnect();
-    worldVoxelWatch = null;
-    session.voxelView?.dispose();
-    session.voxelView = null;
-    return;
-  }
-  if (!host) return;
-  const frame = host.querySelector('[data-role="world-editor"]');
-  if (session.voxelView && session.voxelView.frame !== frame) {
-    session.voxelView.dispose();
-    session.voxelView = null;
-  }
-  if (session.voxelView && session.voxelView.element?.isConnected) return;
-  session.voxelView?.dispose();
-  watchWorldLive(host);
-
-  let sourceFrame = frame;
-  if (session.procWindow && !mapsReady(frame?.contentWindow)) {
-    sourceFrame = { contentWindow: session.procWindow };
-  }
-
-  session.voxelView = mountWorldView(host, {
-    frame: sourceFrame,
-    config: session.config,
-    onExit: () => setWorldVoxel(false),
-  });
-  session.voxelView.frame = frame;
 };
 
 const setWorldProcGen = (on) => {
@@ -2703,7 +2660,7 @@ const setWorldVoxel = (on) => {
   }
   playSound(wanted ? 'open' : 'close');
   syncWorldVoxel();
-  if (wanted && session.voxelView?.error) toast(session.voxelView.error, 'error');
+  if (wanted && session.blockView?.error) toast(session.blockView.error, 'error');
 };
 
 /* Выход с экрана карты: режим гасим сразу, чтобы возврат в слоты не оставил
@@ -2711,40 +2668,14 @@ const setWorldVoxel = (on) => {
 const dropWorldVoxel = () => {
   const session = ui.world;
   if (!session) return;
-  worldVoxelWatch?.disconnect();
-  worldVoxelWatch = null;
-  session.voxelView?.dispose();
-  session.voxelView = null;
+  session.blockView?.dispose();
+  session.blockView = null;
+  session.blockMode = '';
   session.voxel = false;
-  session.procView?.dispose();
-  session.procView = null;
   session.procGen = false;
-  session.procWindow = null;
   session.planetView?.dispose();
   session.planetView = null;
   session.planet = false;
-};
-
-/* Живой предпросмотр правок мастера — это снимки поверх iframe, а карта блоками
-   читает документ самого игрока. Держать их вместе нельзя: игрок видел бы чужую
-   карту поверх своей. Накладка появляется без перерисовки страницы, поэтому
-   за ней следит наблюдатель и гасит режим. */
-let worldVoxelWatch = null;
-const watchWorldLive = (host) => {
-  worldVoxelWatch?.disconnect();
-  worldVoxelWatch = null;
-  if (!host || typeof MutationObserver !== 'function') return;
-  worldVoxelWatch = new MutationObserver(() => {
-    if (!ui.world?.voxel || !host.querySelector('.world-live.is-on')) return;
-    setWorldVoxel(false);
-    toast('Мастер вносит правки: карта блоками показывает вашу копию карты, режим выключен.');
-  });
-  worldVoxelWatch.observe(host, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class'],
-  });
 };
 
 /* Слот получает параметры и открывается картой. Общий путь для «Создать»,
@@ -4527,21 +4458,17 @@ const actions = {
     setWorldPlanet(!session.planet);
   },
 
-  /* Блочная карта строится из живого документа карты. Пока генератор считает,
-     вид ждёт его сам (mountWaitingView), поэтому кнопка отвечает только за
-     режим — кроме одного случая ниже: если мир и правда не построился, второе
-     нажатие пробует снова, а не выключает режим. */
   'world-voxel': () => {
     const session = ui.world;
     if (!session?.open || session.screen !== 'map') return;
-    /* Режим включён, но мир не построился — повторное нажатие пробует снова,
-       а не выключает режим. */
-    if (session.voxel && session.voxelView?.error) {
-      session.voxelView.dispose();
-      session.voxelView = null;
+    /* Режим уже включён, но холст не открылся (нет 2D-контекста) — повторное
+       нажатие пробует снова и говорит, что случилось, а не выключает режим. */
+    if (session.voxel && session.blockView?.error) {
+      session.blockView.dispose();
+      session.blockView = null;
+      session.blockMode = '';
       syncWorldVoxel();
-      const error = session.voxelView?.error;
-      toast(error ?? 'Карта блоками построена.', error ? 'error' : 'ok');
+      toast(session.blockView?.error ?? 'Карта блоками открыта.', session.blockView?.error ? 'error' : 'ok');
       return;
     }
     setWorldVoxel(!session.voxel);
@@ -4639,6 +4566,8 @@ const actions = {
     if (session.slot) {
       enterWorldMap(session.slot, config);
     } else {
+      /* Песочница без слота: мир пересобирается с новым seed, а режим остаётся
+         тем же — иначе «Новый мир» выбрасывал бы человека из карты. */
       const wasProc = session.procGen;
       dropWorldVoxel();
       session.config = config;

@@ -209,7 +209,8 @@ const readRivers = (win, pack, width, height) => {
  * @param {Window} win окно iframe с Azgaar
  * @param {{ seed?: string, width?: number, height?: number }} [hint]
  *   размеры из конфигурации мира — нужны, если документ их не отдал
- * @returns {object} source для buildField (см. src/world/field.js)
+ * @returns {object} source — снимок для своего читателя: им пользуется карта
+ *   планеты (src/planet/source.js)
  */
 export const readSource = (win, hint = {}) => {
   if (!win) throw new VoxelSourceError('документ редактора не открыт');
