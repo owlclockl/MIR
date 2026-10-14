@@ -1,7 +1,7 @@
-// Legacy workbench regression is explicitly opt-in; default unified UI is checked by test:unified-planet-browser.
 /* Смоук-проверка интерфейса: настоящий `mir.html` открывается в jsdom,
-   и по нему кликают, как человек, — карту Azgaar, окна меню и настройки,
-   общий хаб, подключение по адресу, регистрацию, профиль и отключение.
+   и по нему кликают, как человек, — окна меню и настройки, общий хаб,
+   подключение по адресу, регистрацию, профиль, отключение и то, что
+   игровых экранов (кнопки «Играть», слотов и карты) в приложении нет.
 
    Зачем: собранный файл — это то, что получает игрок. Проверки логики
    (`test:hub`, `test:p2p`) не видят разметку, а опечатка в обработчике
@@ -55,7 +55,7 @@ const testCanvasContext = (canvas) => new Proxy({
 });
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
-  url: 'http://127.0.0.1:9999/?mapTools=1',   // «страница» не хаб: его на этом порту нет
+  url: 'http://127.0.0.1:9999/',   // «страница» не хаб: его на этом порту нет
   pretendToBeVisual: true,
   /* fetch нужен уже на старте: приложение сразу проверяет новую сборку. */
   beforeParse(w) {
@@ -100,7 +100,7 @@ const bootPage2 = (saved, pageUrl = `${HUB}/`) => {
   const origin = new URL(pageUrl).origin;
   return new JSDOM(htmlReload, {
     runScripts: 'dangerously',
-    url: (() => { const u = new URL(pageUrl); u.searchParams.set('mapTools', '1'); return u.href; })(),
+    url: pageUrl,
     pretendToBeVisual: true,
     beforeParse(w) {
       w.HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -194,7 +194,9 @@ ok(
 );
 ok('FMG не регистрирует вложенный worker, корневой worker обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
 
-/* Веб-бандл открываем отдельно от mir.html: там Azgaar подключается ссылкой fmg/index.html, а не вшитым шаблоном. */
+/* Веб-бандл открываем отдельно от mir.html: это тот же src/main.js, но
+   собранный сборщиком. Проверяем, что он поднимает меню сообщества и не
+   тащит игровые экраны (статику отдельно сторожит `npm run test:build`). */
 const webIndex = readFileSync(fromRoot('dist/index.html'), 'utf8');
 const webScriptPath = webIndex.match(/<script type="module"[^>]*src="([^"]+)"/)?.[1]?.replace(/^\//, '');
 if (!webScriptPath) throw new Error('В dist/index.html не найден входной модуль веб-сборки');
@@ -206,7 +208,7 @@ const webMarkup = webIndex
   .replace('</body>', () => `<script>${webCode.replaceAll('</script', '<\\/script')}</script>\n  </body>`);
 const webDom = new JSDOM(webMarkup, {
   runScripts: 'dangerously',
-  url: `${HUB}/?mapTools=1&fmg-smoke=${Date.now()}`,
+  url: `${HUB}/?web-bundle=${Date.now()}`,
   pretendToBeVisual: true,
   beforeParse(w) {
     w.fetch = (input, init) => fetchStub(w)(new URL(String(input), w.location.href).href, init);
@@ -227,216 +229,54 @@ const webClick = (selector) => webWindow.document.querySelector(selector)?.dispa
 );
 try {
   await wait(60);
-  webClick('.play-button');
+  ok(
+    'веб-сборка: меню сообщества на месте, игровых экранов нет',
+    !!webWindow.document.querySelector('.shell')
+      && !!webWindow.document.querySelector('[data-action="open-hub"]')
+      && !!webWindow.document.querySelector('[data-action="open-direct"]')
+      && !webWindow.document.querySelector('.play-button')
+      && !webWindow.document.querySelector('[data-action^="open-world"]')
+      && !webWindow.document.querySelector('#world-page-root'),
+  );
+  webClick('[data-action="open-direct"]');
   await wait(40);
-  /* «Играть» открывает экран слотов: мастер создаёт карту в первом слоте. */
-  webClick('[data-action="world-slot-create"][data-slot-index="0"]');
-  await wait(40);
-  const webSeed = webWindow.document.querySelector('[data-role="world-seed"]');
-  if (webSeed) webSeed.value = 'MIR-UI-TEST';
-  webClick('[data-action="world-generate"]');
-  await wait(60);
   ok(
-    'веб-сборка: поверхность открыта поверх Azgaar, собственного генератора нет',
-    !!webWindow.document.querySelector('.world-editor-frame')
-      && !webWindow.document.querySelector('[data-role="world-map-view"]')
-      && !webWindow.document.querySelector('[data-action="world-map-view"]')
-      && webWindow.document.querySelector('[data-action="world-surface"]')?.getAttribute('aria-pressed') === 'true'
-      && !!webWindow.document.querySelector('[data-role="surface-view"]'),
+    'веб-сборка: окно прямого подключения открывается из обработчиков',
+    webWindow.document.querySelector('.dialog__title')?.textContent === 'Прямое подключение',
   );
-  const webFrame = webWindow.document.querySelector('.world-editor-frame');
-  const webSrc = webFrame?.getAttribute('src') ?? '';
-  const webUrl = new URL(webSrc, webWindow.location.href);
-  ok(
-    'веб-сборка: Azgaar подключён через fmg/index.html',
-    webUrl.pathname.endsWith('/fmg/index.html') && !webFrame?.srcdoc,
-    webSrc,
-  );
-  ok(
-    'веб-сборка: Azgaar получает seed, земной размер, 100000 точек и options=default',
-    webUrl.searchParams.get('seed') === 'MIR-UI-TEST'
-      && webUrl.searchParams.get('width') === '40075017'
-      && webUrl.searchParams.get('height') === '20003932'
-      && webUrl.searchParams.get('points') === '100000'
-      && webUrl.searchParams.get('options') === 'default'
-      && webUrl.searchParams.get('world') === 'earth',
-    webSrc,
-  );
-  webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-  await wait(30);
-  ok('веб-сборка: Escape из поверхности возвращает в редактор', webWindow.document.querySelector('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
-  webWindow.document.body.dispatchEvent(new webWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-  await wait(30);
-  ok('веб-сборка: второй Escape закрывает карту', !webWindow.document.querySelector('#world-page-root .world-app'));
 } finally {
   webWindow.close();
 }
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
-  'главное меню без дублей: единственная кнопка «Играть», 5 пунктов разделов, сводка на витрине',
-  $$('[data-action="open-world"]').length === 1
-    && $$('[data-action="open-lobby"]').length === 1
-    && $$('[data-action="open-hub"]').length === 1
+  'главное меню сообщества: хаб, прямое подключение и настройки без игровых разделов',
+  $$('[data-action="open-hub"]').length === 1
+    && $$('[data-action="open-direct"]').length === 1
     && $$('[data-action="open-settings"]').length === 1
-    && !!$('.sidenav__play')
-    && $$('.sidenav__item').length === 5
+    && $$('.sidenav__item').length === 3
     && !!$('.hero__stats')
-    && !!$('[data-region="sidenav"] [data-action="open-world-map"]'),
+    && !$('[data-action^="open-world"]')
+    && !$('.play-button'),
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
 );
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
-/* Быстрый запуск временно открывает существующий Azgaar, не старый движок. */
-click('[data-action="open-world-map"]');
-await wait(100);
+/* Кнопка «Играть» и весь её экран удалены: ни картотеки слотов, ни карты,
+   ни маршрута #play в приложении быть не должно. */
 ok(
-  'из меню открывается пиксельная поверхность без удалённого основного генератора',
-  !!$('.world-editor-frame') && !$('[data-role="world-map-view"]')
-    && !$('[data-action="world-map-view"]')
-    && $('[data-action="world-surface"]')?.getAttribute('aria-pressed') === 'true'
-    && !!$('[data-role="surface-view"]'),
+  'игровых экранов нет: ни кнопки «Играть», ни страницы слотов, ни карты',
+  !$('.play-button') && !$('[data-action^="open-world"]') && !$('#world-page-root') && !$('.world-app'),
 );
-const quickFrame = $('.world-editor-frame');
-click('[data-action="world-editor"]');
-await wait(30);
-ok('переход в редактор снимает поверхность, но сохраняет географию', !$('[data-role="surface-view"]') && $('.world-editor-frame') === quickFrame);
-click('[data-action="world-surface"]');
-await wait(30);
-ok('поверхность возвращается на том же iframe', !!$('[data-role="surface-view"]') && $('.world-editor-frame') === quickFrame);
-window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-await wait(30);
-ok('Escape из поверхности возвращает в Azgaar', !$('[data-role="surface-view"]') && $('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
-click('[data-action="world-editor"]');
-await wait(30);
-ok('повторный выбор Azgaar не пересоздаёт документ карты', $('.world-editor-frame') === quickFrame);
-ok('планетарный просмотр остался доступен', !!$('[data-action="world-planet"]'));
-click('[data-action="world-planet"]');
-await wait(40);
-ok('планетарный вид открывается поверх того же документа Azgaar',
-  $('.world-app')?.classList.contains('is-planet') && $('.world-editor-frame') === quickFrame);
-window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-await wait(30);
-ok('Escape из планеты возвращает к Azgaar и снимает планетарный вид',
-  !$('.world-app')?.classList.contains('is-planet') && $('.world-editor-frame') === quickFrame
-    && $('[data-action="world-editor"]')?.getAttribute('aria-pressed') === 'true');
-click('[data-action="world-exit"]');
-await wait(40);
-
-/* Кнопка «Играть»: экран слотов с ролями, по шесть слотов у каждой и две вкладки. */
-click('.play-button');
-ok('кнопка «Играть» открывает отдельную полноэкранную страницу, не модальное окно', !!$('#world-page-root .world-app') && !$('.dialog--world') && window.document.body.classList.contains('world-page-open'));
-ok('игровая страница отражена в адресе и истории браузера', window.location.hash === '#play');
-ok('в шапке мира одна кнопка выхода в меню без дублей', $$('#world-page-root [data-action="world-exit"]').length === 1);
-ok('в мире нет снимка атласа, экспорта PNG, слоёв и камеры', !$('[data-action="world-save"]') && !$('[data-action="world-export-image"]') && !$('[data-action="world-layer"]') && !$('[data-role="world-focus-map"]'));
+window.location.hash = '#play';
+await wait(60);
 ok(
-  'слоты: по шесть на каждой роли, две вкладки, выбран мастер',
-  $$('[data-action="world-slot-create"]').length === 6
-    && $$('[data-action="world-slot-tab"]').length === 2
-    && $('.world-slot-tab.is-active')?.dataset.tab === 'master'
-    && $('.world-slot-tab[data-tab="player"]') !== null,
+  'адрес #play ничего не открывает: приложение остаётся в меню',
+  !!$('.shell') && !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open'),
 );
-ok(
-  'вкладки и кнопки слотов используют единый набор SVG-иконок',
-  $$('[data-action="world-slot-tab"]').every((button) => button.querySelector('svg.icon'))
-    && $$('[data-action="world-slot-create"] svg.icon').length === 6,
-);
-/* Очистим первый слот мастера после проверки быстрого запуска, чтобы пройти полное создание с нуля. */
-if ($('[data-action="world-slot-clear"][data-slot-index="0"]')) {
-  click('[data-action="world-slot-clear"][data-slot-index="0"]');
-}
-ok('на вкладке мастера пустой слот предлагает создать карту', $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Создать карту'));
-click('[data-action="world-slot-tab"][data-tab="player"]');
-ok(
-  'вкладка игрока: кнопка «Войти в карту» и загрузка файла в пустой слот',
-  $('.world-slot-tab.is-active')?.dataset.tab === 'player'
-    && $('.world-slot-card--empty [data-action="world-slot-create"]')?.textContent.includes('Войти в карту')
-    && !!$('.world-slot-card--empty [data-action="world-slot-import"]'),
-);
-click('[data-action="world-slot-tab"][data-tab="master"]');
-
-/* Мастер: создаёт карту, видит полный редактор и получает случайный seed. */
-click('[data-action="world-slot-create"][data-slot-index="0"]');
-ok(
-  'экран создания: поле seed, размер, кнопка создания и полный редактор',
-  !!$('[data-role="world-seed"]') && !!$('[data-action="world-generate"]') && /ПОЛНЫЙ РЕДАКТОР/.test($('.world-page-body')?.textContent || ''),
-);
-ok('размер по умолчанию — Земля 1:1 (40075017×20003932), доступно 5 пресетов', $('.world-size.is-active')?.dataset.size === 'earth' && $$('.world-size').length === 5);
-const seedBeforeRandom = $('[data-role="world-seed"]').value;
-click('[data-action="world-random-seed"]');
-const masterSeed = $('[data-role="world-seed"]').value;
-ok('кнопка выдаёт новый seed', seedBeforeRandom !== masterSeed && masterSeed.length > 0);
-ok('пресет размера сохраняет набранный seed', $('[data-role="world-seed"]').value === masterSeed && $('.world-size.is-active')?.dataset.size === 'earth');
-click('[data-action="world-generate"]');
+window.location.hash = '';
 await wait(30);
-click('[data-action="world-editor"]');
-await wait(30);
-const masterFrame = $('.world-editor-frame');
-const masterDoc = masterFrame?.srcdoc ?? '';
-ok(
-  'карта мастера: Azgaar встроен с тем же seed, планетарным размером 40075017×20003932, 100000 точек и options=default',
-  masterFrame?.dataset.role === 'world-editor' && masterDoc.includes(`seed=${masterSeed}`) && masterDoc.includes('width=40075017') && masterDoc.includes('height=20003932') && masterDoc.includes('points=100000') && masterDoc.includes('options=default') && masterDoc.includes('world=earth'),
-);
-ok('топбар мастера: Azgaar, планета, «Новый мир» и «Экспорт», без удалённого вида', /РЕЖИМ МАСТЕРА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-map-view"]') && !!$('[data-action="world-editor"]') && !!$('[data-action="world-planet"]') && !$('[data-action="world-voxel"]') && !$('[data-action="world-proc-gen"]') && !!$('[data-action="world-new"]') && !!$('[data-action="world-export"]'));
-ok('однофайловая копия вшивает шаблон Azgaar', !!window.document.getElementById('mir-fmg-template'));
-click('[data-action="world-slots"]');
-const storedAfterCreate = JSON.parse(window.localStorage.getItem('mir-world-slots') || '{}');
-const masterSlot = storedAfterCreate.master?.[0] ?? null;
-ok(
-  'слот хранит только seed и параметры размера, без картинки и правок',
-  !!masterSlot && Object.keys(masterSlot).sort().join(',') === 'height,savedAt,seed,width' && masterSlot.seed === masterSeed && masterSlot.width === 40075017 && masterSlot.height === 20003932,
-  JSON.stringify(masterSlot),
-);
-ok('карточка заполненного слота показывает seed', $('.world-slot-card--filled')?.textContent.includes(masterSeed) === true);
-
-/* Игрок: тот же мир по seed и размеру, но без случайного seed и с панелями, скрытыми в интерфейсе. */
-click('[data-action="world-slot-tab"][data-tab="player"]');
-click('[data-action="world-slot-create"][data-slot-index="0"]');
-ok(
-  'игрок: экран входа без случайного seed и с пометкой «только просмотр»',
-  !$('[data-action="world-random-seed"]') && /Войдите в карту/.test($('.world-page-body')?.textContent || '') && /ТОЛЬКО ПРОСМОТР/.test($('.world-page-body')?.textContent || ''),
-);
-$('[data-role="world-seed"]').value = 'MIR-UI-PLAYER';
-click('[data-action="world-generate"]');
-await wait(30);
-click('[data-action="world-editor"]');
-await wait(30);
-const playerDoc = $('.world-editor-frame')?.srcdoc ?? '';
-ok('игрок: Azgaar открыт с тем же seed, размером 40075017×20003932 и 100000 точек', playerDoc.includes('seed=MIR-UI-PLAYER') && playerDoc.includes('width=40075017') && playerDoc.includes('height=20003932') && playerDoc.includes('points=100000') && playerDoc.includes('world=earth'));
-ok('игрок: режим «РЕЖИМ ИГРОКА», без «Нового мира» и «Экспорта»', /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || '') && !$('[data-action="world-new"]') && !$('[data-action="world-export"]'));
-
-/* Импорт файла карты в пустой слот игрока. */
-click('[data-action="world-slots"]');
-click('[data-action="world-slot-tab"][data-tab="player"]');
-click('[data-action="world-slot-import"][data-slot-index="1"]');
-const fileInput = $('[data-role="world-file"]');
-const payload = JSON.stringify({ format: 'MIR world seed', version: 1, config: { seed: 'IMPORT-UI', width: 1600, height: 1000 } });
-Object.defineProperty(fileInput, 'files', { configurable: true, value: [new File([payload], 'seed.json', { type: 'application/json' })] });
-fileInput.dispatchEvent(new window.Event('change', { bubbles: true }));
-await wait(80);
-ok('импорт файла кладёт карту в слот игрока', /IMPORT-UI/.test($('.world-topbar__seed')?.textContent || '') && /РЕЖИМ ИГРОКА/.test($('.world-topbar__session')?.textContent || ''), $('.world-topbar__seed')?.textContent?.trim());
-click('[data-action="world-exit"]');
-await wait(50);
-ok('«В меню» закрывает игровую страницу и показывает меню', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open') && !!$('.shell'));
-ok(
-  'главное меню: последние миры открываются из «Продолжить» в один клик',
-  $$('[data-action="menu-open-world"]').length > 0 && /IMPORT-UI|MIR-UI/.test($('.continue__list')?.textContent || ''),
-  $('.continue__list')?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120),
-);
-click('[data-action="menu-open-world"]');
-await wait(50);
-ok('«Продолжить» открывает карту напрямую, без картотеки слотов', !!$('#world-page-root .world-app') && /СЛОТ|SEED/.test($('.world-topbar__seed')?.textContent || ''), $('.world-topbar__seed')?.textContent?.trim());
-click('[data-action="world-exit"]');
-await wait(50);
-click('.play-button');
-/* Со страницы слотов достаточно одного Escape. */
-for (let press = 0; press < 1; press += 1) {
-  window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-  await wait(30);
-}
-ok('Escape закрывает мир', !$('#world-page-root .world-app') && !window.document.body.classList.contains('world-page-open'));
-ok('ошибок отрисовки мира нет', errors.length === 0, errors.join(' | '));
 
 /* Обновления: сервер отдаёт сборку 99.0.0, а в странице 0.8.0 — приложение
    обязано сказать об этом строкой под шапкой. Само оно ничего не

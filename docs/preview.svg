@@ -13,7 +13,6 @@
   <linearGradient id="beam"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".38" stop-color="#fff" stop-opacity=".11"/><stop offset=".62" stop-color="#fff" stop-opacity=".11"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
   <linearGradient id="accentL"><stop stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".18"/></linearGradient>
   <linearGradient id="accentR"><stop stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-  <linearGradient id="playAccent"><stop stop-color="#ededf0" stop-opacity="0"/><stop offset=".22" stop-color="#ededf0"/><stop offset=".78" stop-color="#ededf0"/><stop offset="1" stop-color="#ededf0" stop-opacity="0"/></linearGradient>
   <pattern id="grid" width="58" height="58" patternUnits="userSpaceOnUse"><path d="M58 0H0V58" fill="none" stroke="#fff" stroke-opacity=".02"/></pattern>
   <mask id="gridFade"><rect y="78" width="1136" height="780" fill="url(#gridMask)"/></mask>
   <clipPath id="stageClip"><rect y="78" width="1136" height="780"/></clipPath>
@@ -49,7 +48,7 @@
 
 <!-- заголовок -->
 <g text-anchor="start">
-  <text x="292" y="359" font-size="10" font-weight="600" letter-spacing="3" fill="#91a39b">ЦИВИЛИЗАЦИЯ МУДРЕЦОВ</text>
+  <text x="292" y="359" font-size="10" font-weight="600" letter-spacing="3" fill="#91a39b">ЦИВИЛИЗАЦИЯ МУДРЕЦОВ · КАРТОГРАФИЧЕСКИЙ ШТАБ</text>
   <g font-family="Manrope, Arial, sans-serif" font-size="73.6" font-weight="500" letter-spacing="-2.58">
     <text x="292" y="455" fill="#ededf0">The civilization</text>
     <text x="292" y="527" fill="#b6b6be">of the sages</text>
@@ -59,30 +58,31 @@
 
 <rect x="700" y="576" width="64" height="1" fill="url(#accentR)"/>
 
+<!-- сводка витрины: друзья в сети и режим связи -->
+<g>
+  <rect x="292" y="616" width="196" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="312" y="650" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#ededf0">1<tspan font-size="13" fill="#8b8b94">/2</tspan></text>
+  <text x="312" y="669" font-size="10" fill="#65656e">друзей в сети</text>
+  <rect x="500" y="616" width="340" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="520" y="650" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#91a39b">Хаб</text>
+  <text x="520" y="669" font-size="10" fill="#65656e">127.0.0.1:8787</text>
+</g>
 
-<!-- левая навигация: «Играть», разделы, внизу профиль и настройки -->
+
+<!-- левая навигация: сообщество (хаб и прямое подключение) и настройки -->
 <rect x="0" y="78" width="248" height="822" fill="#0d1415" fill-opacity=".66"/>
 <path d="M247.5 78v822" stroke="#fff" stroke-opacity=".08"/>
-<rect x="12" y="94" width="224" height="56" fill="#c2d9c9"/>
-<path d="m86 116 12 6-12 6Z" fill="#080d0e"/>
-<text x="106" y="127" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#080d0e">ИГРАТЬ</text>
 <g font-size="12.5" font-weight="600" fill="#ededf0">
-  <text x="24" y="196">Миры и карты</text>
-  <text x="24" y="244">Лобби с друзьями</text>
-  <text x="24" y="292">Друзья и заявки</text>
-  <text x="24" y="340">Общий хаб</text>
-  <text x="24" y="388">Прямое подключение</text>
+  <text x="24" y="124">Общий хаб</text>
+  <text x="24" y="196">Прямое подключение</text>
 </g>
 <g font-size="10" fill="#65656e">
-  <text x="24" y="212">Слоты мастера и игрока</text>
-  <text x="24" y="260">Общая карта · до 8 игроков</text>
-  <text x="24" y="308">Аккаунт и код-приглашение</text>
-  <text x="24" y="356">Локально, в этом браузере</text>
-  <text x="24" y="404">Без сервера · обмен кодами</text>
+  <text x="24" y="142">Локально, в этом браузере</text>
+  <text x="24" y="214">Без сервера · обмен кодами</text>
 </g>
-<path d="M12 820h224" stroke="#fff" stroke-opacity=".08"/>
-<text x="24" y="848" font-size="12.5" font-weight="600" fill="#ededf0">Профиль</text>
-<text x="24" y="880" font-size="12.5" font-weight="600" fill="#ededf0">Настройки</text>
+<path d="M12 826h224" stroke="#fff" stroke-opacity=".08"/>
+<text x="24" y="856" font-size="12.5" font-weight="600" fill="#ededf0">Настройки</text>
+<text x="24" y="874" font-size="10" fill="#65656e">Звук, анимации, обновления</text>
 
 <!-- подвал -->
 <text x="274" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.10.0</text>
@@ -101,12 +101,6 @@
   <text x="126" y="35" fill="#b6b6be">THE CIVILIZATION</text>
   <text x="126" y="49" fill="#65656e">OF THE SAGES</text>
 </g>
-
-<rect x="482.5" width="171" height="77" fill="#fff" fill-opacity=".042"/>
-<path d="M482.5 0v77M653.5 0v77" stroke="#fff" stroke-opacity=".08"/>
-<rect x="542.5" y="75" width="51" height="2" fill="url(#playAccent)" opacity=".32"/>
-<path d="m530 32.8 11.2 5.7-11.2 5.7Z" fill="#ededf0"/>
-<text x="554.5" y="42.5" font-family="Manrope, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2.2" fill="#ededf0">ИГРАТЬ</text>
 
 <rect x="859" y="24.5" width="86" height="28" fill="none" stroke="#fff" stroke-opacity=".08"/>
 <circle cx="874.5" cy="38.5" r="3.5" fill="#c2d9c9"/>

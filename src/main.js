@@ -11,19 +11,6 @@ import {
 import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
-import { createEditorFrame } from './game/azgaar.js';
-import { startLobbySync } from './game/lobby-sync.js';
-import { mountPlanetView } from './planet/view.js';
-import { mountSurfaceView } from './map/view.js';
-import { mountRtwgView, RTWG_NOTICES, sourceUrl as productSourceUrl } from './rtwg/view.js';
-import { loadPlanetSlot, savePlanetSlot, deletePlanetSlot } from './data/planet-store.js';
-import { PLANET_FORMAT, MAX_PLANET_BYTES, parsePlanet, stringifyPlanet, planetKey } from './world/planet-file.js';
-// Archived workbenches are opt-in diagnostics, never competing products.
-const EXPERT_MAP_TOOLS = new URLSearchParams(location.search).get('mapTools') === '1';
-
-import * as lobby from './data/lobby.js';
-import { lobbyChipHtml, lobbyScreenHtml } from './ui/lobby-view.js';
-import { seedArtOrIcon } from './ui/seed-art.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -133,11 +120,8 @@ const ui = {
   hubDraft: '',
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
-  world: null, // настройки генерации или текущая сессия мира
 };
 
-let worldPageHistoryEntry = false;
-let renderedWorldPageHtml = '';
 let backendReady = store.isBackendInitialized?.() ?? false;
 
 /* Разметка, которая сейчас лежит в слое окон. Сравниваем строки между
@@ -147,8 +131,6 @@ let backendReady = store.isBackendInitialized?.() ?? false;
 let renderedModalHtml = '';
 
 const overlayRoot = () => document.querySelector('#overlay-root');
-const worldPageRoot = () => document.querySelector('#world-page-root');
-const worldRoot = () => ui.world?.open ? worldPageRoot() : overlayRoot();
 
 const openModal = (type, data = null) => {
   ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -2195,701 +2177,6 @@ const adminModalHtml = () => {
   });
 };
 
-/* ---------- мир: слоты, настройка и карта Azgaar ----------------
-   «Играть» открывает страницу с тремя экранами: слоты (шесть на роль),
-   настройка (seed и размер карты) и сама карта. Карта — это редактор
-   Azgaar. Он строит мир заново по seed и размеру, поэтому слот хранит
-   только эти параметры (см. store.js). Мастер получает редактор целиком,
-   игрок — тот же редактор с скрытыми панелями правки (src/game/azgaar.js). */
-
-const WORLD_ROLE_LABELS = { master: 'Мастер', player: 'Игрок' };
-const WORLD_ATTRIBUTION =
-  'Основано на Azgaar’s Fantasy Map Generator · MIT License · Max Haniyeu и contributors';
-
-const worldSeed = () => {
-  const value = new Uint32Array(1);
-  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(value);
-  else value[0] = (Date.now() ^ Math.floor(Math.random() * 0xffff_ffff)) >>> 0;
-  return `SAGES-${value[0].toString(16).toUpperCase().padStart(8, '0')}`;
-};
-
-const worldSizeOf = (config) =>
-  [...store.WORLD_SIZES, ...store.WORLD_LEGACY_SIZES].find(
-    (size) => size.width === config.width && size.height === config.height,
-  ) ?? store.WORLD_DEFAULT_SIZE;
-
-const worldSlotIndex = (el) => {
-  const index = Number(el.dataset.slotIndex);
-  return Number.isInteger(index) && index >= 0 && index < store.WORLD_SLOT_COUNT ? index : null;
-};
-
-const worldSlotDateFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const worldFrameKey = (session) =>
-  `${session.mode}|${session.config.seed}|${session.config.width}x${session.config.height}${
-    session.lobby ? `|lobby:${session.lobby.id}:${session.lobby.epoch}` : ''
-  }`;
-
-const createWorldSession = () => ({
-  open: false,
-  screen: 'slots', // slots — выбор слота, setup — настройка или вход, map — карта мира
-  tab: 'master', // вкладка экрана слотов: master | player
-  mode: 'master', // master получает редактор Azgaar, player — режим просмотра
-  slot: null, // { role, index } — слот, который заполняем или открыли
-  importToSlot: null, // { role, index } — слот для загруженного файла; null — файл заполнит форму
-  config: store.normalizeWorldConfig({ seed: worldSeed() }),
-  frameKey: '', // параметры документа Azgaar: при смене создаём новый iframe
-  viewMode: 'surface', // пиксельный просмотр географии Azgaar
-  surfaceCamera: null, // камера сохраняется при переключении режима
-  surfaceView: null, // read-only пиксельный рендерер
-  planetView: null, // смонтированный вид планеты
-  lobby: null, // { id, role, code, epoch, fresh } — карта открыта из лобби
-  syncStop: null, // остановка синхронизации лобби для текущего iframe
-  leaveArmed: false, // первый клик «Выйти» ждёт подтверждения
-  lobbyDraft: null, // { seed, width, height } — форма «Создать лобби»
-});
-
-const worldSlotCardHtml = (role, index, entry) => {
-  const player = role === 'player';
-  const number = String(index + 1).padStart(2, '0');
-  if (!entry) {
-    return `
-      <article class="world-slot-card world-slot-card--empty" data-slot-role="${role}" data-slot-index="${index}" role="listitem">
-        <header class="world-slot-card__head">
-          <span class="world-slot-card__index">МИР · ${number}</span>
-          <span class="world-slot-card__state"><i aria-hidden="true"></i>Свободен</span>
-        </header>
-        <div class="world-slot-card__ghost" aria-hidden="true">
-          ${icon('map', 'icon--lg')}
-          <span>Пустой слот</span>
-        </div>
-        <div class="world-slot-body">
-          <p class="world-slot-body__title">Слот ${index + 1}</p>
-          <p class="world-slot-body__hint">${player ? 'Войдите в карту мастера по seed или загрузите файл.' : 'Создайте карту — она займёт этот слот.'}</p>
-        </div>
-        <div class="world-slot-actions">
-          <button class="mini-button mini-button--accent" type="button" data-action="world-slot-create" data-slot-index="${index}">
-            ${icon(player ? 'eye' : 'plus', 'icon--xs')}<span>${player ? 'Войти в карту' : 'Создать карту'}</span>
-          </button>
-          <button class="mini-button world-slot-import" type="button" data-action="world-slot-import" data-slot-index="${index}" aria-label="Загрузить файл карты в слот ${index + 1}" title="Открыть файл планеты">${icon('fileDown', 'icon--xs')}</button>
-        </div>
-      </article>`;
-  }
-  const size = worldSizeOf(entry);
-  return `
-    <article class="world-slot-card world-slot-card--filled" data-slot-role="${role}" data-slot-index="${index}" role="listitem">
-      <header class="world-slot-card__head">
-        <span class="world-slot-card__index">МИР · ${number}</span>
-        <span class="world-slot-card__state world-slot-card__state--filled"><i aria-hidden="true"></i>Сохранён</span>
-      </header>
-      <div class="world-slot-card__plate" aria-hidden="true">
-        ${seedArtOrIcon(entry.seed, `${role}-${index}`)}
-        <span>${escapeHtml(size.label)}</span>
-        <small>${entry.width.toLocaleString('ru-RU')} × ${entry.height.toLocaleString('ru-RU')}</small>
-      </div>
-      <div class="world-slot-body">
-        <p class="world-slot-body__title">Мир <code translate="no">${escapeHtml(entry.seed)}</code></p>
-        <p class="world-slot-body__meta"><span>${escapeHtml(size.label)}</span><span>${entry.savedAt ? worldSlotDateFormatter.format(new Date(entry.savedAt)) : ''}</span></p>
-      </div>
-      <div class="world-slot-actions">
-        <button class="mini-button mini-button--accent" type="button" data-action="world-slot-open" data-slot-index="${index}">
-          ${icon(player ? 'eye' : 'play', 'icon--xs')}<span>${player ? 'Играть' : 'Вести карту'}</span>
-        </button>
-        <button class="mini-button world-slot-copy" type="button" data-action="world-slot-copy-seed" data-seed="${escapeHtml(entry.seed)}" aria-label="Скопировать seed ${escapeHtml(entry.seed)}" title="Скопировать seed">${icon('copy', 'icon--xs')}</button>
-        <button class="mini-button mini-button--danger world-slot-clear" type="button" data-action="world-slot-clear" data-slot-index="${index}" aria-label="Очистить слот ${index + 1}" title="Очистить слот">${icon('trash', 'icon--xs')}</button>
-      </div>
-    </article>`;
-};
-
-const worldSlotsHtml = (session) => {
-  const slots = store.loadWorldSlots();
-  const role = store.WORLD_ROLES.includes(session.tab) ? session.tab : 'master';
-  const player = role === 'player';
-  return `
-    <div class="world-shell world-shell--slots">
-      <section class="world-card world-slots">
-        <header class="world-slots__head">
-          <div class="world-slots__intro">
-            <p class="world-card__eyebrow"><span>Картотека</span><span class="world-slots__total">${store.WORLD_SLOT_COUNT} ячеек</span></p>
-            <h2>${player ? 'Выберите карту для входа' : 'Выберите мир для управления'}</h2>
-            <p class="world-slots__lead">${player
-              ? 'Войдите по seed мастера или загрузите файл карты. Карта доступна для просмотра; панели редактирования Azgaar скрыты.'
-              : 'Создайте карту в свободном слоте или продолжите работу с сохранённым миром.'}</p>
-            <p class="world-slots__progress" aria-label="Занято слотов: ${slots[role].filter(Boolean).length} из ${store.WORLD_SLOT_COUNT}"><span style="--filled:${slots[role].filter(Boolean).length / store.WORLD_SLOT_COUNT}"></span><small>${slots[role].filter(Boolean).length} / ${store.WORLD_SLOT_COUNT} занято</small></p>
-          </div>
-          <div class="world-slot-tabs" role="tablist" aria-label="Роль в игре">
-            ${store.WORLD_ROLES.map((value) => {
-              const selected = value === role;
-              const count = slots[value].filter(Boolean).length;
-              const label = WORLD_ROLE_LABELS[value];
-              return `<button class="world-slot-tab${selected ? ' is-active' : ''}" type="button" role="tab" data-action="world-slot-tab" data-tab="${value}" aria-selected="${selected}" aria-label="${label}, занято ${count} из ${store.WORLD_SLOT_COUNT}">
-                ${icon(value === 'master' ? 'crown' : 'eye', 'icon--xs')}<span>${label}</span><span class="world-slot-tab__count" aria-hidden="true">${count}<i>/${store.WORLD_SLOT_COUNT}</i></span>
-              </button>`;
-            }).join('')}
-          </div>
-        </header>
-        <div class="world-slot-grid" role="list" aria-label="Слоты: ${WORLD_ROLE_LABELS[role]}">
-          ${slots[role].map((entry, index) => worldSlotCardHtml(role, index, entry)).join('')}
-        </div>
-      </section>
-    </div>`;
-};
-
-const worldModeToolsHtml = (player) => `
-  <section class="world-card world-mode-panel">
-    <header class="world-card__heading world-card__heading--compact">
-      <div><p class="world-card__eyebrow">Роль доступа</p><h3>${icon(player ? 'eye' : 'crown', 'icon--sm')}<span>${WORLD_ROLE_LABELS[player ? 'player' : 'master']}</span></h3></div>
-      <span class="world-tag world-tag--mode">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ТОЛЬКО ПРОСМОТР' : 'ПОЛНЫЙ РЕДАКТОР'}</span></span>
-    </header>
-    <ul class="world-mode-list">
-      ${(player
-        ? [
-            ['check', 'Карта Azgaar доступна для просмотра'],
-            ['x', 'Редактирование карты Azgaar и экспорт изменений'],
-            ['x', 'Создание нового мира и смена seed'],
-          ]
-        : [
-            ['check', 'Единая карта всей планеты'],
-            ['check', 'Метровые координаты и рельеф'],
-            ['check', 'Сохранение географии и меток в один файл'],
-            ['check', 'Новый мир в один клик'],
-          ])
-        .map(([mark, text]) => `<li class="world-mode-list__item world-mode-list__item--${mark}">${icon(mark === 'check' ? 'check' : 'x', 'icon--xs')}<span>${text}</span></li>`)
-        .join('')}
-    </ul>
-    <p class="world-mode-note">${player
-      ? 'Одна карта планеты, личные метки и измерения. В лобби используется география мастера.'
-      : 'Земной мир: материки на планете 40 075 × 20 004 км, масштаб в километрах. География вымышленная; используется одна география, прочитанная из Azgaar, с периодической долготой и сведёнными полюсами. Метровые адреса не превращают исходные данные в измеренный метровый рельеф.'}</p>
-  </section>`;
-
-const worldSetupHtml = (session) => {
-  const { config, slot } = session;
-  const player = session.mode === 'player';
-  const slotLabel = slot ? `Слот ${slot.index + 1}` : 'Новая карта';
-  return `
-    <div class="world-shell world-shell--setup">
-      <section class="world-card world-config">
-        <div class="world-config__kicker"><span class="world-config__step">${slot ? String(slot.index + 1).padStart(2, '0') : icon('plus', 'icon--xs')}</span><span>${slotLabel} · ${WORLD_ROLE_LABELS[session.mode]}</span></div>
-        <h2>${player ? 'Войдите в карту' : 'Создайте свой мир'}</h2>
-        <p class="world-config__lead">${player
-          ? 'Введите seed и размер, которые назвал мастер, или загрузите файл карты. Тогда мир будет тем же, что у мастера.'
-          : 'Планета займёт этот слот и откроется как единая карта. Выберите «Земля», чтобы получить вымышленные материки земного масштаба, а не обзорный остров.'}</p>
-        <label class="field world-field">
-          <span class="field__label">Seed карты</span>
-          <span class="world-seed-row">
-            <input class="input input--code" type="text" maxlength="${store.WORLD_SEED_MAX}" autocomplete="off" spellcheck="false" data-role="world-seed" value="${escapeHtml(config.seed)}" />
-            ${player ? '' : `<button class="icon-button icon-button--sm world-seed-random" type="button" data-action="world-random-seed" aria-label="Случайный seed" title="Случайный seed">${icon('dices', 'icon--xs')}</button>`}
-            <span class="world-seed-art" data-role="world-seed-art" title="Узор этого seed">${seedArtOrIcon(config.seed, 'setup')}</span>
-          </span>
-          <span class="world-field__hint">${player
-            ? 'Seed выдаёт мастер. Введите его без изменений.'
-            : 'Seed определяет географию Azgaar. Для той же карты нужны одинаковые seed и размер.'}</span>
-        </label>
-        <div class="world-field">
-          <span class="field__label" id="world-size-label">Размер карты</span>
-          <div class="world-size-list" role="radiogroup" aria-labelledby="world-size-label">
-            ${store.WORLD_SIZES.filter(size => EXPERT_MAP_TOOLS || size.width >= 1_000_000).map((size) => {
-              const active = size.width === config.width && size.height === config.height;
-              return `<button class="world-size${active ? ' is-active' : ''}" type="button" role="radio" aria-checked="${active}" data-action="world-size" data-size="${size.id}"><strong>${size.label}</strong><span>${size.width.toLocaleString('ru-RU')} × ${size.height.toLocaleString('ru-RU')}</span></button>`;
-            }).join('')}
-          </div>
-          <span class="world-field__hint">${player
-            ? 'Выберите тот же размер, что у мастера, чтобы континенты и реки совпали.'
-            : '«Земля» — мир 40 075 × 20 004 км с крупными материками. 2× и 4× увеличивают физический мир, а не детализацию; обзорные размеры — старый режим.'}</span>
-        </div>
-        <button class="solid-button world-generate" type="button" data-action="world-generate">
-          <span>${player ? 'Войти в карту' : 'Создать карту'}</span>${icon(player ? 'eye' : 'plus', 'icon--xs')}
-        </button>
-        <button class="ghost-button ghost-button--inline world-import-button" type="button" data-action="world-import">${icon('fileDown', 'icon--xs')}<span>${player ? 'Загрузить файл карты' : 'Открыть файл планеты'}</span></button>
-      </section>
-      ${worldModeToolsHtml(player)}
-    </div>`;
-};
-
-/* Хост Azgaar; дополнительный планетарный вид подключает syncWorldViews. */
-const worldMapHtml = () => `
-  <div class="world-map">
-    <div class="world-editor" data-role="world-editor-host"></div>
-    <p class="world-attribution">${WORLD_ATTRIBUTION}</p>
-  </div>`;
-
-/* Строка сеанса в верхней панели. Seed лобби берём из живого состояния хаба:
-   мастер мог построить новый мир, и панель обязана назвать актуальный мир. */
-const worldSessionInfo = (session) => {
-  if (!session) return '';
-  const { screen, slot, config } = session;
-  if (screen === 'slots') return 'ШЕСТЬ СЛОТОВ · ДВЕ РОЛИ';
-  if (screen === 'lobby') return 'ДО 8 ИГРОКОВ · ОДНА КАРТА';
-  if (session.lobby) {
-    const live = lobby.lobbyState().lobby;
-    const seed = live?.seed ?? config.seed;
-    return `КОД ${escapeHtml(session.lobby.code)} · SEED ${escapeHtml(seed || '—')}`;
-  }
-  return `${slot ? `СЛОТ ${slot.index + 1}` : 'НОВАЯ КАРТА'} · SEED ${escapeHtml(config.seed || '—')}`;
-};
-
-const worldPageHtml = () => {
-  const session = ui.world;
-  if (!session) return '';
-  const { screen, mode } = session;
-  const player = mode === 'player';
-  const titles = {
-    slots: 'Слоты карт',
-    setup: player ? 'Вход в карту' : 'Создание карты',
-    map: session.lobby ? `Лобби · ${session.lobby.role === 'master' ? 'карта мастера' : 'карта игрока'}` : player ? 'Карта · игрок' : 'Карта · мастер',
-    lobby: 'Лобби с друзьями',
-  };
-  const liveLabels = {
-    slots: 'ВЫБОР СЛОТА',
-    setup: player ? 'ВХОД В КАРТУ' : 'НАСТРОЙКА МИРА',
-    map: session.lobby ? 'ОБЩАЯ КАРТА' : player ? 'РЕЖИМ ИГРОКА' : 'РЕЖИМ МАСТЕРА',
-    lobby: 'ЛОББИ',
-  };
-  const sessionInfo = worldSessionInfo(session);
-  const backToSlots = screen === 'slots'
-    ? ''
-    : screen === 'map' && session.lobby
-      ? `<button class="world-topbar-button" type="button" data-action="world-lobby-back" aria-label="К лобби" title="К лобби">${icon('chevronLeft', 'icon--xs')}<span>К лобби</span></button>`
-      : `<button class="world-topbar-button" type="button" data-action="world-slots" aria-label="К слотам" title="К слотам">${icon('chevronLeft', 'icon--xs')}<span>К слотам</span></button>`;
-  const editorLabel = player ? 'Карта Azgaar' : 'Редактор Azgaar';
-  const mapViewButtons = screen === 'map' && EXPERT_MAP_TOOLS
-    ? `
-        <button class="world-topbar-button${session.viewMode === 'surface' ? ' is-on' : ''}" type="button" data-action="world-surface" aria-label="Поверхность" aria-pressed="${session.viewMode === 'surface'}" title="Пиксельная карта рельефа, биомов и рек">${icon('layers', 'icon--xs')}<span>Поверхность</span></button>
-        <button class="world-topbar-button${session.viewMode === 'editor' ? ' is-on' : ''}" type="button" data-action="world-editor" aria-label="${editorLabel}" aria-pressed="${session.viewMode === 'editor'}" title="${player ? 'Просмотр карты Azgaar в режиме игрока' : 'Открыть редактор Azgaar'}">${icon('map', 'icon--xs')}<span>${editorLabel}</span></button>
-        ${!player ? `<button class="world-topbar-button${session.viewMode === 'rtwg' ? ' is-on' : ''}" type="button" data-action="world-rtwg" aria-label="Генератор RTWG" aria-pressed="${session.viewMode === 'rtwg'}" title="RTWG: тектоника, вода, климат — отдельный симулятор">${icon('dices', 'icon--xs')}<span>RTWG</span></button>` : ''}
-        <button class="world-topbar-button${session.viewMode === 'planet' ? ' is-on' : ''}" type="button" data-action="world-planet" aria-label="Планетарный вид" aria-pressed="${session.viewMode === 'planet'}" title="Планетарный вид: тектоника, атмосфера, климат и гидрология">${icon('globe', 'icon--xs')}<span>Планета</span></button>`
-    : '';
-  const masterMapActions = screen === 'map' && !player
-    ? `
-        <button class="world-topbar-button" type="button" data-action="world-new" aria-label="Новый мир" title="Новый мир">${icon('dices', 'icon--xs')}<span>Новый мир</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-export" aria-label="Сохранить планету в файл" title="География, метки и настройки">${icon('fileDown', 'icon--xs')}<span>Сохранить планету</span></button>
-        <button class="world-topbar-button" type="button" data-action="world-import" aria-label="Открыть файл планеты" title="Открыть файл планеты">${icon('fileDown', 'icon--xs')}<span>Открыть</span></button>`
-    : '';
-  const body = screen === 'slots'
-    ? worldSlotsHtml(session)
-    : screen === 'setup'
-      ? worldSetupHtml(session)
-      : screen === 'lobby'
-        ? lobbyScreenHtml(lobbyContext())
-        : worldMapHtml();
-  return `
-    <div class="world-app" role="application" aria-label="The civilization of the sages — карта мира">
-      <header class="world-topbar">
-        <div class="world-topbar__identity">
-          <span class="world-brand-mark">${icon('sigil')}</span>
-          <div class="world-brand-copy"><span>THE CIVILIZATION OF THE SAGES</span><strong>${titles[screen]}</strong></div>
-          ${screen === 'slots' || screen === 'lobby' ? '' : `<span class="world-mode-chip${player ? ' world-mode-chip--player' : ''}">${icon(player ? 'eye' : 'crown', 'icon--xs')}<span>${player ? 'ИГРОК' : 'МАСТЕР'}</span></span>`}
-        </div>
-        <div class="world-topbar__session">
-          <span class="world-topbar__live"><i></i>${liveLabels[screen]}</span>
-          <span class="world-topbar__seed">${sessionInfo}</span>
-          ${screen === 'map' && session.lobby ? '<span class="world-lobby-chip" data-role="lobby-chip"></span>' : ''}
-        </div>
-        <div class="world-topbar__actions">
-          ${backToSlots}${mapViewButtons}${masterMapActions}
-          <button class="world-exit-button" type="button" data-action="world-exit" aria-label="В меню" title="В меню">${icon('logOut', 'icon--xs')}<span>В меню</span></button>
-        </div>
-      </header>
-      <main class="world-page-body${screen === 'map' ? ' world-page-body--map' : ''}" data-role="world-page-body">${body}</main>
-      <input class="world-file-input" type="file" accept="application/json,.json" data-role="world-file" tabindex="-1" aria-hidden="true" />
-    </div>`;
-};
-
-/* Поле seed читаем из DOM: набранный, но ещё не сохранённый текст не должен
-   пропасть при перерисовке (смена размера, кнопка случайного seed). */
-const worldSeedFieldValue = () => {
-  const field = worldRoot()?.querySelector('[data-role="world-seed"]');
-  return field ? field.value.trim() : ui.world?.config.seed ?? '';
-};
-
-const renderWorldPage = ({ focus = false } = {}) => {
-  const root = worldPageRoot();
-  if (!root || !ui.world?.open) return;
-  /* Синхронизация живёт только на экране карты: уходя с него, останавливаем её. */
-  if (ui.world.screen !== 'map' && ui.world.syncStop) {
-    ui.world.syncStop();
-    ui.world.syncStop = null;
-    ui.world.frameKey = '';
-  }
-  const html = worldPageHtml();
-  const current = root.querySelector('.world-app');
-  if (renderedWorldPageHtml !== html || !current) {
-    if (current) current.outerHTML = html;
-    else root.innerHTML = html;
-    renderedWorldPageHtml = html;
-    if (focus) root.querySelector('[data-role="world-seed"]')?.focus();
-  }
-  syncWorldViews();
-  paintLobbyChip();
-};
-
-/* Azgaar сохраняет рабочую карту, планетарный источник и синхронизацию лобби
-   на время подбора нового основного генератора. */
-const mountWorldEditor = () => {
-  const session = ui.world;
-  const host = worldRoot()?.querySelector('[data-role="world-editor-host"]');
-  if (!session?.open || session.screen !== 'map' || !host) return null;
-  const key = worldFrameKey(session);
-  const existing = host.querySelector('[data-role="world-editor"]');
-  if (session.frameKey === key && existing) return existing;
-
-  session.frameKey = key;
-  session.syncStop?.();
-  session.syncStop = null;
-  host.querySelector('[data-role="world-editor-error"]')?.remove();
-  try {
-    const frame = createEditorFrame(session.config, { restricted: session.mode === 'player' });
-    existing?.remove();
-    host.prepend(frame);
-    if (session.lobby) {
-      session.syncStop = startLobbySync(frame, {
-        lobbyId: session.lobby.id,
-        role: session.lobby.role,
-        fresh: session.lobby.fresh,
-      });
-    }
-    return frame;
-  } catch (error) {
-    session.frameKey = '';
-    const message = document.createElement('p');
-    message.className = 'world-editor-error';
-    message.dataset.role = 'world-editor-error';
-    message.setAttribute('role', 'alert');
-    existing?.remove();
-    message.textContent = `Редактор карты не открылся: ${error instanceof Error ? error.message : String(error)}`;
-    host.prepend(message);
-    toast(message.textContent, 'error');
-    return null;
-  }
-};
-
-/* Собственный генератор удалён: остаются Azgaar и дополнительная планета. */
-const planetSlotKey = (session, role = session.mode, index = session.slot?.index ?? 'sandbox') => `${store.getCurrentUser()?.id || 'guest'}:${role}:${index}`;
-const syncWorldViews = () => {
-  const session = ui.world;
-  const root = worldRoot();
-  const app = root?.querySelector('.world-app');
-  if (!session?.open || !app) return;
-
-  const onEditor = session.screen === 'map' && session.viewMode === 'editor';
-  const onPlanet = session.screen === 'map' && session.viewMode === 'planet';
-  const onSurface = session.screen === 'map' && session.viewMode === 'surface';
-  const onRtwg = session.screen === 'map' && session.viewMode === 'rtwg';
-  app.classList.toggle('is-rtwg', onRtwg);
-  const rtwgButton = app.querySelector('[data-action="world-rtwg"]');
-  rtwgButton?.classList.toggle('is-on', onRtwg);
-  rtwgButton?.setAttribute('aria-pressed', String(onRtwg));
-  app.classList.toggle('is-surface', onSurface);
-  const surfaceButton = app.querySelector('[data-action="world-surface"]');
-  surfaceButton?.classList.toggle('is-on', onSurface);
-  surfaceButton?.setAttribute('aria-pressed', String(onSurface));
-  app.classList.toggle('is-planet', onPlanet);
-
-  const editorButton = app.querySelector('[data-action="world-editor"]');
-  editorButton?.classList.toggle('is-on', onEditor);
-  editorButton?.setAttribute('aria-pressed', onEditor ? 'true' : 'false');
-  const planetButton = app.querySelector('[data-action="world-planet"]');
-  planetButton?.classList.toggle('is-on', onPlanet);
-  planetButton?.setAttribute('aria-pressed', onPlanet ? 'true' : 'false');
-
-  const host = root.querySelector('[data-role="world-editor-host"]');
-  if (session.screen !== 'map' || !host) {
-    session.rtwgView?.dispose();
-    session.rtwgView = null;
-    session.surfaceView?.dispose();
-    session.surfaceView = null;
-    session.planetView?.dispose();
-    session.planetView = null;
-    return;
-  }
-
-  if (session.planetRestoreError && !EXPERT_MAP_TOOLS && !session.lobby) {
-    if (!host.querySelector('[data-role="planet-recovery"]')) host.insertAdjacentHTML('beforeend', `<section class="world-editor-error planet-recovery" data-role="planet-recovery" role="alert"><h2>Сохранённая география недоступна</h2><p>Исходная карта по seed может отличаться от сохранённой. Мы не заменяем её автоматически. Откройте файл планеты или явно воссоздайте исходную карту.</p><button class="world-topbar-button" type="button" data-action="world-import">Открыть файл планеты</button><button class="world-topbar-button" type="button" data-action="world-restore-seed">Воссоздать по seed</button></section>`);
-    return;
-  }
-  host.querySelector('[data-role="planet-recovery"]')?.remove();
-  if (session.planetRestoring) return;
-  if (onSurface && !EXPERT_MAP_TOOLS && !session.lobby && !session.planetCacheChecked && !session.planetSnapshot) {
-    session.planetCacheChecked = true; session.planetRestoring = true;
-    const token = session.planetLoadToken = {};
-    const configKey = planetKey(session.config);
-    loadPlanetSlot(planetSlotKey(session)).then(record => {
-      if (ui.world !== session || session.planetLoadToken !== token || session.screen !== 'map') return;
-      if (record && planetKey(record.config) === configKey) {
-        if (record.version !== 1 || !(record.source?.cellH instanceof Float32Array) || record.source.cellH.length !== record.source.cellsX * record.source.cellsY) throw new Error('Повреждённый снимок слота');
-        session.planetSnapshot = record.source;
-      }
-    }).catch(error => {
-      if (ui.world === session && session.planetLoadToken === token) session.planetRestoreError = error;
-    }).finally(() => {
-      if (ui.world === session && session.planetLoadToken === token && session.screen === 'map') { session.planetRestoring = false; syncWorldViews(); }
-    });
-    return;
-  }
-  const editorFrame = session.planetSnapshot && !session.lobby && !EXPERT_MAP_TOOLS ? null : mountWorldEditor();
-  if (onRtwg && session.mode !== 'player' && !session.rtwgView?.element?.isConnected) {
-    session.rtwgView?.dispose();
-    session.rtwgView = mountRtwgView(host, {
-      config: session.config, initialSnapshot: session.rtwgSnapshot,
-      onSnapshot: snapshot => { session.rtwgSnapshot = snapshot; },
-      onExit: () => setWorldView('surface'),
-      onApply: async engine => {
-        const win = editorFrame?.contentWindow;
-        if (!win?.HeightmapGenerator?.queueExternalHeightmap || !win.regenerateMap) throw new Error('Редактор ещё не готов к импорту RTWG. Подожди загрузки карты.');
-        const rock = engine.read(0), soil = engine.read(1);
-        const values = Float32Array.from({ length: engine.width * engine.height }, (_,i) => rock[i*4] + Math.max(0,soil[i*4]));
-        win.HeightmapGenerator.queueExternalHeightmap({width:engine.width,height:engine.height,values,sea:engine.parameters.water.sea_level,scale:4000});
-        await new Promise((resolve,reject) => {
-          const clean = () => { clearTimeout(timer); win.removeEventListener('map:generated', done); };
-          const done = () => { clean(); resolve(); };
-          const timer = setTimeout(() => { clean(); win.HeightmapGenerator.cancelExternalHeightmap(); reject(new Error('Импорт RTWG не завершён. Проверь сообщение редактора.')); },120000);
-          win.addEventListener('map:generated',done);
-          try { win.regenerateMap({seed:session.config.seed}); } catch(e) { clean(); win.HeightmapGenerator.cancelExternalHeightmap(); reject(e); }
-        });
-        toast('Рельеф RTWG перенесён. «Сохранить планету» сохраняет текущую географию; полный проект редактора сохраняется как .map.');
-        setWorldView('surface');
-      },
-    });
-  }
-  if (session.rtwgView?.element) session.rtwgView.element.hidden = !onRtwg;
-  if (onSurface && (editorFrame || session.planetSnapshot)) {
-    if (!session.surfaceView?.element?.isConnected) {
-      session.surfaceCamera = session.surfaceView?.getState().camera || session.surfaceCamera;
-      session.surfaceView?.dispose();
-      session.surfaceView = mountSurfaceView(host, {
-        frame: editorFrame, config: session.config, initialCamera: session.surfaceCamera,
-        sourceSnapshot: !session.lobby && !EXPERT_MAP_TOOLS ? session.planetSnapshot : null,
-        unified: !EXPERT_MAP_TOOLS, showWorkbench: EXPERT_MAP_TOOLS, freezeSource: !EXPERT_MAP_TOOLS && !session.lobby,
-        onSource: source => {
-          if (session !== ui.world || session.screen !== 'map' || session.lobby || EXPERT_MAP_TOOLS) return;
-          session.planetSnapshot = source;
-          const config = { ...session.config };
-          savePlanetSlot(planetSlotKey(session), { version: 1, config, source }).then(() => {
-            if (session === ui.world && planetKey(session.config) === planetKey(config)) {
-              session.surfaceView?.element?.setAttribute('data-persisted', 'true');
-              const label = session.surfaceView?.element?.querySelector('[data-role="planet-persistence"]');
-              if (label) label.textContent = 'География сохранена на устройстве. Файл планеты — переносимая резервная копия.';
-            }
-          }).catch(() => {
-            if (session !== ui.world || planetKey(session.config) !== planetKey(config)) return;
-            const label = session.surfaceView?.element?.querySelector('[data-role="planet-persistence"]');
-            if (label) label.textContent = 'География не сохранена браузером.';
-            toast(session.mode === 'master' ? 'Браузер не сохранил географию. Скачайте файл кнопкой «Сохранить планету».' : 'Браузер не сохранил географию. Для повторного входа используйте файл планеты мастера или лобби.', 'error');
-          });
-          editorFrame?.remove();
-        },
-        loadPins: store.loadSurfacePins, savePins: store.saveSurfacePins,
-        loadDrawings: store.loadSurfaceDrawings, saveDrawings: store.saveSurfaceDrawings,
-        loadSettings: store.loadSurfaceSettings, saveSettings: store.saveSurfaceSettings,
-        onExit: () => EXPERT_MAP_TOOLS ? setWorldView('editor') : closeWorldPage(),
-      });
-      session.surfaceView.element.querySelector('.surface-drawing').insertAdjacentHTML('beforeend', `<p data-role="planet-persistence" role="status">${session.lobby ? 'Общая география лобби. Личные рисунки остаются на устройстве.' : EXPERT_MAP_TOOLS ? 'Архивный источник. Файл планеты сохраняется вручную.' : 'География: подготовка'}</p><details><summary>Лицензия продукта · исходный код</summary><a data-role="product-source" download="sages-complete-source.zip">Скачать полный соответствующий исходный код (GPLv3)</a><pre>${escapeHtml(RTWG_NOTICES)}</pre></details>`);
-      session.surfaceView.element.querySelector('[data-role="product-source"]').href = productSourceUrl;
-    }
-  } else {
-    session.surfaceCamera = session.surfaceView?.getState().camera || session.surfaceCamera;
-    session.surfaceView?.dispose();
-    session.surfaceView = null;
-  }
-
-  if (onPlanet) {
-    if (!session.planetView || !session.planetView.element?.isConnected) {
-      session.planetView?.dispose();
-      const frame = host.querySelector('[data-role="world-editor"]');
-      const sizeMult = session.config.width >= 150_000_000 ? 4 : session.config.width >= 75_000_000 ? 2 : 1;
-      session.planetView = mountPlanetView(host, {
-        seed: session.config.seed || 'mir-2026',
-        size: sizeMult,
-        frame,
-        config: session.config,
-        onExit: () => setWorldView('editor'),
-      });
-      if (session.planetView?.error) toast(session.planetView.error, 'error');
-    }
-  } else {
-    session.planetView?.dispose();
-    session.planetView = null;
-  }
-};
-
-const setWorldView = (mode) => {
-  const session = ui.world;
-  if (!session?.open || session.screen !== 'map' || !['editor', 'planet', 'surface', 'rtwg'].includes(mode)) return;
-  if (!EXPERT_MAP_TOOLS && mode !== 'surface') return;
-  if (mode === 'rtwg' && session.mode === 'player') return;
-  if (session.viewMode === mode) return;
-  session.viewMode = mode;
-  playSound('open');
-  syncWorldViews();
-};
-
-/* Снятие планетарного вида освобождает кадры и очереди перед сменой слота. */
-const dropWorldViews = () => {
-  const session = ui.world;
-  if (!session) return;
-  session.rtwgView?.dispose();
-  session.rtwgView = null;
-  session.rtwgSnapshot = null;
-  session.surfaceView?.dispose();
-  session.surfaceView = null;
-  session.planetView?.dispose();
-  session.planetView = null;
-  session.surfaceCamera = null;
-  session.planetSnapshot = null; session.planetRestoreError = null; session.planetRestoring = false; session.planetCacheChecked = false; session.planetLoadToken = null;
-  session.viewMode = 'surface';
-};
-
-/* Слот получает параметры и открывается картой. Общий путь для «Создать»,
-   «Войти», загрузки файла и «Новый мир». */
-const enterWorldMap = (slot, config) => {
-  const session = ui.world;
-  store.saveWorldSlot(slot.role, slot.index, config);
-  session.config = config;
-  session.mode = slot.role;
-  session.tab = slot.role;
-  session.slot = { role: slot.role, index: slot.index };
-  session.importToSlot = null;
-  dropWorldViews();
-  session.screen = 'map';
-  session.viewMode = 'surface';
-  renderWorldPage();
-};
-
-const startWorldSetup = (role, index) => {
-  const session = ui.world;
-  session.tab = role;
-  session.mode = role;
-  session.slot = { role, index };
-  session.importToSlot = null;
-  session.config = store.normalizeWorldConfig({
-    seed: role === 'player' ? '' : worldSeed(),
-    width: store.WORLD_DEFAULT_SIZE.width,
-    height: store.WORLD_DEFAULT_SIZE.height,
-  });
-  session.screen = 'setup';
-  renderWorldPage({ focus: true });
-};
-
-const openWorldSlot = (role, index) => {
-  const session = ui.world;
-  const entry = store.loadWorldSlots()[role]?.[index];
-  if (!entry) return;
-  session.tab = role;
-  session.mode = role;
-  session.slot = { role, index };
-  session.importToSlot = null;
-  session.config = store.normalizeWorldConfig(entry);
-  dropWorldViews();
-  session.screen = 'map';
-  session.viewMode = 'surface';
-  renderWorldPage();
-};
-
-/* Файл с seed и размером: формат «MIR world seed», версия 1. Для совместимости
-   читаем и поле config, и сам объект. */
-const importWorldFile = (text, target) => {
-  const session = ui.world;
-  if (!session?.open) return;
-  const imported = JSON.parse(text);
-  if (imported?.format === PLANET_FORMAT) {
-    if (session.lobby) throw new Error('Файл планеты открывается в личном слоте, не поверх живого лобби.');
-    const planet = parsePlanet(text);
-    const normalized = store.normalizeWorldConfig(planet.config);
-    if (normalized.width !== planet.config.width || normalized.height !== planet.config.height) throw new Error('Неизвестный размер планеты.');
-    const slot = target || session.slot;
-    if (slot) store.saveWorldSlot(slot.role, slot.index, normalized);
-    const role = slot?.role || session.mode;
-    dropWorldViews();
-    session.config = normalized; session.mode = role; session.tab = role; session.slot = slot ? { ...slot } : null;
-    session.planetSnapshot = planet.source; session.planetCacheChecked = true; session.surfaceCamera = planet.camera;
-    const key = `${normalized.seed}|${Math.round(planet.source.physicalWidth)}x${Math.round(planet.source.physicalHeight)}`;
-    store.saveSurfacePins(key, planet.pins); store.saveSurfaceDrawings(key, planet.annotations); store.saveSurfaceSettings(planet.settings);
-    session.screen = 'map'; renderWorldPage();
-    toast('Планета открыта: география, метки и рисунки восстановлены из файла.');
-    return;
-  }
-  const config = store.normalizeWorldConfig(imported?.config ?? imported);
-  if (!config.seed) throw new Error('В файле нет seed карты.');
-  if (target) {
-    enterWorldMap(target, config);
-    playSound('success');
-    toast(`Карта ${config.seed} заняла слот ${target.index + 1}.`);
-    return;
-  }
-  session.config = config;
-  renderWorldPage();
-  toast(`Параметры мира загружены: ${config.seed}.`);
-};
-
-const openWorldPage = ({ history = true, slots = false } = {}) => {
-  if (!ui.world) ui.world = createWorldSession();
-  /* Кнопка «Играть» всегда открывает экран слотов: игрок выбирает роль
-     и карту, а не попадает в середину прошлой сессии. Возврат по истории
-     браузера (popstate) сохраняет текущий экран. */
-  if (slots) {
-    ui.world.screen = 'slots';
-    ui.world.slot = null;
-  }
-  if (ui.modal) closeModal();
-  ui.world.open = true;
-  if (history && window.location.hash !== '#play') {
-    window.history.pushState({ mirWorldPage: true }, '', `${window.location.pathname}${window.location.search}#play`);
-    worldPageHistoryEntry = true;
-  } else {
-    worldPageHistoryEntry = false;
-  }
-  document.body.classList.add('world-page-open');
-  const root = worldPageRoot();
-  if (root) root.hidden = false;
-  renderWorldPage({ focus: true });
-  /* Живой канал лобби открыт только пока открыт экран «Играть». */
-  if (lobby.lobbyAvailable() && store.getCurrentUser()) {
-    lobby.connectLobby();
-    lobby.refreshLobby().catch(() => {});
-  }
-  playSound('open');
-};
-
-const closeWorldPage = ({ history = true } = {}) => {
-  if (!ui.world?.open) return;
-  ui.world.open = false;
-  ui.world.frameKey = '';
-  dropWorldViews();
-  ui.world.syncStop?.();
-  ui.world.syncStop = null;
-  ui.world.leaveArmed = false;
-  lobby.disconnectLobby();
-  document.body.classList.remove('world-page-open');
-  const root = worldPageRoot();
-  /* Очистка страницы удаляет iframe с картой и освобождает его память. */
-  if (root) {
-    root.hidden = true;
-    root.innerHTML = '';
-  }
-  renderedWorldPageHtml = '';
-  if (history && window.location.hash === '#play') {
-    if (worldPageHistoryEntry) window.history.back();
-    else window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
-  }
-  worldPageHistoryEntry = false;
-  /* Слоты могли измениться, пока игрок был на карте: сводка и
-     «Продолжить» на сцене обязаны показать актуальные миры сразу. */
-  renderRegions();
-  playSound('close');
-};
-
-window.addEventListener('popstate', () => {
-  const isWorldRoute = window.location.hash.toLowerCase() === '#play';
-  if (isWorldRoute && !ui.world?.open) openWorldPage({ history: false });
-  else if (!isWorldRoute && ui.world?.open) closeWorldPage({ history: false });
-});
-
-
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
 
 /* Раскладывает превью точно по тому же квадратному окну, которое сохранит canvas. */
@@ -3092,42 +2379,32 @@ const accountSlotHtml = () => {
     </button>`;
 };
 
-/* ---------- главное меню: компактное игровое лобби --------------
-   Слева — компактная навигация и основное действие, в центре — заголовок,
-   сводка и недавние миры, справа — друзья. Фирменные шалфей и золото
-   работают как акценты, а не как декоративный шум. Навигация и сцена —
-   отдельные области (`sidenav` и `stage-menu`): каждая пересобирается,
-   только когда её строка изменилась (см. setMarkupIfChanged); слоты и
-   друзья берутся из кеша store. */
+/* ---------- главное меню: картографический штаб ----------------
+   Слева — навигация по сообществу, в центре — заголовок и сводка,
+   справа — друзья. Фирменные шалфей и золото работают как акценты,
+   а не как декоративный шум. Навигация и сцена — отдельные области
+   (`sidenav` и `stage-menu`): каждая пересобирается, только когда её
+   строка изменилась (см. setMarkupIfChanged); друзья берутся из кеша
+   store. Экранов миров и лобби в приложении нет: они удалены вместе
+   с кнопкой «Играть», и новых входов в них здесь быть не должно. */
 const menuCounts = () => {
   const me = store.getCurrentUser();
-  const slots = store.loadWorldSlots();
-  const filled = store.WORLD_ROLES.flatMap((role) =>
-    slots[role].map((entry, index) => (entry ? { role, index, entry } : null)).filter(Boolean));
   const friends = me ? store.listFriends(me.id) : [];
   return {
     me,
-    filled,
     friends,
     online: friends.filter((friend) => store.presenceOf(friend) !== 'offline').length,
-    requests: me ? store.incomingRequests(me.id).length : 0,
     hub: !backendReady ? 'Проверяем хаб…' : store.isHub() ? store.hubHost() : 'Локально, в этом браузере',
   };
 };
 
 const sidenavHtml = () => {
-  const { filled, hub } = menuCounts();
+  const { hub } = menuCounts();
   const items = [
-    ['compass', 'Карта мира', 'Пиксельная карта по seed', 'open-world-map', ''],
-    ['users', 'Лобби с друзьями', 'Общая карта · до 8 игроков', 'open-lobby', ''],
     ['globe', 'Общий хаб', hub, 'open-hub', ''],
     ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
   ];
   return `
-    <button class="sidenav__play play-button" type="button" data-action="open-world" aria-label="Играть — создать или открыть мир">
-      ${icon('play', 'icon--play')}<span>Играть</span>
-      <small class="sidenav__play-sub">${filled.length ? `Слотов: ${filled.length}/12` : 'Картотека миров'}</small>
-    </button>
     <div class="sidenav__list" role="list">
       ${items.map(([glyph, title, hint, action, badge]) => `
         <button class="sidenav__item" type="button" role="listitem" data-action="${action}">
@@ -3145,33 +2422,12 @@ const sidenavHtml = () => {
 };
 
 const stageMenuHtml = () => {
-  const { me, filled, friends, online, hub } = menuCounts();
-  const recent = [...filled].sort((a, b) => (b.entry.savedAt || 0) - (a.entry.savedAt || 0)).slice(0, 3);
+  const { me, friends, online, hub } = menuCounts();
   return `
     <div class="hero__stats" aria-label="Сводка">
-      <span class="hero-stat"><strong>${filled.length}<i>/12</i></strong><small>миров в слотах</small></span>
       <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
       <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
-    </div>
-    ${recent.length ? `
-    <section class="continue" aria-labelledby="continue-title">
-      <header class="continue__head">
-        <p class="eyebrow">${icon('history', 'icon--xs')} Продолжить</p>
-        <h2 class="continue__title" id="continue-title">Последние миры</h2>
-      </header>
-      <div class="continue__list">
-        ${recent.map(({ role, index, entry }) => {
-          const size = worldSizeOf(entry);
-          return `
-          <button class="continue-row" type="button" data-action="menu-open-world" data-role="${role}" data-index="${index}" aria-label="Открыть мир ${escapeHtml(entry.seed)}, ${WORLD_ROLE_LABELS[role]}">
-            <span class="continue-row__art" aria-hidden="true">${seedArtOrIcon(entry.seed, `menu-${role}-${index}`)}</span>
-            <span class="continue-row__text"><strong translate="no">${escapeHtml(entry.seed)}</strong><small>${WORLD_ROLE_LABELS[role]} · ${escapeHtml(size.label)} · ${entry.savedAt ? worldSlotDateFormatter.format(new Date(entry.savedAt)) : ''}</small></span>
-            <span class="continue-row__cta">${icon(role === 'player' ? 'eye' : 'play', 'icon--xs')}<span>Открыть</span></span>
-          </button>`;
-        }).join('')}
-      </div>
-    </section>` : `
-    <p class="stage-note">${icon('compass', 'icon--xs')}<span>Сохранённых миров пока нет — нажмите «Играть» или «Карта мира» слева, чтобы создать первый мир.</span></p>`}`;
+    </div>`;
 };
 
 /* ---------- правая панель: друзья ---------------------------- */
@@ -3345,7 +2601,7 @@ document.querySelector('#app').innerHTML = `
 
     <footer class="footer">
       <span>Версия ${VERSION}</span>
-      <span class="footer__hint">Миры · друзья · общая карта</span>
+      <span class="footer__hint">Друзья · общий хаб · прямая связь</span>
       <span class="footer__name" lang="en" translate="no">© 2026 ${TITLE_FULL}</span>
     </footer>
 
@@ -4060,11 +3316,6 @@ document.addEventListener('input', (event) => {
     ui.admin.requestQuery = event.target.value;
     renderModal({ focus: false });
   }
-  /* Узор мини-карты живёт вместе с seed: печатаете — узор меняется. */
-  if (role === 'world-seed' || role === 'lobby-seed') {
-    const art = event.target.closest('.world-seed-row')?.querySelector('[data-role="world-seed-art"]');
-    if (art) art.innerHTML = seedArtOrIcon(event.target.value.trim());
-  }
   if (role === 'admin-event-search') {
     ui.admin.eventQuery = event.target.value;
     renderModal({ focus: false });
@@ -4161,19 +3412,6 @@ document.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 document.addEventListener('change', (event) => {
-  if (event.target.dataset?.role === 'world-file') {
-    const file = event.target.files?.[0];
-    const target = ui.world?.importToSlot ? { ...ui.world.importToSlot } : null;
-    event.target.value = '';
-    if (ui.world) ui.world.importToSlot = null;
-    if (!file) return;
-    if (file.size > MAX_PLANET_BYTES) { toast('Файл планеты больше 32 МиБ.', 'error'); return; }
-    file.text()
-      .then((text) => importWorldFile(text, target))
-      .catch(error => toast(error.message || 'Файл мира повреждён или имеет неверный формат.', 'error'));
-    return;
-  }
-
   const key = event.target.dataset?.setting;
   if (!key) return;
 
@@ -4233,439 +3471,7 @@ const pickAndPreviewAvatar = async () => {
   }
 };
 
-/* ---------- лобби: экран, состояние и действия ---------------- */
-
-const lobbyDraftOf = () => {
-  const session = ui.world;
-  if (!session.lobbyDraft) {
-    const size = store.WORLD_DEFAULT_SIZE;
-    session.lobbyDraft = { seed: worldSeed(), width: size.width, height: size.height };
-  }
-  return session.lobbyDraft;
-};
-
-/* Набранный seed читаем из DOM до перерисовки, как и на экране настройки. */
-const readLobbyDraftSeed = () => {
-  const field = worldRoot()?.querySelector('[data-role="lobby-seed"]');
-  if (field) lobbyDraftOf().seed = field.value.trim();
-};
-
-const lobbyFailed = (error) => toast(error instanceof Error ? error.message : 'Лобби недоступно.', 'error');
-
-const lobbyContext = () => {
-  const me = store.getCurrentUser();
-  const avatar = (user) => avatarEl(store.getUser(user.id) || user, 'avatar--sm');
-  return {
-    available: lobby.lobbyAvailable(),
-    me,
-    state: lobby.lobbyState(),
-    session: ui.world,
-    draft: { ...lobbyDraftOf(), sizes: store.WORLD_SIZES },
-    friends: me ? store.listFriends(me.id) : [],
-    avatar,
-  };
-};
-
-/* Открывает карту лобби. fresh — мастер создал новый мир: карту публикуем заново. */
-const openLobbyMap = (summary, config, { fresh }) => {
-  const session = ui.world;
-  session.lobby = { id: summary.id, role: summary.role, code: summary.code, epoch: Date.now(), fresh };
-  session.mode = summary.role;
-  session.tab = summary.role;
-  session.slot = null;
-  session.importToSlot = null;
-  session.config = config;
-  session.leaveArmed = false;
-  dropWorldViews();
-  session.screen = 'map';
-  session.viewMode = 'surface';
-  renderWorldPage();
-};
-
-const lobbyNewMap = async () => {
-  const session = ui.world;
-  const current = lobby.lobbyState().lobby;
-  if (!session?.open || !current || current.role !== 'master') return;
-  const config = store.normalizeWorldConfig({ seed: worldSeed(), width: current.width, height: current.height });
-  try {
-    await lobby.setLobbyParams({ seed: config.seed, width: config.width, height: config.height });
-  } catch (error) {
-    lobbyFailed(error);
-    return;
-  }
-  openLobbyMap(current, config, { fresh: true });
-  toast(`Новая карта лобби: ${config.seed}. Игроки получат её, когда мастер её построит.`);
-};
-
-const paintLobbyChip = () => {
-  const session = ui.world;
-  const chip = worldRoot()?.querySelector('[data-role="lobby-chip"]');
-  if (chip && session?.lobby) {
-    const html = lobbyChipHtml(lobby.lobbyState(), session.lobby);
-    if (chip.dataset.html !== html) {
-      chip.innerHTML = html;
-      chip.dataset.html = html;
-    }
-  }
-  /* Строка сеанса обновляется на месте: мастер мог построить новый мир,
-     и панель не должна показывать старый seed до полной перерисовки. */
-  const seedLine = worldRoot()?.querySelector('.world-topbar__seed');
-  if (seedLine && session?.open) {
-    const html = worldSessionInfo(session);
-    if (seedLine.innerHTML !== html) seedLine.innerHTML = html;
-  }
-};
-
-const onLobbyState = () => {
-  if (!ui.world?.open) return;
-  if (ui.world.screen === 'lobby') renderWorldPage();
-  paintLobbyChip();
-};
-
-const onLobbyEvent = (event) => {
-  const session = ui.world;
-  if (event.type === 'error') {
-    if (session?.open) toast(event.message, 'error');
-    return;
-  }
-  if (!session?.open || !session.lobby) return;
-  if (event.type !== 'left' && event.type !== 'closed') return;
-  if (event.type === 'closed' && event.lobbyId !== session.lobby.id) return;
-  session.syncStop?.();
-  session.syncStop = null;
-  session.lobby = null;
-  session.frameKey = '';
-  session.leaveArmed = false;
-  if (session.screen === 'map') session.screen = 'lobby';
-  toast(event.type === 'closed' ? lobby.lobbyState().notice || 'Лобби закрыто.' : 'Вы вышли из лобби.', 'error');
-  renderWorldPage();
-};
-
 const actions = {
-  'open-world': () => openWorldPage({ slots: true }),
-
-  /* Быстрый запуск карты Azgaar из меню (песочница без перезаписи слотов). */
-  'open-world-map': () => {
-    openWorldPage({ slots: true });
-    if (!ui.world?.open) return;
-    const session = ui.world;
-    session.config = store.normalizeWorldConfig({ seed: worldSeed() });
-    session.mode = 'master';
-    session.tab = 'master';
-    session.slot = null;
-    session.importToSlot = null;
-    dropWorldViews();
-    session.screen = 'map';
-    session.viewMode = 'surface';
-    renderWorldPage();
-  },
-
-  /* Главное меню ведёт сразу в лобби, минуя слоты: страница мира та же,
-     меняется только её экран. */
-  'open-lobby': () => {
-    openWorldPage({ slots: true });
-    if (!ui.world?.open) return;
-    ui.world.screen = 'lobby';
-    ui.world.leaveArmed = false;
-    renderWorldPage();
-    if (lobby.lobbyAvailable() && store.getCurrentUser()) lobby.refreshLobby().catch(lobbyFailed);
-  },
-
-  /* «Продолжить» со сцены: слот открывается напрямую, без картотеки. */
-  'menu-open-world': (el) => {
-    const role = el.dataset.role;
-    const index = Number(el.dataset.index);
-    if (!store.WORLD_ROLES.includes(role) || !Number.isInteger(index)) return;
-    openWorldPage({ slots: true });
-    if (!ui.world?.open) return;
-    ui.world.tab = role;
-    openWorldSlot(role, index);
-  },
-
-  'world-exit': () => closeWorldPage(),
-
-  'world-lobby-open': () => {
-    const session = ui.world;
-    if (!session?.open) return;
-    session.screen = 'lobby';
-    session.leaveArmed = false;
-    renderWorldPage();
-    if (lobby.lobbyAvailable() && store.getCurrentUser()) lobby.refreshLobby().catch(lobbyFailed);
-  },
-
-  'world-lobby-back': () => {
-    const session = ui.world;
-    if (!session?.open) return;
-    session.syncStop?.();
-    session.syncStop = null;
-    session.frameKey = '';
-    session.screen = 'lobby';
-    session.leaveArmed = false;
-    renderWorldPage();
-  },
-
-  'world-lobby-size': (el) => {
-    const size = store.WORLD_SIZES.find((item) => item.id === el.dataset.size);
-    if (!ui.world?.open || !size) return;
-    readLobbyDraftSeed();
-    const draft = lobbyDraftOf();
-    draft.width = size.width;
-    draft.height = size.height;
-    renderWorldPage();
-  },
-
-  'world-lobby-seed-random': () => {
-    if (!ui.world?.open) return;
-    readLobbyDraftSeed();
-    lobbyDraftOf().seed = worldSeed();
-    renderWorldPage();
-  },
-
-  'world-lobby-create': async () => {
-    if (!ui.world?.open) return;
-    readLobbyDraftSeed();
-    const draft = lobbyDraftOf();
-    const config = store.normalizeWorldConfig({ seed: draft.seed || worldSeed(), width: draft.width, height: draft.height });
-    try {
-      await lobby.createLobby({ seed: config.seed, width: config.width, height: config.height });
-      playSound('success');
-      toast(`Лобби открыто. Код для друзей: ${lobby.lobbyState().lobby?.code ?? ''}.`);
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-join': async () => {
-    if (!ui.world?.open) return;
-    const code = worldRoot()?.querySelector('[data-role="lobby-code"]')?.value.trim().toUpperCase() ?? '';
-    if (!code) {
-      toast('Введите код лобби.', 'error');
-      return;
-    }
-    try {
-      await lobby.joinLobby(code);
-      playSound('success');
-      toast('Вы в лобби.');
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-invite': async (el) => {
-    try {
-      await lobby.inviteFriend(el.dataset.id);
-      toast('Приглашение отправлено.');
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-accept': async (el) => {
-    try {
-      await lobby.acceptInvite(el.dataset.lobbyId);
-      playSound('success');
-      toast('Вы в лобби.');
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-decline': async (el) => {
-    try {
-      await lobby.declineInvite(el.dataset.lobbyId);
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-kick': async (el) => {
-    try {
-      await lobby.kickMember(el.dataset.id);
-      toast('Участник исключён из лобби.');
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  /* Первый клик просит подтверждения: закрыть лобби для всех — заметное действие. */
-  'world-lobby-leave': async () => {
-    const session = ui.world;
-    if (!session?.open || !lobby.lobbyState().lobby) return;
-    if (!session.leaveArmed) {
-      session.leaveArmed = true;
-      renderWorldPage();
-      setTimeout(() => {
-        if (ui.world?.leaveArmed) {
-          ui.world.leaveArmed = false;
-          renderWorldPage();
-        }
-      }, 4000);
-      return;
-    }
-    session.leaveArmed = false;
-    try {
-      await lobby.leaveLobby();
-      toast('Вы вышли из лобби.');
-    } catch (error) {
-      lobbyFailed(error);
-    }
-  },
-
-  'world-lobby-enter-map': () => {
-    const current = lobby.lobbyState().lobby;
-    if (!ui.world?.open || !current) return;
-    const config = store.normalizeWorldConfig({ seed: current.seed, width: current.width, height: current.height });
-    openLobbyMap(current, config, { fresh: false });
-  },
-
-  'world-lobby-new-map': () => lobbyNewMap(),
-
-  'world-slots': () => {
-    if (!ui.world?.open) return;
-    dropWorldViews();
-    ui.world.screen = 'slots';
-    ui.world.slot = null;
-    ui.world.importToSlot = null;
-    renderWorldPage();
-  },
-
-  'world-surface': () => setWorldView('surface'),
-  'world-editor': () => setWorldView('editor'),
-  'world-rtwg': () => setWorldView('rtwg'),
-  'world-planet': () => setWorldView(ui.world?.viewMode === 'planet' ? 'editor' : 'planet'),
-
-  'world-slot-tab': (el) => {
-    const tab = el.dataset.tab;
-    if (!ui.world?.open || !store.WORLD_ROLES.includes(tab)) return;
-    ui.world.tab = tab;
-    renderWorldPage();
-  },
-
-  'world-slot-create': (el) => {
-    const index = worldSlotIndex(el);
-    if (!ui.world?.open || index === null) return;
-    startWorldSetup(ui.world.tab, index);
-  },
-
-  'world-slot-open': (el) => {
-    const index = worldSlotIndex(el);
-    if (!ui.world?.open || index === null) return;
-    openWorldSlot(ui.world.tab, index);
-  },
-
-  'world-slot-clear': (el) => {
-    const index = worldSlotIndex(el);
-    if (!ui.world?.open || index === null) return;
-    deletePlanetSlot(planetSlotKey(ui.world, ui.world.tab, index)).catch(() => {});
-    store.clearWorldSlot(ui.world.tab, index);
-    renderWorldPage();
-  },
-
-  /* Файл на экране слотов: карта сразу займёт слот и откроется. */
-  'world-slot-import': (el) => {
-    const index = worldSlotIndex(el);
-    if (!ui.world?.open || index === null) return;
-    ui.world.importToSlot = { role: ui.world.tab, index };
-    worldRoot()?.querySelector('[data-role="world-file"]')?.click();
-  },
-
-  /* Файл на экране настройки: игрок входит в свой слот, мастер получает
-     параметры в форму и решает сам, создавать ли карту. */
-  'world-import': () => {
-    const session = ui.world;
-    if (!session?.open || !['setup', 'map'].includes(session.screen)) return;
-    if (session.lobby) { toast('Откройте файл в личном слоте, вне лобби.', 'error'); return; }
-    session.importToSlot = session.screen === 'map' && session.slot ? { ...session.slot } : session.mode === 'player' && session.slot ? { ...session.slot } : null;
-    worldRoot()?.querySelector('[data-role="world-file"]')?.click();
-  },
-
-  'world-restore-seed': () => {
-    if (!ui.world?.open || ui.world.screen !== 'map' || !ui.world.planetRestoreError) return;
-    ui.world.planetRestoreError = null;
-    syncWorldViews();
-  },
-
-  'world-random-seed': () => {
-    const session = ui.world;
-    if (!session?.open || session.screen !== 'setup' || session.mode === 'player') return;
-    session.config = { ...session.config, seed: worldSeed() };
-    renderWorldPage();
-  },
-
-  'world-size': (el) => {
-    const session = ui.world;
-    const size = store.WORLD_SIZES.find((item) => item.id === el.dataset.size);
-    if (!session?.open || session.screen !== 'setup' || !size) return;
-    session.config = store.normalizeWorldConfig({
-      seed: worldSeedFieldValue(),
-      width: size.width,
-      height: size.height,
-    });
-    renderWorldPage();
-  },
-
-  'world-generate': () => {
-    const session = ui.world;
-    if (!session?.open || session.screen !== 'setup' || !session.slot) return;
-    const player = session.mode === 'player';
-    const typed = worldSeedFieldValue();
-    /* Игрок входит по seed мастера: пустое поле не заменяем случайным миром,
-       иначе получится карта, которой у мастера нет. */
-    if (player && !typed) {
-      toast('Укажите seed карты, которую ведёт мастер.', 'error');
-      return;
-    }
-    const config = store.normalizeWorldConfig({ ...session.config, seed: typed || worldSeed() });
-    enterWorldMap(session.slot, config);
-    toast(player
-      ? `Вы вошли в карту ${config.seed}. Открыта единая карта планеты.`
-      : `Карта ${config.seed} заняла слот ${session.slot.index + 1}.`);
-  },
-
-  /* Новый мир мастера: новый seed, тот же размер. Слот переписывается сразу. */
-  'world-new': () => {
-    const session = ui.world;
-    if (session?.open && session.screen === 'map' && session.lobby) {
-      lobbyNewMap();
-      return;
-    }
-    if (!session?.open || session.screen !== 'map' || session.mode !== 'master') return;
-    const config = store.normalizeWorldConfig({ ...session.config, seed: worldSeed() });
-    if (session.slot) {
-      enterWorldMap(session.slot, config);
-    } else {
-      /* Песочница без слота: мир пересобирается с новым seed и возвращается
-         на основную карту. */
-      dropWorldViews();
-      session.config = config;
-      session.screen = 'map';
-      session.viewMode = 'surface';
-      renderWorldPage();
-    }
-    toast(`Новый мир: ${config.seed}.`);
-  },
-
-  'world-export': () => {
-    const session = ui.world;
-    if (!session?.open || session.mode !== 'master') return;
-    try {
-      const { seed } = session.config;
-      const source = session.surfaceView?.getSource();
-      if (!source) { toast('Дождитесь подготовки географии планеты.', 'error'); return; }
-      const state = session.surfaceView.getState();
-      const payload = stringifyPlanet({ config: session.config, source, ...state });
-      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${seed.replace(/[^a-z0-9-]/gi, '_')}.sages-planet.json`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      toast('Сохранены сама география, метки, рисунки и настройки планеты.');
-    } catch (error) {
-      toast(error.message || 'Экспорт недоступен в этом браузере.', 'error');
-    }
-  },
-
   'open-auth': () => {
     ui.authTab = 'login';
     openModal('auth');
@@ -5273,12 +4079,6 @@ const actions = {
     toast(ok ? `Код ${el.dataset.code} скопирован. Отправьте его другу.` : 'Не получилось скопировать — выделите код вручную.', ok ? 'ok' : 'error');
   },
 
-  'world-slot-copy-seed': async (el) => {
-    const seed = el.dataset.seed || '';
-    const ok = await copyText(seed);
-    toast(ok ? `Seed ${seed} скопирован.` : 'Не получилось скопировать — выделите seed вручную.', ok ? 'ok' : 'error');
-  },
-
   'regen-code': async () => {
     try {
       const code = await store.regenerateInviteCode();
@@ -5298,13 +4098,11 @@ const actions = {
 
 const ACTIONS_WITH_OWN_SOUND = new Set([
   'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
-  'open-direct', 'open-hub', 'open-world', 'open-lobby', 'menu-open-world', 'world-generate', 'world-slot-tab', 'world-slot-open',
+  'open-direct', 'open-hub',
   'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
   'admin-back', 'admin-lock', 'auth-tab',
 ]);
 
-lobby.subscribeLobby(onLobbyState);
-lobby.onLobbyEvent(onLobbyEvent);
 
 document.addEventListener('click', (event) => {
   const button = event.target.closest('button:not([disabled])');
@@ -5332,17 +4130,6 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (ui.world?.open && event.key === 'Escape') {
-    /* Из планеты сначала возвращаемся к карте Azgaar. */
-    if (EXPERT_MAP_TOOLS && ui.world.screen === 'map' && ['planet', 'surface', 'rtwg'].includes(ui.world.viewMode)) {
-      event.preventDefault();
-      setWorldView('editor');
-      return;
-    }
-    event.preventDefault();
-    closeWorldPage();
-    return;
-  }
   if (!ui.modal) return;
   if (ui.modal.type === 'avatar-preview' && event.target.matches?.('[data-role="avatar-frame"]')) {
     const step = event.shiftKey ? 5 : 1;
@@ -5423,7 +4210,6 @@ update.start();
 restoreNotifications();
 
 render();
-if (window.location.hash.toLowerCase() === '#play') openWorldPage({ history: false });
 /* На старте сперва проверяем хаб; только после этого открываем аккаунты.
    Если сеть недоступна, store включает локальный офлайн-резерв. */
 const initializeConnection = async () => {

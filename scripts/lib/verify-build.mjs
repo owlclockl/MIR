@@ -133,21 +133,22 @@ export function checkWeb() {
   const jsFiles = files.filter((name) => /^assets\/.*\.js$/.test(name));
   add(jsFiles.length > 0, 'в dist есть скрипт приложения', jsFiles.join(', ') || 'не найден');
   const appCode = jsFiles.map((name) => readFileSync(join('dist', name), 'utf8')).join('\n');
-  add(appCode.includes('data-drawing-mode') && appCode.includes('Copyright (c) 2022 rfresh2'), 'браузерный порт XaeroPlus и MIT-уведомление включены в web-бандл');
+  /* Экран миров и лобби удалён вместе с кнопкой «Играть»: в бандле не должно
+     остаться ни картотеки слотов, ни страницы мира, ни встроенного редактора
+     Azgaar. Положительная половина проверки — меню сообщества на месте. */
+  add(
+    !/mir-world-slots|world-page-open|open-world|open-lobby|world-editor-frame|#optionsContainer/.test(appCode),
+    'в web-бандле нет удалённых экранов мира, лобби и встроенного редактора',
+    'ни «Играть», ни слотов, ни iframe Azgaar; движки остаются в исходниках',
+  );
+  add(
+    appCode.includes('open-hub') && appCode.includes('open-direct'),
+    'меню сообщества собрано: общий хаб и прямое подключение',
+  );
   add(
     !existsSync('src/gen') && !existsSync('src/game/world-map-view.js')
       && !/world-map-view|is-world-map/.test(appCode),
     'собственный основной генератор удалён из исходников и веб-бандла',
-  );
-  add(
-    appCode.includes('fmg/index.html') && appCode.includes('world-editor-frame') && appCode.includes('mir-world-slots'),
-    'мир открывает Azgaar во встроенном редакторе и хранит слоты',
-    'iframe /fmg/index.html с seed и размером; слоты в mir-world-slots',
-  );
-  add(
-    appCode.includes('#optionsContainer') && appCode.includes('mir-player-restriction'),
-    'игрок открывает Azgaar с скрытыми панелями правки',
-    'ограничение применяется к документу редактора после загрузки',
   );
 
   const jsBytes = jsFiles.reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -320,7 +321,11 @@ export function checkSingle() {
   const html = readFileSync('mir.html', 'utf8');
   const bytes = Buffer.byteLength(html);
   add(true, 'mir.html собран', kb(bytes));
-  add(html.includes('data-drawing-mode') && html.includes('Copyright (c) 2022 rfresh2'), 'XaeroPlus работает автономно и сохраняет MIT-уведомление');
+  add(
+    !/mir-world-slots|open-world/.test(html) && !/data-action=\\?"world-slot/.test(html),
+    'в автономной сборке нет удалённого экрана миров',
+    'ни кнопки «Играть», ни картотеки слотов',
+  );
   add(!/world-map-view|is-world-map/.test(html), 'автономная сборка не содержит удалённого вида карты');
   add(
     html.includes('<title>The civilization of the sages — Главное меню</title>')
