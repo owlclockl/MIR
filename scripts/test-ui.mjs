@@ -263,16 +263,27 @@ ok(
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
 );
 
-/* «Партии» — основное действие: первый пункт навигации (выделен как
-   главный) и крупная кнопка под заголовком. Обе ведут в одно окно. */
+/* Кнопки меню не дублируются: «Партии» живёт только в навигации слева,
+   в середине страницы остаются заголовок и сводка без кнопок. */
+ok(
+  'кнопка «Партии» есть только в навигации, в середине страницы кнопок нет',
+  $$('[data-action="open-parties"]').length === 1
+    && !!$('[data-region="sidenav"] [data-action="open-parties"]')
+    && !$('.stage-menu button')
+    && !$('.hero-cta')
+    && !$('.hero__actions'),
+);
+
+/* «Партии» — основное действие: первый пункт навигации, выделен как
+   главный. Дубля кнопки под заголовком нет — оба места вели бы в одно
+   окно, поэтому действие живёт только в навигации. */
 const navItems = $$('[data-region="sidenav"] .sidenav__item');
 ok(
-  'основная кнопка «Партии» стоит первой в навигации и под заголовком',
+  'основная кнопка «Партии» стоит первой в навигации и выделена как главная',
   navItems[0]?.dataset.action === 'open-parties'
     && navItems[0]?.classList.contains('sidenav__item--main')
-    && !!$('.hero__actions .hero-cta--primary[data-action="open-parties"]')
-    && ($('.hero__actions .hero-cta__text strong')?.textContent || '') === 'Партии',
-  $('.hero-cta__text small')?.textContent?.trim(),
+    && ($('.sidenav__item--main .sidenav__text strong')?.textContent || '') === 'Партии',
+  $('.sidenav__item--main .sidenav__text small')?.textContent?.trim(),
 );
 
 /* Без аккаунта комнаты не открыть: окно честно говорит об этом и ведёт
@@ -484,8 +495,8 @@ ok(
   !$('.dialog')
     && !$('.party__title')
     && /Партия закрыта/.test($('.toast-stack')?.textContent || '')
-    && /Создать комнату/.test($('.hero-cta__text small')?.textContent || ''),
-  $('.hero-cta__text small')?.textContent?.trim(),
+    && /Создать комнату/.test($('.sidenav__item--main .sidenav__text small')?.textContent || ''),
+  $('.sidenav__item--main .sidenav__text small')?.textContent?.trim(),
 );
 await wait(120);
 
@@ -536,7 +547,7 @@ ok(
 );
 ok(
   'подсказка основной кнопки говорит, что партиям нужен хаб',
-  /нужен общий хаб/i.test($('.hero-cta__text small')?.textContent || ''),
+  /нужен общий хаб/i.test($('.sidenav__item--main .sidenav__text small')?.textContent || ''),
 );
 click('[data-action="close-modal"]');
 await wait(100);

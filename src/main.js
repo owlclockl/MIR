@@ -2765,9 +2765,9 @@ const accountSlotHtml = () => {
 
 /* ---------- главное меню: картографический штаб ----------------
    Слева — навигация: первой и основной стоит «Партии» (комнаты для
-   игры), за ней сообщество. В центре — заголовок, крупная кнопка
-   партий и сводка, справа — друзья. Фирменные шалфей и золото работают
-   как акценты, а не как декоративный шум. Навигация и сцена — отдельные
+   игры), за ней сообщество. В центре — заголовок и сводка, справа —
+   друзья. Фирменные шалфей и золото работают как акценты, а не как
+   декоративный шум. Навигация и сцена — отдельные
    области (`sidenav` и `stage-menu`): каждая пересобирается, только
    когда её строка изменилась (см. setMarkupIfChanged); друзья берутся
    из кеша store. Игровых экранов (карты, редактора, слотов) в
@@ -2784,9 +2784,10 @@ const menuCounts = () => {
   };
 };
 
-/* Кнопка «Партии» — основная: она стоит первой в навигации и крупной
-   кнопкой под заголовком. Подпись объясняет, что внутри, ещё до клика:
-   своя комната с кодом, ждущие приглашения или то, что нужно для входа. */
+/* Пункт «Партии» — основной: он стоит первым в навигации и выделен как
+   главный. Подпись объясняет, что внутри, ещё до клика: своя комната
+   с кодом, ждущие приглашения или то, что нужно для входа. Дубля этой
+   кнопки в центре страницы нет — действие живёт только в навигации. */
 const partyNavState = () => {
   const state = lobby.lobbyState();
   const invites = state.invites?.length ?? 0;
@@ -2801,23 +2802,6 @@ const partyNavState = () => {
   if (!backendReady) return { hint: 'Комнаты для игры · проверяем хаб', badge: 0 };
   if (!store.isHub()) return { hint: 'Комнаты для игры · нужен общий хаб', badge: 0 };
   return { hint: 'Создать комнату и позвать друзей', badge: 0 };
-};
-
-const partyCtaHtml = () => {
-  const party = partyNavState();
-  return `
-    <button class="hero-cta hero-cta--primary" type="button" data-action="open-parties">
-      <span class="hero-cta__icon" aria-hidden="true">${icon('dices')}</span>
-      <span class="hero-cta__text">
-        <strong>Партии</strong>
-        <small>${escapeHtml(party.hint)}</small>
-      </span>
-      ${
-        party.badge
-          ? `<span class="hero-cta__badge" aria-label="Новых приглашений в партии: ${party.badge}">${party.badge}</span>`
-          : ''
-      }
-    </button>`;
 };
 
 const sidenavHtml = () => {
@@ -2861,7 +2845,6 @@ const sidenavHtml = () => {
 const stageMenuHtml = () => {
   const { me, friends, online, hub } = menuCounts();
   return `
-    <div class="hero__actions">${partyCtaHtml()}</div>
     <div class="hero__stats" aria-label="Сводка">
       <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
       <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
