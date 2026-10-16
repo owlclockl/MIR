@@ -321,6 +321,38 @@ a {
   font-weight: 700;
 }
 
+/* Главная кнопка меню — «Партии»: открывает каталог партий. Живёт над
+   разделами сообщества и вне .sidenav__item — главная в меню всегда одна. */
+.sidenav__home {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  min-height: var(--control-h);
+  padding: var(--sp-10);
+  color: var(--bg);
+  border: 1px solid transparent;
+  background: var(--accent);
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.sidenav__home:hover {
+  background: var(--accent-strong);
+}
+
+.sidenav__home:active {
+  background: var(--gold);
+}
+
+.sidenav__home .sidenav__icon {
+  color: inherit;
+}
+
+.sidenav__home .sidenav__text small {
+  color: inherit;
+  opacity: 0.72;
+}
+
 /* ---------- Верхняя панель ---------------------------------------- */
 
 .topbar {
@@ -1122,7 +1154,8 @@ a {
     display: none;
   }
 
-  .sidenav__item {
+  .sidenav__item,
+  .sidenav__home {
     justify-content: center;
   }
 }
@@ -1335,7 +1368,8 @@ a {
     gap: var(--sp-4);
   }
 
-  .sidenav__item {
+  .sidenav__item,
+  .sidenav__home {
     flex: none;
     justify-content: center;
   }
@@ -4687,7 +4721,7 @@ button.admin-file-row--active:hover {
    главном экране, в диалогах, панели и экранах миров.
    =========================================================== */
 
-.shell :is(.icon-button, .profile, .friend, .sidenav__item, .hero-cta, .mini-button, .solid-button, .ghost-button, .tab, .chip, .admin-nav__item, .code-box--button) {
+.shell :is(.icon-button, .profile, .friend, .sidenav__item, .sidenav__home, .hero-cta, .mini-button, .solid-button, .ghost-button, .tab, .chip, .admin-nav__item, .code-box--button) {
   border-radius: var(--radius-sm);
 }
 
