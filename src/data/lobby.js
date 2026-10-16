@@ -1,6 +1,10 @@
 /* ===========================================================
    Лобби на клиенте: состояние, живой канал и события карты.
 
+   В меню этот раздел называется «Партии»: комната для игры, которую
+   создаёт мастер и куда зовёт людей. «Лобби» и «партия» ниже — одно и
+   то же (имена `lobby*` сохранены ради адресов API и данных хаба).
+
    Здесь живёт связь с хабом для лобби (WebSocket /api/ws). Остальной
    интерфейс только спрашивает состояние и подписывается на события;
    сама синхронизация редактора Azgaar — в src/game/lobby-sync.js.
@@ -133,8 +137,8 @@ export const refreshLobby = async () => {
   return applyLobbyResponse(await remote.apiLobbyGet());
 };
 
-export const createLobby = async ({ seed, width, height }) =>
-  applyLobbyResponse(await remote.apiLobbyCreate({ seed, width, height }));
+export const createLobby = async ({ title, seed, width, height }) =>
+  applyLobbyResponse(await remote.apiLobbyCreate({ title, seed, width, height }));
 
 export const joinLobby = async (code) => applyLobbyResponse(await remote.apiLobbyJoin(code));
 
@@ -156,8 +160,45 @@ export const leaveLobby = async () => {
 
 export const kickMember = (userId) => remote.apiLobbyKick(userId);
 
-export const setLobbyParams = async ({ seed, width, height }) =>
-  applyLobbyResponse(await remote.apiLobbyParams({ seed, width, height }));
+export const setLobbyParams = async ({ title, seed, width, height }) =>
+  applyLobbyResponse(await remote.apiLobbyParams({ title, seed, width, height }));
+
+/* ---------- параметры партии ---------------------------------
+   Комната для игры (в меню — «Партии», в данных хаба — `lobbies`)
+   создаётся с названием, seed мира и размером карты. Числа здесь
+   обязаны совпадать с сервером (server/hub-lobby.mjs): хаб отказывает
+   в создании партии с неизвестным размером, а слишком длинное название
+   или seed отбивает сам. Совпадение проверяет `npm run test:parties`. */
+
+/** Допустимые размеры карты партии: [ширина, высота, подпись]. */
+export const PARTY_SIZES = [
+  [1280, 800, 'Компактная · 1280 × 800'],
+  [1600, 1000, 'Обзорная · 1600 × 1000'],
+  [1920, 1080, 'Широкая · 1920 × 1080'],
+];
+
+/** Сколько участников помещается в одну партию. */
+export const PARTY_MAX_MEMBERS = 8;
+
+/** Пределы полей партии (символы). */
+export const PARTY_SEED_MAX = 48;
+export const PARTY_TITLE_MAX = 48;
+
+const SEED_WORDS = [
+  'aurora', 'basalt', 'cedar', 'delta', 'ember', 'fjord', 'gale', 'harbor',
+  'iris', 'juniper', 'kelp', 'lumen', 'mistral', 'nimbus', 'onyx', 'polar',
+  'quartz', 'reef', 'steppe', 'taiga', 'umbra', 'vega', 'wren', 'zephyr',
+];
+
+/** Случайный seed партии: слово и четыре цифры — читается и диктуется. */
+export const randomPartySeed = () => {
+  const word = SEED_WORDS[Math.floor(Math.random() * SEED_WORDS.length)];
+  const digits = String(Math.floor(Math.random() * 9000) + 1000);
+  return `${word}-${digits}`;
+};
+
+/** Название партии по умолчанию: по имени мастера. */
+export const defaultPartyTitle = (name) => `Партия ${String(name || '').trim()}`.slice(0, PARTY_TITLE_MAX);
 
 /* ---------- живой канал ------------------------------------- */
 
@@ -197,10 +238,13 @@ const scheduleReconnect = () => {
   reconnectDelay = Math.min(RECONNECT_MAX_MS, reconnectDelay * 2);
 };
 
+/* Тексты закрытия комнаты. В меню раздел называется «Партии», поэтому
+   и слова здесь игровые, а не серверные («лобби» остаётся в данных и
+   адресах API). */
 const closeNotice = (reason) => {
-  if (reason === 'kicked') return 'Мастер исключил вас из лобби.';
-  if (reason === 'idle') return 'Лобби закрыто: в нём никого не было в сети.';
-  return 'Мастер закрыл лобби.';
+  if (reason === 'kicked') return 'Мастер исключил вас из партии.';
+  if (reason === 'idle') return 'Партия закрыта: в ней никого не было в сети.';
+  return 'Мастер закрыл партию.';
 };
 
 const handleJson = (text) => {
@@ -289,7 +333,7 @@ const openSocket = () => {
     if (socket !== ws) return; // сокет уже заменили — этот не наш
     const token = remote.currentToken();
     if (!token) {
-      giveUp('Войдите в аккаунт, чтобы открыть лобби.');
+      giveUp('Войдите в аккаунт, чтобы открыть партии.');
       ws.close(CLOSE_AUTH, 'no-token');
       return;
     }

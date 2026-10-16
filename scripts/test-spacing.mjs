@@ -198,8 +198,10 @@ family('строки списков: одна плотность --row-pad', [
   ['.friend', 'padding', 'var(--row-pad)'],
   ['.result', 'padding', 'var(--row-pad)'],
   ['.admin-row', 'padding', 'var(--row-pad)'],
+  ['.member', 'padding', 'var(--row-pad)'],
   ['.friend', 'gap', 'var(--row-gap)'],
   ['.result', 'gap', 'var(--row-gap)'],
+  ['.member', 'gap', 'var(--row-gap)'],
 ]);
 
 family('блоки с рамкой: одна плотность --box-pad', [
@@ -207,6 +209,7 @@ family('блоки с рамкой: одна плотность --box-pad', [
   ['.chat__list', 'padding', 'var(--box-pad)'],
   ['.setting-row', 'padding', 'var(--box-pad)'],
   ['.island', 'padding', 'var(--box-pad)'],
+  ['.party__param', 'padding', 'var(--box-pad)'],
 ]);
 
 add(

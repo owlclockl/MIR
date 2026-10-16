@@ -626,11 +626,11 @@ export function createHubCore({
               throw httpError(400, 'Файл data/lobbies.json должен содержать массив лобби.');
             const keepIds = new Set(parsed.map((item) => item?.id).filter(Boolean));
             for (const lobby of [...(db.lobbies ?? [])]) {
-              if (!keepIds.has(lobby.id)) lobbies.closeLobby(lobby.id, 'Лобби закрыто администратором.');
+              if (!keepIds.has(lobby.id)) lobbies.closeLobby(lobby.id, 'Партия закрыта администратором.');
             }
           },
           clear: () => {
-            lobbies.closeAllLobbies('Все лобби закрыты администратором.');
+            lobbies.closeAllLobbies('Все партии закрыты администратором.');
           },
         },
       ],
@@ -1297,14 +1297,14 @@ export function createHubCore({
       const action = String(body?.action || '');
       switch (action) {
         case 'close-lobby': {
-          const closed = lobbies.closeLobby(String(body?.lobbyId || ''), 'Лобби закрыто администратором.');
-          if (!closed) throw httpError(404, 'Лобби не найдено.');
+          const closed = lobbies.closeLobby(String(body?.lobbyId || ''), 'Партия закрыта администратором.');
+          if (!closed) throw httpError(404, 'Партия не найдена.');
           logEvent('admin:lobby-close', { by: 'admin', text: closed.code });
           save.now();
           return { ok: true, ...adminState() };
         }
         case 'close-all-lobbies': {
-          const count = lobbies.closeAllLobbies('Все лобби закрыты администратором.');
+          const count = lobbies.closeAllLobbies('Все партии закрыты администратором.');
           logEvent('admin:lobby-close-all', { by: 'admin', count });
           save.now();
           return { ok: true, count, ...adminState() };

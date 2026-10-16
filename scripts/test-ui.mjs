@@ -1,7 +1,8 @@
 /* Смоук-проверка интерфейса: настоящий `mir.html` открывается в jsdom,
    и по нему кликают, как человек, — окна меню и настройки, общий хаб,
-   подключение по адресу, регистрацию, профиль, отключение и то, что
-   игровых экранов (кнопки «Играть», слотов и карты) в приложении нет.
+   подключение по адресу, регистрацию, профиль, партии (комнаты для игры:
+   создание, код, состав, закрытие), отключение и то, что игровых экранов
+   (кнопки «Играть», слотов и карты) в приложении нет.
 
    Зачем: собранный файл — это то, что получает игрок. Проверки логики
    (`test:hub`, `test:p2p`) не видят разметку, а опечатка в обработчике
@@ -232,6 +233,7 @@ try {
   ok(
     'веб-сборка: меню сообщества на месте, игровых экранов нет',
     !!webWindow.document.querySelector('.shell')
+      && !!webWindow.document.querySelector('[data-action="open-parties"]')
       && !!webWindow.document.querySelector('[data-action="open-hub"]')
       && !!webWindow.document.querySelector('[data-action="open-direct"]')
       && !webWindow.document.querySelector('.play-button')
@@ -250,16 +252,43 @@ try {
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
-  'главное меню сообщества: хаб, прямое подключение и настройки без игровых разделов',
+  'главное меню: партии, хаб, прямое подключение и настройки без игровых разделов',
   $$('[data-action="open-hub"]').length === 1
     && $$('[data-action="open-direct"]').length === 1
     && $$('[data-action="open-settings"]').length === 1
-    && $$('.sidenav__item').length === 3
+    && $$('.sidenav__item').length === 4
     && !!$('.hero__stats')
     && !$('[data-action^="open-world"]')
     && !$('.play-button'),
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
 );
+
+/* «Партии» — основное действие: первый пункт навигации (выделен как
+   главный) и крупная кнопка под заголовком. Обе ведут в одно окно. */
+const navItems = $$('[data-region="sidenav"] .sidenav__item');
+ok(
+  'основная кнопка «Партии» стоит первой в навигации и под заголовком',
+  navItems[0]?.dataset.action === 'open-parties'
+    && navItems[0]?.classList.contains('sidenav__item--main')
+    && !!$('.hero__actions .hero-cta--primary[data-action="open-parties"]')
+    && ($('.hero__actions .hero-cta__text strong')?.textContent || '') === 'Партии',
+  $('.hero-cta__text small')?.textContent?.trim(),
+);
+
+/* Без аккаунта комнаты не открыть: окно честно говорит об этом и ведёт
+   на вход вместо пустой комнаты с нерабочими кнопками. */
+click('[data-action="open-parties"]');
+await wait(120);
+ok(
+  'без входа «Партии» объясняют, что нужен аккаунт',
+  $('.dialog__title')?.textContent === 'Партии'
+    && /Войдите/.test($('.dialog .empty__title')?.textContent || '')
+    && !!$('.dialog [data-action="open-auth"]')
+    && !$('.dialog [data-action="party-invite"]'),
+  $('.dialog .empty__title')?.textContent?.trim(),
+);
+click('[data-action="close-modal"]');
+await wait(60);
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
@@ -373,6 +402,93 @@ ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new 
 ok('в профиле нет дублирующих кнопок хаба и прямого подключения', !$('.dialog [data-action="open-hub"]') && !$('.dialog [data-action="open-direct"]'));
 click('[data-action="close-modal"]');
 await wait(50);
+
+/* ---------- партии: комнаты для игры на общем хабе ----------
+   Аккаунт есть, хаб подключён — значит комната создаётся по-настоящему:
+   код выдаёт хаб, состав приходит живым каналом, а закрытие партии
+   спрашивает подтверждение (выход мастера закрывает её для всех). */
+click('[data-region="sidenav"] [data-action="open-parties"]');
+await wait(400);
+const partyCodeRe = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+ok(
+  'на хабе «Партии» показывают состояние канала и выбор: создать или войти по коду',
+  $('.dialog__title')?.textContent === 'Партии'
+    && /Канал партий/.test($('.link-state')?.textContent || '')
+    && $$('[data-action="party-tab"]').length === 2
+    && !!$('form[data-form="party-create"]'),
+  $('.link-state')?.textContent?.trim(),
+);
+ok(
+  'форма партии: название, seed и три размера карты на выбор',
+  !!$('[data-role="party-title"]')
+    && ($('[data-role="party-seed"]')?.value || '').length > 0
+    && $$('[data-role="party-size"] option').length === 3,
+  $('[data-role="party-seed"]')?.value,
+);
+const seedBefore = $('[data-role="party-seed"]').value;
+click('[data-action="party-random-seed"]');
+await wait(60);
+ok('кнопка «Случайный» меняет seed мира', $('[data-role="party-seed"]')?.value !== seedBefore, $('[data-role="party-seed"]')?.value);
+{
+  const createForm = $('form[data-form="party-create"]');
+  createForm.elements.title.value = 'Проверка партий';
+  createForm.elements.title.dispatchEvent(new window.Event('input', { bubbles: true }));
+  createForm.elements.size.value = '1600x1000';
+  createForm.elements.size.dispatchEvent(new window.Event('change', { bubbles: true }));
+  createForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await wait(1200);
+}
+const partyCode = $('[data-action="party-copy-code"]')?.dataset.code || '';
+ok(
+  'партия создана: хаб выдал код комнаты, а создатель стал мастером',
+  partyCodeRe.test(partyCode)
+    && ($('.party__title')?.textContent || '').includes('Проверка партий')
+    && /Мастер партии/.test($('.member__state')?.textContent || ''),
+  `${$('.party__title')?.textContent?.trim()} · ${partyCode}`,
+);
+ok(
+  'в комнате видны мир партии и люди: seed, размер, счётчик мест',
+  ($('.party__params')?.textContent || '').includes('1600 × 1000')
+    && /1 \/ 8/.test($('.party__params')?.textContent || ''),
+  $('.party__params')?.textContent?.replace(/\s+/g, ' ').trim(),
+);
+ok(
+  'мастер может звать друзей и менять мир партии',
+  /Пригласить в партию/.test($('.party')?.textContent || '')
+    && !!$('form[data-form="party-params"]'),
+);
+{
+  const paramsForm = $('form[data-form="party-params"]');
+  paramsForm.elements.title.value = 'Проверка партий v2';
+  paramsForm.elements.title.dispatchEvent(new window.Event('input', { bubbles: true }));
+  paramsForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await wait(900);
+}
+ok(
+  'мастер сохранил новый мир партии',
+  ($('.party__title')?.textContent || '').includes('Проверка партий v2'),
+  $('.party__title')?.textContent?.trim(),
+);
+ok('код партии копируется одной кнопкой', !!$('[data-action="party-copy-code"]') && $('[data-action="party-copy-code"]').dataset.code === partyCode);
+click('[data-action="party-close"]');
+await wait(120);
+ok(
+  'закрытие партии спрашивает подтверждение: комната закроется для всех',
+  $('.dialog__title')?.textContent === 'Закрыть партию?' && !!$('[data-action="confirm-party-close"]'),
+  $('.dialog__title')?.textContent?.trim(),
+);
+click('[data-action="confirm-party-close"]');
+await wait(900);
+ok(
+  'закрытая партия уходит: окно закрыто, комната пуста, меню зовёт создать новую',
+  !$('.dialog')
+    && !$('.party__title')
+    && /Партия закрыта/.test($('.toast-stack')?.textContent || '')
+    && /Создать комнату/.test($('.hero-cta__text small')?.textContent || ''),
+  $('.hero-cta__text small')?.textContent?.trim(),
+);
+await wait(120);
+
 click('[data-region="sidenav"] [data-action="open-direct"]');
 await wait(50);
 ok('прямое подключение из главного меню не перезагружает страницу', $('.dialog__title')?.textContent === 'Прямое подключение' && $('.shell') === shellBeforeMenus);
@@ -404,6 +520,25 @@ ok('локальный аккаунт создан', ($('.profile')?.textContent
 /* После успешной регистрации окно закрывается само — жмём «закрыть»
    только если оно ещё открыто. */
 if ($('[data-action="close-modal"]')) click('[data-action="close-modal"]');
+await wait(100);
+
+/* Локальный режим (хаб отключён): партии живут на сервере, поэтому окно
+   не показывает пустую комнату с нерабочими кнопками, а объясняет, чего
+   не хватает, и ведёт к подключению хаба. */
+click('[data-region="sidenav"] [data-action="open-parties"]');
+await wait(150);
+ok(
+  'без общего хаба «Партии» честно просят подключить хаб',
+  /нужен общий хаб/i.test($('.dialog .empty__title')?.textContent || '')
+    && !!$('.dialog [data-action="open-hub"]')
+    && !$('form[data-form="party-create"]'),
+  $('.dialog .empty__title')?.textContent?.trim(),
+);
+ok(
+  'подсказка основной кнопки говорит, что партиям нужен хаб',
+  /нужен общий хаб/i.test($('.hero-cta__text small')?.textContent || ''),
+);
+click('[data-action="close-modal"]');
 await wait(100);
 
 /* Скрытая панель админа: вход по знаку игры и заводскому ключу.
