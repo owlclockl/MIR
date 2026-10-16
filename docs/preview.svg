@@ -68,21 +68,13 @@
 <rect x="700" y="576" width="64" height="1" fill="url(#accentR)"/>
 
 <!-- сводка витрины: друзья в сети и режим связи -->
-<!-- основное действие: «Партии» — комнаты для игры -->
 <g>
-  <rect x="292" y="606" width="340" height="56" fill="#c2d9c9" stroke="#c2d9c9"/>
-  <g transform="translate(308 622)" color="#080d0e"><use href="#icoDices"/></g>
-  <text x="346" y="630" font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="700" fill="#080d0e">Партии</text>
-  <text x="346" y="648" font-size="10.5" font-weight="500" fill="#080d0e" fill-opacity=".72">Создать комнату и позвать друзей</text>
-</g>
-
-<g>
-  <rect x="292" y="682" width="196" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-  <text x="312" y="716" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#ededf0">1<tspan font-size="13" fill="#8b8b94">/2</tspan></text>
-  <text x="312" y="735" font-size="10" fill="#65656e">друзей в сети</text>
-  <rect x="500" y="682" width="340" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-  <text x="520" y="716" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#91a39b">Хаб</text>
-  <text x="520" y="735" font-size="10" fill="#65656e">127.0.0.1:8787</text>
+  <rect x="292" y="620" width="196" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="312" y="654" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#ededf0">1<tspan font-size="13" fill="#8b8b94">/2</tspan></text>
+  <text x="312" y="673" font-size="10" fill="#65656e">друзей в сети</text>
+  <rect x="500" y="620" width="340" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="520" y="654" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#91a39b">Хаб</text>
+  <text x="520" y="673" font-size="10" fill="#65656e">127.0.0.1:8787</text>
 </g>
 
 
@@ -90,9 +82,8 @@
 <rect x="0" y="78" width="248" height="822" fill="#0d1415" fill-opacity=".66"/>
 <path d="M247.5 78v822" stroke="#fff" stroke-opacity=".08"/>
 
-<!-- основной пункт: тёплая площадка, постоянная полоса слева и живая иконка -->
+<!-- основной пункт: тёплая площадка и живая иконка -->
 <rect x="12" y="94" width="224" height="58" fill="#d8c184" fill-opacity=".1" stroke="#d8c184" stroke-opacity=".34"/>
-<rect x="12" y="94" width="2" height="58" fill="#c2d9c9"/>
 <g transform="translate(24 111)" color="#d8c184"><use href="#icoDices" transform="scale(.92)"/></g>
 <text x="60" y="118" font-size="12.5" font-weight="600" fill="#ededf0">Партии</text>
 <text x="60" y="136" font-size="10" fill="#8b8b94">Создать комнату и позвать друзей</text>
