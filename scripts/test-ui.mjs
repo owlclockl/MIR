@@ -261,6 +261,19 @@ ok(
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
 );
 ok('кнопка общего хаба видна до входа', !!$('[data-action="open-hub"]'));
+
+/* Главная кнопка «Партии» — вход в каталог партий; каталог пока пуст. */
+click('[data-action="open-parties"]');
+await wait(100);
+ok(
+  'кнопка «Партии» открывает каталог партий',
+  $('.dialog__title')?.textContent === 'Партии'
+    && /Каталог партий/.test($('.dialog')?.textContent || '')
+    && !!$('.dialog .empty'),
+  ($('.dialog')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+);
+click('[data-action="close-modal"]');
+await wait(50);
 ok('ошибок в консоли нет', errors.length === 0, errors.join(' | '));
 
 /* Кнопка «Играть» и весь её экран удалены: ни картотеки слотов, ни карты,

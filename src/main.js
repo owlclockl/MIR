@@ -495,6 +495,22 @@ const hubModalHtml = () => {
   });
 };
 
+/* --- Каталог партий --- */
+/* Пустой каталог по запросу владельца: партий пока нет, списка и действий
+   с партиями в этом окне ещё не будет — их добавят отдельным запросом. */
+const partiesModalHtml = () => dialogShell({
+  label: 'Партии',
+  title: 'Партии',
+  body: `
+    <div class="dialog__body">
+      <p class="eyebrow">Каталог партий</p>
+      <div class="empty">
+        <p class="empty__title">Пока партий нет</p>
+        <p class="empty__text">Новые партии появятся в каталоге здесь.</p>
+      </div>
+    </div>`,
+});
+
 /* --- Настройки интерфейса --- */
 const settingsModalHtml = () => {
   const settings = store.getSettings();
@@ -2245,6 +2261,9 @@ const renderModal = ({ focus = true } = {}) => {
     case 'settings':
       html = settingsModalHtml();
       break;
+    case 'parties':
+      html = partiesModalHtml();
+      break;
     case 'avatar-preview':
       html = avatarPreviewHtml();
       break;
@@ -2386,7 +2405,9 @@ const accountSlotHtml = () => {
    (`sidenav` и `stage-menu`): каждая пересобирается, только когда её
    строка изменилась (см. setMarkupIfChanged); друзья берутся из кеша
    store. Экранов миров и лобби в приложении нет: они удалены вместе
-   с кнопкой «Играть», и новых входов в них здесь быть не должно. */
+   с кнопкой «Играть», и новых входов в них здесь быть не должно.
+   Над разделами сообщества — главная кнопка «Партии» (новый запрос
+   владельца): она открывает каталог партий, пока пустой. */
 const menuCounts = () => {
   const me = store.getCurrentUser();
   const friends = me ? store.listFriends(me.id) : [];
@@ -2405,6 +2426,10 @@ const sidenavHtml = () => {
     ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
   ];
   return `
+    <button class="sidenav__home" type="button" data-action="open-parties" aria-label="Партии — каталог партий">
+      <span class="sidenav__icon">${icon('dices')}</span>
+      <span class="sidenav__text"><strong>Партии</strong><small>Каталог партий</small></span>
+    </button>
     <div class="sidenav__list" role="list">
       ${items.map(([glyph, title, hint, action, badge]) => `
         <button class="sidenav__item" type="button" role="listitem" data-action="${action}">
@@ -3485,6 +3510,7 @@ const actions = {
 
   'open-profile': () => openModal('profile'),
   'open-settings': () => openModal('settings'),
+  'open-parties': () => openModal('parties'),
   /* Проверку делает модуль обновлений (src/data/update.js), а текст состояния
      рисуют настройки из его ответа: так на телефоне, где приложение не
      закрывают, проверка не заканчивается ничем видимым. */
@@ -4097,7 +4123,7 @@ const actions = {
 };
 
 const ACTIONS_WITH_OWN_SOUND = new Set([
-  'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
+  'open-auth', 'open-profile', 'open-settings', 'open-parties', 'open-add-friend', 'open-friend',
   'open-direct', 'open-hub',
   'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
   'admin-back', 'admin-lock', 'auth-tab',
