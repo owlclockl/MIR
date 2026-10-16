@@ -1,6 +1,7 @@
 import './style.css';
 import * as store from './data/store.js';
 import * as p2p from './data/p2p.js';
+import * as lobby from './data/lobby.js';
 import * as update from './data/update.js';
 import {
   createAvatarPreview,
@@ -100,6 +101,18 @@ const adminState = () => ({
 
 /* ---------- модальные окна ---------------------------------- */
 
+/* Черновик окна «Партии». Поля хранятся здесь, а не в разметке: окно
+   перерисовывается при каждом обновлении состава (живой канал), и
+   введённое название партии без черновика пропадало бы на полуслове. */
+const partyDraft = () => ({
+  tab: 'create', // create | join — когда своей партии ещё нет
+  title: '',
+  seed: lobby.randomPartySeed(),
+  size: `${lobby.PARTY_SIZES[0][0]}x${lobby.PARTY_SIZES[0][1]}`,
+  code: '',
+  busy: false,
+});
+
 const ui = {
   modal: null, // { type, data }
   admin: adminState(),
@@ -120,6 +133,8 @@ const ui = {
   hubDraft: '',
   /* Прямое подключение по коду: шаг мастера, выданные коды и черновики полей. */
   direct: { step: 'invite', offer: '', answer: '', offerDraft: '', answerDraft: '', busy: false },
+  /* Партии (комнаты для игры): черновики полей создания и входа по коду. */
+  party: partyDraft(),
 };
 
 let backendReady = store.isBackendInitialized?.() ?? false;
@@ -152,6 +167,7 @@ const closeModal = () => {
   ui.codeValue = '';
   ui.chatDraft = '';
   ui.authDraft = { name: '', password: '', password2: '' };
+  ui.party = partyDraft();
   const root = overlayRoot();
   if (root) root.innerHTML = '';
   /* Слой окон пуст: помнить прежнюю разметку больше нельзя, иначе
@@ -868,6 +884,371 @@ const directJoinHtml = () => `
     ${gatherNoteHtml(ui.direct.answer)}
   </div>`;
 
+/* --- Окно «Партии»: комнаты для игры ---------------------------
+   Партия — это комната на общем хабе. Мастер создаёт её, получает код
+   и зовёт друзей; друг принимает приглашение (оно приходит живым
+   каналом сразу) или входит по коду сам. Состав, присутствие и
+   приглашения присылает хаб (src/data/lobby.js), поэтому окно ничего
+   не «догадывает» и не опрашивает сервер само: что пришло, то и рисуем.
+
+   Без общего хаба партий не бывает — комната живёт на сервере, который
+   видят все игроки, а не в одном браузере. Локальный режим говорит об
+   этом прямо и предлагает подключить хаб: пустая комната с неработающей
+   кнопкой была бы обманом. */
+
+const PARTY_CHANNEL = {
+  online: { label: 'Канал партий подключён', modifier: 'live' },
+  connecting: { label: 'Подключаемся к каналу партий…', modifier: 'warn' },
+  offline: { label: 'Канал партий не отвечает', modifier: 'off' },
+  idle: { label: 'Канал партий закрыт', modifier: 'off' },
+};
+
+const partyChannelHtml = (state) => {
+  const view = PARTY_CHANNEL[state.status] ?? PARTY_CHANNEL.idle;
+  const ms = state.status === 'online' && Number.isFinite(state.rtt) ? ` · ${state.rtt} мс` : '';
+  return `<span class="link-state link-state--${view.modifier}">
+      <span class="dot dot--${view.modifier}" aria-hidden="true"></span>${view.label}${ms}
+    </span>`;
+};
+
+const partySizeLabel = (width, height) =>
+  lobby.PARTY_SIZES.find(([w, h]) => w === Number(width) && h === Number(height))?.[2]
+  ?? `${Number(width)} × ${Number(height)}`;
+
+const partySizeValue = (width, height) => `${Number(width)}x${Number(height)}`;
+
+/* Имя комнаты важнее кода, но без имени показываем код: пустая строка в
+   шапке читалась бы как ошибка, а код всё равно виден рядом. */
+const partyName = (room) => String(room?.title ?? '').trim() || `Партия ${room?.code ?? ''}`;
+
+/* Участник партии приходит из хаба коротким видом (id, имя, в сети,
+   мастер). Аватарку берём из кеша аккаунтов, если человек есть в списке
+   (друг или я), иначе рисуем инициалы: войти по коду может и чужой.
+   Присутствие — из живого канала партии: хаб знает про сокет участника
+   точнее, чем кеш друзей (друг мог открыть приложение на другом устройстве). */
+const partyMemberUser = (member) => {
+  const known = store.getUser(member.id);
+  const base = known ?? {
+    id: member.id,
+    name: member.name,
+    nameKey: String(member.name || '').toLowerCase(),
+    avatar: null,
+  };
+  return { ...base, online: !!member.online, seenAt: member.online ? Date.now() : 0 };
+};
+
+const partyMemberHtml = (member, canKick) => `
+  <div class="member${member.online ? ' member--live' : ' member--off'}">
+    ${avatarEl(partyMemberUser(member), 'avatar--sm')}
+    <span class="member__text">
+      <strong class="member__name" translate="no">${escapeHtml(member.name)}</strong>
+      <small class="member__state">${
+        member.master ? 'Мастер партии' : member.online ? 'В комнате' : 'Не в сети'
+      }</small>
+    </span>
+    ${
+      member.master
+        ? `<span class="member__mark" title="Мастер партии" aria-label="Мастер партии">${icon('crown', 'icon--xs')}</span>`
+        : ''
+    }
+    ${
+      canKick && !member.master
+        ? `<button class="icon-button icon-button--sm icon-button--danger" type="button" data-action="party-kick" data-id="${member.id}" aria-label="Исключить ${escapeHtml(member.name)} из партии" title="Исключить">
+             ${icon('x')}
+           </button>`
+        : ''
+    }
+    <span class="dot dot--${member.online ? 'live' : 'off'}" aria-hidden="true"></span>
+  </div>`;
+
+/* Кого можно позвать: друзья, которых в комнате ещё нет. Про уже
+   приглашённых хаб отвечает списком `invited` — подпись честно говорит,
+   что приглашение ушло, и предлагает позвать ещё раз (оно живёт 15 минут). */
+const partyInviteRowHtml = (friend, pending) => `
+  <div class="member">
+    ${avatarEl(friend, 'avatar--sm')}
+    <span class="member__text">
+      <strong class="member__name" translate="no">${escapeHtml(friend.name)}</strong>
+      <small class="member__state">${PRESENCE[store.presenceOf(friend)].label}</small>
+    </span>
+    ${
+      pending
+        ? `<button class="mini-button" type="button" data-action="party-invite" data-id="${friend.id}">${icon('refresh', 'icon--xs')} Позвать ещё раз</button>`
+        : `<button class="mini-button mini-button--accent" type="button" data-action="party-invite" data-id="${friend.id}">${icon('send', 'icon--xs')} Пригласить</button>`
+    }
+  </div>`;
+
+/* Входящее приглашение — та же плотная строка, что у заявок в друзья:
+   человек видит, кто зовёт и в какую комнату, и отвечает в один клик. */
+const partyRequestHtml = (invite) => {
+  const from = store.getUser(invite.from);
+  const who = from ?? {
+    id: invite.from,
+    name: invite.fromName || 'Мастер',
+    nameKey: String(invite.fromName || '').toLowerCase(),
+    avatar: null,
+    online: true,
+    seenAt: Date.now(),
+  };
+  const room = String(invite.title ?? '').trim() || `Партия ${invite.code}`;
+  return `
+    <div class="request">
+      ${avatarEl(who, 'avatar--sm')}
+      <span class="friend__text">
+        <strong class="friend__name" translate="no">${escapeHtml(room)}</strong>
+        <small class="friend__state">${escapeHtml(invite.fromName || 'Мастер')} зовёт вас · код ${escapeHtml(invite.code)}</small>
+      </span>
+      <button class="icon-button icon-button--sm" type="button" data-action="party-invite-accept" data-id="${escapeHtml(invite.lobbyId)}" aria-label="Войти в партию ${escapeHtml(room)}" title="Войти">
+        ${icon('check')}
+      </button>
+      <button class="icon-button icon-button--sm icon-button--danger" type="button" data-action="party-invite-decline" data-id="${escapeHtml(invite.lobbyId)}" aria-label="Отклонить приглашение в партию ${escapeHtml(room)}" title="Отклонить">
+        ${icon('x')}
+      </button>
+    </div>`;
+};
+
+const partyEmptyHtml = (title, text, action = null) => `
+  <div class="empty">
+    <p class="empty__title">${escapeHtml(title)}</p>
+    <p class="empty__text">${escapeHtml(text)}</p>
+    ${
+      action
+        ? `<button class="solid-button" type="button" data-action="${action.action}"><span>${escapeHtml(action.label)}</span></button>`
+        : ''
+    }
+  </div>`;
+
+/* Комната глазами участника: код, мир, люди, приглашения и выход.
+   Всё, что может только мастер, хаб проверяет сам — интерфейс просто
+   не показывает лишних кнопок, а защитой не является. */
+const partyRoomHtml = (room) => {
+  const isMaster = room.role === 'master';
+  const members = room.members ?? [];
+  const inside = new Set(members.map((member) => member.id));
+  const pending = new Set((room.invited ?? []).map((item) => item.id));
+  const me = store.getCurrentUser();
+  const friends = me ? store.listFriends(me.id).filter((friend) => !inside.has(friend.id)) : [];
+  const full = members.length >= lobby.PARTY_MAX_MEMBERS;
+  const draft = ui.party;
+  return `
+    <div class="party">
+      <div class="party__head">
+        <div class="party__heading">
+          <p class="eyebrow">${isMaster ? 'Ваша комната для игры' : 'Комната для игры'}</p>
+          <h3 class="party__title" translate="no">${escapeHtml(partyName(room))}</h3>
+          <p class="party__meta">
+            Мастер: <span translate="no">${escapeHtml(room.masterName || '—')}</span>
+            · создана ${formatDate(room.createdAt)}
+          </p>
+        </div>
+        <button class="code-box code-box--button" type="button" data-action="party-copy-code" data-code="${escapeHtml(room.code)}" title="Скопировать код партии" aria-label="Код партии ${escapeHtml(room.code)} — скопировать">
+          <code class="code-box__value" translate="no">${escapeHtml(room.code)}</code>
+          ${icon('copy')}
+        </button>
+      </div>
+
+      <p class="party__params">
+        <span class="party__param"><small>Участников</small><strong>${members.length} / ${lobby.PARTY_MAX_MEMBERS}</strong></span>
+        <span class="party__param"><small>Seed мира</small><strong translate="no">${escapeHtml(room.seed)}</strong></span>
+        <span class="party__param"><small>Размер</small><strong>${escapeHtml(partySizeLabel(room.width, room.height))}</strong></span>
+      </p>
+
+      <div class="party__block">
+        <p class="eyebrow">В комнате</p>
+        <div class="party__members">
+          ${members.map((member) => partyMemberHtml(member, isMaster)).join('')}
+        </div>
+      </div>
+
+      ${
+        isMaster
+          ? `<div class="party__block">
+               <p class="eyebrow">Пригласить в партию</p>
+               ${
+                 friends.length
+                   ? `<div class="party__members">${friends
+                       .map((friend) => partyInviteRowHtml(friend, pending.has(friend.id)))
+                       .join('')}</div>
+                      ${
+                        full
+                          ? `<p class="form-note form-note--warn">В партии уже ${lobby.PARTY_MAX_MEMBERS} участников — свободных мест нет. Исключите кого-нибудь, чтобы позвать нового.</p>`
+                          : `<p class="form-note">Приглашение живёт 15 минут и приходит другу сразу, если он в приложении. Позвать можно только друга: сначала добавьте человека в друзья.</p>`
+                      }`
+                   : `<p class="form-note">Друзей, которых ещё нет в комнате, не осталось. Добавьте человека в друзья — и он появится здесь, а код партии ${escapeHtml(room.code)} можно передать и так.</p>`
+               }
+             </div>`
+          : `<p class="form-note">Код партии ${escapeHtml(room.code)}: по нему сюда войдёт любой, кому вы его передадите. Зовёт в комнату мастер — ${escapeHtml(room.masterName || 'он')}.</p>`
+      }
+
+      ${
+        isMaster
+          ? `<form class="form party__block" data-form="party-params" novalidate>
+               <p class="eyebrow">Мир партии</p>
+               <label class="field">
+                 <span class="field__label">Название</span>
+                 <input class="input" name="title" type="text" maxlength="${lobby.PARTY_TITLE_MAX}" autocomplete="off"
+                        placeholder="Например: Северный ветер" data-role="party-title"
+                        value="${escapeHtml(draft.title)}" />
+               </label>
+               <label class="field">
+                 <span class="field__label">Seed мира</span>
+                 <span class="code-form__row">
+                   <input class="input" name="seed" type="text" maxlength="${lobby.PARTY_SEED_MAX}" spellcheck="false"
+                          autocomplete="off" placeholder="aurora-4210" data-role="party-seed"
+                          value="${escapeHtml(draft.seed)}" />
+                   <button class="mini-button" type="button" data-action="party-random-seed">${icon('dices', 'icon--xs')} Случайный</button>
+                 </span>
+               </label>
+               <label class="field">
+                 <span class="field__label">Размер карты</span>
+                 <select class="input input--select" name="size" data-role="party-size">
+                   ${lobby.PARTY_SIZES.map(([width, height, label]) => `
+                     <option value="${width}x${height}" ${partySizeValue(room.width, room.height) === `${width}x${height}` ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+                 </select>
+               </label>
+               <p class="form-error" data-role="form-error" hidden></p>
+               <button class="mini-button mini-button--accent" type="submit" data-role="submit">${icon('save', 'icon--xs')} Сохранить мир партии</button>
+               <p class="form-note">Смена seed или размера означает новый мир: участникам придётся пересобрать карту. Название меняется без последствий.</p>
+             </form>`
+          : ''
+      }
+
+      <div class="dialog__actions dialog__actions--spread">
+        <span class="party__hint">${
+          isMaster
+            ? 'Пока вы в комнате, партия жива: закрыв её, вы закроете её для всех.'
+            : 'Вы можете выйти и вернуться по коду, если место ещё свободно.'
+        }</span>
+        <button class="mini-button ${isMaster ? 'mini-button--danger' : ''}" type="button" data-action="${isMaster ? 'party-close' : 'party-leave'}">
+          ${icon('logOut', 'icon--xs')}${isMaster ? 'Закрыть партию' : 'Выйти из партии'}
+        </button>
+      </div>
+    </div>`;
+};
+
+/* Новая партия: название, seed мира и размер. Seed обязателен для хаба —
+   по нему строится мир комнаты, поэтому поле заполнено сразу случайным
+   значением: создать партию можно одним нажатием. */
+const partyCreateHtml = () => {
+  const draft = ui.party;
+  return `
+    <form class="form" data-form="party-create" novalidate>
+      <label class="field">
+        <span class="field__label">Название партии</span>
+        <input class="input" name="title" type="text" maxlength="${lobby.PARTY_TITLE_MAX}" autocomplete="off"
+               placeholder="Например: Северный ветер" data-role="party-title" data-autofocus
+               value="${escapeHtml(draft.title)}" />
+      </label>
+      <label class="field">
+        <span class="field__label">Seed мира</span>
+        <span class="code-form__row">
+          <input class="input" name="seed" type="text" maxlength="${lobby.PARTY_SEED_MAX}" spellcheck="false"
+                 autocomplete="off" placeholder="aurora-4210" data-role="party-seed"
+                 value="${escapeHtml(draft.seed)}" />
+          <button class="mini-button" type="button" data-action="party-random-seed">${icon('dices', 'icon--xs')} Случайный</button>
+        </span>
+      </label>
+      <label class="field">
+        <span class="field__label">Размер карты</span>
+        <select class="input input--select" name="size" data-role="party-size">
+          ${lobby.PARTY_SIZES.map(([width, height, label]) => `
+            <option value="${width}x${height}" ${draft.size === `${width}x${height}` ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+        </select>
+      </label>
+      <p class="form-error" data-role="form-error" hidden></p>
+      <button class="solid-button" type="submit" data-role="submit" ${draft.busy ? 'disabled' : ''}>
+        <span>${draft.busy ? 'Создаём партию…' : 'Создать партию'}</span>
+      </button>
+      <p class="form-note">Вы станете мастером партии: сможете звать друзей, менять мир и закрыть комнату. Код партии виден только участникам. Пустая комната (никого в сети) закрывается сама через десять минут.</p>
+    </form>`;
+};
+
+const partyJoinHtml = () => `
+  <form class="form" data-form="party-join" novalidate>
+    <label class="field">
+      <span class="field__label">Код партии</span>
+      <input class="input input--code" name="code" type="text" inputmode="latin" autocomplete="off" spellcheck="false"
+             maxlength="9" placeholder="XXXX-XXXX" data-role="party-code" data-autofocus
+             value="${escapeHtml(ui.party.code)}" />
+    </label>
+    <p class="form-error" data-role="form-error" hidden></p>
+    <button class="solid-button" type="submit" data-role="submit"><span>Войти в партию</span></button>
+    <p class="form-note">Код даёт мастер партии — он выглядит как XXXX-XXXX. Войти по коду может любой игрок с аккаунтом на этом хабе, пока в комнате есть свободное место (всего ${lobby.PARTY_MAX_MEMBERS}).</p>
+  </form>`;
+
+const partiesModalHtml = () => {
+  const ready = store.isBackendInitialized?.() ?? backendReady;
+  const me = store.getCurrentUser();
+  const state = lobby.lobbyState();
+  const room = state.lobby;
+  const invites = state.invites ?? [];
+
+  const gate = !ready
+    ? partyEmptyHtml(
+        'Проверяем подключение',
+        'Приложение сначала ищет общий хаб: партии живут на нём, а не в этом браузере. Через пару секунд здесь появятся комнаты.',
+      )
+    : !me
+      ? partyEmptyHtml(
+          'Войдите, чтобы играть вместе',
+          'Партии создают и принимают только игроки с аккаунтом: комната привязана к имени, а приглашения приходят по нему.',
+          { action: 'open-auth', label: 'Войти в аккаунт' },
+        )
+      : !store.isHub()
+        ? partyEmptyHtml(
+            'Партиям нужен общий хаб',
+            'Комната для игры живёт на сервере, который видят все участники. Подключите общий хаб — свой одной командой npm run host или адрес друга, — и партии откроются.',
+            { action: 'open-hub', label: 'Подключить общий хаб' },
+          )
+        : '';
+
+  const body = gate
+    ? gate
+    : `
+        <div class="link-box">
+          <div class="link-box__text">
+            <p class="eyebrow">Комнаты для игры</p>
+            ${partyChannelHtml(state)}
+            <p class="link-box__hint">${
+              room
+                ? `Вы в партии «${partyName(room)}». Состав и присутствие обновляются сами: канал живой.`
+                : 'Создайте партию и позовите друзей — или войдите в чужую по коду. Приглашения приходят сюда сразу, как только мастер нажал «Пригласить».'
+            }</p>
+          </div>
+          ${
+            state.notice
+              ? `<div class="link-box__actions"><span class="party__notice">${escapeHtml(state.notice)}</span></div>`
+              : ''
+          }
+        </div>
+
+        ${
+          invites.length
+            ? `<div class="requests" role="group" aria-label="Приглашения в партии">
+                 <p class="requests__title">Приглашения · ${invites.length}</p>
+                 ${invites.map(partyRequestHtml).join('')}
+               </div>`
+            : ''
+        }
+
+        ${
+          room
+            ? partyRoomHtml(room)
+            : `<div class="tabs" role="tablist" aria-label="Как попасть в партию">
+                 <button class="tab${ui.party.tab === 'create' ? ' tab--active' : ''}" type="button" role="tab" aria-selected="${ui.party.tab === 'create'}" data-action="party-tab" data-tab="create">Создать партию</button>
+                 <button class="tab${ui.party.tab === 'join' ? ' tab--active' : ''}" type="button" role="tab" aria-selected="${ui.party.tab === 'join'}" data-action="party-tab" data-tab="join">Войти по коду</button>
+               </div>
+               ${ui.party.tab === 'join' ? partyJoinHtml() : partyCreateHtml()}`
+        }`;
+
+  return dialogShell({
+    label: 'Партии',
+    title: 'Партии',
+    size: 'wide',
+    body: `<div class="dialog__body">${body}</div>`,
+  });
+};
+
 /* --- Окно подтверждения --- */
 const confirmModalHtml = () => dialogShell({
   label: ui.confirm.title,
@@ -956,8 +1337,8 @@ const EVENT_LABELS = {
   'admin:file-write': 'Панель: файл сохранён',
   'admin:file-rename': 'Панель: файл переименован',
   'admin:file-delete': 'Панель: файл удалён',
-  'admin:lobby-close': 'Панель: лобби закрыто',
-  'admin:lobby-close-all': 'Панель: все лобби закрыты',
+  'admin:lobby-close': 'Панель: партия закрыта',
+  'admin:lobby-close-all': 'Панель: все партии закрыты',
   'admin:kick-all': 'Панель: сброс всех сессий',
   'admin:backup-restore': 'Панель: импорт снимка',
 };
@@ -1801,7 +2182,7 @@ const adminFilesHtml = () => {
 
   return `
     <div class="admin-page-intro">
-      <p class="hint">Управление файлами сервера, живой конфигурацией, журналами, активными лобби и резервными копиями прямо из панели.</p>
+      <p class="hint">Управление файлами сервера, живой конфигурацией, журналами, активными партиями и резервными копиями прямо из панели.</p>
       <div class="dialog__actions">
         <button class="mini-button mini-button--accent" type="button" data-action="admin-file-new">
           ${icon('plus', 'icon--xs')}<span>Новый файл</span>
@@ -1948,7 +2329,7 @@ const adminFilesHtml = () => {
 
       <section class="admin-card">
         <div class="admin-card__heading">
-          <div><p class="eyebrow">Комнаты</p><h4>Активные лобби (${lobbies.length})</h4></div>
+          <div><p class="eyebrow">Комнаты</p><h4>Активные партии (${lobbies.length})</h4></div>
           ${icon('map', 'admin-card__icon')}
         </div>
         ${
@@ -1958,8 +2339,8 @@ const adminFilesHtml = () => {
                   (item) => `
                     <div class="admin-row admin-row--static">
                       <span class="admin-row__text">
-                        <strong class="admin-row__name" translate="no">${escapeHtml(item.code)} · ${escapeHtml(item.masterName || item.masterId)}</strong>
-                        <small class="admin-row__meta">Участников: ${item.members?.length ?? 1} · seed ${escapeHtml(item.seed || '—')}</small>
+                        <strong class="admin-row__name" translate="no">${escapeHtml(item.title || item.code)} · ${escapeHtml(item.masterName || item.masterId)}</strong>
+                        <small class="admin-row__meta">Код ${escapeHtml(item.code)} · участников: ${item.members?.length ?? 1} · seed ${escapeHtml(item.seed || '—')}</small>
                       </span>
                       <button class="mini-button mini-button--danger" type="button" data-action="admin-lobby-close" data-id="${escapeHtml(item.id)}">
                         Закрыть
@@ -1969,10 +2350,10 @@ const adminFilesHtml = () => {
                 .join('')}</div>
                <div class="admin-card__actions">
                  <button class="mini-button mini-button--danger" type="button" data-action="admin-lobby-close-all">
-                   ${icon('trash', 'icon--xs')}<span>Закрыть все лобби</span>
+                   ${icon('trash', 'icon--xs')}<span>Закрыть все партии</span>
                  </button>
                </div>`
-            : '<div class="admin-empty"><strong>Активных лобби нет</strong><span>Открытые комнаты появятся здесь автоматически.</span></div>'
+            : '<div class="admin-empty"><strong>Активных партий нет</strong><span>Открытые комнаты появятся здесь автоматически.</span></div>'
         }
       </section>
 
@@ -2008,7 +2389,7 @@ const adminSystemHtml = () => {
       ${statRow('Заблокировано', String(data?.stats?.banned ?? 0))}
       ${statRow('Заявок', String(data?.stats?.requests ?? 0))}
       ${statRow('Дружб', String(data?.stats?.links ?? 0))}
-      ${statRow('Активных лобби', String(data?.stats?.lobbies ?? data?.lobbies?.length ?? 0))}
+      ${statRow('Активных партий', String(data?.stats?.lobbies ?? data?.lobbies?.length ?? 0))}
       ${statRow('Файлов сервера', `${data?.stats?.files ?? data?.files?.length ?? 0} (${formatFileSize(data?.stats?.fileBytes ?? 0)})`)}
       ${statRow('Аватарок', String(data?.stats?.avatars ?? 0))}
       ${statRow('Записей в журнале', String(data?.stats?.events ?? data?.events?.length ?? 0))}
@@ -2115,7 +2496,7 @@ const adminModalHtml = () => {
         : ui.admin.tab === 'requests'
           ? 'Очередь заявок в друзья'
           : ui.admin.tab === 'files'
-            ? 'Просмотр, редактирование и загрузка файлов сервера, управление лобби и сессиями'
+            ? 'Просмотр, редактирование и загрузка файлов сервера, управление партиями и сессиями'
             : ui.admin.tab === 'events'
               ? 'История активности и действий панели'
               : 'Безопасность, настройки и диагностика';
@@ -2254,6 +2635,9 @@ const renderModal = ({ focus = true } = {}) => {
     case 'direct':
       html = directModalHtml();
       break;
+    case 'parties':
+      html = partiesModalHtml();
+      break;
     case 'hub':
       html = hubModalHtml();
       break;
@@ -2380,13 +2764,15 @@ const accountSlotHtml = () => {
 };
 
 /* ---------- главное меню: картографический штаб ----------------
-   Слева — навигация по сообществу, в центре — заголовок и сводка,
-   справа — друзья. Фирменные шалфей и золото работают как акценты,
-   а не как декоративный шум. Навигация и сцена — отдельные области
-   (`sidenav` и `stage-menu`): каждая пересобирается, только когда её
-   строка изменилась (см. setMarkupIfChanged); друзья берутся из кеша
-   store. Экранов миров и лобби в приложении нет: они удалены вместе
-   с кнопкой «Играть», и новых входов в них здесь быть не должно. */
+   Слева — навигация: первой и основной стоит «Партии» (комнаты для
+   игры), за ней сообщество. В центре — заголовок, крупная кнопка
+   партий и сводка, справа — друзья. Фирменные шалфей и золото работают
+   как акценты, а не как декоративный шум. Навигация и сцена — отдельные
+   области (`sidenav` и `stage-menu`): каждая пересобирается, только
+   когда её строка изменилась (см. setMarkupIfChanged); друзья берутся
+   из кеша store. Игровых экранов (карты, редактора, слотов) в
+   приложении нет — «Партии» открывают комнату и людей в ней, а не
+   экран мира. */
 const menuCounts = () => {
   const me = store.getCurrentUser();
   const friends = me ? store.listFriends(me.id) : [];
@@ -2398,19 +2784,70 @@ const menuCounts = () => {
   };
 };
 
+/* Кнопка «Партии» — основная: она стоит первой в навигации и крупной
+   кнопкой под заголовком. Подпись объясняет, что внутри, ещё до клика:
+   своя комната с кодом, ждущие приглашения или то, что нужно для входа. */
+const partyNavState = () => {
+  const state = lobby.lobbyState();
+  const invites = state.invites?.length ?? 0;
+  const room = state.lobby;
+  if (room)
+    return {
+      hint: `${partyName(room)} · ${room.members?.length ?? 1}/${lobby.PARTY_MAX_MEMBERS}`,
+      badge: invites,
+    };
+  if (invites) return { hint: `Вас зовут в ${invites} комн. · войти`, badge: invites };
+  if (!store.getCurrentUser()) return { hint: 'Комнаты для игры · войдите в аккаунт', badge: 0 };
+  if (!backendReady) return { hint: 'Комнаты для игры · проверяем хаб', badge: 0 };
+  if (!store.isHub()) return { hint: 'Комнаты для игры · нужен общий хаб', badge: 0 };
+  return { hint: 'Создать комнату и позвать друзей', badge: 0 };
+};
+
+const partyCtaHtml = () => {
+  const party = partyNavState();
+  return `
+    <button class="hero-cta hero-cta--primary" type="button" data-action="open-parties">
+      <span class="hero-cta__icon" aria-hidden="true">${icon('dices')}</span>
+      <span class="hero-cta__text">
+        <strong>Партии</strong>
+        <small>${escapeHtml(party.hint)}</small>
+      </span>
+      ${
+        party.badge
+          ? `<span class="hero-cta__badge" aria-label="Новых приглашений в партии: ${party.badge}">${party.badge}</span>`
+          : ''
+      }
+    </button>`;
+};
+
 const sidenavHtml = () => {
   const { hub } = menuCounts();
+  const party = partyNavState();
   const items = [
-    ['globe', 'Общий хаб', hub, 'open-hub', ''],
-    ['link', 'Прямое подключение', 'Без сервера · обмен кодами', 'open-direct', ''],
+    {
+      glyph: 'dices',
+      title: 'Партии',
+      hint: party.hint,
+      action: 'open-parties',
+      badge: party.badge,
+      badgeLabel: 'Новых приглашений в партии',
+      modifier: 'sidenav__item--main',
+    },
+    { glyph: 'globe', title: 'Общий хаб', hint: hub, action: 'open-hub' },
+    {
+      glyph: 'link',
+      title: 'Прямое подключение',
+      hint: 'Без сервера · обмен кодами',
+      action: 'open-direct',
+    },
   ];
   return `
     <div class="sidenav__list" role="list">
-      ${items.map(([glyph, title, hint, action, badge]) => `
-        <button class="sidenav__item" type="button" role="listitem" data-action="${action}">
+      ${items.map(({ glyph, title, hint, action, badge = 0, badgeLabel = 'Новых заявок', modifier = '' }) => `
+        <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}">
           <span class="sidenav__icon">${icon(glyph)}</span>
           <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(hint)}</small></span>
-          ${badge ? `<span class="sidenav__badge" aria-label="Новых заявок: ${badge}">${badge}</span>` : ''}
+          ${badge ? `<span class="sidenav__badge" aria-label="${badgeLabel}: ${badge}">${badge}</span>` : ''}
         </button>`).join('')}
     </div>
     <div class="sidenav__foot">
@@ -2424,6 +2861,7 @@ const sidenavHtml = () => {
 const stageMenuHtml = () => {
   const { me, friends, online, hub } = menuCounts();
   return `
+    <div class="hero__actions">${partyCtaHtml()}</div>
     <div class="hero__stats" aria-label="Сводка">
       <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
       <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
@@ -2601,7 +3039,7 @@ document.querySelector('#app').innerHTML = `
 
     <footer class="footer">
       <span>Версия ${VERSION}</span>
-      <span class="footer__hint">Друзья · общий хаб · прямая связь</span>
+      <span class="footer__hint">Партии · друзья · общий хаб · прямая связь</span>
       <span class="footer__name" lang="en" translate="no">© 2026 ${TITLE_FULL}</span>
     </footer>
 
@@ -2658,7 +3096,7 @@ const render = () => {
   if (ui.modal) renderModal({ focus: false });
 };
 
-const storeModalTypes = new Set(['profile', 'add-friend', 'friend', 'hub', 'admin']);
+const storeModalTypes = new Set(['profile', 'add-friend', 'friend', 'hub', 'admin', 'parties']);
 const renderAfterStoreChange = () => {
   renderRegions();
   if (ui.modal && (storeModalTypes.has(ui.modal.type) || (ui.modal.type === 'auth' && backendReady)))
@@ -2845,6 +3283,106 @@ const syncP2P = () => {
 };
 
 store.subscribe(syncP2P);
+
+/* ---------- партии: живой канал комнаты ------------------------ */
+
+/* Канал партий (WebSocket хаба) живёт столько же, сколько сессия игрока
+   на общем хабе: вошёл — подняли, вышел или отключил хаб — закрыли. Без
+   канала приглашения приходили бы только по явному запросу, и человек не
+   узнал бы, что его зовут, пока сам не откроет окно «Партии». */
+let lobbyRunning = false;
+
+const syncLobby = () => {
+  const wanted = backendReady && store.isHub() && !!store.getCurrentUser();
+  if (wanted && !lobbyRunning) {
+    lobbyRunning = lobby.connectLobby();
+    if (lobbyRunning) lobby.refreshLobby().catch(() => {});
+    return;
+  }
+  if (!wanted && lobbyRunning) {
+    lobbyRunning = false;
+    lobby.disconnectLobby();
+  }
+};
+
+store.subscribe(syncLobby);
+
+/* Перерисовка по каналу партий. Замер задержки приходит каждые пятнадцать
+   секунд и к составу комнаты отношения не имеет, поэтому сравниваем подпись
+   данных: изменился только rtt — меню не трогаем (иначе навигация и панель
+   друзей пересобирались бы впустую, см. renderAfterPeerChange). */
+let partySignature = '';
+
+const partySignatureOf = (state) =>
+  [
+    state.status,
+    state.notice,
+    state.lobby?.id ?? '',
+    state.lobby?.code ?? '',
+    state.lobby?.title ?? '',
+    state.lobby?.seed ?? '',
+    state.lobby?.width ?? '',
+    state.lobby?.height ?? '',
+    (state.lobby?.members ?? [])
+      .map((member) => `${member.id}:${member.online ? 1 : 0}:${member.master ? 1 : 0}`)
+      .join(','),
+    (state.lobby?.invited ?? []).map((item) => item.id).join(','),
+    (state.invites ?? []).map((item) => item.lobbyId).join(','),
+  ].join('|');
+
+const renderAfterLobbyChange = (state) => {
+  const signature = partySignatureOf(state);
+  if (signature === partySignature) return;
+  partySignature = signature;
+  /* Своя комната снова появилась (вошли заново) — флаг «вышел сам»
+     больше не нужен: следующее закрытие уже не наше. */
+  if (state.lobby) partyLeftByMe = false;
+  renderRegions();
+  if (ui.modal?.type === 'parties') renderModal({ focus: false });
+};
+
+lobby.subscribeLobby(renderAfterLobbyChange);
+
+/* Зов в партию слышно и с закрытым окном: звук, значок в навигации
+   (он перерисовывается вместе с областями) и короткое сообщение.
+   Об одном и том же приглашении дважды не напоминаем. */
+let knownPartyInvites = new Set();
+
+const notifyPartyInvites = (state) => {
+  const invites = state.invites ?? [];
+  const fresh = invites.filter((item) => !knownPartyInvites.has(item.lobbyId));
+  knownPartyInvites = new Set(invites.map((item) => item.lobbyId));
+  if (fresh.length === 0) return;
+  playSound('message');
+  if (ui.modal?.type === 'parties') return; // в открытом окне приглашения и так видны
+  const first = fresh[0];
+  const room = String(first.title || '').trim() || `партию ${first.code}`;
+  toast(
+    fresh.length === 1
+      ? `${first.fromName || 'Мастер'} зовёт вас в ${room}. Откройте «Партии».`
+      : `Новых приглашений в партии: ${fresh.length}. Откройте «Партии».`,
+  );
+};
+
+lobby.subscribeLobby(notifyPartyInvites);
+
+/* Закрытие комнаты и ошибки канала доходят текстом. Свой собственный выход
+   не озвучиваем: игрок и так знает, что нажал (иначе мастер получал бы
+   «Мастер закрыл партию» в ответ на своё же действие). */
+let partyLeftByMe = false;
+
+lobby.onLobbyEvent((event) => {
+  if (event.type === 'closed') {
+    if (partyLeftByMe) return;
+    playSound('back');
+    toast(lobby.lobbyState().notice || 'Партия закрыта.');
+    return;
+  }
+  if (event.type === 'error' && event.message) {
+    playSound('error');
+    toast(event.message, 'error');
+  }
+});
 
 /* ---------- формы -------------------------------------------- */
 
@@ -3144,6 +3682,59 @@ const formHandlers = {
       );
     }),
 
+  /* Партии: создание комнаты, вход по коду и правка мира мастером.
+     Размер приходит строкой «1600x1000» — хаб принимает только размеры
+     из своего списка (LOBBY_SIZES), поэтому чужое число здесь не
+     выдумываем: что выбрано в списке, то и отправляем. */
+  'party-create': (form, fields) =>
+    withBusy(form, async () => {
+      const [width, height] = String(fields.size.value).split('x').map(Number);
+      ui.party.busy = true;
+      renderModal({ focus: false });
+      try {
+        const data = await lobby.createLobby({
+          title: fields.title.value.trim(),
+          seed: fields.seed.value.trim(),
+          width,
+          height,
+        });
+        ui.party.busy = false;
+        setFormError(form, '');
+        playSound('success');
+        toast(
+          `Партия «${partyName(data.lobby)}» создана. Код ${data.lobby.code} — позовите друзей.`,
+        );
+      } catch (error) {
+        ui.party.busy = false;
+        throw error;
+      }
+      renderModal({ focus: false });
+    }),
+
+  'party-join': (form, fields) =>
+    withBusy(form, async () => {
+      const data = await lobby.joinLobby(fields.code.value);
+      setFormError(form, '');
+      playSound('connect');
+      toast(`Вы вошли в партию «${partyName(data.lobby)}».`);
+      renderModal({ focus: false });
+    }),
+
+  'party-params': (form, fields) =>
+    withBusy(form, async () => {
+      const [width, height] = String(fields.size.value).split('x').map(Number);
+      const data = await lobby.setLobbyParams({
+        title: fields.title.value.trim(),
+        seed: fields.seed.value.trim(),
+        width,
+        height,
+      });
+      setFormError(form, '');
+      playSound('success');
+      toast(`Мир партии «${partyName(data.lobby)}» обновлён.`);
+      renderModal({ focus: false });
+    }),
+
   'change-password': (form, fields) =>
     withBusy(form, async () => {
       await store.changePassword(fields.old.value, fields.next.value);
@@ -3347,6 +3938,17 @@ document.addEventListener('input', (event) => {
   if (role === 'auth-password2') ui.authDraft.password2 = event.target.value;
   if (role === 'direct-offer') ui.direct.offerDraft = event.target.value;
   if (role === 'direct-answer') ui.direct.answerDraft = event.target.value;
+  if (role === 'party-title') ui.party.title = event.target.value;
+  if (role === 'party-seed') ui.party.seed = event.target.value;
+  /* Код партии приводим к виду хаба (XXXX-XXXX; в алфавите кода нет знаков,
+     которые путают при диктовке): человек вставляет его из мессенджера
+     в любом регистре и с пробелами. */
+  if (role === 'party-code') {
+    const raw = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const formatted = raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4, 8)}` : raw;
+    event.target.value = formatted;
+    ui.party.code = formatted;
+  }
   if (role === 'code-input') {
     const raw = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const formatted = raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4, 8)}` : raw;
@@ -3412,6 +4014,12 @@ document.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 document.addEventListener('change', (event) => {
+  /* Размер карты партии: черновик обязан его запомнить, иначе живое
+     обновление состава перерисует окно и вернёт прежнее значение. */
+  if (event.target.dataset?.role === 'party-size') {
+    ui.party.size = event.target.value;
+    return;
+  }
   const key = event.target.dataset?.setting;
   if (!key) return;
 
@@ -3576,6 +4184,164 @@ const actions = {
   'p2p-disconnect': (el) => {
     p2p.disconnect(el.dataset.id);
     toast('Прямая связь разорвана.');
+  },
+
+  /* --- партии: комнаты для игры -------------------------------
+     Комнату ведёт хаб (server/hub-lobby.mjs), состояние приносит живой
+     канал (src/data/lobby.js). Поэтому действия здесь короткие: сказать
+     хабу, что человек сделал, и показать его ответ. Ошибки хаба
+     («уже в другом лобби», «нет свободных мест») доходят до игрока
+     текстом — молча проглатывать их нельзя. */
+
+  'open-parties': () => {
+    const me = store.getCurrentUser();
+    const room = lobby.lobbyState().lobby;
+    /* Черновик мира мастера берём из его же комнаты: открыв форму,
+       человек видит текущие значения, а не пустые поля. */
+    ui.party =
+      room && room.role === 'master'
+        ? {
+            ...partyDraft(),
+            title: room.title ?? '',
+            seed: room.seed ?? '',
+            size: partySizeValue(room.width, room.height),
+          }
+        : { ...partyDraft(), title: me ? lobby.defaultPartyTitle(me.name) : '' };
+    openModal('parties');
+    /* Состав мог измениться, пока окно было закрыто (другое устройство,
+       переподключение): перечитываем у хаба, не дожидаясь кадра канала. */
+    if (backendReady && store.isHub() && me) {
+      lobby.connectLobby();
+      lobby.refreshLobby().catch(() => {});
+    }
+  },
+
+  'party-tab': (el) => {
+    playSound('select');
+    ui.party.tab = el.dataset.tab === 'join' ? 'join' : 'create';
+    renderModal();
+  },
+
+  'party-random-seed': () => {
+    playSound('select');
+    ui.party.seed = lobby.randomPartySeed();
+    renderModal({ focus: false });
+  },
+
+  'party-copy-code': async (el) => {
+    const ok = await copyText(el.dataset.code);
+    toast(
+      ok
+        ? `Код партии ${el.dataset.code} скопирован. Передайте его друзьям.`
+        : 'Не получилось скопировать — выделите код вручную.',
+      ok ? 'ok' : 'error',
+    );
+  },
+
+  'party-invite': async (el) => {
+    try {
+      const data = await lobby.inviteFriend(el.dataset.id);
+      playSound('success');
+      toast(`${data.invited?.name ?? 'Игрок'} приглашён в партию.`);
+    } catch (error) {
+      playSound('error');
+      toast(
+        error instanceof Error ? error.message : 'Не удалось отправить приглашение.',
+        'error',
+      );
+    }
+  },
+
+  'party-invite-accept': async (el) => {
+    try {
+      const data = await lobby.acceptInvite(el.dataset.id);
+      playSound('connect');
+      toast(`Вы вошли в партию «${partyName(data.lobby)}».`);
+    } catch (error) {
+      playSound('error');
+      toast(
+        error instanceof Error ? error.message : 'Не удалось войти в партию.',
+        'error',
+      );
+      /* Приглашение могло истечь или комната — закрыться: перечитаем,
+         чтобы не показывать строку, которой на хабе уже нет. */
+      lobby.refreshLobby().catch(() => {});
+    }
+  },
+
+  'party-invite-decline': async (el) => {
+    try {
+      await lobby.declineInvite(el.dataset.id);
+      toast('Приглашение отклонено.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось отклонить приглашение.', 'error');
+    }
+  },
+
+  'party-leave': async () => {
+    try {
+      partyLeftByMe = true;
+      await lobby.leaveLobby();
+      playSound('back');
+      toast('Вы вышли из партии.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось выйти из партии.', 'error');
+    }
+  },
+
+  /* Мастер выходит последним: его выход закрывает комнату для всех,
+     поэтому спрашиваем подтверждение. */
+  'party-close': () => {
+    const room = lobby.lobbyState().lobby;
+    ui.confirm = {
+      title: 'Закрыть партию?',
+      text: `Комната «${partyName(room)}» закроется для всех участников: ${
+        room?.members?.length ?? 1
+      } человек(а) получат сообщение о закрытии. Вернуться в неё можно только новой партией.`,
+      label: 'Закрыть партию',
+      action: 'confirm-party-close',
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'confirm-party-close': async () => {
+    try {
+      partyLeftByMe = true;
+      await lobby.leaveLobby();
+      playSound('back');
+      closeModal();
+      toast('Партия закрыта.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось закрыть партию.', 'error');
+    }
+  },
+
+  'party-kick': (el) => {
+    const member = lobby.lobbyState().lobby?.members?.find((item) => item.id === el.dataset.id);
+    if (!member) return;
+    ui.confirm = {
+      title: 'Исключить из партии?',
+      text: `${member.name} потеряет место в комнате и сможет вернуться только по коду, если место освободится.`,
+      label: 'Исключить',
+      action: 'confirm-party-kick',
+      id: member.id,
+    };
+    ui.modal = { type: 'confirm' };
+    renderModal();
+  },
+
+  'confirm-party-kick': async (el) => {
+    try {
+      await lobby.kickMember(el.dataset.id);
+      playSound('success');
+      toast('Игрок исключён из партии.');
+      ui.confirm = null;
+      ui.modal = { type: 'parties' };
+      renderModal({ focus: false });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось исключить игрока.', 'error');
+    }
   },
 
   /* --- панель админа --- */
@@ -3756,13 +4522,13 @@ const actions = {
   'admin-lobby-close': (el) =>
     runAdminAction(
       () => store.adminServerAction('close-lobby', { id: el.dataset.id }),
-      'Лобби принудительно закрыто.',
+      'Партия принудительно закрыта.',
     ),
 
   'admin-lobby-close-all': () =>
     runAdminAction(
       () => store.adminServerAction('close-all-lobbies'),
-      'Все активные лобби закрыты.',
+      'Все активные партии закрыты.',
     ),
 
   'admin-kick-all': () => {
@@ -4098,7 +4864,7 @@ const actions = {
 
 const ACTIONS_WITH_OWN_SOUND = new Set([
   'open-auth', 'open-profile', 'open-settings', 'open-add-friend', 'open-friend',
-  'open-direct', 'open-hub',
+  'open-direct', 'open-hub', 'open-parties', 'party-tab',
   'close-modal', 'admin-tap', 'admin-tab', 'admin-go',
   'admin-back', 'admin-lock', 'auth-tab',
 ]);
@@ -4226,6 +4992,9 @@ const initializeConnection = async () => {
   store.heartbeat();
   if (mode === 'hub') toast(`Подключено к общему хабу: ${store.hubHost()}.`);
   syncP2P();
+  /* Партии живут на хабе: канал комнаты поднимаем сразу после проверки,
+     чтобы приглашение дошло, даже если окно «Партии» ни разу не открывали. */
+  syncLobby();
   /* Ссылка с `#admin` (или `?admin=1`) открывает панель сразу: так в неё
      удобно заходить на телефоне, где нет клавиатуры для сочетания клавиш.
      Ключ всё равно спросят. */

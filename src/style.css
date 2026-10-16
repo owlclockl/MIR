@@ -330,6 +330,34 @@ a {
   font-weight: 700;
 }
 
+/* Основной пункт навигации — «Партии». Он главный, поэтому заметен до
+   наведения: тёплая площадка, постоянная полоса слева и живая иконка.
+   Остальные пункты остаются тихими — акцент один. */
+.sidenav__item--main {
+  color: var(--text);
+  border-color: var(--gold-line);
+  background: var(--gold-soft);
+}
+
+.sidenav__item--main::before {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.sidenav__item--main .sidenav__icon {
+  color: var(--gold);
+}
+
+.sidenav__item--main:hover {
+  color: var(--text);
+  border-color: var(--gold-line);
+  background: var(--fill-active);
+}
+
+.sidenav__item--main:hover .sidenav__icon {
+  color: var(--accent-strong);
+}
+
 /* ---------- Верхняя панель ---------------------------------------- */
 
 .topbar {
@@ -814,6 +842,62 @@ a {
   color: var(--bg);
   border-color: var(--accent-strong);
   background: var(--accent-strong);
+}
+
+/* Главная кнопка «Партии»: иконка, название и подсказка в две строки,
+   значок приглашений справа. Подсказка рассказывает состояние комнаты
+   до клика — свой код партии или число приглашений. */
+.hero-cta__icon {
+  display: grid;
+  place-items: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  flex: none;
+}
+
+.hero-cta__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  text-align: left;
+}
+
+.hero-cta__text strong {
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.hero-cta__text small {
+  overflow: hidden;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-cta__badge {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  flex: none;
+  padding-inline: var(--sp-4);
+  color: var(--bg);
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+}
+
+.hero-cta--primary .hero-cta__badge {
+  color: var(--gold);
+  background: var(--bg);
 }
 
 .eyebrow {
@@ -1438,6 +1522,10 @@ a {
 
   .hero__title {
     font-size: clamp(2.15rem, 8vw, 2.6rem);
+  }
+
+  .party__params {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .hero__stats {
@@ -2176,6 +2264,173 @@ input[type='search']::-webkit-search-cancel-button {
 .request .icon-button {
   width: var(--control-h-mini);
   height: var(--control-h-mini);
+}
+
+/* ---------- Партии: комнаты для игры -------------------------------
+   Окно «Партии» собирается из тех же плотностей, что и остальные блоки
+   с рамкой: заголовок комнаты и код, три параметра мира, список
+   участников и подвал с выходом. Строка участника — та же, что в списке
+   друзей (--row-pad/--row-gap), поэтому люди в комнате и в панели
+   справа выглядят одним семейством. */
+
+.party {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  min-width: 0;
+}
+
+.party__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--box-gap);
+  flex-wrap: wrap;
+}
+
+.party__heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+.party__title {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party__meta {
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.party__head .code-box {
+  flex: none;
+}
+
+.party__params {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-10);
+}
+
+.party__param {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--box-pad);
+  border: 1px solid var(--line);
+  background: var(--fill);
+}
+
+.party__param small {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.party__param strong {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+
+.party__members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: min(38vh, 38dvh);
+  padding: var(--sp-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.party__hint {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.party__notice {
+  color: var(--warn);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: var(--row-gap);
+  padding: var(--row-pad);
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.member + .member {
+  border-top: 1px solid var(--line);
+}
+
+.member__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.member__name {
+  overflow: hidden;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member__state {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--gold);
+}
+
+.member--off .member__name {
+  color: var(--text-faint);
 }
 
 /* ---------- Пустые состояния ---------------------------------- */

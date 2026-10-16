@@ -12,8 +12,21 @@
    защищённом контексте, а хаб на адресе локальной сети открыт по http.
    =========================================================== */
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder('utf-8', { fatal: true });
+/* Кодировщик и разборщик создаём лениво, а не при импорте модуля. Причина:
+   канал партий (src/data/lobby.js) импортирует отсюда только `peekFrameType`,
+   а меню — канал партий. Тогда в среде без TextEncoder (jsdom без полифила,
+   очень старый WebView в APK) приложение не падает на старте: ошибка
+   случится только там, где кадр карты действительно кодируют или читают. */
+let encoderInstance = null;
+let decoderInstance = null;
+const encoder = () => {
+  if (!encoderInstance) encoderInstance = new TextEncoder();
+  return encoderInstance;
+};
+const decoder = () => {
+  if (!decoderInstance) decoderInstance = new TextDecoder('utf-8', { fatal: true });
+  return decoderInstance;
+};
 
 /** Версия формата заголовка: меняется при несовместимых изменениях. */
 export const FRAME_VERSION = 1;
@@ -32,7 +45,7 @@ export const gunzip = (bytes) =>
 
 /** Собирает кадр: длина заголовка, заголовок, gzip-данные. */
 export const encodeFrame = async (text, header) => {
-  const headerBytes = encoder.encode(JSON.stringify(header));
+  const headerBytes = encoder().encode(JSON.stringify(header));
   const payload = await gzip(text);
   const frame = new Uint8Array(4 + headerBytes.length + payload.length);
   new DataView(frame.buffer).setUint32(0, headerBytes.length);
@@ -46,7 +59,7 @@ export const decodeFrame = (bytes) => {
   const headerLength = peekHeaderLength(bytes);
   if (!headerLength) return null;
   try {
-    const header = JSON.parse(decoder.decode(bytes.subarray(4, 4 + headerLength)));
+    const header = JSON.parse(decoder().decode(bytes.subarray(4, 4 + headerLength)));
     if (!header || typeof header !== 'object') return null;
     return { header, payload: bytes.subarray(4 + headerLength) };
   } catch {
@@ -68,7 +81,7 @@ export const peekFrameType = (bytes) => {
   const headerLength = peekHeaderLength(bytes);
   if (!headerLength || bytes.byteLength < 4 + headerLength) return null;
   try {
-    const header = JSON.parse(decoder.decode(bytes.subarray(4, 4 + headerLength)));
+    const header = JSON.parse(decoder().decode(bytes.subarray(4, 4 + headerLength)));
     return header?.t === 'map' || header?.t === 'live' ? header.t : null;
   } catch {
     return null;

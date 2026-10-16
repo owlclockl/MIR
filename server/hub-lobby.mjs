@@ -1,6 +1,11 @@
 /* ===========================================================
    Лобби и живая синхронизация карты.
 
+   В меню этот раздел называется «Партии»: комната для игры, которую
+   создаёт мастер и куда он зовёт людей. Ниже «лобби» и «партия» —
+   одна и та же сущность (имя `lobbies` сохранено в данных хаба и в
+   адресах API ради совместимости со старыми базами и клиентами).
+
    Мастер создаёт лобби, приглашает друзей (или друзья входят по коду),
    а дальше карта мастера течёт всем участникам в реальном времени:
 
@@ -67,7 +72,13 @@ const SOCKET_IDLE_MS = 90_000;
 /* Запрос мастеру «пришлите карту» не чаще раза в несколько секунд на лобби:
    каждый такой запрос заставляет мастера сжать и отправить карту заново. */
 const NEED_MAP_EVERY_MS = 3_000;
-const MAX_SEED = 48;
+/* Экспортируем пределы: проверка `npm run test:parties` сверяет их с
+   клиентом (src/data/lobby.js) — меню не должно предлагать то, что хаб
+   отобьёт. */
+export const MAX_SEED = 48;
+/* Название партии видно всем участникам и приходит вместе с приглашением:
+   человек должен понимать, куда его зовут, до входа в комнату. */
+export const MAX_TITLE = 48;
 /* Размеры совпадают с пресетами игры (store.js, WORLD_SIZES). */
 export const LOBBY_SIZES = [
   [1280, 800],
@@ -158,9 +169,22 @@ export function createLobbies({
   const lobbyById = (id) => db.lobbies.find((lobby) => lobby.id === id) ?? null;
   const lobbyOf = (userId) => db.lobbies.find((lobby) => lobby.members.includes(userId)) ?? null;
 
+  /* Ждущие ответа приглашения в одну партию: userId → время приглашения.
+     Приглашения живут в памяти (см. INVITE_TTL_MS), поэтому список
+     собирается просмотром ящиков — их немного. */
+  const invitedOf = (lobbyId) => {
+    const out = [];
+    for (const [userId, map] of invites) {
+      const invite = map.get(lobbyId);
+      if (invite) out.push({ id: userId, name: byId(userId)?.name ?? '', at: invite.at });
+    }
+    return out.sort((a, b) => b.at - a.at);
+  };
+
   const view = (lobby, selfId) => ({
     id: lobby.id,
     code: lobby.code,
+    title: lobby.title ?? '',
     masterId: lobby.masterId,
     masterName: byId(lobby.masterId)?.name ?? '',
     seed: lobby.seed,
@@ -176,6 +200,10 @@ export function createLobbies({
         master: id === lobby.masterId,
       })),
     role: selfId === lobby.masterId ? 'master' : 'player',
+    /* Кого мастер уже позвал и кто ещё не ответил. Нужно только ему:
+       участник не обязан видеть чужие приглашения, а мастер без этого
+       списка звал бы одного и того же друга по несколько раз. */
+    invited: selfId === lobby.masterId ? invitedOf(lobby.id) : [],
     hasMap: frames.has(lobby.id),
     live: liveFrames.has(lobby.id),
   });
@@ -186,6 +214,7 @@ export function createLobbies({
       .map((invite) => ({
         lobbyId: invite.lobbyId,
         code: lobbyById(invite.lobbyId)?.code ?? '',
+        title: lobbyById(invite.lobbyId)?.title ?? '',
         from: invite.from,
         fromName: invite.fromName,
         at: invite.at,
@@ -283,7 +312,7 @@ export function createLobbies({
       const code = makeCode();
       if (!db.lobbies.some((lobby) => lobby.code === code)) return code;
     }
-    throw httpError(503, 'Не удалось выдать код лобби — попробуйте ещё раз.');
+    throw httpError(503, 'Не удалось выдать код партии — попробуйте ещё раз.');
   };
 
   const httpError = (status, message) => {
@@ -300,15 +329,23 @@ export function createLobbies({
     return { seed, width: Number(body.width), height: Number(body.height) };
   };
 
+  /* Название партии. Пустое разрешено (комната остаётся без имени),
+     длинное — нет: оно показывается в строке приглашения и в шапке. */
+  const checkTitle = (body) => {
+    const title = String(body?.title ?? '').replace(/\s+/g, ' ').trim();
+    if (title.length > MAX_TITLE) throw httpError(400, `Название длиннее ${MAX_TITLE} символов.`);
+    return title;
+  };
+
   const masterOnly = (me, lobby) => {
-    if (!lobby) throw httpError(409, 'Вы не в лобби.');
-    if (lobby.masterId !== me.id) throw httpError(403, 'Это может сделать только мастер лобби.');
+    if (!lobby) throw httpError(409, 'Вы не в партии.');
+    if (lobby.masterId !== me.id) throw httpError(403, 'Это может сделать только мастер партии.');
   };
 
   const joinLobby = (me, lobby, save) => {
     if (lobby.members.includes(me.id)) return view(lobby, me.id);
-    if (lobbyOf(me.id)) throw httpError(409, 'Сначала выйдите из текущего лобби.');
-    if (lobby.members.length >= LOBBY_MAX_MEMBERS) throw httpError(409, 'В лобби нет свободных мест.');
+    if (lobbyOf(me.id)) throw httpError(409, 'Сначала выйдите из текущей партии.');
+    if (lobby.members.length >= LOBBY_MAX_MEMBERS) throw httpError(409, 'В партии нет свободных мест.');
     lobby.members.push(me.id);
     activity.set(lobby.id, now());
     dropInvite(me.id, lobby.id);
@@ -331,11 +368,12 @@ export function createLobbies({
     'POST /api/lobby/create': async (req, body, save) => {
       const me = auth(req);
       tidy();
-      if (lobbyOf(me.id)) throw httpError(409, 'Вы уже в лобби — сначала выйдите из него.');
+      if (lobbyOf(me.id)) throw httpError(409, 'Вы уже в партии — сначала выйдите из неё.');
       const params = checkParams(body);
       const lobby = {
         id: `l_${hex(6)}`,
         code: freshCode(),
+        title: checkTitle(body),
         masterId: me.id,
         seed: params.seed,
         width: params.width,
@@ -354,9 +392,9 @@ export function createLobbies({
       const me = auth(req);
       tidy();
       const code = normalizeCode(body?.code);
-      if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw httpError(400, 'Код лобби выглядит как XXXX-XXXX.');
+      if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw httpError(400, 'Код партии выглядит как XXXX-XXXX.');
       const lobby = db.lobbies.find((item) => item.code === code);
-      if (!lobby) throw httpError(404, 'Лобби с таким кодом не найдено.');
+      if (!lobby) throw httpError(404, 'Партия с таким кодом не найдена.');
       const joined = joinLobby(me, lobby, save);
       return { lobby: joined, invites: invitesOf(me.id) };
     },
@@ -369,9 +407,9 @@ export function createLobbies({
       const friend = byId(body?.friendId);
       if (!friend) throw httpError(404, 'Игрок не найден.');
       if (!me.friends.includes(friend.id)) throw httpError(403, 'Приглашать можно только друзей.');
-      if (lobby.members.includes(friend.id)) throw httpError(409, `${friend.name} уже в лобби.`);
-      if (lobbyOf(friend.id)) throw httpError(409, `${friend.name} уже в другом лобби.`);
-      if (lobby.members.length >= LOBBY_MAX_MEMBERS) throw httpError(409, 'В лобби нет свободных мест.');
+      if (lobby.members.includes(friend.id)) throw httpError(409, `${friend.name} уже в партии.`);
+      if (lobbyOf(friend.id)) throw httpError(409, `${friend.name} уже в другой партии.`);
+      if (lobby.members.length >= LOBBY_MAX_MEMBERS) throw httpError(409, 'В партии нет свободных мест.');
       let map = invites.get(friend.id);
       if (!map) {
         map = new Map();
@@ -393,7 +431,7 @@ export function createLobbies({
       if (!lobby) {
         dropInvite(me.id, invite.lobbyId);
         pushInvites(me.id);
-        throw httpError(404, 'Лобби уже закрыто.');
+        throw httpError(404, 'Партия уже закрыта.');
       }
       const joined = joinLobby(me, lobby, save);
       return { lobby: joined, invites: invitesOf(me.id) };
@@ -427,7 +465,7 @@ export function createLobbies({
       const lobby = lobbyOf(me.id);
       masterOnly(me, lobby);
       const targetId = String(body?.userId ?? '');
-      if (targetId === me.id || !lobby.members.includes(targetId)) throw httpError(404, 'Игрока нет в лобби.');
+      if (targetId === me.id || !lobby.members.includes(targetId)) throw httpError(404, 'Игрока нет в партии.');
       lobby.members = lobby.members.filter((id) => id !== targetId);
       sendUser(targetId, JSON.stringify({ t: 'closed', lobbyId: lobby.id, reason: 'kicked' }));
       sendUser(targetId, JSON.stringify({ t: 'lobby', lobby: null }));
@@ -437,12 +475,17 @@ export function createLobbies({
     },
 
     /* Мастер сменил seed или размер (новый мир). Старый кадр карты больше
-       не подходит: новые участники будут ждать карту от мастера. */
+       не подходит: новые участники будут ждать карту от мастера.
+       Название партии меняется здесь же; само по себе оно кадр не сбрасывает. */
     'POST /api/lobby/params': async (req, body, save) => {
       const me = auth(req);
       const lobby = lobbyOf(me.id);
       masterOnly(me, lobby);
+      /* Сначала проверяем всё, потом пишем: иначе запрос с неверным seed
+         успел бы поменять название и ушёл бы с ошибкой 400. */
+      const title = body?.title === undefined ? null : checkTitle(body);
       const params = checkParams(body);
+      if (title !== null) lobby.title = title;
       Object.assign(lobby, params);
       frames.delete(lobby.id);
       notifyLobby(lobby);
@@ -634,7 +677,7 @@ export function createLobbies({
   const handleFrame = (conn, state, bytes) => {
     const lobby = lobbyOf(state.userId);
     if (!lobby || lobby.masterId !== state.userId) {
-      sendTo(conn, JSON.stringify({ t: 'error', message: 'Карту может присылать только мастер лобби.' }));
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Карту может присылать только мастер партии.' }));
       return;
     }
     const header = parseMapFrame(bytes);
@@ -648,7 +691,7 @@ export function createLobbies({
       return;
     }
     if (bytes.byteLength > LOBBY_MAX_MAP_BYTES) {
-      sendTo(conn, JSON.stringify({ t: 'error', message: 'Карта слишком большая для лобби.' }));
+      sendTo(conn, JSON.stringify({ t: 'error', message: 'Карта слишком большая для партии.' }));
       return;
     }
     if (

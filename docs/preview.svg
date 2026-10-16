@@ -31,6 +31,15 @@
     <rect x="9" y="9" width="13" height="13"/><rect x="5" y="5" width="13" height="13"/>
   </g>
   <path id="icoChevron" d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <g id="icoDices" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="10" width="12" height="12" rx="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01M10 14h.01M15 6h.01M18 9h.01"/>
+  </g>
+  <g id="icoGlobe" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/>
+  </g>
+  <g id="icoLink" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+  </g>
 </defs>
 
 <rect width="1440" height="900" fill="#080d0e"/>
@@ -59,30 +68,49 @@
 <rect x="700" y="576" width="64" height="1" fill="url(#accentR)"/>
 
 <!-- сводка витрины: друзья в сети и режим связи -->
+<!-- основное действие: «Партии» — комнаты для игры -->
 <g>
-  <rect x="292" y="616" width="196" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-  <text x="312" y="650" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#ededf0">1<tspan font-size="13" fill="#8b8b94">/2</tspan></text>
-  <text x="312" y="669" font-size="10" fill="#65656e">друзей в сети</text>
-  <rect x="500" y="616" width="340" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
-  <text x="520" y="650" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#91a39b">Хаб</text>
-  <text x="520" y="669" font-size="10" fill="#65656e">127.0.0.1:8787</text>
+  <rect x="292" y="606" width="340" height="56" fill="#c2d9c9" stroke="#c2d9c9"/>
+  <g transform="translate(308 622)" color="#080d0e"><use href="#icoDices"/></g>
+  <text x="346" y="630" font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="700" fill="#080d0e">Партии</text>
+  <text x="346" y="648" font-size="10.5" font-weight="500" fill="#080d0e" fill-opacity=".72">Создать комнату и позвать друзей</text>
+</g>
+
+<g>
+  <rect x="292" y="682" width="196" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="312" y="716" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#ededf0">1<tspan font-size="13" fill="#8b8b94">/2</tspan></text>
+  <text x="312" y="735" font-size="10" fill="#65656e">друзей в сети</text>
+  <rect x="500" y="682" width="340" height="66" fill="#fff" fill-opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+  <text x="520" y="716" font-family="Manrope, Arial, sans-serif" font-size="21" font-weight="600" fill="#91a39b">Хаб</text>
+  <text x="520" y="735" font-size="10" fill="#65656e">127.0.0.1:8787</text>
 </g>
 
 
-<!-- левая навигация: сообщество (хаб и прямое подключение) и настройки -->
+<!-- левая навигация: партии (основное), сообщество и настройки -->
 <rect x="0" y="78" width="248" height="822" fill="#0d1415" fill-opacity=".66"/>
 <path d="M247.5 78v822" stroke="#fff" stroke-opacity=".08"/>
+
+<!-- основной пункт: тёплая площадка, постоянная полоса слева и живая иконка -->
+<rect x="12" y="94" width="224" height="58" fill="#d8c184" fill-opacity=".1" stroke="#d8c184" stroke-opacity=".34"/>
+<rect x="12" y="94" width="2" height="58" fill="#c2d9c9"/>
+<g transform="translate(24 111)" color="#d8c184"><use href="#icoDices" transform="scale(.92)"/></g>
+<text x="60" y="118" font-size="12.5" font-weight="600" fill="#ededf0">Партии</text>
+<text x="60" y="136" font-size="10" fill="#8b8b94">Создать комнату и позвать друзей</text>
+
+<g transform="translate(24 183)" color="#65656e"><use href="#icoGlobe" transform="scale(.92)"/></g>
+<g transform="translate(24 255)" color="#65656e"><use href="#icoLink" transform="scale(.92)"/></g>
 <g font-size="12.5" font-weight="600" fill="#ededf0">
-  <text x="24" y="124">Общий хаб</text>
-  <text x="24" y="196">Прямое подключение</text>
+  <text x="60" y="196">Общий хаб</text>
+  <text x="60" y="268">Прямое подключение</text>
 </g>
 <g font-size="10" fill="#65656e">
-  <text x="24" y="142">Локально, в этом браузере</text>
-  <text x="24" y="214">Без сервера · обмен кодами</text>
+  <text x="60" y="214">127.0.0.1:8787</text>
+  <text x="60" y="286">Без сервера · обмен кодами</text>
 </g>
 <path d="M12 826h224" stroke="#fff" stroke-opacity=".08"/>
-<text x="24" y="856" font-size="12.5" font-weight="600" fill="#ededf0">Настройки</text>
-<text x="24" y="874" font-size="10" fill="#65656e">Звук, анимации, обновления</text>
+<g transform="translate(24 843)" color="#65656e"><use href="#icoGear" transform="scale(.92)"/></g>
+<text x="60" y="856" font-size="12.5" font-weight="600" fill="#ededf0">Настройки</text>
+<text x="60" y="874" font-size="10" fill="#65656e">Звук, анимации, обновления</text>
 
 <!-- подвал -->
 <text x="274" y="876" font-size="10" letter-spacing="1.6" fill="#55555d">ВЕРСИЯ 0.10.0</text>
