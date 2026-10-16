@@ -40,6 +40,15 @@
   --map-frame: rgba(8, 13, 14, 0.82); /* полупрозрачные панели и подписи поверх карты */
   --accent-glow: rgba(176, 208, 186, 0.45);
   --shadow-dialog: 0 24px 72px rgba(0, 0, 0, 0.44);
+  /* Плавающий остров: приподнятая поверхность и тень под ней.
+     Тень глубже карточной, но мягче диалоговой — остров висит
+     над страницей, а не давит, как окно. */
+  --surface-raised: #121c1b;
+  --shadow-island: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --shadow-island-raise: 0 26px 64px rgba(0, 0, 0, 0.42);
+  /* Остров лежит выше сцены и панелей, но ниже окон, тостов и
+     служебных слоёв: над соседними элементами, а не над ними. */
+  --z-island: 20;
   --dur: 160ms;
 
   /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
@@ -1462,6 +1471,58 @@ a {
   .hero__caption::before,
   .hero__caption::after {
     width: 28px;
+  }
+}
+
+/* ---------- Плавающий остров ---------------------------------- */
+
+/* Остров — блок, парящий над страницей или над соседними
+   элементами: приподнятая поверхность, глубокая мягкая тень
+   и тонкий контур. Тень — главный признак парения: под
+   островом остаётся свет фона, и край не «наклеен» к
+   подложке, а висит над ней. Плотность полей — общая с
+   блоками с рамкой (--box-pad). */
+.island {
+  position: relative;
+  z-index: var(--z-island);
+  padding: var(--box-pad);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-island);
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+/* Касание поднимает остров на волосок выше: тень глубже,
+   поверхность светлее. Блок кажется живым, а не нарисованным. */
+.island:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-island-raise);
+}
+
+/* Левитация: остров медленно покачивается, будто висит в
+   воздухе. Только для декоративных островов — на управляемых
+   блоках движение мешает читать текст и ловить край. */
+.island--float {
+  animation: island-float 6s ease-in-out infinite;
+}
+
+/* Касание останавливает покачивание: остров замирает в том
+   положении, где его догнали, и тень всё равно глубже. */
+.island--float:hover {
+  animation-play-state: paused;
+}
+
+@keyframes island-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
   }
 }
 

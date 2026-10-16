@@ -206,6 +206,7 @@ family('блоки с рамкой: одна плотность --box-pad', [
   ['.link-box', 'padding', 'var(--box-pad)'],
   ['.chat__list', 'padding', 'var(--box-pad)'],
   ['.setting-row', 'padding', 'var(--box-pad)'],
+  ['.island', 'padding', 'var(--box-pad)'],
 ]);
 
 add(
