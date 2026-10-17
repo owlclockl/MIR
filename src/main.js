@@ -13,6 +13,7 @@ import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
 import { motionOff, motionQuery } from './ui/motion.js';
+import { settingsModalHtml } from './ui/settings.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -567,39 +568,6 @@ const hubModalHtml = () => {
   });
 };
 
-/* --- Настройки интерфейса --- */
-const settingsModalHtml = () => {
-  const settings = store.getSettings();
-  return dialogShell({
-    label: 'Настройки',
-    title: 'Настройки',
-    size: 'wide',
-    body: `
-      <div class="dialog__body settings-list">
-        <label class="setting-row">
-          <span><strong>Звуки игрового меню</strong><small>Кнопки, окна, переключатели и игровые события</small></span>
-          <input class="switch" type="checkbox" data-setting="sound" ${settings.sound ? 'checked' : ''} />
-        </label>
-        <label class="setting-row setting-row--column">
-          <span><strong>Громкость</strong><small>${Math.round(settings.volume * 100)}%</small></span>
-          <input class="range" type="range" min="0" max="1" step="0.05" value="${settings.volume}" data-setting="volume" ${settings.sound ? '' : 'disabled'} />
-        </label>
-        <label class="setting-row">
-          <span><strong>Анимации</strong><small>Плавные переходы и движение фона</small></span>
-          <input class="switch" type="checkbox" data-setting="motion" ${settings.motion ? 'checked' : ''} />
-        </label>
-        <div class="setting-row">
-          <span><strong>Обновления</strong><small>${updateStatusText()}</small></span>
-          <button class="mini-button${update.getUpdateInfo().available ? ' mini-button--accent' : ''}" type="button" data-action="${update.getUpdateInfo().available ? 'update-apply' : 'check-update'}">${update.getUpdateInfo().available ? 'Обновить' : 'Проверить'}</button>
-        </div>
-        <label class="setting-row">
-          <span><strong>Уведомления на телефон</strong><small>${notifyHint()}</small></span>
-          <input class="switch" type="checkbox" data-setting="notify" ${settings.notify ? 'checked' : ''} ${update.notificationState().supported ? '' : 'disabled'} />
-        </label>
-        <p class="form-note">Настройки сохраняются на этом устройстве. Обновление применяется один раз после загрузки и больше не создаёт цикл перезагрузок.</p>
-      </div>`,
-  });
-};
 
 /* --- Современный редактор аватарки: перетаскивание, зум и точная настройка --- */
 const avatarPreviewHtml = () => dialogShell({
@@ -2680,7 +2648,14 @@ const renderModal = ({ focus = true } = {}) => {
       html = profileModalHtml();
       break;
     case 'settings':
-      html = settingsModalHtml();
+      html = settingsModalHtml({
+        dialogShell,
+        settings: store.getSettings(),
+        updateInfo: update.getUpdateInfo(),
+        statusText: updateStatusText(),
+        notifyText: notifyHint(),
+        notificationsSupported: update.notificationState().supported,
+      });
       break;
     case 'avatar-preview':
       html = avatarPreviewHtml();

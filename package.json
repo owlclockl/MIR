@@ -57,10 +57,14 @@
     "test:rtwg": "node scripts/test-rtwg.mjs",
     "test:rtwg-browser": "node scripts/test-rtwg-browser.mjs",
     "predev": "node scripts/build-rtwg-source.mjs",
-    "test:unified-planet": "node scripts/test-unified-planet.mjs"
+    "test:unified-planet": "node scripts/test-unified-planet.mjs",
+    "test:invite-code": "node scripts/test-invite-code.mjs",
+    "test:browser": "node scripts/test-browser.mjs",
+    "test:settings": "node scripts/test-settings-view.mjs"
   },
   "devDependencies": {
     "jsdom": "26.1.0",
+    "playwright": "^1.64.1",
     "vite": "^7.1.9"
   },
   "dependencies": {

@@ -1,3 +1,5 @@
+import { isInviteCode } from '../src/data/invite-code.js';
+
 /* ===========================================================
    Лобби и живая синхронизация карты.
 
@@ -392,7 +394,7 @@ export function createLobbies({
       const me = auth(req);
       tidy();
       const code = normalizeCode(body?.code);
-      if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw httpError(400, 'Код партии выглядит как XXXX-XXXX.');
+      if (!isInviteCode(code)) throw httpError(400, 'Код партии выглядит как XXXX-XXXX.');
       const lobby = db.lobbies.find((item) => item.code === code);
       if (!lobby) throw httpError(404, 'Партия с таким кодом не найдена.');
       const joined = joinLobby(me, lobby, save);

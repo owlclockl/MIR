@@ -1,19 +1,67 @@
-name: Deploy The civilization of the sages to Cloudflare
+name: Validate and deploy The civilization of the sages
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: mir-production
+  group: mir-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build and verify bundles
+        run: |
+          npm run build
+          npm run test:build
+          npm run test:perf
+      - name: Test invite-code and settings modules
+        run: |
+          npm run test:invite-code
+          npm run test:settings
+      - name: Test hub, lobby client, parties, realtime and Worker adapter
+        run: |
+          npm run test:parties
+          npm run test:realtime
+          npm run test:lobby-client
+          npm run test:worker
+      - name: Test live local hub and jsdom UI
+        run: |
+          node server/serve.mjs dist --port 4173 > /tmp/mir-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4173/api/ping >/dev/null; then break; fi
+            sleep 0.5
+          done
+          npm run test:hub
+          npm run test:ui -- http://127.0.0.1:4173
+      - name: Test browser and offline shell
+        run: npm run test:browser
+
   deploy:
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
