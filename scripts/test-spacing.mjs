@@ -289,6 +289,27 @@ add(
   `display: ${phoneNavFoot ?? 'не задан'}`,
 );
 
+/* Главный экран телефона выровнен по центру: печать, заголовок, девиз и
+   плитки сводки не прижаты к левому краю, а «Друзья» стоят посередине
+   строки (кнопка «добавить» при этом остаётся справа). */
+const phoneCentered = [
+  ['.hero', 'text-align', 'center'],
+  ['.hero', 'align-items', 'center'],
+  ['.hero-stat', 'text-align', 'center'],
+  ['.rail__heading', 'justify-content', 'center'],
+  ['.stage__inner', 'justify-content', 'center'],
+];
+const offCenter = phoneCentered.filter(
+  ([selector, prop, expected]) => declared(selector, prop, '@media (max-width: 860px)') !== expected,
+);
+add(
+  offCenter.length === 0,
+  'на телефоне главный экран отцентрован',
+  offCenter.length
+    ? offCenter.map(([selector, prop]) => `${selector} { ${prop}: ${declared(selector, prop, '@media (max-width: 860px)') ?? '—'} }`).join('; ')
+    : 'витрина, сводка и заголовок друзей',
+);
+
 /* ---------- 4. структурные дубли ----------------------------------- */
 
 /* Одно и то же свойство у одного селектора в одной области видимости —

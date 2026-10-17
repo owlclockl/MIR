@@ -1461,7 +1461,19 @@ a {
   }
 
   .stage__inner {
-    justify-content: start;
+    justify-content: center;
+  }
+
+  /* Главный экран телефона — по центру: печать, надзаголовок, название и
+     девиз стоят посередине, а не прижаты к левому краю. На ПК витрина
+     остаётся выровненной слева — там широкий экран и длинный заголовок. */
+  .hero {
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero__caption {
+    justify-content: center;
   }
 
   .hero__seal {
@@ -1469,22 +1481,42 @@ a {
     height: 44px;
   }
 
+  /* Плитки сводки — тоже по центру: цифры и подписи в них не разъезжаются
+     по краям, когда плитка растянулась на половину экрана. */
+  .hero-stat {
+    align-items: center;
+    text-align: center;
+  }
+
   .rail {
     border-left: 0;
     border-top: 1px solid var(--line);
   }
 
+  /* Заголовок «Друзья» — по центру строки, кнопка «добавить» остаётся
+     справа. Трёхколоночная сетка с равными краями держит заголовок ровно
+     посередине: при `justify-content: center` он уехал бы вместе с кнопкой. */
   .rail__head {
-    height: auto;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
+    height: auto;
+    gap: var(--sp-12);
     padding: var(--panel-pad-y) var(--panel-pad-x);
   }
 
   .rail__heading {
-    flex-direction: row-reverse;
+    grid-column: 2;
+    flex-direction: row;
     align-items: baseline;
-    justify-content: flex-end;
-    gap: var(--sp-12);
+    justify-content: center;
+    gap: var(--sp-8);
+    text-align: center;
+  }
+
+  .rail__head > .icon-button {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .rail__heading .eyebrow {
