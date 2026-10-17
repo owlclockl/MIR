@@ -174,6 +174,16 @@ const heavy = await call('POST', '/api/avatar', {
   body: { avatar: `data:image/png;base64,${'A'.repeat(400 * 1024)}` },
 });
 expect('слишком тяжёлая аватарка отклонена', heavy.status === 400 || heavy.status === 413, heavy.data.error);
+const craftedAvatar = await call('POST', '/api/avatar', {
+  token: A.token,
+  body: { avatar: 'data:image/png;base64,AAAA" onerror="alert(1)' },
+});
+expect('аватарка с кавычкой и обработчиком отклонена', craftedAvatar.status === 400, craftedAvatar.data.error);
+const svgAvatar = await call('POST', '/api/avatar', {
+  token: A.token,
+  body: { avatar: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' },
+});
+expect('SVG под видом аватарки отклонён', svgAvatar.status === 400, svgAvatar.data.error);
 
 const renamed = `${A.name}x`;
 const rename = await call('POST', '/api/name', { token: A.token, body: { name: renamed } });

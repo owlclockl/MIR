@@ -1,5 +1,7 @@
 # The civilization of the sages
 
+![The civilization of the sages — фирменная печать, название и фраза «Мудрость создаёт миры.»](public/logo.svg)
+
 ## Что это сейчас
 
 Главное меню веб-игры **The civilization of the sages** с системой аккаунтов и

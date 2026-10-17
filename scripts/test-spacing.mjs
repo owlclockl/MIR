@@ -329,6 +329,58 @@ add(
   `${tabbarHidden ?? '—'} за ${tabbarTransition || '—'}`,
 );
 
+/* Аккаунт с аватаркой — в правой колонке шапки, а не в средней: сетка
+   шапки `1fr auto 1fr`, и без явной колонки автоматическая расстановка
+   отдавала блоку аккаунта именно среднюю. На телефоне аватарка из-за
+   этого вставала по центру экрана вместо правого края. */
+add(
+  declared('.topbar__side--end', 'grid-column') === '3',
+  'на телефоне аватарка аккаунта стоит справа (правая колонка шапки)',
+  declared('.topbar__side--end', 'grid-column') ?? '—',
+);
+
+/* Пункты нижней панели должны влезать в узкий телефон без горизонтальной
+   прокрутки: пять несжимаемых клеток по 72px на экранах уже ~400px
+   уводили «Настройки» за край экрана. */
+add(
+  declared('.sidenav__item', 'flex', '@media (max-width: 860px)') === '1 1 72px',
+  'на телефоне пункты нижней панели влезают в экран без прокрутки вбок',
+  declared('.sidenav__item', 'flex', '@media (max-width: 860px)') ?? '—',
+);
+
+/* Фото-аватарка обрезается по форме аватарки: финишный слой делает её
+   круглой, и без `overflow: hidden` квадратная фотография вылезает
+   углами из круглой заглушки. */
+add(
+  declared('.avatar', 'overflow') === 'hidden',
+  'фото аватарки обрезается по форме аватарки',
+  declared('.avatar', 'overflow') ?? '—',
+);
+
+/* У `.input` стоит appearance: none, поэтому выпадающий список обязан
+   рисовать свою стрелку — иначе он неотличим от текстового поля.
+   Нативные виджеты при этом тёмные, а автозаполнение не красит поле
+   в белый. */
+const selectRule = rules.find((rule) => rule.scope === '' && rule.selector.includes('.input--select'));
+const selectBg = selectRule
+  ? declarations(selectRule.body).find((decl) => decl.prop === 'background-image')?.value ?? null
+  : null;
+add(
+  Boolean(selectBg && selectBg.includes('data:image/svg+xml')),
+  'у выпадающего списка есть своя стрелка',
+  selectBg ? 'svg-шеврон' : '—',
+);
+add(
+  rootDecls.some((decl) => decl.prop === 'color-scheme' && decl.value === 'dark'),
+  'нативные виджеты тёмные (color-scheme: dark)',
+  rootDecls.find((decl) => decl.prop === 'color-scheme')?.value ?? '—',
+);
+add(
+  declared('.input:-webkit-autofill', '-webkit-text-fill-color') === 'var(--text)',
+  'автозаполнение не красит поле в белый',
+  declared('.input:-webkit-autofill', '-webkit-text-fill-color') ?? '—',
+);
+
 /* ---------- 4. структурные дубли ----------------------------------- */
 
 /* Одно и то же свойство у одного селектора в одной области видимости —

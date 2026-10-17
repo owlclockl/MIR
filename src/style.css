@@ -147,6 +147,11 @@
 
   font-family: var(--font-ui);
   font-synthesis: none;
+  /* Нативные виджеты (выпадающие списки, полосы прокрутки, автозаполнение)
+     обязаны быть тёмными и там, где у страницы нет inline-метки — например,
+     в мастерской планеты: без этого браузер рисует их светлыми на нашем
+     тёмном фоне. */
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -188,6 +193,13 @@ button,
 a {
   -webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
   touch-action: manipulation;
+}
+
+/* Выделение текста — в фирменном шалфее, а не в системной синеве:
+   на тёмном фоне браузерная заливка выглядит чужим пятном. */
+::selection {
+  color: var(--text);
+  background: var(--accent-line);
 }
 
 :where(button, a):focus-visible {
@@ -402,7 +414,13 @@ a {
   padding-left: max(var(--pad-x), var(--safe-left));
 }
 
+/* Аккаунт — в третьей, правой колонке шапки. Колонки заданы как
+   `1fr auto 1fr`, и без явного номера средняя (auto) доставалась именно
+   блоку аккаунта: аватарка вставала по центру экрана, а не справа —
+   заметнее всего это было на телефоне, где от шапки остаются знак
+   игры слева и аватарка. */
 .topbar__side--end {
+  grid-column: 3;
   justify-content: flex-end;
   gap: var(--sp-12);
   padding-right: max(var(--pad-x), var(--safe-right));
@@ -512,6 +530,13 @@ a {
 
 .icon-button:active {
   background: var(--fill-active);
+}
+
+/* Отключённая кнопка-иконка обязана выглядеть отключённой везде, а не
+   только в форме переписки: иначе по ней продолжают касаться. */
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .icon-button--sm {
@@ -709,6 +734,10 @@ a {
   place-items: center;
   width: 34px;
   height: 34px;
+  /* Фото обрезается по форме самой аватарки: финишный слой делает её
+     круглой, и без обрезки квадратная фотография вылезала углами из-под
+     круглой заглушки-инициалов — два вида аватаров выглядели по-разному. */
+  overflow: hidden;
   flex: none;
   color: #16161a;
   outline: 1px solid var(--line);
@@ -1277,6 +1306,8 @@ a {
   padding: var(--box-pad);
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 .chat__row {
@@ -1405,7 +1436,12 @@ a {
 
   .sidenav__item {
     position: relative;
-    flex: 1 0 72px;
+    /* Пункты обязаны влезать в ширину телефона без горизонтальной
+       прокрутки панели: на экранах уже ~400px пять клеток по 72px с
+       зазорами не помещались, и «Настройки» уезжали за край. Поэтому
+       клетка может сжиматься ниже желаемых 72px, а не только расти. */
+    flex: 1 1 72px;
+    min-width: 0;
     flex-direction: column;
     justify-content: center;
     gap: var(--sp-2);
@@ -1586,6 +1622,13 @@ a {
     /* Лента друзей листается пальцем и досылается до карточки,
        а не останавливается на половине. */
     scroll-snap-type: x proximity;
+    /* Полоса горизонтальной прокрутки под лентой — шум, как и в нижней
+       панели: что лента листается, видно по обрезанной карточке. */
+    scrollbar-width: none;
+  }
+
+  .rail__list::-webkit-scrollbar {
+    display: none;
   }
 
   /* Карточка друга на телефоне — клетка ленты, как в мессенджере: крупный
@@ -1637,11 +1680,21 @@ a {
     display: none;
   }
 
-  /* Счётчик непрочитанного — на углу аватара, а не третьей строкой. */
+  /* Счётчик непрочитанного — на углу аватара, а не третьей строкой.
+     Угол клетки шире угла аватара (84 против 56 по центру), поэтому
+     правый отступ бейджа — до края аватара, а не до края клетки. */
   .friend .badge--inline {
     position: absolute;
     top: var(--sp-4);
-    right: var(--sp-8);
+    right: var(--sp-12);
+  }
+
+  /* Профиль в шапке — цель для пальца не меньше основной ступени:
+     сама аватарка 34px, и с прежними полями кнопка получалась 42px. */
+  .profile {
+    min-width: var(--control-h);
+    min-height: var(--control-h);
+    justify-content: center;
   }
 
   .rail__foot {
@@ -1653,7 +1706,9 @@ a {
     /* Нижнюю безопасную зону телефона держит каркас: под подвалом теперь
        панель навигации, а уже под ней — системная полоса жестов. */
     padding-block: var(--sp-12);
-    font-size: 9px;
+    /* Подпись подвала — самая мелкая ступень шкалы, а не свои 9px:
+       на телефоне она читается хуже любой другой подписи экрана. */
+    font-size: var(--fs-micro);
     letter-spacing: 0.12em;
   }
 
@@ -1673,6 +1728,13 @@ a {
   .status,
   .topbar__divider {
     display: none;
+  }
+
+  /* Знак игры на телефоне крупнее: по нему семь раз касаются ради
+     скрытой панели, и площадка 34px для пальца мала. */
+  .brand__mark {
+    width: 40px;
+    height: 40px;
   }
 
   .hero__title {
@@ -1801,6 +1863,7 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: inherit;
 }
 
 .avatar--img {
@@ -2013,11 +2076,46 @@ input[type='search']::-webkit-search-cancel-button {
   appearance: none;
 }
 
+/* Отключённое поле (хаб ещё подключается, канал не поднялся) не должно
+   выглядеть редактируемым: та же прозрачность, что у кнопок. */
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .input--code {
   font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
   font-size: var(--fs-lead);
   letter-spacing: 0.2em;
   text-transform: uppercase;
+}
+
+/* Выпадающий список обязан показывать, что он выпадающий: у `.input`
+   стоит `appearance: none`, и без своей стрелки <select> выглядел как
+   обычное поле, в которое почему-то нельзя печатать. Стрелка — та же
+   Chevron Lucide, что рисует `icon('chevron')`, только повёрнутая вниз. */
+.input--select,
+.shell .input.input--select {
+  padding-right: calc(var(--sp-32) + var(--sp-8));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca8a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--sp-12) center;
+  cursor: pointer;
+}
+
+/* Автозаполнение браузера красит поле в белый со светло-жёлтым текстом —
+   на нашей тёмной теме это самое яркое пятно экрана. Заливку не убрать,
+   но можно перекрыть её внутренней тенью под цвет поверхности. */
+.input:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--accent);
+  box-shadow: 0 0 0 64px var(--panel-solid) inset;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 .form-error {
@@ -2341,6 +2439,10 @@ input[type='search']::-webkit-search-cancel-button {
   max-height: 236px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Та же тонкая полоса, что у панели друзей и окон: список результатов
+     не должен отличаться от соседних списков толщиной скроллбара. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 .result {
@@ -3122,8 +3224,9 @@ input[type='search']::-webkit-search-cancel-button {
   position: absolute;
   top: var(--sp-10);
   right: var(--sp-12);
+  display: grid;
+  place-items: center;
   color: var(--text-faint);
-  font-size: var(--fs-small);
   transition: color 160ms var(--ease), transform 160ms var(--ease);
 }
 
@@ -3615,9 +3718,9 @@ button.admin-row:hover {
 }
 
 .admin-gate__arrow {
+  display: grid;
+  place-items: center;
   margin-left: auto;
-  font-size: var(--fs-base);
-  letter-spacing: 0;
   transition: transform 160ms var(--ease);
 }
 

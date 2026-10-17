@@ -14,8 +14,18 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { RTCPeerConnection } from 'node-datachannel/polyfill';
 import { fromRoot } from './lib/root.mjs';
+
+/* Полифил WebRTC — разовая необязательная зависимость (как jsdom в
+   test:ui): без него проверка обязана назвать недостающий пакет, а не
+   падать стеком ERR_MODULE_NOT_FOUND. */
+let RTCPeerConnection;
+try {
+  ({ RTCPeerConnection } = await import('node-datachannel/polyfill'));
+} catch {
+  console.error('Нет node-datachannel. Поставьте его разово: npm i --no-save node-datachannel');
+  process.exit(1);
+}
 
 globalThis.RTCPeerConnection = RTCPeerConnection;
 

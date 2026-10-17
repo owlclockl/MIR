@@ -34,7 +34,7 @@ const avatarMarkupCache = new Map(); // ключ → { avatar, html }
 const buildAvatarEl = (user, cls, offline) => {
   const off = offline ? ' avatar--dim' : '';
   if (user.avatar)
-    return `<span class="avatar avatar--img${cls ? ` ${cls}` : ''}${off}"><img src="${user.avatar}" alt="" /></span>`;
+    return `<span class="avatar avatar--img${cls ? ` ${cls}` : ''}${off}"><img src="${escapeHtml(user.avatar)}" alt="" /></span>`;
   const hue = nameHue(user.nameKey);
   return `<span class="avatar${cls ? ` ${cls}` : ''}${off}" style="background:hsl(${hue} 26% 30%);color:hsl(${hue} 45% 87%)" aria-hidden="true">${escapeHtml(user.name.slice(0, 2).toUpperCase())}</span>`;
 };
@@ -42,7 +42,9 @@ const buildAvatarEl = (user, cls, offline) => {
 const avatarEl = (user, cls = '') => {
   const offline = store.presenceOf(user) === 'offline';
   const avatar = user.avatar ?? null;
-  const key = `${user.id}|${cls}|${offline ? 'off' : 'on'}`;
+  /* В ключе — и имя: без него переименование не меняло инициалы и цвет
+     аватарки-заглушки, кеш продолжал отдавать старые буквы. */
+  const key = `${user.id}|${cls}|${offline ? 'off' : 'on'}|${user.name ?? ''}|${user.nameKey ?? ''}`;
   const cached = avatarMarkupCache.get(key);
   if (cached && cached.avatar === avatar) return cached.html;
   const html = buildAvatarEl(user, cls, offline);
@@ -159,7 +161,10 @@ const MOTION_QUERY = motionQuery();
 const TAB_HIDE_AFTER = 120; // у самого верха панель нужна: там друзья
 const TAB_SCROLL_STEP = 8; // дрожание пальца за прокрутку не считаем
 let tabbarHidden = false;
-let tabbarScrollY = 0;
+/* Последняя позиция — отдельно у каждого вертикального скроллера:
+   страница и сцена листаются независимо, и общая «прошлая позиция»
+   принимала переход между ними за резкий рывок. */
+const tabbarScrollY = new Map();
 
 const setTabbarHidden = (hidden) => {
   if (tabbarHidden === hidden) return;
@@ -174,14 +179,26 @@ document.addEventListener(
       setTabbarHidden(false);
       return;
     }
-    const y = event.target === document ? window.scrollY : event.target.scrollTop ?? 0;
-    const step = y - tabbarScrollY;
-    tabbarScrollY = y;
+    /* Панель прячет только прокрутка основного содержимого: страницы
+       или сцены. Горизонтальная лента друзей и внутренние списки сюда
+       попадали со своим `scrollTop` (у ленты он всегда 0) и дёргали
+       панель, хотя по вертикали игрок ничего не листал. */
+    const target = event.target;
+    const scroller =
+      target === document
+        ? 'document'
+        : target instanceof Element && target.classList.contains('stage')
+          ? 'stage'
+          : null;
+    if (!scroller) return;
+    const y = scroller === 'document' ? window.scrollY : target.scrollTop;
+    const step = y - (tabbarScrollY.get(scroller) ?? 0);
+    tabbarScrollY.set(scroller, y);
     if (Math.abs(step) < TAB_SCROLL_STEP) return;
     setTabbarHidden(step > 0 && y > TAB_HIDE_AFTER);
   },
   /* Прокрутка не всплывает, поэтому слушаем в фазе перехвата: так видно и
-     прокрутку страницы, и прокрутку отдельных лент внутри неё. */
+     прокрутку страницы, и прокрутку сцены внутри неё. */
   { capture: true, passive: true },
 );
 
@@ -596,7 +613,7 @@ const avatarPreviewHtml = () => dialogShell({
           <div class="avatar-editor__frame" data-role="avatar-frame" role="group" tabindex="0"
                aria-label="Кадр аватарки. Перетаскивайте изображение, стрелки на клавиатуре двигают кадр."
                aria-describedby="avatar-editor-help">
-            <img class="avatar-editor__img" data-role="avatar-editor-image" src="${ui.pendingAvatar}"
+            <img class="avatar-editor__img" data-role="avatar-editor-image" src="${escapeHtml(ui.pendingAvatar)}"
                  alt="Исходная фотография для кадрирования" draggable="false" />
             <span class="avatar-editor__grid" aria-hidden="true"></span>
             <span class="avatar-editor__center" aria-hidden="true"></span>
@@ -607,7 +624,7 @@ const avatarPreviewHtml = () => dialogShell({
         <aside class="avatar-editor__panel" aria-label="Настройки кадрирования">
           <div class="avatar-editor__sample">
             <div class="avatar-editor__sample-frame" data-role="avatar-sample-frame">
-              <img class="avatar-editor__sample-img" data-role="avatar-sample-image" src="${ui.pendingAvatar}"
+              <img class="avatar-editor__sample-img" data-role="avatar-sample-image" src="${escapeHtml(ui.pendingAvatar)}"
                    alt="Так будет выглядеть аватарка в игре" draggable="false" />
             </div>
             <div class="avatar-editor__sample-meta">
@@ -1439,7 +1456,7 @@ const adminLoginHtml = () => {
         </label>
         <p class="form-error" data-role="form-error" hidden></p>
         <button class="solid-button admin-gate__submit" type="submit" data-role="submit">
-          ${icon('shield', 'icon--xs')}<span>Открыть панель</span><span class="admin-gate__arrow" aria-hidden="true">↗</span>
+          ${icon('shield', 'icon--xs')}<span>Открыть панель</span><span class="admin-gate__arrow" aria-hidden="true">${icon('arrowUpRight')}</span>
         </button>
       </form>
 
@@ -1509,7 +1526,7 @@ const adminCardHtml = (user) => {
     <div class="account">
       <div class="account__avatar">${
         user.avatar
-          ? `<span class="avatar avatar--img avatar--lg"><img src="${user.avatar}" alt="" /></span>`
+          ? `<span class="avatar avatar--img avatar--lg"><img src="${escapeHtml(user.avatar)}" alt="" /></span>`
           : adminAvatarEl(user, 'avatar--lg')
       }</div>
       <div class="account__main">
@@ -2072,7 +2089,7 @@ const adminOverviewHtml = () => {
       <span class="admin-tile__value" translate="no">${escapeHtml(String(value))}</span>
       <span class="admin-tile__key">${escapeHtml(key)}</span>
       <span class="admin-tile__note">${escapeHtml(note)}</span>
-      <span class="admin-tile__arrow" aria-hidden="true">↗</span>
+      <span class="admin-tile__arrow" aria-hidden="true">${icon('arrowUpRight', 'icon--sm')}</span>
     </button>`;
   const recent = events.slice(0, 5);
   return `

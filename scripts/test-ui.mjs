@@ -357,6 +357,16 @@ ok('при прокрутке вниз нижняя панель уезжает'
 scrollTo(200);
 await wait(20);
 ok('при прокрутке вверх панель возвращается', !tabbar.classList.contains('sidenav--hidden'));
+scrollTo(600);
+await wait(20);
+$('.rail__list')?.dispatchEvent(new window.Event('scroll'));
+await wait(20);
+ok(
+  'горизонтальная лента друзей панель не дёргает',
+  tabbar.classList.contains('sidenav--hidden'),
+);
+scrollTo(200);
+await wait(20);
 window.document.documentElement.classList.add('reduce-motion');
 scrollTo(900);
 await wait(20);
@@ -615,6 +625,28 @@ ok('локальный аккаунт создан', ($('.profile')?.textContent
 /* После успешной регистрации окно закрывается само — жмём «закрыть»
    только если оно ещё открыто. */
 if ($('[data-action="close-modal"]')) click('[data-action="close-modal"]');
+await wait(100);
+
+/* Переименование обязано менять и инициалы аватарки-заглушки: кеш
+   разметки аватара раньше помнил старые буквы по одному лишь id. */
+click('.profile');
+await wait(150);
+const renamedLocal = localName.replace('loc', 'new');
+const nameForm = $('form[data-form="change-name"]');
+nameForm.elements.name.value = renamedLocal;
+nameForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(400);
+ok(
+  'после переименования аватарка показывает новые инициалы',
+  ($('.dialog .avatar')?.textContent || '').trim() === renamedLocal.slice(0, 2).toUpperCase()
+    && ($('.profile .avatar')?.textContent || '').trim() === renamedLocal.slice(0, 2).toUpperCase(),
+  $('.dialog .avatar')?.textContent?.trim(),
+);
+const backForm = $('form[data-form="change-name"]');
+backForm.elements.name.value = localName;
+backForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+await wait(400);
+click('[data-action="close-modal"]');
 await wait(100);
 
 /* Локальный режим (хаб отключён): партии живут на сервере, поэтому окно
