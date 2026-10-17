@@ -10,12 +10,23 @@
    Логику встраивания и подстановки версии делают плагины из
    scripts/lib/vite-mir.mjs, здесь — только запуск и проверка результата. */
 
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { build as viteBuild } from 'vite';
 import './root.mjs';
 import { buildEmbeddedEditor, embedTemplate } from './fmg-offline.mjs';
 import { buildRtwgSourceArchive } from './rtwg-source.mjs';
 import { singleFileHtml } from './vite-mir.mjs';
+
+const stampSingleBuild = (html) => {
+  const buildId = createHash('sha256').update(html).digest('hex').slice(0, 8);
+  const stamped = html.replace(
+    /<\/head>/i,
+    `  <meta name="mir-build" content="${buildId}" />\n  </head>`,
+  );
+  if (stamped === html) throw new Error('В mir.html не найдена закрывающая </head> для метки сборки.');
+  return stamped;
+};
 
 /**
  * Веб-сборка в dist/. Возвращает список файлов сборки.
@@ -61,7 +72,7 @@ export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) 
         'Проверьте режим сборки: нужен `mode: "single"`.',
     );
 
-  const html = embedTemplate(game, editor.template);
+  const html = stampSingleBuild(embedTemplate(game, editor.template));
   if (!html.includes('id="mir-fmg-template"') || !html.includes('MIR_FMG_HOST'))
     throw new Error('В mir.html не попал редактор Azgaar: шаблон не вшит.');
 

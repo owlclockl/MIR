@@ -10,11 +10,10 @@
       зовут, вторая партия у одного игрока не заводится, длинное название
       и неизвестный размер отбиваются, комната не принимает лишнего
       человека сверх предела мест.
-   2. Договор клиента с хабом: пресеты размера, предел участников и длины
-      полей в src/data/lobby.js обязаны совпадать с серверными, а то, что
-      меню реально отправляет (случайный seed, имя по умолчанию, размер из
-      списка), хаб обязан принимать. Иначе интерфейс и хаб разъезжаются
-      молча — игрок видит «Такого размера карты нет» на ровном месте.
+   2. Договор клиента с хабом: допустимые размеры, предел участников и длины
+      полей в src/data/lobby.js обязаны совпадать с серверными, а внутренние
+      параметры создания партии (случайный seed, имя по умолчанию, размер
+      по умолчанию) хаб обязан принимать. Иначе клиент и хаб разъедутся.
 
    Запуск: npm run test:parties
    Ничего не сохраняет и не трогает данные хаба. */
@@ -276,21 +275,21 @@ expect('по коду закрытой партии не войти', afterClose
 
 /* ---------- договор клиента с хабом --------------------------- */
 
-console.log('\nДоговор меню с хабом:');
+console.log('\nДоговор клиента с хабом:');
 
 const clientSizes = PARTY_SIZES.map(([width, height]) => [width, height]);
 expect(
-  'пресеты размера в меню совпадают со списком хаба',
+  'разрешённые размеры карты клиента совпадают со списком хаба',
   JSON.stringify(clientSizes) === JSON.stringify(LOBBY_SIZES),
   `${clientSizes.length} пресета`,
 );
-expect('предел участников в меню тот же, что на хабе', PARTY_MAX_MEMBERS === LOBBY_MAX_MEMBERS, `${PARTY_MAX_MEMBERS}`);
-expect('предел seed в меню тот же, что на хабе', PARTY_SEED_MAX === MAX_SEED, `${PARTY_SEED_MAX}`);
-expect('предел названия в меню тот же, что на хабе', PARTY_TITLE_MAX === MAX_TITLE, `${PARTY_TITLE_MAX}`);
+expect('предел участников у клиента тот же, что на хабе', PARTY_MAX_MEMBERS === LOBBY_MAX_MEMBERS, `${PARTY_MAX_MEMBERS}`);
+expect('предел seed у клиента тот же, что на хабе', PARTY_SEED_MAX === MAX_SEED, `${PARTY_SEED_MAX}`);
+expect('предел названия у клиента тот же, что на хабе', PARTY_TITLE_MAX === MAX_TITLE, `${PARTY_TITLE_MAX}`);
 
 const seed = randomPartySeed();
 expect(
-  'случайный seed меню хаб принимает',
+  'автоматический seed клиента хаб принимает',
   seed.length > 0 && seed.length <= PARTY_SEED_MAX && /^[\w-]+$/.test(seed),
   seed,
 );
@@ -301,8 +300,8 @@ expect(
   `${longName.length} символов`,
 );
 
-/* Именно эти значения отправляет меню, когда человек нажал «Создать партию»
-   и ничего не менял: хаб обязан их принять, иначе кнопка выглядит сломанной. */
+/* Эти внутренние значения отправляет клиент при создании партии:
+   seed генерируется автоматически, размер пока берётся по умолчанию. */
 const solo = await register('partysolo');
 const clientRoom = await call('POST', '/api/lobby/create', {
   token: solo.token,
@@ -314,7 +313,7 @@ const clientRoom = await call('POST', '/api/lobby/create', {
   },
 });
 expect(
-  'партия с параметрами из меню создаётся без правок',
+  'партия с параметрами по умолчанию создаётся без правок',
   clientRoom.status === 200 && CODE_RE.test(clientRoom.json?.lobby?.code ?? ''),
   clientRoom.json?.error ?? `${clientRoom.json?.lobby?.title} · ${clientRoom.json?.lobby?.code}`,
 );

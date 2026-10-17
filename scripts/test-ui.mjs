@@ -240,6 +240,13 @@ try {
       && !webWindow.document.querySelector('[data-action^="open-world"]')
       && !webWindow.document.querySelector('#world-page-root'),
   );
+  const webBuildId = webWindow.document.querySelector('meta[name="mir-build"]')?.content || '';
+  ok(
+    'версия в веб-интерфейсе показывает обновляемую метку сборки',
+    /^[0-9a-f]{8}$/.test(webBuildId)
+      && webWindow.document.querySelector('.footer__version')?.textContent?.includes(webBuildId),
+    webBuildId,
+  );
   webClick('[data-action="open-direct"]');
   await wait(40);
   ok(
@@ -251,10 +258,16 @@ try {
 }
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
+const singleBuildId = window.document.querySelector('meta[name="mir-build"]')?.content || '';
 ok(
-  'гостю не показываются пустые карточки сводки',
-  !$('.hero__stats') && !$('.hero-stat--wide') && !$('.hero-stat__hub'),
-  $('.stage-menu')?.textContent?.replace(/\s+/g, ' ').trim() || 'главный экран без карточек хаба и друзей',
+  'версия автономной сборки показывает её собственную метку',
+  /^[0-9a-f]{8}$/.test(singleBuildId) && $('.footer__version')?.textContent?.includes(singleBuildId),
+  singleBuildId,
+);
+ok(
+  'в центре главного экрана больше нет дублирующей сводки друзей',
+  !$('.stage-menu') && !$('.hero__stats') && !$('.hero-stat--friends'),
+  'счётчик друзей остаётся только в боковой панели',
 );
 ok(
   'главное меню: партии, хаб, прямое подключение и настройки без игровых разделов',
@@ -268,7 +281,7 @@ ok(
 );
 
 /* Кнопки меню не дублируются: «Партии» живёт только в навигации слева,
-   в середине страницы остаются заголовок и сводка без кнопок. */
+   в центре остаётся брендовый заголовок без второй сводки друзей. */
 ok(
   'кнопка «Партии» есть только в навигации, в середине страницы кнопок нет',
   $$('[data-action="open-parties"]').length === 1
@@ -407,13 +420,12 @@ ok(
 window.location.hash = '';
 await wait(30);
 
-/* Обновления: сервер отдаёт сборку 99.0.0, а в странице 0.8.0 — приложение
-   обязано сказать об этом строкой под шапкой. Само оно ничего не
-   перезагружает: перезагрузку выбирает игрок кнопкой. */
+/* Обновления: сервер сообщает версию и отдельный hash сборки; интерфейс
+   обязан показать оба значения, даже если semver не менялся. */
 const bar = $('.update-bar');
 ok(
   'строка обновления появилась и знает версию с сервера',
-  !!bar && !bar.hidden && /99\.0\.0/.test(bar.textContent || ''),
+  !!bar && !bar.hidden && /99\.0\.0/.test(bar.textContent || '') && /deadbeef/.test(bar.textContent || ''),
   bar?.textContent?.replace(/\s+/g, ' ').trim(),
 );
 ok(
@@ -497,9 +509,13 @@ const registered = await registerWithRetry({
 
 ok('аккаунт создан на хабе', registered, $('.profile')?.textContent?.trim() || $('[data-role="form-error"]')?.textContent?.trim());
 ok(
-  'после входа счётчик друзей снова показывается',
-  registered && !!$('.hero-stat--friends') && $('.hero-stat--friends')?.textContent?.includes('/'),
-  $('.hero-stat--friends')?.textContent?.replace(/\s+/g, ' ').trim() || 'счётчик не найден',
+  'после входа счётчик друзей показывается только в боковой панели',
+  registered
+    && !!$('.rail__count')
+    && $('.rail__count')?.textContent?.includes('/')
+    && !$('.hero-stat--friends')
+    && !$('.stage-menu'),
+  $('.rail__count')?.textContent?.replace(/\s+/g, ' ').trim() || 'счётчик панели не найден',
 );
 click('[data-action="open-profile"]');
 await wait(200);
@@ -524,22 +540,34 @@ ok(
   $('.link-state')?.textContent?.trim(),
 );
 ok(
-  'форма партии: название, seed и три размера карты на выбор',
-  !!$('[data-role="party-title"]')
-    && ($('[data-role="party-seed"]')?.value || '').length > 0
-    && $$('[data-role="party-size"] option').length === 3,
-  $('[data-role="party-seed"]')?.value,
+  'у каждого аккаунта отображаются четыре сохранённых слота партий',
+  $$('[data-action="party-slot"]').length === 4
+    && !!$('[data-action="party-slot"][data-slot="0"][aria-pressed="true"]'),
+  $$('[data-action="party-slot"]').map((button) => button.textContent.replace(/\s+/g, ' ').trim()).join(' · '),
 );
-const seedBefore = $('[data-role="party-seed"]').value;
-click('[data-action="party-random-seed"]');
+click('[data-action="party-tab"][data-tab="join"]');
 await wait(60);
-ok('кнопка «Случайный» меняет seed мира', $('[data-role="party-seed"]')?.value !== seedBefore, $('[data-role="party-seed"]')?.value);
+ok('слоты остаются доступны и на вкладке входа по коду', $$('[data-action="party-slot"]').length === 4);
+click('[data-action="party-slot"][data-slot="1"]');
+await wait(80);
+ok(
+  'переключение слота загружает его отдельное название и выбор друзей',
+  !!$('[data-action="party-slot"][data-slot="1"][aria-pressed="true"]')
+    && ($('[data-role="party-title"]')?.value || '').includes(`${name} 2`),
+  $('[data-role="party-title"]')?.value,
+);
+ok(
+  'форма партии запрашивает только название, без seed и размера карты',
+  !!$('[data-role="party-title"]')
+    && !$('[data-role="party-seed"]')
+    && !$('[data-role="party-size"]')
+    && !$('[data-action="party-random-seed"]'),
+  $('.dialog [data-form="party-create"]')?.textContent?.replace(/\s+/g, ' ').trim(),
+);
 {
   const createForm = $('form[data-form="party-create"]');
   createForm.elements.title.value = 'Проверка партий';
   createForm.elements.title.dispatchEvent(new window.Event('input', { bubbles: true }));
-  createForm.elements.size.value = '1600x1000';
-  createForm.elements.size.dispatchEvent(new window.Event('change', { bubbles: true }));
   createForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await wait(1200);
 }
@@ -552,15 +580,23 @@ ok(
   `${$('.party__title')?.textContent?.trim()} · ${partyCode}`,
 );
 ok(
-  'в комнате видны мир партии и люди: seed, размер, счётчик мест',
-  ($('.party__params')?.textContent || '').includes('1600 × 1000')
-    && /1 \/ 8/.test($('.party__params')?.textContent || ''),
+  'активная партия связана с выбранным слотом, остальные заблокированы до выхода',
+  !!$('[data-action="party-slot"][data-slot="1"][aria-pressed="true"]')
+    && $('[data-action="party-slot"][data-slot="0"]')?.disabled === true
+    && $('[data-action="party-slot"][data-slot="2"]')?.disabled === true,
+);
+ok(
+  'в комнате видны участники, seed и размер карты не показываются',
+  /1 \/ 8/.test($('.party__params')?.textContent || '')
+    && !/seed|размер/i.test($('.party')?.textContent || ''),
   $('.party__params')?.textContent?.replace(/\s+/g, ' ').trim(),
 );
 ok(
-  'мастер может звать друзей и менять мир партии',
+  'мастер может звать друзей и менять только название партии',
   /Пригласить в партию/.test($('.party')?.textContent || '')
-    && !!$('form[data-form="party-params"]'),
+    && !!$('form[data-form="party-params"]')
+    && !$('form[data-form="party-params"] [data-role="party-seed"]')
+    && !$('form[data-form="party-params"] [data-role="party-size"]'),
 );
 {
   const paramsForm = $('form[data-form="party-params"]');
@@ -570,8 +606,9 @@ ok(
   await wait(900);
 }
 ok(
-  'мастер сохранил новый мир партии',
-  ($('.party__title')?.textContent || '').includes('Проверка партий v2'),
+  'мастер переименовал партию без изменения настроек карты',
+  ($('.party__title')?.textContent || '').includes('Проверка партий v2')
+    && !/seed|размер/i.test($('.party')?.textContent || ''),
   $('.party__title')?.textContent?.trim(),
 );
 ok('код партии копируется одной кнопкой', !!$('[data-action="party-copy-code"]') && $('[data-action="party-copy-code"]').dataset.code === partyCode);
@@ -585,13 +622,23 @@ ok(
 click('[data-action="confirm-party-close"]');
 await wait(900);
 ok(
-  'закрытая партия уходит: окно закрыто, комната пуста, меню зовёт создать новую',
-  !$('.dialog')
+  'после закрытия партии окно остаётся открытым для переключения слотов',
+  $('.dialog__title')?.textContent === 'Партии'
     && !$('.party__title')
+    && $$('[data-action="party-slot"]').length === 4
     && /Партия закрыта/.test($('.toast-stack')?.textContent || '')
     && /Создать комнату/.test($('.sidenav__item--main .sidenav__text small')?.textContent || ''),
   $('.sidenav__item--main .sidenav__text small')?.textContent?.trim(),
 );
+click('[data-action="party-slot"][data-slot="2"]');
+await wait(80);
+ok(
+  'после выхода можно переключить слот, сохранив выбранный слот',
+  !!$('[data-action="party-slot"][data-slot="2"][aria-pressed="true"]')
+    && ($('[data-role="party-title"]')?.value || '').includes(`${name} 3`),
+  $('[data-role="party-title"]')?.value,
+);
+click('[data-action="close-modal"]');
 await wait(120);
 
 click('[data-region="sidenav"] [data-action="open-direct"]');
