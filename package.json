@@ -41,6 +41,7 @@
     "test:realtime": "node scripts/test-realtime.mjs",
     "test:lobby-client": "node scripts/test-lobby-client.mjs",
     "test:parties": "node scripts/test-parties.mjs",
+    "test:party-slots": "node scripts/test-party-slots.mjs",
     "test:ui": "node scripts/test-ui.mjs",
     "test:avatar": "node scripts/test-avatar.mjs",
     "test:perf": "node scripts/test-perf.mjs",

@@ -388,6 +388,12 @@ export function checkSingle() {
     'версия mir.html совпадает с package.json',
     expected,
   );
+  const buildMeta = html.match(/<meta name="mir-build" content="([0-9a-f]{8})"\s*\/>/);
+  add(
+    Boolean(buildMeta),
+    'метка сборки mir.html на месте',
+    buildMeta?.[1] ?? 'не найдена',
+  );
 
   const embeddedSounds = (html.match(/data:audio\/mpeg;base64/g) ?? []).length;
   add(
