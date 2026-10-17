@@ -883,6 +883,12 @@ a {
   gap: var(--sp-10);
 }
 
+/* Гостю нечего считать про друзей: в сводке остаётся только полезный
+   статус хаба, он занимает всю строку вместо пустых ячеек сетки. */
+.hero__stats.hero__stats--guest {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .hero-stat {
   display: flex;
   flex-direction: column;

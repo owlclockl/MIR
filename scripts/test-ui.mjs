@@ -252,6 +252,11 @@ try {
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
+  'гостю не показывается пустое «— друзей в сети»',
+  !$('.hero-stat--friends') && !!$('.hero-stat--wide') && $('.hero__stats')?.classList.contains('hero__stats--guest'),
+  $('.hero__stats')?.textContent?.replace(/\s+/g, ' ').trim(),
+);
+ok(
   'главное меню: партии, хаб, прямое подключение и настройки без игровых разделов',
   $$('[data-action="open-hub"]').length === 1
     && $$('[data-action="open-direct"]').length === 1
@@ -482,6 +487,11 @@ const registered = await registerWithRetry({
 });
 
 ok('аккаунт создан на хабе', registered, $('.profile')?.textContent?.trim() || $('[data-role="form-error"]')?.textContent?.trim());
+ok(
+  'после входа счётчик друзей снова показывается',
+  registered && !!$('.hero-stat--friends') && $('.hero-stat--friends')?.textContent?.includes('/'),
+  $('.hero-stat--friends')?.textContent?.replace(/\s+/g, ' ').trim() || 'счётчик не найден',
+);
 click('[data-action="open-profile"]');
 await wait(200);
 ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new URL(HUB).host}`.replace(/\./g, '\\.')).test($('.account__meta')?.textContent || ''), $('.account__meta')?.textContent?.trim());

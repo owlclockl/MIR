@@ -2922,9 +2922,12 @@ const sidenavHtml = () => {
 
 const stageMenuHtml = () => {
   const { me, friends, online, hub } = menuCounts();
+  const friendsStat = me
+    ? `<span class="hero-stat hero-stat--friends"><strong>${online}<i>/${friends.length}</i></strong><small>друзей в сети</small></span>`
+    : '';
   return `
-    <div class="hero__stats" aria-label="Сводка">
-      <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
+    <div class="hero__stats${me ? '' : ' hero__stats--guest'}" aria-label="Сводка">
+      ${friendsStat}
       <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
     </div>`;
 };
