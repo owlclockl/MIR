@@ -2826,20 +2826,25 @@ const navAriaLabel = ({ title, hint, badge = 0, badgeLabel = 'Новых зая�
 const sidenavHtml = () => {
   const { hub } = menuCounts();
   const party = partyNavState();
+  /* `short` — подпись пункта для нижней панели телефона: полное название
+     «Прямое подключение» в клетку 72px не влезает, а значок без слова не
+     читается. Доступное имя кнопки от подписи не зависит — оно в aria-label. */
   const items = [
     {
       glyph: 'dices',
       title: 'Партии',
+      short: 'Партии',
       hint: party.hint,
       action: 'open-parties',
       badge: party.badge,
       badgeLabel: 'Новых приглашений в партии',
       modifier: 'sidenav__item--main',
     },
-    { glyph: 'globe', title: 'Общий хаб', hint: hub, action: 'open-hub' },
+    { glyph: 'globe', title: 'Общий хаб', short: 'Хаб', hint: hub, action: 'open-hub' },
     {
       glyph: 'link',
       title: 'Прямое подключение',
+      short: 'Напрямую',
       hint: 'Без сервера · обмен кодами',
       action: 'open-direct',
     },
@@ -2847,13 +2852,17 @@ const sidenavHtml = () => {
   return `
     <div class="sidenav__list" role="list">
       ${items.map((item) => {
-        const { glyph, title, action, badge = 0, modifier = '' } = item;
+        const { glyph, title, short, action, badge = 0, modifier = '' } = item;
         const hotkey = navHotkey(action);
         return `
         <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}"
                 aria-label="${escapeHtml(navAriaLabel(item))}"${hotkey ? ` title="${escapeHtml(`${title} — ${hotkey}`)}"` : ''}>
           <span class="sidenav__icon">${icon(glyph)}</span>
-          <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(item.hint)}</small></span>
+          <span class="sidenav__text">
+            <strong>${escapeHtml(title)}</strong>
+            <span class="sidenav__short" aria-hidden="true">${escapeHtml(short)}</span>
+            <small>${escapeHtml(item.hint)}</small>
+          </span>
           ${badge ? `<span class="sidenav__badge" aria-hidden="true">${badge}</span>` : ''}
         </button>`;
       }).join('')}
@@ -2863,7 +2872,11 @@ const sidenavHtml = () => {
               aria-label="${escapeHtml(navAriaLabel({ title: 'Настройки', hint: 'Звук, анимации, обновления' }))}"
               title="${escapeHtml(`Настройки — ${navHotkey('open-settings')}`)}">
         <span class="sidenav__icon">${icon('settings')}</span>
-        <span class="sidenav__text"><strong>Настройки</strong><small>Звук, анимации, обновления</small></span>
+        <span class="sidenav__text">
+          <strong>Настройки</strong>
+          <span class="sidenav__short" aria-hidden="true">Настройки</span>
+          <small>Звук, анимации, обновления</small>
+        </span>
       </button>
     </div>`;
 };

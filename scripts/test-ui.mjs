@@ -299,6 +299,16 @@ ok(
   navItems.map((item) => item.getAttribute('aria-label')).join(' | ').slice(0, 140),
 );
 
+/* На телефоне пункты живут в нижней панели, и полное название («Прямое
+   подключение») в клетку 72px не влезает: у каждого пункта есть короткая
+   подпись. Доступное имя от неё не зависит — оно в aria-label. */
+const navShorts = navItems.map((item) => item.querySelector('.sidenav__short')?.textContent?.trim() || '');
+ok(
+  'у каждого пункта навигации есть короткая подпись для нижней панели',
+  navShorts.length === 4 && navShorts.every((label) => label.length > 1 && label.length <= 10),
+  navShorts.join(' · '),
+);
+
 ok(
   'подвал подсказывает сочетания клавиш (на телефоне строка спрятана)',
   /Alt/.test($('.footer__keys')?.textContent || '') && /Esc/.test($('.footer__keys')?.textContent || ''),

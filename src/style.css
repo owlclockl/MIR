@@ -49,6 +49,9 @@
   /* Остров лежит выше сцены и панелей, но ниже окон, тостов и
      служебных слоёв: над соседними элементами, а не над ними. */
   --z-island: 20;
+  /* Нижняя панель навигации телефона: выше сцены и островов, но ниже
+     окон и тостов — за открытым окном разделы не переключают. */
+  --z-tabbar: 30;
   --dur: 160ms;
 
   /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
@@ -86,6 +89,11 @@
   /* Высота шапки вместе с верхней безопасной зоной: строка каркаса и
      высота шапки панели друзей считаются от одного числа. */
   --bar-h-safe: calc(var(--bar-h) + var(--safe-top));
+  /* Нижняя панель навигации телефона: высота самой полосы без полосы
+     жестов. Равна высоте шапки телефона — экран обрамлён двумя
+     одинаковыми панелями, сверху и снизу. Место под панель заложено в
+     каркасе тем же токеном, поэтому содержимое под неё не заезжает. */
+  --tabbar-h: 68px;
 
   /* Скругления и глубина — единые во всех экранах. */
   --radius-xs: 6px;
@@ -315,6 +323,13 @@ a {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Короткая подпись пункта — только для нижней панели навигации телефона,
+   где полное название в клетку 72px не влезает. На широком экране показан
+   `strong`, а доступное имя кнопки в обоих случаях — в aria-label. */
+.sidenav__short {
+  display: none;
 }
 
 .sidenav__badge {
@@ -1319,32 +1334,45 @@ a {
     --control-h-mini: 44px;
   }
 
+  /* Управление на телефоне — снизу, как в мессенджерах: большой палец
+     живёт внизу экрана, и до разделов не нужно тянуться через весь экран.
+     Панель выведена из каркаса (`position: fixed`) и видна всегда, а место
+     под неё заложено в каркасе отступом — содержимое под панель не
+     заезжает и не прячется за ней. */
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--bar-h-safe) auto minmax(0, 1fr) auto auto;
+    grid-template-rows: var(--bar-h-safe) minmax(0, 1fr) auto auto;
     grid-template-areas:
       'topbar'
-      'sidenav'
       'stage'
       'rail'
       'footer';
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
   }
 
-  /* Навигация на узком экране — горизонтальная полоса под шапкой.
-     Каждый пункт — иконка с подписью: значок без слова на телефоне
-     не читается, а «Настройки» здесь же, иначе до них не добраться
-     (единственная кнопка настроек живёт в подвале навигации). */
   .sidenav {
+    position: fixed;
+    z-index: var(--z-tabbar);
+    /* Панель больше не ячейка каркаса: в телефонной сетке области sidenav
+       нет, и место под панель держит отступ каркаса. */
+    grid-area: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     gap: var(--sp-8);
-    padding: var(--sp-8) max(var(--sp-10), var(--safe-right)) var(--sp-8) max(var(--sp-10), var(--safe-left));
+    height: calc(var(--tabbar-h) + var(--safe-bottom));
+    padding: var(--sp-8) max(var(--sp-10), var(--safe-right)) var(--safe-bottom) max(var(--sp-10), var(--safe-left));
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+    /* Панель лежит поверх контента, поэтому поверхность плотная:
+       полупрозрачная показала бы прокручивающийся под ней текст. */
+    background: var(--panel-solid);
     overflow-x: auto;
     scroll-snap-type: x proximity;
     /* Полоса прокрутки в навигации — шум: пункты и так влезают в экран,
-       а листается полоса пальцем. */
+       а листается панель пальцем. */
     scrollbar-width: none;
   }
 
@@ -1365,8 +1393,14 @@ a {
     justify-content: center;
     gap: var(--sp-2);
     max-width: 132px;
-    padding: var(--sp-6);
+    padding: var(--sp-4) var(--sp-6);
     scroll-snap-align: start;
+  }
+
+  /* Отклик на нажатие: на телефоне нет наведения, и палец должен видеть,
+     что пункт пойман. */
+  .sidenav__item:active {
+    background: var(--fill-active);
   }
 
   .sidenav__icon {
@@ -1374,9 +1408,11 @@ a {
     height: 24px;
   }
 
-  /* Подпись возвращается (на планшете её прячет блок 1000px), а состояние
-     пункта уходит: вторая строка сделала бы полосу вдвое выше. Состояние
-     видно в окне раздела и в значке приглашений. */
+  /* Подпись пункта обязательна (на планшете её прячет блок 1000px), но
+     в нижней панели она короткая и в одну строку: полное название
+     «Прямое подключение» в клетку 72px не влезает. Состояние пункта
+     («вас зовут в 1 комн.») не показывается — оно видно в окне раздела
+     и в значке приглашений. */
   .sidenav__text {
     display: flex;
     gap: 0;
@@ -1384,10 +1420,16 @@ a {
   }
 
   .sidenav__text strong {
+    display: none;
+  }
+
+  .sidenav__short {
+    display: block;
+    color: inherit;
     font-size: var(--fs-micro);
     line-height: 1.25;
     letter-spacing: 0.01em;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   .sidenav__text small {
@@ -1401,13 +1443,12 @@ a {
     display: grid;
   }
 
-  /* Подвал навигации не прячется, а встаёт в полосу последним пунктом,
-     отделённым линией. */
+  /* Подвал навигации не прячется, а встаёт в панель последним пунктом,
+     отделённым линией: «Настройки» — не раздел, и это видно. */
   .sidenav__foot {
     flex: none;
     flex-direction: row;
-    align-items: center;
-    align-self: stretch;
+    align-items: stretch;
     margin-top: 0;
     padding-top: 0;
     padding-inline-start: var(--sp-8);
@@ -1475,11 +1516,16 @@ a {
 
   .footer {
     justify-content: center;
-    /* Безопасную зону телефона не теряем: под подвалом может быть
-       системная полоса, и текст не должен в неё уезжать. */
-    padding-block: var(--sp-12) max(var(--sp-12), var(--safe-bottom));
+    /* Нижнюю безопасную зону телефона держит каркас: под подвалом теперь
+       панель навигации, а уже под ней — системная полоса жестов. */
+    padding-block: var(--sp-12);
     font-size: 9px;
     letter-spacing: 0.12em;
+  }
+
+  /* Тосты не должны падать на панель навигации: поднимаем их над ней. */
+  .toast-stack {
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--sp-16));
   }
 
   .footer span:first-child,

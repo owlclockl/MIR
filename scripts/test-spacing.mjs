@@ -218,14 +218,26 @@ add(
   `${declared('.rail__head', 'height') ?? '—'} / первая строка каркаса: ${declared('.shell', 'grid-template-rows')?.split(' ')[0] ?? '—'}`,
 );
 
-/* Телефонная вёрстка не должна терять безопасную зону: под подвалом
-   бывает системная полоса, а с `padding-block: 12px` текст уезжает в неё.
-   Токен --safe-bottom — то же самое env(), объявленное один раз в :root. */
-const footerMobile = declared('.footer', 'padding-block', '@media (max-width: 860px)');
+/* Управление на телефоне — снизу, как в мессенджерах: панель прибита к
+   нижнему краю и не уезжает вместе со страницей, а каркас закладывает под
+   неё место вместе с полосой жестов — иначе последние строки контента
+   прячутся за панелью. */
+const shellMobilePad = declared('.shell', 'padding-bottom', '@media (max-width: 860px)');
 add(
-  Boolean(footerMobile && /env\(safe-area-inset-bottom\)|var\(--safe-bottom\)/.test(footerMobile)),
-  'на телефоне подвал учитывает безопасную зону экрана',
-  footerMobile ?? '—',
+  Boolean(shellMobilePad && /var\(--tabbar-h\)/.test(shellMobilePad) && /var\(--safe-bottom\)/.test(shellMobilePad)),
+  'каркас телефона оставляет место под нижнюю панель и полосу жестов',
+  shellMobilePad ?? '—',
+);
+add(
+  declared('.sidenav', 'position', '@media (max-width: 860px)') === 'fixed'
+    && declared('.sidenav', 'bottom', '@media (max-width: 860px)') === '0',
+  'на телефоне навигация прибита к нижнему краю экрана',
+  `position: ${declared('.sidenav', 'position', '@media (max-width: 860px)') ?? '—'}, bottom: ${declared('.sidenav', 'bottom', '@media (max-width: 860px)') ?? '—'}`,
+);
+add(
+  /var\(--tabbar-h\)/.test(declared('.sidenav', 'height', '@media (max-width: 860px)') ?? ''),
+  'высота нижней панели задана токеном, а не полями на глаз',
+  declared('.sidenav', 'height', '@media (max-width: 860px)') ?? '—',
 );
 
 /* Безопасные зоны объявлены токенами, чтобы каждый экран не писал env()
@@ -264,11 +276,12 @@ add(
 /* Значок без слова на телефоне не читается, а «Настройки» живут в подвале
    навигации: спрячь его — и до настроек на телефоне не добраться. */
 const phoneNavText = declared('.sidenav__text', 'display', '@media (max-width: 860px)');
+const phoneNavShort = declared('.sidenav__short', 'display', '@media (max-width: 860px)');
 const phoneNavFoot = declared('.sidenav__foot', 'display', '@media (max-width: 860px)');
 add(
-  phoneNavText !== 'none',
+  phoneNavText !== 'none' && phoneNavShort === 'block',
   'на телефоне у пунктов навигации остаётся подпись',
-  `display: ${phoneNavText ?? 'не задан'}`,
+  `подпись: ${phoneNavShort ?? 'не задана'}, контейнер: ${phoneNavText ?? 'не задан'}`,
 );
 add(
   phoneNavFoot !== 'none',
