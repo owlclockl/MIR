@@ -1,3 +1,5 @@
+import { isInviteCode } from '../src/data/invite-code.js';
+
 /* ===========================================================
    Ядро хаба: общие аккаунты, друзья, заявки, коды-приглашения
    и сигналинг P2P. Здесь нет ни одного обращения к файлам,
@@ -564,7 +566,7 @@ export function createHubCore({
                 user.name = nextName;
                 user.nameKey = nextName.toLowerCase();
               }
-              if (typeof item.inviteCode === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(item.inviteCode)) {
+              if (isInviteCode(item.inviteCode)) {
                 user.inviteCode = item.inviteCode;
               }
               if (item.ban === null || item.ban === false) {
@@ -1055,7 +1057,7 @@ export function createHubCore({
     'POST /api/invite/use': async (req, body, save) => {
       const me = auth(req);
       const code = normalizeCode(body.code);
-      if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw httpError(400, 'Код выглядит как XXXX-XXXX.');
+      if (!isInviteCode(code)) throw httpError(400, 'Код выглядит как XXXX-XXXX.');
       const owner = db.users.find((u) => u.inviteCode === code);
       if (!owner) throw httpError(404, 'Такой код никому не выдан.');
       if (owner.id === me.id) throw httpError(400, 'Это ваш собственный код.');

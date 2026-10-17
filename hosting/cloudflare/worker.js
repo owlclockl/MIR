@@ -97,7 +97,6 @@ export class MirHub {
     this.snapshot = new Map(); // ключ хранилища → как он выглядел при последней записи
     this.lastPresenceWrite = 0;
     this.pending = null;
-    this.trailingWrite = null; // отложенная запись, когда окно PRESENCE_WRITE_MS ещё закрыто
     this.ticker = null; // уборка мёртвых сокетов; работает, пока открыт хотя бы один
 
     /* Пока идёт загрузка, объект не обрабатывает запросы — иначе
@@ -231,20 +230,20 @@ export class MirHub {
     const now = Date.now();
     const wait = PRESENCE_WRITE_MS - (now - this.lastPresenceWrite);
     if (wait > 0) {
-      /* Окно записи закрыто, но изменение не отбрасываем: записываем, когда
-         окно откроется. Раньше такая запись пропадала вовсе, если больше
-         ничего не менялось, — и потом терялась при остановке объекта. */
-      if (!this.trailingWrite) {
-        this.trailingWrite = setTimeout(() => {
-          this.trailingWrite = null;
-          this.persist(false);
-        }, wait);
-      }
-      return undefined;
+      /* Обычный таймер исчезает при вытеснении Durable Object. Alarm
+         хранится платформой и разбудит объект даже без новых запросов. */
+      return this.state.storage.setAlarm(Date.now() + wait);
     }
     this.lastPresenceWrite = now;
     this.pending = this.flush().catch(() => {});
     return undefined;
+  }
+
+  /* Cloudflare вызывает alarm после пробуждения Durable Object. Запись
+     ожидающего присутствия идёт через тот же diff-flush, что и обычные мутации. */
+  async alarm() {
+    this.lastPresenceWrite = Date.now();
+    await this.flush();
   }
 
   /* Уборка мёртвых сокетов и пустых лобби. Таймер заводим только при открытом

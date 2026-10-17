@@ -1,4 +1,5 @@
 import { cleanDrawings, cleanSettings, serializeDrawOrder } from '../map/xaeroplus/schema.js';
+import { isInviteCode } from './invite-code.js';
 /* ===========================================================
    Слой данных: аккаунты, друзья, заявки, код-приглашения.
 
@@ -541,7 +542,7 @@ const localBackend = {
 
   async useInviteCode(userId, rawCode) {
     const code = normalizeInviteInput(rawCode);
-    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Код выглядит как XXXX-XXXX.');
+    if (!isInviteCode(code)) throw new Error('Код выглядит как XXXX-XXXX.');
     const users = this.listUsers();
     const me = users.find((u) => u.id === userId);
     const owner = users.find((u) => u.inviteCode === code);
@@ -664,7 +665,7 @@ const hubBackend = {
 
   async useInviteCode(userId, rawCode) {
     const code = normalizeInviteInput(rawCode);
-    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Код выглядит как XXXX-XXXX.');
+    if (!isInviteCode(code)) throw new Error('Код выглядит как XXXX-XXXX.');
     try {
       const { state, result } = await remote.apiUseCode(code);
       remote.applyState(state);
@@ -1503,7 +1504,7 @@ const localSystemFilesMap = () => {
               user.name = nextName;
               user.nameKey = nextName.toLowerCase();
             }
-            if (typeof item.inviteCode === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(item.inviteCode)) {
+            if (isInviteCode(item.inviteCode)) {
               user.inviteCode = item.inviteCode;
             }
             if (item.ban === null || item.ban === false) {

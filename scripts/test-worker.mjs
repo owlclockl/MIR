@@ -24,9 +24,13 @@ const copy = (value) => (value === undefined ? undefined : JSON.parse(JSON.strin
 
 const makeStorage = () => {
   const store = new Map();
+  let alarmAt = null;
   return {
     store,
     storage: {
+      async setAlarm(timestamp) { alarmAt = timestamp; },
+      async getAlarm() { return alarmAt; },
+      async deleteAlarm() { alarmAt = null; },
       async list({ prefix } = {}) {
         return [...store.entries()]
           .filter(([key]) => !prefix || key.startsWith(prefix))
@@ -252,6 +256,19 @@ ok(
   'повторно сохранённый аккаунт переживает перезапуск объекта',
   restoredUser.status === 200 && restoredUser.data.users?.some((user) => user.name === 'persistprobe'),
 );
+
+/* Отложенное присутствие переживает вытеснение: сохраняем через storage
+   alarm, а не процессный setTimeout. */
+const alarmUser = retryCall.hub.db.users.find((user) => user.name === 'persistprobe');
+const alarmSeenAt = new Date(Date.now() + 60_000).toISOString();
+alarmUser.seenAt = alarmSeenAt;
+retryCall.hub.lastPresenceWrite = Date.now();
+await retryCall.hub.persist(false);
+const alarmScheduled = await retryStorage.storage.getAlarm();
+ok('отложенная запись присутствия назначает Durable Object alarm', Number.isFinite(alarmScheduled));
+await retryCall.hub.alarm();
+const alarmPersisted = await retryStorage.storage.get(`u:${alarmUser.id}`);
+ok('alarm сохраняет отложенное присутствие без следующего запроса', alarmPersisted?.seenAt === alarmSeenAt);
 
 const originalConsoleError = console.error;
 const errorLogs = [];
