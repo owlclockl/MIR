@@ -286,6 +286,49 @@ ok(
   $('.sidenav__item--main .sidenav__text small')?.textContent?.trim(),
 );
 
+/* Пункты навигации читаются и без подписи: на планшете и в полосе телефона
+   её прячет CSS, а вместе с `display: none` из дерева доступности пропадает
+   и имя кнопки. Поэтому имя — в aria-label, а сочетание клавиш — в подсказке. */
+ok(
+  'у каждого пункта навигации есть доступное имя и подсказка о клавише',
+  navItems.length === 4
+    && navItems.every((item) => (item.getAttribute('aria-label') || '').trim().length > 3)
+    && (navItems[0].getAttribute('aria-label') || '').startsWith('Партии —')
+    && navItems.map((item) => item.getAttribute('title')).join(' · ')
+      === 'Партии — Alt + 1 · Общий хаб — Alt + 2 · Прямое подключение — Alt + 3 · Настройки — Alt + 4',
+  navItems.map((item) => item.getAttribute('aria-label')).join(' | ').slice(0, 140),
+);
+
+ok(
+  'подвал подсказывает сочетания клавиш (на телефоне строка спрятана)',
+  /Alt/.test($('.footer__keys')?.textContent || '') && /Esc/.test($('.footer__keys')?.textContent || ''),
+  $('.footer__keys')?.textContent?.replace(/\s+/g, ' ').trim(),
+);
+
+/* Разделы открываются с клавиатуры: Alt + цифра (по `code`, чтобы работало
+   и на русской раскладке), Esc закрывает, а за открытым окном разделы не
+   переключаются — иначе несохранённое в окне теряется молча. */
+const pressKey = (code, init = {}) =>
+  window.document.dispatchEvent(
+    new window.KeyboardEvent('keydown', { code, key: code, bubbles: true, cancelable: true, ...init }),
+  );
+
+pressKey('Digit2', { altKey: true });
+await wait(120);
+ok('Alt + 2 открывает общий хаб с клавиатуры', $('.dialog__title')?.textContent === 'Общий хаб', $('.dialog__title')?.textContent?.trim());
+pressKey('Escape');
+await wait(60);
+ok('Esc закрывает окно, открытое с клавиатуры', !$('.dialog'));
+pressKey('Digit4', { altKey: true });
+await wait(80);
+ok('Alt + 4 открывает настройки с клавиатуры', $('.dialog__title')?.textContent === 'Настройки', $('.dialog__title')?.textContent?.trim());
+pressKey('Digit1', { altKey: true });
+await wait(80);
+ok('пока окно открыто, сочетания разделов не работают', $('.dialog__title')?.textContent === 'Настройки');
+pressKey('Escape');
+await wait(60);
+ok('окно закрыто, меню на месте', !$('.dialog') && !!$('.shell'));
+
 /* Без аккаунта комнаты не открыть: окно честно говорит об этом и ведёт
    на вход вместо пустой комнаты с нерабочими кнопками. */
 click('[data-action="open-parties"]');

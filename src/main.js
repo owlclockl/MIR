@@ -2804,6 +2804,25 @@ const partyNavState = () => {
   return { hint: 'Создать комнату и позвать друзей', badge: 0 };
 };
 
+/* Сочетания клавиш разделов: на ПК меню открывается с клавиатуры, не уводя
+   руку с верхнего ряда. Цифры проверяются по `code` (см. обработчик ниже),
+   поэтому сочетание работает и на русской раскладке. Подпись пункта на
+   планшете и в полосе телефона спрятана, поэтому имя кнопки дублируется в
+   aria-label: без него с экрана читается пустая кнопка. */
+const NAV_HOTKEYS = [
+  { code: 'Digit1', label: 'Alt + 1', action: 'open-parties' },
+  { code: 'Digit2', label: 'Alt + 2', action: 'open-hub' },
+  { code: 'Digit3', label: 'Alt + 3', action: 'open-direct' },
+  { code: 'Digit4', label: 'Alt + 4', action: 'open-settings' },
+];
+
+const navHotkey = (action) => NAV_HOTKEYS.find((item) => item.action === action)?.label ?? '';
+
+/* Доступное имя пункта: название, состояние и счётчик приглашений —
+   всё, что видно глазами на широком экране. */
+const navAriaLabel = ({ title, hint, badge = 0, badgeLabel = 'Новых заявок' }) =>
+  [`${title} — ${hint}`, badge ? `${badgeLabel}: ${badge}` : ''].filter(Boolean).join(' · ');
+
 const sidenavHtml = () => {
   const { hub } = menuCounts();
   const party = partyNavState();
@@ -2827,15 +2846,22 @@ const sidenavHtml = () => {
   ];
   return `
     <div class="sidenav__list" role="list">
-      ${items.map(({ glyph, title, hint, action, badge = 0, badgeLabel = 'Новых заявок', modifier = '' }) => `
-        <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}">
+      ${items.map((item) => {
+        const { glyph, title, action, badge = 0, modifier = '' } = item;
+        const hotkey = navHotkey(action);
+        return `
+        <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}"
+                aria-label="${escapeHtml(navAriaLabel(item))}"${hotkey ? ` title="${escapeHtml(`${title} — ${hotkey}`)}"` : ''}>
           <span class="sidenav__icon">${icon(glyph)}</span>
-          <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(hint)}</small></span>
-          ${badge ? `<span class="sidenav__badge" aria-label="${badgeLabel}: ${badge}">${badge}</span>` : ''}
-        </button>`).join('')}
+          <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(item.hint)}</small></span>
+          ${badge ? `<span class="sidenav__badge" aria-hidden="true">${badge}</span>` : ''}
+        </button>`;
+      }).join('')}
     </div>
     <div class="sidenav__foot">
-      <button class="sidenav__item" type="button" data-action="open-settings">
+      <button class="sidenav__item" type="button" data-action="open-settings"
+              aria-label="${escapeHtml(navAriaLabel({ title: 'Настройки', hint: 'Звук, анимации, обновления' }))}"
+              title="${escapeHtml(`Настройки — ${navHotkey('open-settings')}`)}">
         <span class="sidenav__icon">${icon('settings')}</span>
         <span class="sidenav__text"><strong>Настройки</strong><small>Звук, анимации, обновления</small></span>
       </button>
@@ -3023,6 +3049,7 @@ document.querySelector('#app').innerHTML = `
     <footer class="footer">
       <span>Версия ${VERSION}</span>
       <span class="footer__hint">Партии · друзья · общий хаб · прямая связь</span>
+      <span class="footer__keys"><kbd>Alt</kbd> + <kbd>1…4</kbd> — разделы · <kbd>Esc</kbd> — закрыть окно</span>
       <span class="footer__name" lang="en" translate="no">© 2026 ${TITLE_FULL}</span>
     </footer>
 
@@ -4876,6 +4903,17 @@ document.addEventListener('keydown', (event) => {
   if (!(event.ctrlKey && event.shiftKey && event.altKey && event.code === 'KeyA')) return;
   event.preventDefault();
   openAdminGate();
+});
+
+/* Alt + 1…4 — разделы навигации: на ПК до пунктов меню можно не тянуться
+   мышью. Сочетание не работает, пока открыто окно: переключать раздел за
+   диалогом — значит потерять несохранённое, сначала Esc. */
+document.addEventListener('keydown', (event) => {
+  if (ui.modal || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const hit = NAV_HOTKEYS.find((item) => item.code === event.code);
+  if (!hit) return;
+  event.preventDefault();
+  actions[hit.action]?.();
 });
 
 document.addEventListener('keydown', (event) => {

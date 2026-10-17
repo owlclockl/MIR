@@ -213,18 +213,67 @@ family('блоки с рамкой: одна плотность --box-pad', [
 ]);
 
 add(
-  declared('.rail__head', 'height') === 'var(--bar-h)',
+  declared('.rail__head', 'height') === declared('.shell', 'grid-template-rows')?.split(' ')[0],
   'шапка панели друзей той же высоты, что верхняя панель',
-  declared('.rail__head', 'height') ?? '—',
+  `${declared('.rail__head', 'height') ?? '—'} / первая строка каркаса: ${declared('.shell', 'grid-template-rows')?.split(' ')[0] ?? '—'}`,
 );
 
 /* Телефонная вёрстка не должна терять безопасную зону: под подвалом
-   бывает системная полоса, а с `padding-block: 12px` текст уезжает в неё. */
+   бывает системная полоса, а с `padding-block: 12px` текст уезжает в неё.
+   Токен --safe-bottom — то же самое env(), объявленное один раз в :root. */
 const footerMobile = declared('.footer', 'padding-block', '@media (max-width: 860px)');
 add(
-  Boolean(footerMobile && footerMobile.includes('env(safe-area-inset-bottom)')),
+  Boolean(footerMobile && /env\(safe-area-inset-bottom\)|var\(--safe-bottom\)/.test(footerMobile)),
   'на телефоне подвал учитывает безопасную зону экрана',
   footerMobile ?? '—',
+);
+
+/* Безопасные зоны объявлены токенами, чтобы каждый экран не писал env()
+   заново: раньше нижнюю зону помнил только подвал, а шапка в PWA на
+   телефоне уходила под системную строку. */
+const safeTokens = ['--safe-top', '--safe-bottom', '--safe-left', '--safe-right'];
+const missingSafe = safeTokens.filter((name) => !/env\(safe-area-inset/.test(tokenValue(name) ?? ''));
+add(
+  missingSafe.length === 0 && /var\(--bar-h\)/.test(tokenValue('--bar-h-safe') ?? '') && /var\(--safe-top\)/.test(tokenValue('--bar-h-safe') ?? ''),
+  'безопасные зоны экрана объявлены токенами, высота шапки считает верхнюю зону',
+  missingSafe.length ? `нет токенов: ${missingSafe.join(', ')}` : `${tokenValue('--bar-h-safe')}`,
+);
+
+/* Верхняя панель обязана отступать на верхнюю безопасную зону, иначе в PWA
+   на телефоне её содержимое ложится под системную строку и «чёлку». */
+add(
+  declared('.topbar', 'padding-top') === 'var(--safe-top)',
+  'шапка отступает от верхнего края экрана в PWA',
+  declared('.topbar', 'padding-top') ?? '—',
+);
+
+/* ---------- 5. вёрстка для пальца ------------------------------ */
+
+/* На телефоне поля ввода не меньше 16px: iOS приближает страницу при
+   фокусе меньшего текста и обратно сама не отъезжает. */
+const phoneInputs = rules
+  .filter((rule) => rule.scope === '@media (max-width: 680px)' && rule.selector.includes('.input'))
+  .flatMap((rule) => declarations(rule.body))
+  .filter((decl) => decl.prop === 'font-size');
+add(
+  phoneInputs.length > 0 && phoneInputs.every((decl) => parseFloat(decl.value) >= 16),
+  'на телефоне поля ввода не меньше 16px (iOS не увеличивает страницу)',
+  phoneInputs.map((decl) => decl.value).join(', ') || '—',
+);
+
+/* Значок без слова на телефоне не читается, а «Настройки» живут в подвале
+   навигации: спрячь его — и до настроек на телефоне не добраться. */
+const phoneNavText = declared('.sidenav__text', 'display', '@media (max-width: 860px)');
+const phoneNavFoot = declared('.sidenav__foot', 'display', '@media (max-width: 860px)');
+add(
+  phoneNavText !== 'none',
+  'на телефоне у пунктов навигации остаётся подпись',
+  `display: ${phoneNavText ?? 'не задан'}`,
+);
+add(
+  phoneNavFoot !== 'none',
+  'на телефоне «Настройки» остаются в навигации',
+  `display: ${phoneNavFoot ?? 'не задан'}`,
 );
 
 /* ---------- 4. структурные дубли ----------------------------------- */
