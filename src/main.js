@@ -1456,7 +1456,7 @@ const adminLoginHtml = () => {
         </label>
         <p class="form-error" data-role="form-error" hidden></p>
         <button class="solid-button admin-gate__submit" type="submit" data-role="submit">
-          ${icon('shield', 'icon--xs')}<span>Открыть панель</span><span class="admin-gate__arrow" aria-hidden="true">↗</span>
+          ${icon('shield', 'icon--xs')}<span>Открыть панель</span><span class="admin-gate__arrow" aria-hidden="true">${icon('arrowUpRight')}</span>
         </button>
       </form>
 
@@ -2089,7 +2089,7 @@ const adminOverviewHtml = () => {
       <span class="admin-tile__value" translate="no">${escapeHtml(String(value))}</span>
       <span class="admin-tile__key">${escapeHtml(key)}</span>
       <span class="admin-tile__note">${escapeHtml(note)}</span>
-      <span class="admin-tile__arrow" aria-hidden="true">↗</span>
+      <span class="admin-tile__arrow" aria-hidden="true">${icon('arrowUpRight', 'icon--sm')}</span>
     </button>`;
   const recent = events.slice(0, 5);
   return `

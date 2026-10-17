@@ -348,6 +348,39 @@ add(
   declared('.sidenav__item', 'flex', '@media (max-width: 860px)') ?? '—',
 );
 
+/* Фото-аватарка обрезается по форме аватарки: финишный слой делает её
+   круглой, и без `overflow: hidden` квадратная фотография вылезает
+   углами из круглой заглушки. */
+add(
+  declared('.avatar', 'overflow') === 'hidden',
+  'фото аватарки обрезается по форме аватарки',
+  declared('.avatar', 'overflow') ?? '—',
+);
+
+/* У `.input` стоит appearance: none, поэтому выпадающий список обязан
+   рисовать свою стрелку — иначе он неотличим от текстового поля.
+   Нативные виджеты при этом тёмные, а автозаполнение не красит поле
+   в белый. */
+const selectRule = rules.find((rule) => rule.scope === '' && rule.selector.includes('.input--select'));
+const selectBg = selectRule
+  ? declarations(selectRule.body).find((decl) => decl.prop === 'background-image')?.value ?? null
+  : null;
+add(
+  Boolean(selectBg && selectBg.includes('data:image/svg+xml')),
+  'у выпадающего списка есть своя стрелка',
+  selectBg ? 'svg-шеврон' : '—',
+);
+add(
+  rootDecls.some((decl) => decl.prop === 'color-scheme' && decl.value === 'dark'),
+  'нативные виджеты тёмные (color-scheme: dark)',
+  rootDecls.find((decl) => decl.prop === 'color-scheme')?.value ?? '—',
+);
+add(
+  declared('.input:-webkit-autofill', '-webkit-text-fill-color') === 'var(--text)',
+  'автозаполнение не красит поле в белый',
+  declared('.input:-webkit-autofill', '-webkit-text-fill-color') ?? '—',
+);
+
 /* ---------- 4. структурные дубли ----------------------------------- */
 
 /* Одно и то же свойство у одного селектора в одной области видимости —

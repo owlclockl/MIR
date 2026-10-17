@@ -35,6 +35,7 @@ export const ICONS = {
   save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7M7 3v4a1 1 0 0 0 1 1h7"/>',
   users: '<path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/>',
   arrowUp: '<path d="m5 12 7-7 7 7M12 19V5"/>',
+  arrowUpRight: '<path d="M7 7h10v10M7 17 17 7"/>',
   arrowRight: '<path d="M5 12h14m-7-7 7 7-7 7"/>',
   arrowDown: '<path d="M12 5v14m7-7-7 7-7-7"/>',
   arrowLeft: '<path d="m12 19-7-7 7-7M19 12H5"/>',
