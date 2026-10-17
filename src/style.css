@@ -49,6 +49,9 @@
   /* Остров лежит выше сцены и панелей, но ниже окон, тостов и
      служебных слоёв: над соседними элементами, а не над ними. */
   --z-island: 20;
+  /* Нижняя панель навигации телефона: выше сцены и островов, но ниже
+     окон и тостов — за открытым окном разделы не переключают. */
+  --z-tabbar: 30;
   --dur: 160ms;
 
   /* Шкала отступов. Правило: в gap, padding, margin и inset стоят только
@@ -72,6 +75,25 @@
   --nav-w: 224px;
   --rail-w: 280px;
   --pad-x: clamp(16px, 2vw, 24px);
+
+  /* Безопасные зоны экрана. В обычном браузере они равны нулю, а в PWA
+     на телефоне — реальным пикселям: сверху системная строка и «чёлка»,
+     снизу полоса жестов, в альбомной ориентации — вырез сбоку. Каркас
+     считает их токенами, чтобы ни один экран не писал env() сам: раньше
+     нижнюю зону помнил только подвал, а шапка в PWA уходила под
+     системную строку. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  /* Высота шапки вместе с верхней безопасной зоной: строка каркаса и
+     высота шапки панели друзей считаются от одного числа. */
+  --bar-h-safe: calc(var(--bar-h) + var(--safe-top));
+  /* Нижняя панель навигации телефона: высота самой полосы без полосы
+     жестов. Равна высоте шапки телефона — экран обрамлён двумя
+     одинаковыми панелями, сверху и снизу. Место под панель заложено в
+     каркасе тем же токеном, поэтому содержимое под неё не заезжает. */
+  --tabbar-h: 68px;
 
   /* Скругления и глубина — единые во всех экранах. */
   --radius-xs: 6px;
@@ -118,6 +140,10 @@
   --fs-lead: 16px;
 
   --ease: cubic-bezier(0.3, 0.8, 0.3, 1);
+  /* Пружина: элемент проскакивает цель и возвращается, как панель и
+     иконки в новых клиентах Telegram. Только для коротких откликов на
+     нажатие и появления окон — на длинных переходах покачивание мешает. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   font-family: var(--font-ui);
   font-synthesis: none;
@@ -204,7 +230,7 @@ a {
 .shell {
   display: grid;
   grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--rail-w);
-  grid-template-rows: var(--bar-h) minmax(0, 1fr) auto;
+  grid-template-rows: var(--bar-h-safe) minmax(0, 1fr) auto;
   grid-template-areas:
     'topbar topbar rail'
     'sidenav stage  rail'
@@ -303,6 +329,13 @@ a {
   white-space: nowrap;
 }
 
+/* Короткая подпись пункта — только для нижней панели навигации телефона,
+   где полное название в клетку 72px не влезает. На широком экране показан
+   `strong`, а доступное имя кнопки в обоих случаях — в aria-label. */
+.sidenav__short {
+  display: none;
+}
+
 .sidenav__badge {
   display: grid;
   place-items: center;
@@ -348,6 +381,9 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: stretch;
+  /* В PWA на телефоне шапка начинается от самого верха экрана: без этого
+     поля содержимое ложится под системную строку и «чёлку». */
+  padding-top: var(--safe-top);
   border-bottom: 1px solid var(--line);
   background: var(--bar);
 }
@@ -360,9 +396,16 @@ a {
   padding-inline: var(--pad-x);
 }
 
+/* Альбомная ориентация на телефоне: вырез бывает сбоку, и крайний
+   элемент шапки не должен прятаться под ним. */
+.topbar__side--start {
+  padding-left: max(var(--pad-x), var(--safe-left));
+}
+
 .topbar__side--end {
   justify-content: flex-end;
   gap: var(--sp-12);
+  padding-right: max(var(--pad-x), var(--safe-right));
 }
 
 .topbar__divider {
@@ -840,6 +883,12 @@ a {
   gap: var(--sp-10);
 }
 
+/* Вошедшему полезен только счётчик друзей; статус хаба дублировал
+   навигацию и занимал место на главном экране. */
+.hero__stats.hero__stats--friends-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .hero-stat {
   display: flex;
   flex-direction: column;
@@ -875,10 +924,6 @@ a {
   white-space: nowrap;
 }
 
-.hero-stat__hub {
-  color: var(--gold) !important;
-}
-
 .footer__hint {
   color: var(--text-faint);
 }
@@ -894,14 +939,14 @@ a {
   background: var(--panel);
 }
 
-/* Высота шапки панели равна высоте верхней панели —
-   линия под ними идёт через весь экран. */
+/* Высота шапки панели равна высоте верхней панели (вместе с её верхней
+   безопасной зоной) — линия под ними идёт через весь экран. */
 .rail__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-14);
-  height: var(--bar-h);
+  height: var(--bar-h-safe);
   padding-inline: var(--panel-pad-x);
   border-bottom: 1px solid var(--line);
 }
@@ -1040,7 +1085,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-16);
-  padding: var(--sp-14) var(--pad-x) max(var(--sp-16), env(safe-area-inset-bottom));
+  padding: var(--sp-14) max(var(--pad-x), var(--safe-right)) max(var(--sp-16), var(--safe-bottom)) max(var(--pad-x), var(--safe-left));
   color: var(--text-faint);
   font-size: var(--fs-micro);
   letter-spacing: 0.02em;
@@ -1052,12 +1097,30 @@ a {
   white-space: nowrap;
 }
 
+/* Подсказка о клавишах — только для ПК: на телефоне сочетания с Alt
+   некому нажимать, и строка уезжает в подвал на узком экране. */
+.footer__keys {
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.footer__keys kbd {
+  color: var(--text-soft);
+  font-family: inherit;
+}
+
 /* ---------- Адаптив ----------------------------------------------- */
 
 @media (max-width: 1180px) {
   :root {
     --rail-w: 272px;
     --nav-w: 216px;
+  }
+
+  /* В подвале средней колонки места на четыре строки нет: описание
+     уступает место подсказке о клавишах. */
+  .footer__hint {
+    display: none;
   }
 }
 
@@ -1277,49 +1340,172 @@ a {
     --control-h-mini: 44px;
   }
 
+  /* Управление на телефоне — снизу, как в мессенджерах: большой палец
+     живёт внизу экрана, и до разделов не нужно тянуться через весь экран.
+     Панель выведена из каркаса (`position: fixed`) и видна всегда, а место
+     под неё заложено в каркасе отступом — содержимое под панель не
+     заезжает и не прячется за ней. */
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--bar-h) auto minmax(0, 1fr) auto auto;
+    grid-template-rows: var(--bar-h-safe) auto minmax(0, 1fr) auto;
+    /* Друзья — над витриной: кто в сети, видно сразу, без прокрутки
+       мимо заголовка. Порядок как в ленте мессенджера: люди сверху,
+       витрина под ними. */
     grid-template-areas:
       'topbar'
-      'sidenav'
-      'stage'
       'rail'
+      'stage'
       'footer';
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
   }
 
-  /* Навигация на узком экране — горизонтальная полоса под шапкой:
-     пункты сообщества едут прокруткой вбок, подвал навигации прячется. */
   .sidenav {
+    position: fixed;
+    z-index: var(--z-tabbar);
+    /* Панель больше не ячейка каркаса: в телефонной сетке области sidenav
+       нет, и место под панель держит отступ каркаса. */
+    grid-area: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     gap: var(--sp-8);
-    padding: var(--sp-8) var(--sp-10);
+    height: calc(var(--tabbar-h) + var(--safe-bottom));
+    padding: var(--sp-8) max(var(--sp-10), var(--safe-right)) var(--safe-bottom) max(var(--sp-10), var(--safe-left));
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+    /* Панель лежит поверх контента, поэтому поверхность плотная:
+       полупрозрачная показала бы прокручивающийся под ней текст. */
+    background: var(--panel-solid);
     overflow-x: auto;
+    scroll-snap-type: x proximity;
+    /* Полоса прокрутки в навигации — шум: пункты и так влезают в экран,
+       а листается панель пальцем. */
+    scrollbar-width: none;
+    /* Панель уезжает и возвращается плавно: класс ставит main.js по
+       направлению прокрутки (и не ставит вовсе, если движение выключено). */
+    transition: transform 280ms var(--ease);
+  }
+
+  .sidenav--hidden {
+    transform: translateY(100%);
+  }
+
+  .sidenav::-webkit-scrollbar {
+    display: none;
   }
 
   .sidenav__list {
+    flex: 1;
     flex-direction: row;
+    justify-content: center;
     gap: var(--sp-4);
   }
 
   .sidenav__item {
-    flex: none;
+    position: relative;
+    flex: 1 0 72px;
+    flex-direction: column;
     justify-content: center;
+    gap: var(--sp-2);
+    max-width: 132px;
+    padding: var(--sp-4) var(--sp-6);
+    border-radius: var(--radius-md);
+    /* Площадка пункта — «пилюля»: подсветка нажатия со скруглением, как у
+       вкладок в новых клиентах Telegram. Касание возвращается пружиной. */
+    transition:
+      background-color var(--dur) var(--ease),
+      transform 320ms var(--ease-spring);
+    scroll-snap-align: start;
+    overflow: hidden;
   }
 
+  /* Отклик на нажатие: на телефоне нет наведения, и палец должен видеть,
+     что пункт пойман. Пункт приседает и возвращается пружиной. */
+  .sidenav__item:active {
+    background: var(--fill-active);
+    transform: scale(0.93);
+    transition-duration: 90ms;
+  }
+
+  /* Круг от точки касания расходится по площадке — чистый CSS, без скриптов:
+     при нажатии вспышка появляется почти сразу, а гаснет медленно. */
+  .sidenav__item::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.2), transparent 68%);
+    opacity: 0;
+    transition: opacity 420ms var(--ease);
+    pointer-events: none;
+  }
+
+  .sidenav__item:active::after {
+    opacity: 1;
+    transition-duration: 60ms;
+  }
+
+  .sidenav__icon {
+    width: 24px;
+    height: 24px;
+    /* Иконка пружинит отдельно от площадки: так нажатие читается живее. */
+    transition:
+      transform 360ms var(--ease-spring),
+      color var(--dur) var(--ease);
+  }
+
+  .sidenav__item:active .sidenav__icon {
+    transform: scale(0.86);
+    color: var(--accent-strong);
+  }
+
+  /* Подпись пункта обязательна (на планшете её прячет блок 1000px), но
+     в нижней панели она короткая и в одну строку: полное название
+     «Прямое подключение» в клетку 72px не влезает. Состояние пункта
+     («вас зовут в 1 комн.») не показывается — оно видно в окне раздела
+     и в значке приглашений. */
   .sidenav__text {
+    display: flex;
+    gap: 0;
+    text-align: center;
+  }
+
+  .sidenav__text strong {
+    display: none;
+  }
+
+  .sidenav__short {
+    display: block;
+    color: inherit;
+    font-size: var(--fs-micro);
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .sidenav__text small {
     display: none;
   }
 
   .sidenav__badge {
+    position: absolute;
+    top: var(--sp-2);
+    right: var(--sp-2);
     display: grid;
   }
 
+  /* Подвал навигации не прячется, а встаёт в панель последним пунктом,
+     отделённым линией: «Настройки» — не раздел, и это видно. */
   .sidenav__foot {
-    display: none;
+    flex: none;
+    flex-direction: row;
+    align-items: stretch;
+    margin-top: 0;
+    padding-top: 0;
+    padding-inline-start: var(--sp-8);
+    border-top: 0;
+    border-inline-start: 1px solid var(--line);
   }
 
   .stage {
@@ -1327,7 +1513,19 @@ a {
   }
 
   .stage__inner {
-    justify-content: start;
+    justify-content: center;
+  }
+
+  /* Главный экран телефона — по центру: печать, надзаголовок, название и
+     девиз стоят посередине, а не прижаты к левому краю. На ПК витрина
+     остаётся выровненной слева — там широкий экран и длинный заголовок. */
+  .hero {
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero__caption {
+    justify-content: center;
   }
 
   .hero__seal {
@@ -1335,22 +1533,44 @@ a {
     height: 44px;
   }
 
-  .rail {
-    border-left: 0;
-    border-top: 1px solid var(--line);
+  /* Плитки сводки — тоже по центру: цифры и подписи в них не разъезжаются
+     по краям, когда плитка растянулась на половину экрана. */
+  .hero-stat {
+    align-items: center;
+    text-align: center;
   }
 
+  .rail {
+    border-left: 0;
+    /* Панель друзей теперь над витриной, поэтому линия — под ней. */
+    border-top: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Заголовок «Друзья» — по центру строки, кнопка «добавить» остаётся
+     справа. Трёхколоночная сетка с равными краями держит заголовок ровно
+     посередине: при `justify-content: center` он уехал бы вместе с кнопкой. */
   .rail__head {
-    height: auto;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
+    height: auto;
+    gap: var(--sp-12);
     padding: var(--panel-pad-y) var(--panel-pad-x);
   }
 
   .rail__heading {
-    flex-direction: row-reverse;
+    grid-column: 2;
+    flex-direction: row;
     align-items: baseline;
-    justify-content: flex-end;
-    gap: var(--sp-12);
+    justify-content: center;
+    gap: var(--sp-8);
+    text-align: center;
+  }
+
+  .rail__head > .icon-button {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .rail__heading .eyebrow {
@@ -1359,17 +1579,69 @@ a {
 
   .rail__list {
     flex-direction: row;
-    gap: var(--sp-6);
+    gap: var(--sp-10);
+    padding-block: var(--sp-12);
     overflow-x: auto;
     overflow-y: hidden;
+    /* Лента друзей листается пальцем и досылается до карточки,
+       а не останавливается на половине. */
+    scroll-snap-type: x proximity;
   }
 
-  /* Растягиваются на всю ширину, а при нехватке места — горизонтальная прокрутка. */
+  /* Карточка друга на телефоне — клетка ленты, как в мессенджере: крупный
+     аватар, имя под ним. Кто в сети — первыми (сортировка в railHtml) и с
+     фирменным контуром вокруг аватара. */
   .friend {
-    flex: 1 0 168px;
-    width: auto;
-    border-color: var(--line);
-    background: var(--fill);
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-6);
+    width: 84px;
+    padding: var(--sp-8) var(--sp-4);
+    border-color: transparent;
+    background: transparent;
+    text-align: center;
+    scroll-snap-align: start;
+  }
+
+  .friend .avatar--sm {
+    width: 56px;
+    height: 56px;
+    font-size: var(--fs-lead);
+  }
+
+  .friend--live .avatar--sm {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .friend__text {
+    flex: none;
+    width: 100%;
+    gap: 0;
+  }
+
+  .friend__name {
+    font-size: var(--fs-micro);
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-align: center;
+  }
+
+  /* Состояние («в сети») читается контуром аватара, а подпись и значок
+     прямого канала в клетке 84px только резались бы многоточием: и то и
+     другое видно в окне друга. */
+  .friend__state,
+  .friend__link,
+  .friend .dot {
+    display: none;
+  }
+
+  /* Счётчик непрочитанного — на углу аватара, а не третьей строкой. */
+  .friend .badge--inline {
+    position: absolute;
+    top: var(--sp-4);
+    right: var(--sp-8);
   }
 
   .rail__foot {
@@ -1378,14 +1650,20 @@ a {
 
   .footer {
     justify-content: center;
-    /* Безопасную зону телефона не теряем: под подвалом может быть
-       системная полоса, и текст не должен в неё уезжать. */
-    padding-block: var(--sp-12) max(var(--sp-12), env(safe-area-inset-bottom));
+    /* Нижнюю безопасную зону телефона держит каркас: под подвалом теперь
+       панель навигации, а уже под ней — системная полоса жестов. */
+    padding-block: var(--sp-12);
     font-size: 9px;
     letter-spacing: 0.12em;
   }
 
-  .footer span:first-child {
+  /* Тосты не должны падать на панель навигации: поднимаем их над ней. */
+  .toast-stack {
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--sp-16));
+  }
+
+  .footer span:first-child,
+  .footer__keys {
     display: none;
   }
 }
@@ -1409,12 +1687,13 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hero-stat--wide {
-    grid-column: 1 / -1;
-  }
-
-  .footer__hint {
-    display: none;
+  /* iOS приближает страницу, если в поле под курсором текст меньше 16px,
+     и обратно сама не отъезжает: после входа в аккаунт меню оставалось
+     увеличенным. На телефоне все поля — 16px, на ПК шкала не меняется. */
+  .input,
+  textarea.input,
+  select.input {
+    font-size: 16px;
   }
 }
 
@@ -2362,8 +2641,8 @@ input[type='search']::-webkit-search-cancel-button {
 .toast-stack {
   position: fixed;
   z-index: 60;
-  left: var(--pad-x);
-  bottom: max(var(--sp-16), env(safe-area-inset-bottom));
+  left: max(var(--pad-x), var(--safe-left));
+  bottom: max(var(--sp-16), var(--safe-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--sp-8);
@@ -4230,6 +4509,69 @@ button.admin-file-row--active:hover {
 
   .admin-page-intro {
     align-items: flex-start;
+  }
+}
+
+/* ---------- Окна на телефоне: лист у нижнего края --------------
+   Правило стоит после размеров админ-панели (блок 720px), поэтому
+   лист побеждает и там. На телефоне окно приезжает снизу, а не
+   висит в середине: до кнопок действий большим пальцем дотянуться
+   проще, и системная полоса жестов не налезает на подвал окна. */
+@keyframes sheet-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(28px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .overlay {
+    align-items: end;
+    padding: var(--sp-8) var(--sp-8) max(var(--sp-8), var(--safe-bottom));
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  }
+
+  /* Лист выезжает снизу пружиной и чуть проскакивает вверх — так окно
+     кажется физическим, а не нарисованным. Только не у уже открытого окна:
+     при обновлении содержимого (`data-static`) въезжать заново не надо. */
+  .dialog:not([data-static]) {
+    animation: sheet-in 360ms var(--ease-spring);
+  }
+
+  /* Кнопки в окне дают отклик нажатием — тем же приседанием, что и пункты
+     нижней панели. */
+  .dialog__actions > button:active,
+  .dialog .mini-button:active {
+    transform: scale(0.97);
+  }
+
+  /* Админ-панель — тот же лист, а не «почти весь экран» с пустым
+     зазором сверху. */
+  .dialog--admin {
+    height: auto;
+    max-height: 88dvh;
+  }
+
+  .dialog__actions {
+    align-items: stretch;
+    gap: var(--sp-8);
+  }
+
+  /* Кнопки действий делят ширину окна: их ловят пальцем, а не курсором,
+     и узкая «Отмена» рядом с широкой основной кнопкой — промах. */
+  .dialog__actions > button {
+    flex: 1;
+    justify-content: center;
   }
 }
 

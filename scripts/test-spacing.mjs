@@ -213,18 +213,120 @@ family('блоки с рамкой: одна плотность --box-pad', [
 ]);
 
 add(
-  declared('.rail__head', 'height') === 'var(--bar-h)',
+  declared('.rail__head', 'height') === declared('.shell', 'grid-template-rows')?.split(' ')[0],
   'шапка панели друзей той же высоты, что верхняя панель',
-  declared('.rail__head', 'height') ?? '—',
+  `${declared('.rail__head', 'height') ?? '—'} / первая строка каркаса: ${declared('.shell', 'grid-template-rows')?.split(' ')[0] ?? '—'}`,
 );
 
-/* Телефонная вёрстка не должна терять безопасную зону: под подвалом
-   бывает системная полоса, а с `padding-block: 12px` текст уезжает в неё. */
-const footerMobile = declared('.footer', 'padding-block', '@media (max-width: 860px)');
+/* Управление на телефоне — снизу, как в мессенджерах: панель прибита к
+   нижнему краю и не уезжает вместе со страницей, а каркас закладывает под
+   неё место вместе с полосой жестов — иначе последние строки контента
+   прячутся за панелью. */
+const shellMobilePad = declared('.shell', 'padding-bottom', '@media (max-width: 860px)');
 add(
-  Boolean(footerMobile && footerMobile.includes('env(safe-area-inset-bottom)')),
-  'на телефоне подвал учитывает безопасную зону экрана',
-  footerMobile ?? '—',
+  Boolean(shellMobilePad && /var\(--tabbar-h\)/.test(shellMobilePad) && /var\(--safe-bottom\)/.test(shellMobilePad)),
+  'каркас телефона оставляет место под нижнюю панель и полосу жестов',
+  shellMobilePad ?? '—',
+);
+add(
+  declared('.sidenav', 'position', '@media (max-width: 860px)') === 'fixed'
+    && declared('.sidenav', 'bottom', '@media (max-width: 860px)') === '0',
+  'на телефоне навигация прибита к нижнему краю экрана',
+  `position: ${declared('.sidenav', 'position', '@media (max-width: 860px)') ?? '—'}, bottom: ${declared('.sidenav', 'bottom', '@media (max-width: 860px)') ?? '—'}`,
+);
+add(
+  /var\(--tabbar-h\)/.test(declared('.sidenav', 'height', '@media (max-width: 860px)') ?? ''),
+  'высота нижней панели задана токеном, а не полями на глаз',
+  declared('.sidenav', 'height', '@media (max-width: 860px)') ?? '—',
+);
+
+/* Безопасные зоны объявлены токенами, чтобы каждый экран не писал env()
+   заново: раньше нижнюю зону помнил только подвал, а шапка в PWA на
+   телефоне уходила под системную строку. */
+const safeTokens = ['--safe-top', '--safe-bottom', '--safe-left', '--safe-right'];
+const missingSafe = safeTokens.filter((name) => !/env\(safe-area-inset/.test(tokenValue(name) ?? ''));
+add(
+  missingSafe.length === 0 && /var\(--bar-h\)/.test(tokenValue('--bar-h-safe') ?? '') && /var\(--safe-top\)/.test(tokenValue('--bar-h-safe') ?? ''),
+  'безопасные зоны экрана объявлены токенами, высота шапки считает верхнюю зону',
+  missingSafe.length ? `нет токенов: ${missingSafe.join(', ')}` : `${tokenValue('--bar-h-safe')}`,
+);
+
+/* Верхняя панель обязана отступать на верхнюю безопасную зону, иначе в PWA
+   на телефоне её содержимое ложится под системную строку и «чёлку». */
+add(
+  declared('.topbar', 'padding-top') === 'var(--safe-top)',
+  'шапка отступает от верхнего края экрана в PWA',
+  declared('.topbar', 'padding-top') ?? '—',
+);
+
+/* ---------- 5. вёрстка для пальца ------------------------------ */
+
+/* На телефоне поля ввода не меньше 16px: iOS приближает страницу при
+   фокусе меньшего текста и обратно сама не отъезжает. */
+const phoneInputs = rules
+  .filter((rule) => rule.scope === '@media (max-width: 680px)' && rule.selector.includes('.input'))
+  .flatMap((rule) => declarations(rule.body))
+  .filter((decl) => decl.prop === 'font-size');
+add(
+  phoneInputs.length > 0 && phoneInputs.every((decl) => parseFloat(decl.value) >= 16),
+  'на телефоне поля ввода не меньше 16px (iOS не увеличивает страницу)',
+  phoneInputs.map((decl) => decl.value).join(', ') || '—',
+);
+
+/* Значок без слова на телефоне не читается, а «Настройки» живут в подвале
+   навигации: спрячь его — и до настроек на телефоне не добраться. */
+const phoneNavText = declared('.sidenav__text', 'display', '@media (max-width: 860px)');
+const phoneNavShort = declared('.sidenav__short', 'display', '@media (max-width: 860px)');
+const phoneNavFoot = declared('.sidenav__foot', 'display', '@media (max-width: 860px)');
+add(
+  phoneNavText !== 'none' && phoneNavShort === 'block',
+  'на телефоне у пунктов навигации остаётся подпись',
+  `подпись: ${phoneNavShort ?? 'не задана'}, контейнер: ${phoneNavText ?? 'не задан'}`,
+);
+add(
+  phoneNavFoot !== 'none',
+  'на телефоне «Настройки» остаются в навигации',
+  `display: ${phoneNavFoot ?? 'не задан'}`,
+);
+
+/* Главный экран телефона выровнен по центру: печать, заголовок, девиз и
+   плитки сводки не прижаты к левому краю, а «Друзья» стоят посередине
+   строки (кнопка «добавить» при этом остаётся справа). */
+const phoneCentered = [
+  ['.hero', 'text-align', 'center'],
+  ['.hero', 'align-items', 'center'],
+  ['.hero-stat', 'text-align', 'center'],
+  ['.rail__heading', 'justify-content', 'center'],
+  ['.stage__inner', 'justify-content', 'center'],
+];
+const offCenter = phoneCentered.filter(
+  ([selector, prop, expected]) => declared(selector, prop, '@media (max-width: 860px)') !== expected,
+);
+add(
+  offCenter.length === 0,
+  'на телефоне главный экран отцентрован',
+  offCenter.length
+    ? offCenter.map(([selector, prop]) => `${selector} { ${prop}: ${declared(selector, prop, '@media (max-width: 860px)') ?? '—'} }`).join('; ')
+    : 'витрина, сводка и заголовок друзей',
+);
+
+/* Друзья на телефоне — над витриной: кто в сети, видно сразу, без
+   прокрутки мимо заголовка. */
+const phoneAreas = declared('.shell', 'grid-template-areas', '@media (max-width: 860px)') ?? '';
+add(
+  phoneAreas.includes('rail') && phoneAreas.indexOf('rail') < phoneAreas.indexOf('stage'),
+  'на телефоне панель друзей стоит над витриной',
+  phoneAreas.replace(/\s+/g, ' ').trim(),
+);
+
+/* Нижняя панель уезжает при прокрутке переходом, а не перерисовкой
+   разметки: класс ставит main.js, а гасит движение motionOff(). */
+const tabbarTransition = declared('.sidenav', 'transition', '@media (max-width: 860px)') ?? '';
+const tabbarHidden = declared('.sidenav--hidden', 'transform', '@media (max-width: 860px)');
+add(
+  tabbarTransition.includes('transform') && tabbarHidden === 'translateY(100%)',
+  'нижняя панель прячется при прокрутке переходом',
+  `${tabbarHidden ?? '—'} за ${tabbarTransition || '—'}`,
 );
 
 /* ---------- 4. структурные дубли ----------------------------------- */

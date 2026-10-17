@@ -12,6 +12,7 @@ import {
 import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
+import { motionOff, motionQuery } from './ui/motion.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -147,9 +148,47 @@ let renderedModalHtml = '';
 
 const overlayRoot = () => document.querySelector('#overlay-root');
 
+/* ---------- нижняя панель: уезжает при прокрутке ------------------
+   Механика ленты Telegram: листаешь вниз — панель прячется и не закрывает
+   содержимое, листаешь вверх или возвращаешься к началу — выезжает обратно.
+   Движение здесь решает код, а не CSS, поэтому на каждом событии спрашиваем
+   `motionOff()`: тумблер «Анимации» и системная настройка обязаны гасить и
+   его (см. src/ui/motion.js). За открытым окном панель не прячем — она и так
+   под затемнением, а после закрытия должна быть на месте. */
+const MOTION_QUERY = motionQuery();
+const TAB_HIDE_AFTER = 120; // у самого верха панель нужна: там друзья
+const TAB_SCROLL_STEP = 8; // дрожание пальца за прокрутку не считаем
+let tabbarHidden = false;
+let tabbarScrollY = 0;
+
+const setTabbarHidden = (hidden) => {
+  if (tabbarHidden === hidden) return;
+  tabbarHidden = hidden;
+  document.querySelector('.sidenav')?.classList.toggle('sidenav--hidden', hidden);
+};
+
+document.addEventListener(
+  'scroll',
+  (event) => {
+    if (ui.modal || motionOff(MOTION_QUERY)) {
+      setTabbarHidden(false);
+      return;
+    }
+    const y = event.target === document ? window.scrollY : event.target.scrollTop ?? 0;
+    const step = y - tabbarScrollY;
+    tabbarScrollY = y;
+    if (Math.abs(step) < TAB_SCROLL_STEP) return;
+    setTabbarHidden(step > 0 && y > TAB_HIDE_AFTER);
+  },
+  /* Прокрутка не всплывает, поэтому слушаем в фазе перехвата: так видно и
+     прокрутку страницы, и прокрутку отдельных лент внутри неё. */
+  { capture: true, passive: true },
+);
+
 const openModal = (type, data = null) => {
   ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   ui.modal = { type, data };
+  setTabbarHidden(false);
   playSound('open');
   renderModal();
 };
@@ -2804,50 +2843,89 @@ const partyNavState = () => {
   return { hint: 'Создать комнату и позвать друзей', badge: 0 };
 };
 
+/* Сочетания клавиш разделов: на ПК меню открывается с клавиатуры, не уводя
+   руку с верхнего ряда. Цифры проверяются по `code` (см. обработчик ниже),
+   поэтому сочетание работает и на русской раскладке. Подпись пункта на
+   планшете и в полосе телефона спрятана, поэтому имя кнопки дублируется в
+   aria-label: без него с экрана читается пустая кнопка. */
+const NAV_HOTKEYS = [
+  { code: 'Digit1', label: 'Alt + 1', action: 'open-parties' },
+  { code: 'Digit2', label: 'Alt + 2', action: 'open-hub' },
+  { code: 'Digit3', label: 'Alt + 3', action: 'open-direct' },
+  { code: 'Digit4', label: 'Alt + 4', action: 'open-settings' },
+];
+
+const navHotkey = (action) => NAV_HOTKEYS.find((item) => item.action === action)?.label ?? '';
+
+/* Доступное имя пункта: название, состояние и счётчик приглашений —
+   всё, что видно глазами на широком экране. */
+const navAriaLabel = ({ title, hint, badge = 0, badgeLabel = 'Новых заявок' }) =>
+  [`${title} — ${hint}`, badge ? `${badgeLabel}: ${badge}` : ''].filter(Boolean).join(' · ');
+
 const sidenavHtml = () => {
   const { hub } = menuCounts();
   const party = partyNavState();
+  /* `short` — подпись пункта для нижней панели телефона: полное название
+     «Прямое подключение» в клетку 72px не влезает, а значок без слова не
+     читается. Доступное имя кнопки от подписи не зависит — оно в aria-label. */
   const items = [
     {
       glyph: 'dices',
       title: 'Партии',
+      short: 'Партии',
       hint: party.hint,
       action: 'open-parties',
       badge: party.badge,
       badgeLabel: 'Новых приглашений в партии',
       modifier: 'sidenav__item--main',
     },
-    { glyph: 'globe', title: 'Общий хаб', hint: hub, action: 'open-hub' },
+    { glyph: 'globe', title: 'Общий хаб', short: 'Хаб', hint: hub, action: 'open-hub' },
     {
       glyph: 'link',
       title: 'Прямое подключение',
+      short: 'Напрямую',
       hint: 'Без сервера · обмен кодами',
       action: 'open-direct',
     },
   ];
   return `
     <div class="sidenav__list" role="list">
-      ${items.map(({ glyph, title, hint, action, badge = 0, badgeLabel = 'Новых заявок', modifier = '' }) => `
-        <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}">
+      ${items.map((item) => {
+        const { glyph, title, short, action, badge = 0, modifier = '' } = item;
+        const hotkey = navHotkey(action);
+        return `
+        <button class="sidenav__item${modifier ? ` ${modifier}` : ''}" type="button" role="listitem" data-action="${action}"
+                aria-label="${escapeHtml(navAriaLabel(item))}"${hotkey ? ` title="${escapeHtml(`${title} — ${hotkey}`)}"` : ''}>
           <span class="sidenav__icon">${icon(glyph)}</span>
-          <span class="sidenav__text"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(hint)}</small></span>
-          ${badge ? `<span class="sidenav__badge" aria-label="${badgeLabel}: ${badge}">${badge}</span>` : ''}
-        </button>`).join('')}
+          <span class="sidenav__text">
+            <strong>${escapeHtml(title)}</strong>
+            <span class="sidenav__short" aria-hidden="true">${escapeHtml(short)}</span>
+            <small>${escapeHtml(item.hint)}</small>
+          </span>
+          ${badge ? `<span class="sidenav__badge" aria-hidden="true">${badge}</span>` : ''}
+        </button>`;
+      }).join('')}
     </div>
     <div class="sidenav__foot">
-      <button class="sidenav__item" type="button" data-action="open-settings">
+      <button class="sidenav__item" type="button" data-action="open-settings"
+              aria-label="${escapeHtml(navAriaLabel({ title: 'Настройки', hint: 'Звук, анимации, обновления' }))}"
+              title="${escapeHtml(`Настройки — ${navHotkey('open-settings')}`)}">
         <span class="sidenav__icon">${icon('settings')}</span>
-        <span class="sidenav__text"><strong>Настройки</strong><small>Звук, анимации, обновления</small></span>
+        <span class="sidenav__text">
+          <strong>Настройки</strong>
+          <span class="sidenav__short" aria-hidden="true">Настройки</span>
+          <small>Звук, анимации, обновления</small>
+        </span>
       </button>
     </div>`;
 };
 
 const stageMenuHtml = () => {
-  const { me, friends, online, hub } = menuCounts();
+  const { me, friends, online } = menuCounts();
+  if (!me) return '';
   return `
-    <div class="hero__stats" aria-label="Сводка">
-      <span class="hero-stat"><strong>${me ? online : '—'}${me ? `<i>/${friends.length}</i>` : ''}</strong><small>друзей в сети</small></span>
-      <span class="hero-stat hero-stat--wide"><strong class="hero-stat__hub">${escapeHtml(backendReady ? (store.isHub() ? 'Хаб' : 'Локально') : '…')}</strong><small>${escapeHtml(hub)}</small></span>
+    <div class="hero__stats hero__stats--friends-only" aria-label="Сводка">
+      <span class="hero-stat hero-stat--friends"><strong>${online}<i>/${friends.length}</i></strong><small>друзей в сети</small></span>
     </div>`;
 };
 
@@ -2937,6 +3015,13 @@ const railHtml = () => {
   const friends = store.listFriends(me.id);
   const requests = store.incomingRequests(me.id);
   const online = friends.filter((f) => store.presenceOf(f) !== 'offline').length;
+  /* Кто в сети — первые, дальше по имени. На телефоне лента друзей
+     листается пальцем, и те, с кем можно говорить прямо сейчас, должны
+     попадаться сразу, а не после прокрутки. */
+  const presenceRank = (friend) => (store.presenceOf(friend) === 'offline' ? 1 : 0);
+  const ordered = [...friends].sort(
+    (a, b) => presenceRank(a) - presenceRank(b) || a.name.localeCompare(b.name, 'ru'),
+  );
 
   return `
     <div class="rail__head">
@@ -2962,8 +3047,8 @@ const railHtml = () => {
           : ''
       }
       ${
-        friends.length
-          ? friends.map(friendRowHtml).join('')
+        ordered.length
+          ? ordered.map(friendRowHtml).join('')
           : `<div class="empty">
               <p class="empty__title">Пока пусто</p>
               <p class="empty__text">Нажмите на значок «+» в шапке панели или поделитесь своим код-приглашением ниже.</p>
@@ -3023,6 +3108,7 @@ document.querySelector('#app').innerHTML = `
     <footer class="footer">
       <span>Версия ${VERSION}</span>
       <span class="footer__hint">Партии · друзья · общий хаб · прямая связь</span>
+      <span class="footer__keys"><kbd>Alt</kbd> + <kbd>1…4</kbd> — разделы · <kbd>Esc</kbd> — закрыть окно</span>
       <span class="footer__name" lang="en" translate="no">© 2026 ${TITLE_FULL}</span>
     </footer>
 
@@ -4876,6 +4962,17 @@ document.addEventListener('keydown', (event) => {
   if (!(event.ctrlKey && event.shiftKey && event.altKey && event.code === 'KeyA')) return;
   event.preventDefault();
   openAdminGate();
+});
+
+/* Alt + 1…4 — разделы навигации: на ПК до пунктов меню можно не тянуться
+   мышью. Сочетание не работает, пока открыто окно: переключать раздел за
+   диалогом — значит потерять несохранённое, сначала Esc. */
+document.addEventListener('keydown', (event) => {
+  if (ui.modal || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const hit = NAV_HOTKEYS.find((item) => item.code === event.code);
+  if (!hit) return;
+  event.preventDefault();
+  actions[hit.action]?.();
 });
 
 document.addEventListener('keydown', (event) => {

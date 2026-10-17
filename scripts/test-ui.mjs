@@ -252,12 +252,16 @@ try {
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
+  'гостю не показываются пустые карточки сводки',
+  !$('.hero__stats') && !$('.hero-stat--wide') && !$('.hero-stat__hub'),
+  $('.stage-menu')?.textContent?.replace(/\s+/g, ' ').trim() || 'главный экран без карточек хаба и друзей',
+);
+ok(
   'главное меню: партии, хаб, прямое подключение и настройки без игровых разделов',
   $$('[data-action="open-hub"]').length === 1
     && $$('[data-action="open-direct"]').length === 1
     && $$('[data-action="open-settings"]').length === 1
     && $$('.sidenav__item').length === 4
-    && !!$('.hero__stats')
     && !$('[data-action^="open-world"]')
     && !$('.play-button'),
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
@@ -285,6 +289,81 @@ ok(
     && ($('.sidenav__item--main .sidenav__text strong')?.textContent || '') === 'Партии',
   $('.sidenav__item--main .sidenav__text small')?.textContent?.trim(),
 );
+
+/* Пункты навигации читаются и без подписи: на планшете и в полосе телефона
+   её прячет CSS, а вместе с `display: none` из дерева доступности пропадает
+   и имя кнопки. Поэтому имя — в aria-label, а сочетание клавиш — в подсказке. */
+ok(
+  'у каждого пункта навигации есть доступное имя и подсказка о клавише',
+  navItems.length === 4
+    && navItems.every((item) => (item.getAttribute('aria-label') || '').trim().length > 3)
+    && (navItems[0].getAttribute('aria-label') || '').startsWith('Партии —')
+    && navItems.map((item) => item.getAttribute('title')).join(' · ')
+      === 'Партии — Alt + 1 · Общий хаб — Alt + 2 · Прямое подключение — Alt + 3 · Настройки — Alt + 4',
+  navItems.map((item) => item.getAttribute('aria-label')).join(' | ').slice(0, 140),
+);
+
+/* На телефоне пункты живут в нижней панели, и полное название («Прямое
+   подключение») в клетку 72px не влезает: у каждого пункта есть короткая
+   подпись. Доступное имя от неё не зависит — оно в aria-label. */
+const navShorts = navItems.map((item) => item.querySelector('.sidenav__short')?.textContent?.trim() || '');
+ok(
+  'у каждого пункта навигации есть короткая подпись для нижней панели',
+  navShorts.length === 4 && navShorts.every((label) => label.length > 1 && label.length <= 10),
+  navShorts.join(' · '),
+);
+
+ok(
+  'подвал подсказывает сочетания клавиш (на телефоне строка спрятана)',
+  /Alt/.test($('.footer__keys')?.textContent || '') && /Esc/.test($('.footer__keys')?.textContent || ''),
+  $('.footer__keys')?.textContent?.replace(/\s+/g, ' ').trim(),
+);
+
+/* Разделы открываются с клавиатуры: Alt + цифра (по `code`, чтобы работало
+   и на русской раскладке), Esc закрывает, а за открытым окном разделы не
+   переключаются — иначе несохранённое в окне теряется молча. */
+const pressKey = (code, init = {}) =>
+  window.document.dispatchEvent(
+    new window.KeyboardEvent('keydown', { code, key: code, bubbles: true, cancelable: true, ...init }),
+  );
+
+pressKey('Digit2', { altKey: true });
+await wait(120);
+ok('Alt + 2 открывает общий хаб с клавиатуры', $('.dialog__title')?.textContent === 'Общий хаб', $('.dialog__title')?.textContent?.trim());
+pressKey('Escape');
+await wait(60);
+ok('Esc закрывает окно, открытое с клавиатуры', !$('.dialog'));
+pressKey('Digit4', { altKey: true });
+await wait(80);
+ok('Alt + 4 открывает настройки с клавиатуры', $('.dialog__title')?.textContent === 'Настройки', $('.dialog__title')?.textContent?.trim());
+pressKey('Digit1', { altKey: true });
+await wait(80);
+ok('пока окно открыто, сочетания разделов не работают', $('.dialog__title')?.textContent === 'Настройки');
+pressKey('Escape');
+await wait(60);
+ok('окно закрыто, меню на месте', !$('.dialog') && !!$('.shell'));
+
+/* Механика ленты: листаешь вниз — нижняя панель уезжает, вверх — возвращается.
+   Движение здесь решает код, поэтому тумблер «Анимации» обязан его гасить:
+   проверяем и прокрутку, и выключенное движение. */
+const tabbar = $('[data-region="sidenav"]');
+const scrollTo = (y) => {
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+  window.document.dispatchEvent(new window.Event('scroll'));
+};
+scrollTo(600);
+await wait(20);
+ok('при прокрутке вниз нижняя панель уезжает', tabbar.classList.contains('sidenav--hidden'));
+scrollTo(200);
+await wait(20);
+ok('при прокрутке вверх панель возвращается', !tabbar.classList.contains('sidenav--hidden'));
+window.document.documentElement.classList.add('reduce-motion');
+scrollTo(900);
+await wait(20);
+ok('с выключенными анимациями панель не прячется', !tabbar.classList.contains('sidenav--hidden'));
+window.document.documentElement.classList.remove('reduce-motion');
+scrollTo(0);
+await wait(20);
 
 /* Без аккаунта комнаты не открыть: окно честно говорит об этом и ведёт
    на вход вместо пустой комнаты с нерабочими кнопками. */
@@ -407,6 +486,11 @@ const registered = await registerWithRetry({
 });
 
 ok('аккаунт создан на хабе', registered, $('.profile')?.textContent?.trim() || $('[data-role="form-error"]')?.textContent?.trim());
+ok(
+  'после входа счётчик друзей снова показывается',
+  registered && !!$('.hero-stat--friends') && $('.hero-stat--friends')?.textContent?.includes('/'),
+  $('.hero-stat--friends')?.textContent?.replace(/\s+/g, ' ').trim() || 'счётчик не найден',
+);
 click('[data-action="open-profile"]');
 await wait(200);
 ok('в профиле виден адрес хаба', new RegExp(`Хаб ${new URL(HUB).host}`.replace(/\./g, '\\.')).test($('.account__meta')?.textContent || ''), $('.account__meta')?.textContent?.trim());
