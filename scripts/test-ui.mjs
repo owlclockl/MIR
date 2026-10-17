@@ -339,6 +339,28 @@ pressKey('Escape');
 await wait(60);
 ok('окно закрыто, меню на месте', !$('.dialog') && !!$('.shell'));
 
+/* Механика ленты: листаешь вниз — нижняя панель уезжает, вверх — возвращается.
+   Движение здесь решает код, поэтому тумблер «Анимации» обязан его гасить:
+   проверяем и прокрутку, и выключенное движение. */
+const tabbar = $('[data-region="sidenav"]');
+const scrollTo = (y) => {
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+  window.document.dispatchEvent(new window.Event('scroll'));
+};
+scrollTo(600);
+await wait(20);
+ok('при прокрутке вниз нижняя панель уезжает', tabbar.classList.contains('sidenav--hidden'));
+scrollTo(200);
+await wait(20);
+ok('при прокрутке вверх панель возвращается', !tabbar.classList.contains('sidenav--hidden'));
+window.document.documentElement.classList.add('reduce-motion');
+scrollTo(900);
+await wait(20);
+ok('с выключенными анимациями панель не прячется', !tabbar.classList.contains('sidenav--hidden'));
+window.document.documentElement.classList.remove('reduce-motion');
+scrollTo(0);
+await wait(20);
+
 /* Без аккаунта комнаты не открыть: окно честно говорит об этом и ведёт
    на вход вместо пустой комнаты с нерабочими кнопками. */
 click('[data-action="open-parties"]');

@@ -12,6 +12,7 @@ import {
 import { icon } from './ui/icons.js';
 import { copyText, escapeHtml, formatDate, nameHue, toast } from './ui/dom.js';
 import { configureSounds, playSound } from './ui/sound.js';
+import { motionOff, motionQuery } from './ui/motion.js';
 
 /* Название игры. Разбито на две строки — так оно читается и в шапке, и в заголовке. */
 const TITLE = { lead: 'The civilization', tail: 'of the sages' };
@@ -147,9 +148,47 @@ let renderedModalHtml = '';
 
 const overlayRoot = () => document.querySelector('#overlay-root');
 
+/* ---------- нижняя панель: уезжает при прокрутке ------------------
+   Механика ленты Telegram: листаешь вниз — панель прячется и не закрывает
+   содержимое, листаешь вверх или возвращаешься к началу — выезжает обратно.
+   Движение здесь решает код, а не CSS, поэтому на каждом событии спрашиваем
+   `motionOff()`: тумблер «Анимации» и системная настройка обязаны гасить и
+   его (см. src/ui/motion.js). За открытым окном панель не прячем — она и так
+   под затемнением, а после закрытия должна быть на месте. */
+const MOTION_QUERY = motionQuery();
+const TAB_HIDE_AFTER = 120; // у самого верха панель нужна: там друзья
+const TAB_SCROLL_STEP = 8; // дрожание пальца за прокрутку не считаем
+let tabbarHidden = false;
+let tabbarScrollY = 0;
+
+const setTabbarHidden = (hidden) => {
+  if (tabbarHidden === hidden) return;
+  tabbarHidden = hidden;
+  document.querySelector('.sidenav')?.classList.toggle('sidenav--hidden', hidden);
+};
+
+document.addEventListener(
+  'scroll',
+  (event) => {
+    if (ui.modal || motionOff(MOTION_QUERY)) {
+      setTabbarHidden(false);
+      return;
+    }
+    const y = event.target === document ? window.scrollY : event.target.scrollTop ?? 0;
+    const step = y - tabbarScrollY;
+    tabbarScrollY = y;
+    if (Math.abs(step) < TAB_SCROLL_STEP) return;
+    setTabbarHidden(step > 0 && y > TAB_HIDE_AFTER);
+  },
+  /* Прокрутка не всплывает, поэтому слушаем в фазе перехвата: так видно и
+     прокрутку страницы, и прокрутку отдельных лент внутри неё. */
+  { capture: true, passive: true },
+);
+
 const openModal = (type, data = null) => {
   ui.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   ui.modal = { type, data };
+  setTabbarHidden(false);
   playSound('open');
   renderModal();
 };
@@ -2976,6 +3015,13 @@ const railHtml = () => {
   const friends = store.listFriends(me.id);
   const requests = store.incomingRequests(me.id);
   const online = friends.filter((f) => store.presenceOf(f) !== 'offline').length;
+  /* Кто в сети — первые, дальше по имени. На телефоне лента друзей
+     листается пальцем, и те, с кем можно говорить прямо сейчас, должны
+     попадаться сразу, а не после прокрутки. */
+  const presenceRank = (friend) => (store.presenceOf(friend) === 'offline' ? 1 : 0);
+  const ordered = [...friends].sort(
+    (a, b) => presenceRank(a) - presenceRank(b) || a.name.localeCompare(b.name, 'ru'),
+  );
 
   return `
     <div class="rail__head">
@@ -3001,8 +3047,8 @@ const railHtml = () => {
           : ''
       }
       ${
-        friends.length
-          ? friends.map(friendRowHtml).join('')
+        ordered.length
+          ? ordered.map(friendRowHtml).join('')
           : `<div class="empty">
               <p class="empty__title">Пока пусто</p>
               <p class="empty__text">Нажмите на значок «+» в шапке панели или поделитесь своим код-приглашением ниже.</p>

@@ -140,6 +140,10 @@
   --fs-lead: 16px;
 
   --ease: cubic-bezier(0.3, 0.8, 0.3, 1);
+  /* Пружина: элемент проскакивает цель и возвращается, как панель и
+     иконки в новых клиентах Telegram. Только для коротких откликов на
+     нажатие и появления окон — на длинных переходах покачивание мешает. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   font-family: var(--font-ui);
   font-synthesis: none;
@@ -1341,11 +1345,14 @@ a {
      заезжает и не прячется за ней. */
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--bar-h-safe) minmax(0, 1fr) auto auto;
+    grid-template-rows: var(--bar-h-safe) auto minmax(0, 1fr) auto;
+    /* Друзья — над витриной: кто в сети, видно сразу, без прокрутки
+       мимо заголовка. Порядок как в ленте мессенджера: люди сверху,
+       витрина под ними. */
     grid-template-areas:
       'topbar'
-      'stage'
       'rail'
+      'stage'
       'footer';
     padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
   }
@@ -1374,6 +1381,13 @@ a {
     /* Полоса прокрутки в навигации — шум: пункты и так влезают в экран,
        а листается панель пальцем. */
     scrollbar-width: none;
+    /* Панель уезжает и возвращается плавно: класс ставит main.js по
+       направлению прокрутки (и не ставит вовсе, если движение выключено). */
+    transition: transform 280ms var(--ease);
+  }
+
+  .sidenav--hidden {
+    transform: translateY(100%);
   }
 
   .sidenav::-webkit-scrollbar {
@@ -1388,24 +1402,60 @@ a {
   }
 
   .sidenav__item {
+    position: relative;
     flex: 1 0 72px;
     flex-direction: column;
     justify-content: center;
     gap: var(--sp-2);
     max-width: 132px;
     padding: var(--sp-4) var(--sp-6);
+    border-radius: var(--radius-md);
+    /* Площадка пункта — «пилюля»: подсветка нажатия со скруглением, как у
+       вкладок в новых клиентах Telegram. Касание возвращается пружиной. */
+    transition:
+      background-color var(--dur) var(--ease),
+      transform 320ms var(--ease-spring);
     scroll-snap-align: start;
+    overflow: hidden;
   }
 
   /* Отклик на нажатие: на телефоне нет наведения, и палец должен видеть,
-     что пункт пойман. */
+     что пункт пойман. Пункт приседает и возвращается пружиной. */
   .sidenav__item:active {
     background: var(--fill-active);
+    transform: scale(0.93);
+    transition-duration: 90ms;
+  }
+
+  /* Круг от точки касания расходится по площадке — чистый CSS, без скриптов:
+     при нажатии вспышка появляется почти сразу, а гаснет медленно. */
+  .sidenav__item::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.2), transparent 68%);
+    opacity: 0;
+    transition: opacity 420ms var(--ease);
+    pointer-events: none;
+  }
+
+  .sidenav__item:active::after {
+    opacity: 1;
+    transition-duration: 60ms;
   }
 
   .sidenav__icon {
     width: 24px;
     height: 24px;
+    /* Иконка пружинит отдельно от площадки: так нажатие читается живее. */
+    transition:
+      transform 360ms var(--ease-spring),
+      color var(--dur) var(--ease);
+  }
+
+  .sidenav__item:active .sidenav__icon {
+    transform: scale(0.86);
+    color: var(--accent-strong);
   }
 
   /* Подпись пункта обязательна (на планшете её прячет блок 1000px), но
@@ -1490,7 +1540,9 @@ a {
 
   .rail {
     border-left: 0;
-    border-top: 1px solid var(--line);
+    /* Панель друзей теперь над витриной, поэтому линия — под ней. */
+    border-top: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   /* Заголовок «Друзья» — по центру строки, кнопка «добавить» остаётся
@@ -1525,7 +1577,8 @@ a {
 
   .rail__list {
     flex-direction: row;
-    gap: var(--sp-6);
+    gap: var(--sp-10);
+    padding-block: var(--sp-12);
     overflow-x: auto;
     overflow-y: hidden;
     /* Лента друзей листается пальцем и досылается до карточки,
@@ -1533,13 +1586,60 @@ a {
     scroll-snap-type: x proximity;
   }
 
-  /* Растягиваются на всю ширину, а при нехватке места — горизонтальная прокрутка. */
+  /* Карточка друга на телефоне — клетка ленты, как в мессенджере: крупный
+     аватар, имя под ним. Кто в сети — первыми (сортировка в railHtml) и с
+     фирменным контуром вокруг аватара. */
   .friend {
-    flex: 1 0 168px;
-    width: auto;
-    border-color: var(--line);
-    background: var(--fill);
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-6);
+    width: 84px;
+    padding: var(--sp-8) var(--sp-4);
+    border-color: transparent;
+    background: transparent;
+    text-align: center;
     scroll-snap-align: start;
+  }
+
+  .friend .avatar--sm {
+    width: 56px;
+    height: 56px;
+    font-size: var(--fs-lead);
+  }
+
+  .friend--live .avatar--sm {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .friend__text {
+    flex: none;
+    width: 100%;
+    gap: 0;
+  }
+
+  .friend__name {
+    font-size: var(--fs-micro);
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-align: center;
+  }
+
+  /* Состояние («в сети») читается контуром аватара, а подпись и значок
+     прямого канала в клетке 84px только резались бы многоточием: и то и
+     другое видно в окне друга. */
+  .friend__state,
+  .friend__link,
+  .friend .dot {
+    display: none;
+  }
+
+  /* Счётчик непрочитанного — на углу аватара, а не третьей строкой. */
+  .friend .badge--inline {
+    position: absolute;
+    top: var(--sp-4);
+    right: var(--sp-8);
   }
 
   .rail__foot {
@@ -4419,6 +4519,18 @@ button.admin-file-row--active:hover {
    лист побеждает и там. На телефоне окно приезжает снизу, а не
    висит в середине: до кнопок действий большим пальцем дотянуться
    проще, и системная полоса жестов не налезает на подвал окна. */
+@keyframes sheet-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(28px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (max-width: 680px) {
   .overlay {
     align-items: end;
@@ -4429,6 +4541,20 @@ button.admin-file-row--active:hover {
     width: 100%;
     max-height: 88dvh;
     border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  }
+
+  /* Лист выезжает снизу пружиной и чуть проскакивает вверх — так окно
+     кажется физическим, а не нарисованным. Только не у уже открытого окна:
+     при обновлении содержимого (`data-static`) въезжать заново не надо. */
+  .dialog:not([data-static]) {
+    animation: sheet-in 360ms var(--ease-spring);
+  }
+
+  /* Кнопки в окне дают отклик нажатием — тем же приседанием, что и пункты
+     нижней панели. */
+  .dialog__actions > button:active,
+  .dialog .mini-button:active {
+    transform: scale(0.97);
   }
 
   /* Админ-панель — тот же лист, а не «почти весь экран» с пустым

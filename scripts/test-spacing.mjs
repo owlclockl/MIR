@@ -310,6 +310,25 @@ add(
     : 'витрина, сводка и заголовок друзей',
 );
 
+/* Друзья на телефоне — над витриной: кто в сети, видно сразу, без
+   прокрутки мимо заголовка. */
+const phoneAreas = declared('.shell', 'grid-template-areas', '@media (max-width: 860px)') ?? '';
+add(
+  phoneAreas.includes('rail') && phoneAreas.indexOf('rail') < phoneAreas.indexOf('stage'),
+  'на телефоне панель друзей стоит над витриной',
+  phoneAreas.replace(/\s+/g, ' ').trim(),
+);
+
+/* Нижняя панель уезжает при прокрутке переходом, а не перерисовкой
+   разметки: класс ставит main.js, а гасит движение motionOff(). */
+const tabbarTransition = declared('.sidenav', 'transition', '@media (max-width: 860px)') ?? '';
+const tabbarHidden = declared('.sidenav--hidden', 'transform', '@media (max-width: 860px)');
+add(
+  tabbarTransition.includes('transform') && tabbarHidden === 'translateY(100%)',
+  'нижняя панель прячется при прокрутке переходом',
+  `${tabbarHidden ?? '—'} за ${tabbarTransition || '—'}`,
+);
+
 /* ---------- 4. структурные дубли ----------------------------------- */
 
 /* Одно и то же свойство у одного селектора в одной области видимости —
