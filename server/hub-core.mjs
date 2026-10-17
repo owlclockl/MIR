@@ -33,6 +33,11 @@
 import { createLobbies } from './hub-lobby.mjs';
 
 const MAX_AVATAR_CHARS = 300 * 1024;
+/* Аватарка — только растровая картинка в base64, какой её и делает
+   редактор (`canvas.toDataURL`). Прежняя проверка «начинается с
+   data:image/» пропускала кавычки и обработчики событий: такая строка
+   потом вклеивалась в `src="…"` на чужих устройствах. */
+const AVATAR_DATA_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
 export const MAX_REQUEST_BYTES = 512 * 1024; // аватарки до ~300 КБ в base64
 const TOKEN_TOKENS_PER_USER = 8; // одновременных устройств хватит всем
 
@@ -974,9 +979,9 @@ export function createHubCore({
       const avatar = body.avatar ?? null;
       if (
         avatar !== null &&
-        (!String(avatar).startsWith('data:image/') || avatar.length > MAX_AVATAR_CHARS)
+        (typeof avatar !== 'string' || !AVATAR_DATA_RE.test(avatar) || avatar.length > MAX_AVATAR_CHARS)
       )
-        throw httpError(400, 'Картинка слишком тяжёлая даже после сжатия.');
+        throw httpError(400, 'Картинка не подходит: нужна PNG, JPEG, WebP или GIF после сжатия редактором.');
       user.avatar = avatar;
       logEvent(avatar ? 'avatar' : 'avatar-clear', { userId: user.id, name: user.name });
       save.now();
@@ -1156,9 +1161,9 @@ export function createHubCore({
           const avatar = body.avatar ?? null;
           if (
             avatar !== null &&
-            (!String(avatar).startsWith('data:image/') || String(avatar).length > MAX_AVATAR_CHARS)
+            (typeof avatar !== 'string' || !AVATAR_DATA_RE.test(avatar) || avatar.length > MAX_AVATAR_CHARS)
           )
-            throw httpError(400, 'Картинка слишком тяжёлая даже после сжатия.');
+            throw httpError(400, 'Картинка не подходит: нужна PNG, JPEG, WebP или GIF после сжатия редактором.');
           user.avatar = avatar === null ? null : String(avatar);
           logEvent(avatar ? 'admin:avatar' : 'admin:avatar-clear', {
             by: 'admin',

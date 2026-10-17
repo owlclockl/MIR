@@ -1173,10 +1173,15 @@ export const updateSettings = (patch) => {
 /* ---------- аватар ------------------------------------------ */
 
 export const MAX_AVATAR_BYTES = 300 * 1024;
+/* Зеркало серверного правила в hub-core.mjs: аватарка редактора — всегда
+   растровый data URL в base64. Всё остальное в `src="…"` не вклеиваем. */
+const AVATAR_DATA_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 export const setAvatar = async (dataUrl) => {
   const me = getCurrentUser();
   if (!me) throw new Error('Вы не вошли в аккаунт.');
+  if (dataUrl && !AVATAR_DATA_RE.test(dataUrl))
+    throw new Error('Аватарка должна быть картинкой PNG, JPEG, WebP или GIF.');
   if (dataUrl && dataUrl.length > MAX_AVATAR_BYTES)
     throw new Error('Картинка слишком тяжёлая даже после сжатия.');
   await backend.setAvatar(me.id, dataUrl || null);
