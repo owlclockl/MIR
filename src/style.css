@@ -883,9 +883,9 @@ a {
   gap: var(--sp-10);
 }
 
-/* Гостю нечего считать про друзей: в сводке остаётся только полезный
-   статус хаба, он занимает всю строку вместо пустых ячеек сетки. */
-.hero__stats.hero__stats--guest {
+/* Вошедшему полезен только счётчик друзей; статус хаба дублировал
+   навигацию и занимал место на главном экране. */
+.hero__stats.hero__stats--friends-only {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -922,10 +922,6 @@ a {
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.hero-stat__hub {
-  color: var(--gold) !important;
 }
 
 .footer__hint {
@@ -1689,10 +1685,6 @@ a {
 
   .hero__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .hero-stat--wide {
-    grid-column: 1 / -1;
   }
 
   /* iOS приближает страницу, если в поле под курсором текст меньше 16px,

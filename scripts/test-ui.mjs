@@ -252,9 +252,9 @@ try {
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
 ok(
-  'гостю не показывается пустое «— друзей в сети»',
-  !$('.hero-stat--friends') && !!$('.hero-stat--wide') && $('.hero__stats')?.classList.contains('hero__stats--guest'),
-  $('.hero__stats')?.textContent?.replace(/\s+/g, ' ').trim(),
+  'гостю не показываются пустые карточки сводки',
+  !$('.hero__stats') && !$('.hero-stat--wide') && !$('.hero-stat__hub'),
+  $('.stage-menu')?.textContent?.replace(/\s+/g, ' ').trim() || 'главный экран без карточек хаба и друзей',
 );
 ok(
   'главное меню: партии, хаб, прямое подключение и настройки без игровых разделов',
@@ -262,7 +262,6 @@ ok(
     && $$('[data-action="open-direct"]').length === 1
     && $$('[data-action="open-settings"]').length === 1
     && $$('.sidenav__item').length === 4
-    && !!$('.hero__stats')
     && !$('[data-action^="open-world"]')
     && !$('.play-button'),
   $$('.sidenav__item').map((tile) => tile.textContent.replace(/\s+/g, ' ').trim()).join(' · ').slice(0, 120),
