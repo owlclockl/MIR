@@ -16,14 +16,14 @@ logs/
 .dev.vars*
 
 # Новые базы хаба не должны попадать в Git. Уже отслеживаемый файл
-# server/data/mir-hub.json это правило НЕ удаляет из истории/индекса.
+# server/data/sages-hub.json это правило НЕ удаляет из истории/индекса.
 server/data/
 
 # Картинка-черновик генератора планеты (scripts/planet-preview.mjs)
 planet-preview.png
 
 # Generated corresponding-source archive; rebuilt before web/single/dev.
-/src/rtwg/mir-source.zip
+/src/rtwg/sages-source.zip
 
 # Local compiler/toolchain downloads and caches; reproducible from pinned locks.
 /.cache/

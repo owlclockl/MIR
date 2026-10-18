@@ -3,14 +3,16 @@
 #   npm run host        собрать игру и выложить её в интернет
 #   npm run host:dev    то же самое локально, без выкладывания
 #
-# Что получится: адрес https://mir.ВАШ-АККАУНТ.workers.dev, на
+# Что получится: адрес https://sages.ВАШ-АККАУНТ.workers.dev, на
 # котором лежит и сама игра (dist/), и хаб общих аккаунтов (/api/*).
 # Бесплатного тарифа хватает с запасом: 100 000 запросов в сутки,
 # аккаунты и друзья хранятся в Durable Object со SQLite.
 #
 # Имя ниже можно поменять — оно станет первой частью адреса.
+# Переименовано из "mir" 2026-10-18: адрес и id Durable Object сменились,
+# прежний хаб по адресу mir.*.workers.dev больше не обслуживается этим воркером.
 
-name = "mir"
+name = "sages"
 main = "hosting/cloudflare/worker.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
@@ -45,22 +47,30 @@ run_worker_first = ["/api/*"]
 # Свой ключ задаётся секретом, один раз, командой
 #
 #   npm run host:secret
-#   (то же самое: npx wrangler secret put MIR_ADMIN_KEY)
+#   (то же самое: npx wrangler secret put SAGES_ADMIN_KEY)
 #
 # и переживает все последующие выкладывания, в том числе автодеплой из
 # GitHub Actions. Ключ также меняется в самой панели — он хранится в
 # данных хаба. Реальный ключ сюда вписывать нельзя — [vars] видны в
 # исходнике репозитория, секрет — только через wrangler secret put.
 # [vars]
-# MIR_ADMIN_KEY = "свой-ключ"
+# SAGES_ADMIN_KEY = "свой-ключ"
 # Список текущих секретов: npm run host:secrets (npx wrangler secret list)
 
 # Хаб: общие аккаунты, друзья, заявки, сигналинг P2P.
 [[durable_objects.bindings]]
 name = "HUB"
-class_name = "MirHub"
+class_name = "SagesHub"
 
 # SQLite-хранилище — единственный вид Durable Object на бесплатном тарифе.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MirHub"]
+
+# 2026-10-18: класс переименован вместе с продуктом. renamed_classes сохраняет
+# то же хранилище (объекты не теряются), но идентификатор DO всё равно новый
+# (idFromName("sages") вместо idFromName("mir")) — это отдельная, уже принятая
+# потеря: прежний хаб по mir.*.workers.dev недоступен из этого воркера.
+[[migrations]]
+tag = "v2"
+renamed_classes = [{ from = "MirHub", to = "SagesHub" }]

@@ -1,14 +1,14 @@
 /* Сборка проекта: одна точка входа для всех форматов.
 
-   Раньше каждый сборщик (.exe, .apk, mir.html) сам вызывал Vite и сам же
+   Раньше каждый сборщик (.exe, .apk, sages.html) сам вызывал Vite и сам же
    переписывал готовый HTML — отсюда и расхождения между версиями. Теперь
    сборок ровно две, и обе живут здесь:
 
      buildWeb()        — dist/ для сервера, хаба, установщика и хостинга;
-     buildSingleHtml() — mir.html: самодостаточный файл для file:// и .apk.
+     buildSingleHtml() — sages.html: самодостаточный файл для file:// и .apk.
 
    Логику встраивания и подстановки версии делают плагины из
-   scripts/lib/vite-mir.mjs, здесь — только запуск и проверка результата. */
+   scripts/lib/vite-build.mjs, здесь — только запуск и проверка результата. */
 
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -16,15 +16,15 @@ import { build as viteBuild } from 'vite';
 import './root.mjs';
 import { buildEmbeddedEditor, embedTemplate } from './fmg-offline.mjs';
 import { buildRtwgSourceArchive } from './rtwg-source.mjs';
-import { singleFileHtml } from './vite-mir.mjs';
+import { singleFileHtml } from './vite-build.mjs';
 
 const stampSingleBuild = (html) => {
   const buildId = createHash('sha256').update(html).digest('hex').slice(0, 8);
   const stamped = html.replace(
     /<\/head>/i,
-    `  <meta name="mir-build" content="${buildId}" />\n  </head>`,
+    `  <meta name="sages-build" content="${buildId}" />\n  </head>`,
   );
-  if (stamped === html) throw new Error('В mir.html не найдена закрывающая </head> для метки сборки.');
+  if (stamped === html) throw new Error('В sages.html не найдена закрывающая </head> для метки сборки.');
   return stamped;
 };
 
@@ -43,7 +43,7 @@ export async function buildWeb({ logLevel = 'warn' } = {}) {
 }
 
 /**
- * Однофайловая сборка mir.html: игра и редактор карт Azgaar в одном файле.
+ * Однофайловая сборка sages.html: игра и редактор карт Azgaar в одном файле.
  * Редактор собирается из vendor/ (нужен `npm run fmg:install`) и вшивается
  * JSON-блоком после сборки игры — см. scripts/lib/fmg-offline.mjs.
  * @param {{ write?: boolean, logLevel?: string }} [options]
@@ -54,7 +54,7 @@ export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) 
   buildRtwgSourceArchive();
   const editor = await buildEmbeddedEditor();
 
-  /* Сборка идёт в память: на диск попадает ровно один файл — mir.html. */
+  /* Сборка идёт в память: на диск попадает ровно один файл — sages.html. */
   const result = await viteBuild({
     mode: 'single',
     logLevel,
@@ -68,15 +68,15 @@ export async function buildSingleHtml({ write = true, logLevel = 'warn' } = {}) 
   const game = htmlAsset ? String(htmlAsset.source) : singleFileHtml();
   if (!game)
     throw new Error(
-      'Однофайловая сборка не отдала HTML — плагин mir:single-file не сработал. ' +
+      'Однофайловая сборка не отдала HTML — плагин sages:single-file не сработал. ' +
         'Проверьте режим сборки: нужен `mode: "single"`.',
     );
 
   const html = stampSingleBuild(embedTemplate(game, editor.template));
-  if (!html.includes('id="mir-fmg-template"') || !html.includes('MIR_FMG_HOST'))
-    throw new Error('В mir.html не попал редактор Azgaar: шаблон не вшит.');
+  if (!html.includes('id="sages-fmg-template"') || !html.includes('SAGES_FMG_HOST'))
+    throw new Error('В sages.html не попал редактор Azgaar: шаблон не вшит.');
 
-  if (write) writeFileSync('mir.html', html);
+  if (write) writeFileSync('sages.html', html);
   return html;
 }
 

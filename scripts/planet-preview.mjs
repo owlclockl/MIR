@@ -78,7 +78,7 @@ const option = (name, fallback) => {
 };
 const flag = (name) => args.includes(`--${name}`);
 
-const seed = option('seed', 'mir-2026');
+const seed = option('seed', 'sages-2026');
 const size = Number(option('size', '1'));
 const level = Number(option('level', '4'));
 const layerId = option('layer', 'relief');

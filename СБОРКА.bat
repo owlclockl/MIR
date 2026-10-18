@@ -22,7 +22,7 @@ if errorlevel 1 goto :fail
 echo.
 echo Что вы хотите собрать?
 echo.
-echo   [1] Веб-версию (папка dist\ и один файл mir.html)
+echo   [1] Веб-версию (папка dist\ и один файл sages.html)
 echo   [2] Windows-приложение (.exe установщик для ПК)
 echo   [3] Android-приложение (.apk установщик для телефонов)
 echo   [4] Всё сразу (Веб + .exe + .apk)
@@ -44,7 +44,7 @@ echo.
 echo ============================================================
 echo   Готово!
 echo     dist\      — собранный сайт, его раздаёт сервер
-echo     mir.html   — один файл, можно открыть в любом браузере
+echo     sages.html   — один файл, можно открыть в любом браузере
 echo ============================================================
 goto :done
 
@@ -56,7 +56,7 @@ if errorlevel 1 goto :fail
 echo.
 echo ============================================================
 echo   Готово!
-echo     MIR-Setup.exe  — файл установщика для Windows
+echo     Sages-Setup.exe  — файл установщика для Windows
 echo   Просто перекиньте файл другу (Telegram / Discord / флешка).
 echo   При запуске создаст ярлыки на рабочем столе и в Пуск,
 echo   права администратора не нужны.
@@ -75,7 +75,7 @@ if errorlevel 1 goto :fail
 echo.
 echo ============================================================
 echo   Готово!
-echo     MIR.apk  — файл приложения для Android 5.0 и новее
+echo     Sages.apk  — файл приложения для Android 5.0 и новее
 echo   Просто перекиньте файл на телефон и нажмите «Установить».
 echo   Телефон спросит разрешение на установку из этого источника —
 echo   разрешите, подпись у файла своя, магазин для неё не нужен.
@@ -97,9 +97,9 @@ if errorlevel 1 goto :fail
 echo.
 echo ============================================================
 echo   ВСЕ СБОРКИ ГОТОВЫ!
-echo     • Windows:  MIR-Setup.exe  (или dist-app\MIR-Setup.exe)
-echo     • Android:  MIR.apk        (или dist-app\MIR.apk)
-echo     • Браузер:  mir.html       (или папка dist\)
+echo     • Windows:  Sages-Setup.exe  (или dist-app\Sages-Setup.exe)
+echo     • Android:  Sages.apk        (или dist-app\Sages.apk)
+echo     • Браузер:  sages.html       (или папка dist\)
 echo   Файлами можно делиться просто перекидывая их друзьям!
 echo ============================================================
 goto :done
@@ -129,7 +129,7 @@ echo     • первый запуск без интернета — не ска
 echo.
 echo   Полные протоколы сборки лежат в папке logs:
 echo     logs\apk-build.log   — Android, каждый шаг и каждая проверка
-echo     logs\apk-doctor.log  — разбор готового MIR.apk
+echo     logs\apk-doctor.log  — разбор готового Sages.apk
 echo.
 pause
 exit /b 1

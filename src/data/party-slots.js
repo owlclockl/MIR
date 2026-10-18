@@ -6,7 +6,7 @@ export const PARTY_SLOT_COUNT = 4;
 export const PARTY_SLOT_MAX_INVITEES = Math.max(0, PARTY_MAX_MEMBERS - 1);
 
 const memory = new Map();
-const storageKey = (userId) => `mir:party-slots:${String(userId ?? '').trim().slice(0, 160)}`;
+const storageKey = (userId) => `sages:party-slots:${String(userId ?? '').trim().slice(0, 160)}`;
 const validUser = (userId) => String(userId ?? '').trim().length > 0;
 const slotIndex = (value) => Math.max(0, Math.min(PARTY_SLOT_COUNT - 1, Math.trunc(Number(value) || 0)));
 

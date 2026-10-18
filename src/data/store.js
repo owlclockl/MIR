@@ -4,20 +4,20 @@ import { isInviteCode } from './invite-code.js';
    Слой данных: аккаунты, друзья, заявки, код-приглашения.
 
    Два бэкенда с одинаковым интерфейсом:
-   — local: «база» в localStorage этого браузера (нет сети, mir.html);
+   — local: «база» в localStorage этого браузера (нет сети, sages.html);
    — hub:   общий хаб (serve.mjs на ПК или бесплатный хостинг — /api/*).
    Выбор происходит в initBackend(), по порядку:
 
      1. адрес из ссылки `?hub=https://…` — так друг присылает хаб;
      2. адрес, сохранённый игроком в окне «Общий хаб»;
-     3. адрес, вшитый в сборку (VITE_MIR_HUB) — для APK и mir.html;
+     3. адрес, вшитый в сборку (VITE_SAGES_HUB) — для APK и sages.html;
      4. тот адрес, откуда открыта игра;
      5. если ни один хаб не ответил — локальный режим как офлайн-резерв.
 
    Каждый запуск сначала проверяет хаб. Предыдущий выбор «локально» действует
    только до закрытия приложения и не блокирует повторное подключение при старте.
 
-   Сессия всегда локальная (mir:session): в hub-режиме в ней лежит
+   Сессия всегда локальная (sages:session): в hub-режиме в ней лежит
    токен, который выдал хаб при входе, и адрес этого хаба — токен
    чужого хаба бессмысленен, поэтому при смене адреса сессия
    сбрасывается. Хеши паролей считаются на клиенте — по сети пароль
@@ -27,26 +27,26 @@ import { isInviteCode } from './invite-code.js';
 import * as remote from './remote.js';
 
 const KEYS = {
-  users: 'mir:users',
-  requests: 'mir:requests',
-  session: 'mir:session',
-  hub: 'mir:hub',
-  settings: 'mir:settings',
-  admin: 'mir:admin',
+  users: 'sages:users',
+  requests: 'sages:requests',
+  session: 'sages:session',
+  hub: 'sages:hub',
+  settings: 'sages:settings',
+  admin: 'sages:admin',
   /* Настройки служебной панели (открыта ли регистрация, объявление),
      пользовательские файлы и журнал событий — в локальном режиме они
      лежат здесь, в режиме хаба приходят снимком от хаба. */
-  hubSettings: 'mir:hub-settings',
-  events: 'mir:events',
-  files: 'mir:files',
+  hubSettings: 'sages:hub-settings',
+  events: 'sages:events',
+  files: 'sages:files',
 };
 
-/* Адрес хаба, вшитый при сборке: `VITE_MIR_HUB=https://… npm run build`.
-   Нужен для APK и mir.html — там «адрес страницы» это file://, и
+/* Адрес хаба, вшитый при сборке: `VITE_SAGES_HUB=https://… npm run build`.
+   Нужен для APK и sages.html — там «адрес страницы» это file://, и
    узнать хаб больше неоткуда. */
 const BUILT_IN_HUB = (() => {
   try {
-    return String(import.meta.env?.VITE_MIR_HUB || '').trim();
+    return String(import.meta.env?.VITE_SAGES_HUB || '').trim();
   } catch {
     return '';
   }
@@ -72,7 +72,7 @@ const memoryStore = new Map();
 let persistent = null;
 
 try {
-  const probe = 'mir:probe';
+  const probe = 'sages:probe';
   globalThis.localStorage.setItem(probe, '1');
   globalThis.localStorage.removeItem(probe);
   persistent = globalThis.localStorage;
@@ -672,7 +672,7 @@ const hubBackend = {
       return { result };
     } catch (error) {
       /* Частый тупик: друг прислал код из офлайн-приложения (APK или
-         mir.html с флешки) — тот живёт в его локальном хранилище, и
+         sages.html с флешки) — тот живёт в его локальном хранилище, и
          хаб про него никогда не слышал. Без объяснения человек вводит
          тот же код двадцать раз подряд. */
       if (error?.status === 404)
@@ -715,7 +715,7 @@ const HUB_OFF = 'local'; // игрок сам отказался от хаба
 
 const trimSlash = (url) => String(url ?? '').trim().replace(/\/+$/, '');
 
-/** «mir.имя.workers.dev» → «https://mir.имя.workers.dev». */
+/** «sages.имя.workers.dev» → «https://sages.имя.workers.dev». */
 export const normalizeHubUrl = (raw) => {
   const text = String(raw ?? '').trim();
   if (!text) return '';
@@ -724,10 +724,10 @@ export const normalizeHubUrl = (raw) => {
   try {
     parsed = new URL(withScheme);
   } catch {
-    throw new Error('Это не похоже на адрес. Пример: https://mir.имя.workers.dev');
+    throw new Error('Это не похоже на адрес. Пример: https://sages.имя.workers.dev');
   }
   if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost')
-    throw new Error('В адресе не хватает домена. Пример: https://mir.имя.workers.dev');
+    throw new Error('В адресе не хватает домена. Пример: https://sages.имя.workers.dev');
   return trimSlash(`${parsed.origin}${parsed.pathname}`);
 };
 
@@ -1264,10 +1264,10 @@ export const regenerateInviteCode = async () => {
 export const useInviteCode = async (rawCode) => {
   const me = getCurrentUser();
   if (!me) throw new Error('Вы не вошли в аккаунт.');
-  /* Длинный код MIR1.… — это приглашение прямого подключения, а не
-     код друга: после нормализации он неотличим от обычного («MIR1-EJW9»),
+  /* Длинный код SAGES1.… — это приглашение прямого подключения, а не
+     код друга: после нормализации он неотличим от обычного («SAGES1-EJW9»),
      и хаб честно отвечает «не найден». Отлавливаем до отправки. */
-  if (/^\s*MIR[01]\./i.test(String(rawCode || '')))
+  if (/^\s*SAGES[01]\./i.test(String(rawCode || '')))
     throw new Error(
       'Это код прямого подключения — он вставляется в окне «Прямое подключение», а сюда короткий код друга вида XXXX-XXXX.',
     );
@@ -1312,7 +1312,7 @@ if (typeof window !== 'undefined') {
 
    Режим хаба: общие аккаунты правит хаб, а не браузер. Действует
    ключ, сменённый через панель (хранится в данных хаба и переживает
-   перезапуск), либо заданный владельцем (MIR_ADMIN_KEY на ПК, секрет
+   перезапуск), либо заданный владельцем (SAGES_ADMIN_KEY на ПК, секрет
    воркера на хостинге), либо заводской DEFAULT_ADMIN_KEY. Панель на
    хабе включена всегда; заводской ключ публичный — панель напоминает
    сменить его сразу после входа.
@@ -1322,7 +1322,7 @@ if (typeof window !== 'undefined') {
    =========================================================== */
 
 export const DEFAULT_ADMIN_KEY = 'owlananaslwo';
-const ADMIN_SALT_FALLBACK = 'mir-admin-salt-v1';
+const ADMIN_SALT_FALLBACK = 'sages-admin-salt-v1';
 const ADMIN_MIN_KEY = 6;
 
 /* Ключ живёт только в памяти вкладки: перезагрузка снова спросит его.
@@ -2156,7 +2156,7 @@ export const adminWipeLocal = async () => {
 
 /* Размеры и seed мира — словарь генераторов. Экранов миров (слоты, карта,
    лобби) в приложении нет: их удалили вместе с кнопкой «Играть», поэтому
-   localStorage-слоты `mir-world-slots` здесь больше не читаются и не
+   localStorage-слоты `sages-world-slots` здесь больше не читаются и не
    пишутся. Константы остаются: на них смотрят Azgaar-профиль и тесты
    масштаба Земли. */
 
@@ -2194,7 +2194,7 @@ export const normalizeWorldConfig = (raw) => {
 
 /* Local personal waypoints, separate from world slots and never sent to hub.
    Bounded storage: 24 recent worlds × 64 normalized positions. */
-const SURFACE_PINS_KEY = 'mir:surface-pins';
+const SURFACE_PINS_KEY = 'sages:surface-pins';
 const cleanSurfacePins = (pins) => Array.isArray(pins) ? pins.filter((p) =>
   p && Number.isFinite(p.u) && Number.isFinite(p.v) && p.u >= 0 && p.u <= 1 && p.v >= 0 && p.v <= 1,
 ).slice(0, 64).map((p) => ({ u: p.u, v: p.v, name: String(p.name || 'Метка').slice(0, 40) })) : [];
@@ -2212,7 +2212,7 @@ export const saveSurfacePins = (key, pins) => {
 
 
 /* XaeroPlus browser drawing adapter: independent personal annotation storage. */
-const SURFACE_DRAWINGS_KEY = 'mir:surface-drawings';
+const SURFACE_DRAWINGS_KEY = 'sages:surface-drawings';
 const cleanSurfaceDrawings = cleanDrawings;
 export const loadSurfaceDrawings = (key) => {
   const worlds = readJSON(SURFACE_DRAWINGS_KEY, []);
@@ -2226,8 +2226,8 @@ export const saveSurfaceDrawings = (key, shapes) => {
 };
 
 /* Personal cartography preferences; never included in hub payloads. */
-export const loadSurfaceSettings = () => cleanSettings(readJSON('mir:surface-settings', {}));
+export const loadSurfaceSettings = () => cleanSettings(readJSON('sages:surface-settings', {}));
 export const saveSurfaceSettings = (settings) => {
   const valid = cleanSettings(settings);
-  writeJSON('mir:surface-settings', { ...valid, order: serializeDrawOrder(valid.order) });
+  writeJSON('sages:surface-settings', { ...valid, order: serializeDrawOrder(valid.order) });
 };

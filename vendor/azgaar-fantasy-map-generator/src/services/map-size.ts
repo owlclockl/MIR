@@ -15,7 +15,7 @@ export function getRequestedMapSize(params: URLSearchParams): RequestedMapSize {
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
 
-  // Legacy / standalone links still accept their exact point count. MIR's
+  // Legacy / standalone links still accept their exact point count. Sages'
   // opt-in physical whole-world profile above uses the supported 100K density.
   const pointsValue = Number(params.get("points"));
   const points = Number.isFinite(pointsValue) && pointsValue > 0 ? Math.round(pointsValue) : undefined;

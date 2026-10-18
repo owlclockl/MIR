@@ -2,7 +2,7 @@
 
    Зачем отдельная проверка: подтормаживание меню не видно в обычных
    тестах — они смотрят на разметку, а не на цену её перерисовки. Здесь
-   собранный `mir.html` открывается в jsdom с «тяжёлой» базой (40
+   собранный `sages.html` открывается в jsdom с «тяжёлой» базой (40
    аккаунтов, у каждого аватарка ~20 КБ), и мы считаем то, что реально
    греет телефон:
 
@@ -17,7 +17,7 @@
      npm i --no-save jsdom            (разово)
      npm run single && npm run test:perf
 
-   Проверка ничего не собирает сама: она смотрит на mir.html, то есть на
+   Проверка ничего не собирает сама: она смотрит на sages.html, то есть на
    то, что получает игрок. */
 
 import { readFileSync } from 'node:fs';
@@ -60,7 +60,7 @@ for (const user of users.slice(1, 1 + FRIENDS)) user.friends = ['u_0'];
 
 const stats = { parses: 0, parseBytes: 0, writes: 0, writeBytes: 0, reads: 0, readBytes: 0, regionWrites: 0 };
 
-const html = readFileSync(fromRoot('mir.html'), 'utf8');
+const html = readFileSync(fromRoot('sages.html'), 'utf8');
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
   url: 'http://127.0.0.1:9999/',
@@ -68,10 +68,10 @@ const dom = new JSDOM(html, {
   beforeParse(window) {
     /* Сети в проверке нет: приложение обязано уйти в локальный режим. */
     window.fetch = () => Promise.reject(new Error('нет сети'));
-    window.localStorage.setItem('mir:users', JSON.stringify(users));
-    window.localStorage.setItem('mir:requests', JSON.stringify([]));
+    window.localStorage.setItem('sages:users', JSON.stringify(users));
+    window.localStorage.setItem('sages:requests', JSON.stringify([]));
     window.localStorage.setItem(
-      'mir:session',
+      'sages:session',
       JSON.stringify({ userId: 'u_0', token: null, hub: null, since: now }),
     );
     window.HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -162,7 +162,7 @@ ok('панель друзей нарисована со всеми друзья�
 /* ---------- 2. обновление данных под открытым окном ---------- */
 
 const sameDialog = $('.dialog');
-window.dispatchEvent(new window.StorageEvent('storage', { key: 'mir:session' }));
+window.dispatchEvent(new window.StorageEvent('storage', { key: 'sages:session' }));
 await wait(50);
 ok('окно не пересобирается, когда данные не изменились', $('.dialog') === sameDialog);
 
@@ -209,7 +209,7 @@ reset();
 for (let i = 0; i < 20; i += 1) {
   /* Так приходит замер задержки P2P: раз в пять секунд на каждый канал.
      К списку друзей он отношения не имеет. */
-  window.dispatchEvent(new window.StorageEvent('storage', { key: 'mir:session' }));
+  window.dispatchEvent(new window.StorageEvent('storage', { key: 'sages:session' }));
 }
 await wait(50);
 ok(

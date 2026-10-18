@@ -4,7 +4,7 @@ import { createRtwgEngine } from './engine.js';
 import { FIELDS, LABELS, PARAMETERS, PARAM_LABELS, defaultParameters } from './config.js';
 import { decodeSnapshot, encodeSnapshot, MAX_FILE_BYTES } from './snapshot.js';
 import { download, pngFields } from './export.js';
-import sourceUrl from './mir-source.zip?url';
+import sourceUrl from './sages-source.zip?url';
 import { RTWG_NOTICES } from './licenses.js';
 
 export function mountRtwgView(host, { config, initialSnapshot = null, onSnapshot = () => {}, onApply, onExit = () => {} }) {
@@ -20,11 +20,11 @@ export function mountRtwgView(host, { config, initialSnapshot = null, onSnapshot
     <div class="rtwg-toolbar"><button type="button" data-rtwg="image">PNG вида</button><button type="button" data-rtwg="png">Все 8 PNG (ZIP)</button><button type="button" data-rtwg="save">Сохранить RTWG</button><button type="button" data-rtwg="load">Открыть RTWG</button><button type="button" data-rtwg="heightmap">Импорт высот PNG</button><button type="button" data-rtwg="apply" ${onApply?'':'disabled'}>Рельеф → редактор</button></div>
     <p class="rtwg-hint">2D — карта сверху. 3D: мышь — орбита, Shift — сдвиг, колесо — приближение, WASD — движение. Масштаб высоты влияет только на вид. RTWG моделирует глобальное поле, а не каждый метр планеты.</p>
     <input type="file" data-file="snapshot" accept=".json,application/json" hidden><input type="file" data-file="heightmap" accept="image/png" hidden>
-  </div><aside class="rtwg-controls"><details open><summary>Мир · тектоника</summary><label>Seed <input data-control="seed" maxlength="200" value="${esc(initialSnapshot?.seed || config.seed || 'MIR-RTWG')}"></label><label>Глобальная сетка <select data-control="resolution">${[64,128,256,512].map(n=>`<option value="${n}" ${n===(initialSnapshot?.width||256)?'selected':''}>${n} × ${n/2}${n===512?' · больше памяти':''}</option>`).join('')}</select></label><button type="button" data-rtwg="restart">Перезапуск по seed</button><button type="button" data-rtwg="new">Новый мир</button><label><input type="checkbox" data-control="tectonic"> Движение плит (вода приостановлена)</label><button type="button" data-rtwg="plates">Новые плиты</button><p>Доля океана, число плит и шероховатость применяются при перезапуске. Слияние и складчатость — сразу.</p><div data-parameters="tectonic"></div></details>
+  </div><aside class="rtwg-controls"><details open><summary>Мир · тектоника</summary><label>Seed <input data-control="seed" maxlength="200" value="${esc(initialSnapshot?.seed || config.seed || 'SAGES-RTWG')}"></label><label>Глобальная сетка <select data-control="resolution">${[64,128,256,512].map(n=>`<option value="${n}" ${n===(initialSnapshot?.width||256)?'selected':''}>${n} × ${n/2}${n===512?' · больше памяти':''}</option>`).join('')}</select></label><button type="button" data-rtwg="restart">Перезапуск по seed</button><button type="button" data-rtwg="new">Новый мир</button><label><input type="checkbox" data-control="tectonic"> Движение плит (вода приостановлена)</label><button type="button" data-rtwg="plates">Новые плиты</button><p>Доля океана, число плит и шероховатость применяются при перезапуске. Слияние и складчатость — сразу.</p><div data-parameters="tectonic"></div></details>
     ${FIELDS.map((f,i)=>`<details><summary>${LABELS[i]}</summary><label><input type="checkbox" data-enabled="${f}" checked> Симуляция включена</label><button type="button" data-reset="${f}">Сбросить поле</button><div data-parameters="${f}"></div>${f==='wind'?'<button type="button" data-rtwg="distortion">Новое возмущение</button>':''}</details>`).join('')}
     <details><summary>3D · свет и поверхность</summary>${[['heightScale','Высота (только вид)',.65,.1,5,.05],['terrainScale','Размер поверхности',1,.1,5,.1],['waterSpeed','Анимация воды',5,0,10,.1],['lightX','Свет: X',-4,-10,10,.5],['lightY','Свет: высота',7,.5,15,.5],['lightZ','Свет: Z',3,-10,10,.5]].map(([k,l,v,min,max,step])=>`<label>${l}<input type="number" data-render="${k}" value="${v}" min="${min}" max="${max}" step="${step}"></label>`).join('')}</details>
     <details><summary>Импорт PNG · диапазон</summary><p>Яркость PNG задаёт высоту от минимума до максимума. Карта пересчитывается до выбранной сетки.</p><label>Минимум <input type="number" data-control="heightMin" value="0.1" min="0.001" max="20" step="0.1"></label><label>Максимум <input type="number" data-control="heightMax" value="3" min="0.001" max="20" step="0.1"></label></details>
-    <details><summary>Исходники · лицензии · ограничения</summary><button type="button" data-rtwg="source">Скачать полный исходный код MIR</button><p>Порт RTWG / RTplatec / libnoise. При загрузке снимка скалярные поля восстанавливаются точно; внутреннее состояние плит пересоздаётся. Это не геологический прогноз.</p><pre class="rtwg-license"></pre></details></aside>`;
+    <details><summary>Исходники · лицензии · ограничения</summary><button type="button" data-rtwg="source">Скачать полный исходный код</button><p>Порт RTWG / RTplatec / libnoise. При загрузке снимка скалярные поля восстанавливаются точно; внутреннее состояние плит пересоздаётся. Это не геологический прогноз.</p><pre class="rtwg-license"></pre></details></aside>`;
   host.append(element);
   element.querySelector('.rtwg-license').textContent=RTWG_NOTICES;
   const canvas=element.querySelector('canvas'), status=element.querySelector('.rtwg-status'), errorEl=element.querySelector('.rtwg-error');
@@ -42,7 +42,7 @@ export function mountRtwgView(host, { config, initialSnapshot = null, onSnapshot
     const token=++generation; busy=true; paused=true; controls(); errorEl.hidden=true; status.textContent='Сборка мира RTWG…';
     let pending=null;
     try {
-      const seed=snapshot?.seed || q('[data-control="seed"]').value.trim() || 'MIR-RTWG', width=snapshot?.width || Number(q('[data-control="resolution"]').value);
+      const seed=snapshot?.seed || q('[data-control="seed"]').value.trim() || 'SAGES-RTWG', width=snapshot?.width || Number(q('[data-control="resolution"]').value);
       const staging=document.createElement('canvas'); // Construct before replacing a valid running engine.
       const next=pending=await createRtwgEngine(staging,{seed,width,height:width/2,parameters:snapshot?.parameters || parameters});
       if(disposed || token!==generation) {next.dispose();return;}
@@ -80,7 +80,7 @@ export function mountRtwgView(host, { config, initialSnapshot = null, onSnapshot
   element.addEventListener('click',async e=> {
     const b=e.target.closest('button'); if(!b)return; const action=b.dataset.rtwg;
     if(action==='exit'){onExit();return;}
-    if(action==='source'){const a=document.createElement('a');a.href=sourceUrl;a.download='mir-corresponding-source.zip';a.click();return;} if(busy)return;
+    if(action==='source'){const a=document.createElement('a');a.href=sourceUrl;a.download='sages-corresponding-source.zip';a.click();return;} if(busy)return;
     try {
       if(action==='restart'||action==='new') { if(action==='new') q('[data-control="seed"]').value=`RTWG-${crypto.getRandomValues(new Uint32Array(1))[0]}`; await init();return; }
       if(!engine) return;

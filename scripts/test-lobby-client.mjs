@@ -63,7 +63,7 @@ globalThis.DOMParser = pageWindow.DOMParser;
 
 /* ---------- хаб -------------------------------------------------- */
 
-const dir = mkdtempSync(join(tmpdir(), 'mir-lobby-client-'));
+const dir = mkdtempSync(join(tmpdir(), 'sages-lobby-client-'));
 const hub = createHub({ dbFile: join(dir, 'hub.json'), adminKey: 'проверка-ключа' });
 const server = createServer(async (req, res) => {
   const handled = await hub.handle(req, res);

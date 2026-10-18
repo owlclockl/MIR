@@ -2,7 +2,7 @@
 import { FIELDS, validateParameters } from './config.js';
 export const MAX_FILE_BYTES = 32 * 1024 * 1024;
 export function validateSnapshot(s) {
-  if (!s || s.format !== 'mir-rtwg' || s.version !== 1 || typeof s.seed !== 'string' || !s.seed.length || s.seed.length > 200 || ![64,128,256,512].includes(s.width) || s.height !== s.width / 2) throw Error('Неизвестный формат / размер RTWG');
+  if (!s || s.format !== 'sages-rtwg' || s.version !== 1 || typeof s.seed !== 'string' || !s.seed.length || s.seed.length > 200 || ![64,128,256,512].includes(s.width) || s.height !== s.width / 2) throw Error('Неизвестный формат / размер RTWG');
   const parameters = validateParameters(s.parameters);
   for (const key of ['iteration', 'noiseCounter']) if (!Number.isInteger(s[key]) || s[key]<0 || s[key]>1e9) throw Error(`Неверный счётчик ${key}`);
   for (const key of ['timeTemp','timeWind']) if (!Number.isFinite(s[key]) || Math.abs(s[key])>1e10) throw Error('Неверное время RTWG');

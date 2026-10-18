@@ -1,6 +1,6 @@
-/* Встроенный редактор Azgaar для однофайлового mir.html.
+/* Встроенный редактор Azgaar для однофайлового sages.html.
 
-   Внутри mir.html редактор живёт не на сервере, а в iframe с srcdoc: у такого
+   Внутри sages.html редактор живёт не на сервере, а в iframe с srcdoc: у такого
    документа нет адреса, поэтому всё, что Azgaar иначе читал бы с диска или по
    сети, собирается в один HTML:
 
@@ -8,12 +8,12 @@
        конфигом fmg-offline.config.mjs), без import/export и без чанков;
      • стили и библиотеки libs/ — встроенными тегами, в исходном порядке;
      • картинки, карты высот, стили-пресеты и прочие ресурсы — в таблице
-       base64 (#mir-fmg-assets); шим перед запуском редактора переписывает
+       base64 (#sages-fmg-assets); шим перед запуском редактора переписывает
        адреса src/href/fetch/XHR на blob: URL из этой таблицы.
 
-   Параметры карты (seed, размер) передаются через MIR_FMG_HOST.query:
+   Параметры карты (seed, размер) передаются через SAGES_FMG_HOST.query:
    плейсхолдер "__FMG_QUERY__" подставляет оболочка при каждом открытии.
-   Результат кладётся в mir.html как JSON-строка: так текст шаблона не
+   Результат кладётся в sages.html как JSON-строка: так текст шаблона не
    ломает разбор HTML (нет `</script`, нет `<!--`). */
 
 import { createRequire } from 'node:module';
@@ -29,8 +29,8 @@ const CONFIG = fileURLToPath(new URL('./fmg-offline.config.mjs', import.meta.url
 /** Заменяется в шаблоне на JSON-строку с параметрами карты при каждом открытии. */
 export const QUERY_PLACEHOLDER = '"__FMG_QUERY__"';
 
-/** id JSON-блока с шаблоном в mir.html. */
-export const TEMPLATE_ID = 'mir-fmg-template';
+/** id JSON-блока с шаблоном в sages.html. */
+export const TEMPLATE_ID = 'sages-fmg-template';
 
 const MIME = {
   '.png': 'image/png',
@@ -60,7 +60,7 @@ const SKIPPED = new Set(['index.html', 'app.js', 'sw.js', 'dropbox.html', 'manif
 const SHIM = `(function () {
   var table = null, cache = Object.create(null);
   function assets() {
-    if (!table) { var el = document.getElementById("mir-fmg-assets"); table = el ? JSON.parse(el.textContent) : {}; }
+    if (!table) { var el = document.getElementById("sages-fmg-assets"); table = el ? JSON.parse(el.textContent) : {}; }
     return table;
   }
   function keyOf(url) {
@@ -155,7 +155,7 @@ export async function buildEmbeddedEditor({ logLevel = 'error' } = {}) {
   const requireFromVendor = createRequire(join(VENDOR, 'package.json'));
   const { build } = await import(pathToFileURL(requireFromVendor.resolve('vite')).href);
 
-  const dir = mkdtempSync(join(tmpdir(), 'mir-fmg-'));
+  const dir = mkdtempSync(join(tmpdir(), 'sages-fmg-'));
   try {
     await build({ configFile: CONFIG, mode: 'electron', logLevel, build: { outDir: dir, emptyOutDir: true } });
     return assembleTemplate(dir);
@@ -223,9 +223,9 @@ export function assembleTemplate(dir) {
   });
 
   const head = [
-    `<script type="application/json" id="mir-fmg-assets">${JSON.stringify(table)}</script>`,
+    `<script type="application/json" id="sages-fmg-assets">${JSON.stringify(table)}</script>`,
     `<script>${escapeScript(SHIM)}</script>`,
-    `<script>globalThis.MIR_FMG_HOST = { query: ${QUERY_PLACEHOLDER} };</script>`,
+    `<script>globalThis.SAGES_FMG_HOST = { query: ${QUERY_PLACEHOLDER} };</script>`,
   ].join('\n');
   html = html.replace(/<head>/i, (match) => `${match}\n${head}`);
 
@@ -242,7 +242,7 @@ const mimeOf = (key) => MIME[extname(key)] ?? 'application/octet-stream';
 const dataUri = (path, key) => `data:${mimeOf(key)};base64,${readFileSync(path).toString('base64')}`;
 
 /**
- * Вставляет шаблон в mir.html как JSON-строку. JSON экранирует кавычки и
+ * Вставляет шаблон в sages.html как JSON-строку. JSON экранирует кавычки и
  * переводы строк, а `<` заменяется на \u003c: текст шаблона не может закрыть
  * элемент <script> и не меняет разбор страницы.
  */

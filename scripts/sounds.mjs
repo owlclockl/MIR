@@ -7,7 +7,7 @@
 
    Библиотека содержит 936 коротких файлов: 78 смысловых откликов (press,
    success, notification, error, open, select, back, unlock и так далее) в 12
-   наборах. Для MIR выбраны звуки, которые покрывают щелчки, окна, навигацию,
+   наборах. Для игры выбраны звуки, которые покрывают щелчки, окна, навигацию,
    переключатели, подключение и скрытый вход администратора.
 
    Скрипт не зависит ни от чего, кроме Node: сам скачивает tgz-архив пакета
@@ -142,4 +142,4 @@ for (const [cue, name] of CUES) {
 
 console.log(`\nГотово: ${CUES.length} файла, ${kb(total)} всего.`);
 console.log('Лицензия звуков — CC0 1.0, происхождение — src/assets/sounds/LICENSE.txt.');
-console.log('Дальше: npm run build и npm run single, чтобы звуки попали в dist/ и mir.html.');
+console.log('Дальше: npm run build и npm run single, чтобы звуки попали в dist/ и sages.html.');

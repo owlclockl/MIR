@@ -1,4 +1,4 @@
-// MIR integration: physical planet size is not the SVG / Voronoi coordinate extent.
+// Sages integration: physical planet size is not the SVG / Voronoi coordinate extent.
 // Keeping a 40-million-unit graph saturates upstream Uint16 cell areas and does
 // not enlarge heightmap features. Use the supported 100K terrain density instead.
 import type { OptionsData } from "@/components/options-schema";
@@ -19,7 +19,7 @@ export function readEarthWorldProfile(params: URLSearchParams): EarthWorldProfil
   const width = Number(params.get("width"));
   const height = Number(params.get("height"));
   if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1_000_000 || height < 1_000_000) return;
-  // MIR's world presets are 2:1. Reject malformed/extreme aspect ratios rather
+  // Sages' world presets are 2:1. Reject malformed/extreme aspect ratios rather
   // than building an unbounded SVG, while retaining the exact physical extent.
   const aspect = width / height;
   if (aspect < 1 || aspect > 4 || width > 1_000_000_000 || height > 1_000_000_000) return;

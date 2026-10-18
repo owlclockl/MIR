@@ -3,7 +3,7 @@
    проверяет работоспособность провайдера и не включает ИИ в игре. */
 const groups = [
   ['Разработка (GitHub CLI; публичный GitHub API работает и без ключа)', ['GH_TOKEN', 'GITHUB_TOKEN']],
-  ['Хаб и развёртывание', ['MIR_ADMIN_KEY', 'CLOUDFLARE_TUNNEL_TOKEN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID']],
+  ['Хаб и развёртывание', ['SAGES_ADMIN_KEY', 'CLOUDFLARE_TUNNEL_TOKEN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID']],
 ];
 
 console.log('Статус переменных окружения (без раскрытия значений)');

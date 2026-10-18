@@ -44,7 +44,7 @@ camera.x = -100; camera.y = 100; clampCamera(camera);
 check(Math.abs(camera.x - 0.5) < 1e-10 && Math.abs(camera.y - 0.5) < 1e-10, 'камера не теряет мир за границами');
 check(scaleBar(20000).label.includes('км') && scaleBar(0.5).label.includes('м'), 'линейка переводит метры в реальные единицы');
 
-const dom = new JSDOM('<!doctype html><div id="host"><iframe></iframe></div>', { pretendToBeVisual: true, url: 'https://mir.test/' });
+const dom = new JSDOM('<!doctype html><div id="host"><iframe></iframe></div>', { pretendToBeVisual: true, url: 'https://sages.test/' });
 const window = dom.window;
 for (const name of ['window', 'document', 'Node', 'HTMLElement']) globalThis[name] = window[name];
 globalThis.localStorage = window.localStorage;

@@ -1,7 +1,7 @@
 /* ===========================================================
    Игра на бесплатном хостинге Cloudflare Workers.
 
-   Один адрес вида https://mir.ИМЯ.workers.dev отдаёт сразу всё:
+   Один адрес вида https://sages.ИМЯ.workers.dev отдаёт сразу всё:
 
    — саму игру (файлы из `dist/`, собранные `npm run build`);
    — хаб общих аккаунтов и сигналинг P2P (`/api/*`).
@@ -90,7 +90,7 @@ const readJsonBody = async (request) => {
   }
 };
 
-export class MirHub {
+export class SagesHub {
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -144,13 +144,13 @@ export class MirHub {
         db: this.db,
         persist: (_db, { immediate }) => this.persist(immediate),
         /* Ключ панели: сменённый через панель лежит в хранилище объекта
-           (adminKey выше), секрет воркера MIR_ADMIN_KEY задаёт свой
+           (adminKey выше), секрет воркера SAGES_ADMIN_KEY задаёт свой
            начальный ключ, а по умолчанию действует заводской
            HUB_DEFAULT_ADMIN_KEY — адрес публичный, поэтому панель сама
            напоминает сменить заводской ключ. Секрет задаётся командой
-             npx wrangler secret put MIR_ADMIN_KEY
+             npx wrangler secret put SAGES_ADMIN_KEY
            или переменной [vars] в wrangler.toml. */
-        adminKey: String(this.env?.MIR_ADMIN_KEY || '').trim(),
+        adminKey: String(this.env?.SAGES_ADMIN_KEY || '').trim(),
       });
     });
   }
@@ -319,7 +319,7 @@ export class MirHub {
       headers: {
         authorization: request.headers.get('Authorization') || '',
         /* Ключ панели админа передаём ядру: сам воркер его не проверяет. */
-        'x-mir-admin': request.headers.get('X-Mir-Admin') || '',
+        'x-sages-admin': request.headers.get('X-Sages-Admin') || '',
       },
       body,
       ip: request.headers.get('CF-Connecting-IP') || 'unknown',
@@ -345,7 +345,7 @@ export default {
       /* Обновление до WebSocket проходит без пересборки тела: поток нужен
          только для обычных запросов с JSON. */
       if (url.pathname === '/api/ws' && request.headers.get('Upgrade') === 'websocket') {
-        return await env.HUB.get(env.HUB.idFromName('mir')).fetch(request);
+        return await env.HUB.get(env.HUB.idFromName('sages')).fetch(request);
       }
 
       let requestForHub = request;
@@ -372,14 +372,14 @@ export default {
 
       /* Хаб один на весь мир: все игроки должны видеть одни и те же
          аккаунты, поэтому имя объекта фиксированное. */
-      const id = env.HUB.idFromName('mir');
+      const id = env.HUB.idFromName('sages');
       return await env.HUB.get(id).fetch(requestForHub);
     } catch (error) {
       /* Не записываем query string или заголовки: в них могут быть сессии
          и ключ панели. Для диагноза хватает метода, пути и типа ошибки. */
       console.error(
         JSON.stringify({
-          event: 'mir_hub_request_failed',
+          event: 'sages_hub_request_failed',
           method: request.method,
           path: url.pathname,
           error: error instanceof Error ? error.name : 'UnknownError',

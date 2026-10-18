@@ -2,7 +2,7 @@
    Клиент хаба. Хаб — это общий сервер аккаунтов: он может быть
    тем же адресом, откуда открыта игра (ПК в локальной сети или
    бесплатный хостинг), а может быть чужим адресом, который игрок
-   ввёл руками — тогда даже mir.html с флешки и APK на телефоне
+   ввёл руками — тогда даже sages.html с флешки и APK на телефоне
    играют вместе с остальными.
 
    Общение — HTTP на `base`, состояние зеркалится в cache.
@@ -58,7 +58,7 @@ export const pingHub = async (url = base, { timeout = url ? 6000 : 1500 } = {}) 
   });
   if (!response.ok) throw new Error('Хаб недоступен.');
   const data = await response.json();
-  if (data?.hub !== 'mir') throw new Error('По этому адресу отвечает не хаб игры.');
+  if (data?.hub !== 'sages') throw new Error('По этому адресу отвечает не хаб игры.');
   return data;
 };
 
@@ -107,10 +107,10 @@ export const apiInbox = ({ wait = true } = {}) =>
    Ключ администратора уходит на хаб в заголовке — в адресе ему не
    место (адреса попадают в логи и историю). Проверяет ключ сам хаб:
    действует ключ, сменённый через панель, затем заданный владельцем
-   (MIR_ADMIN_KEY на ПК, секрет воркера на хостинге), затем заводской
+   (SAGES_ADMIN_KEY на ПК, секрет воркера на хостинге), затем заводской
    HUB_DEFAULT_ADMIN_KEY — чужой человек в панель не войдёт. */
 
-const adminHeaders = (key) => ({ 'X-Mir-Admin': String(key || '') });
+const adminHeaders = (key) => ({ 'X-Sages-Admin': String(key || '') });
 
 export const apiAdminPing = (key) =>
   call('POST', '/api/admin/ping', {}, { headers: adminHeaders(key), timeout: 10_000 });

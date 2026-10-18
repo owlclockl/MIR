@@ -14,7 +14,7 @@ export const pickAvatarFile = () =>
     input.type = 'file';
     input.accept = 'image/png, image/jpeg, image/webp, image/gif';
     /* Поле обязательно должно быть в документе: часть WebView (в том
-       числе та, что внутри MIR.apk) игнорирует клик по <input type="file">,
+       числе та, что внутри Sages.apk) игнорирует клик по <input type="file">,
        который ни к чему не прикреплён, и выбор файла просто не открывается. */
     input.setAttribute('aria-hidden', 'true');
     input.tabIndex = -1;

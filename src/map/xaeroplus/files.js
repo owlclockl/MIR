@@ -2,7 +2,7 @@ import { infiniteEndpoints } from './drawing.js';
 import { cleanDrawings, cleanPins, cleanSettings } from './schema.js';
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 export function makeProject(world, drawings, pins, settings) {
-  return { format: 'MIR surface annotations', version: 1, world: { key: world.key, widthM: world.widthM, heightM: world.heightM },
+  return { format: 'Sages surface annotations', version: 1, world: { key: world.key, widthM: world.widthM, heightM: world.heightM },
     drawings: cleanDrawings(drawings), pins: cleanPins(pins), settings: cleanSettings(settings) };
 }
 const geo = (u, v) => [u * 360 - 180, 90 - v * 180];
@@ -40,9 +40,9 @@ function drawingGeometry(s) {
   return { type: 'LineString', coordinates: endpoints.map(([u, v]) => geo(u, v)) };
 }
 export function makeGeoJSON(drawings, pins) {
-  const features = cleanDrawings(drawings).map((s) => ({ type: 'Feature', properties: { mirDrawing: s, ...(s.type === 'text' ? { name: s.text } : {}) }, geometry: drawingGeometry(s) }));
+  const features = cleanDrawings(drawings).map((s) => ({ type: 'Feature', properties: { sagesDrawing: s, ...(s.type === 'text' ? { name: s.text } : {}) }, geometry: drawingGeometry(s) }));
   for (const p of cleanPins(pins)) features.push({ type: 'Feature', properties: { name: p.name }, geometry: { type: 'Point', coordinates: geo(p.u, p.v) } });
-  return { type: 'FeatureCollection', mirProjection: 'fictional whole-world equirectangular', features };
+  return { type: 'FeatureCollection', sagesProjection: 'fictional whole-world equirectangular', features };
 }
 export function parseProject(text, world) {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > MAX_IMPORT_BYTES) throw new Error('Файл больше 2 МиБ');
@@ -54,8 +54,8 @@ export function parseProject(text, world) {
     for (const f of data.features) {
       if (f?.type !== 'Feature') throw new Error('GeoJSON: ожидался Feature');
       const g = f?.geometry; const props = f?.properties || {};
-      if (props.mirDrawing) {
-        const valid = cleanDrawings([props.mirDrawing]); if (valid.length !== 1) throw new Error('Повреждённый рисунок GeoJSON');
+      if (props.sagesDrawing) {
+        const valid = cleanDrawings([props.sagesDrawing]); if (valid.length !== 1) throw new Error('Повреждённый рисунок GeoJSON');
         drawings.push(valid[0]);
       } else if (g?.type === 'Point') {
         const [u, v] = uv(g.coordinates); pins.push({ u, v, name: String(props.name || 'Метка GeoJSON') });
@@ -78,7 +78,7 @@ export function parseProject(text, world) {
     if (valid.length !== drawings.length) throw new Error('GeoJSON содержит нулевые или неверные линии');
     return { drawings: valid, pins: cleanPins(pins) };
   }
-  if (data.format !== 'MIR surface annotations' || data.version !== 1) throw new Error('Это не файл рисунков поверхности MIR');
+  if (data.format !== 'Sages surface annotations' || data.version !== 1) throw new Error('Это не файл рисунков поверхности Sages');
   if (data.world?.key !== world.key || data.world?.widthM !== world.widthM || data.world?.heightM !== world.heightM) throw new Error('Seed или физический размер файла не совпадает с текущей картой');
   if (!Array.isArray(data.drawings) || !Array.isArray(data.pins) || data.drawings.length > 256 || data.pins.length > 64) throw new Error('Неверные списки или превышен лимит');
   const drawings = cleanDrawings(data.drawings); const pins = cleanPins(data.pins);

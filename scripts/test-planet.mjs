@@ -63,12 +63,12 @@ const add = (ok, what, detail = '') => checks.push({ ok: Boolean(ok), what, deta
 
 /* ---------- 1. шкала ---------- */
 
-const earth = createPlanet({ seed: 'mir-2026', size: 1 });
+const earth = createPlanet({ seed: 'sages-2026', size: 1 });
 add(Math.abs(earth.widthM - 40_075_000) < 5000, 'экватор планеты 1× — 40 075 км', `${(earth.widthM / 1000).toFixed(0)} км`);
 add(Math.abs(earth.heightM - earth.widthM / 2) / earth.widthM < 0.002,
   'высота карты — половина экватора (с округлением до пикселя)', `${(earth.heightM / 1000).toFixed(0)} км`);
 add(mppAt(earth, earth.maxLevel) === 1, 'на максимальном уровне 1 пиксель = 1 метр', `${mppAt(earth, earth.maxLevel)} м`);
-const huge = createPlanet({ seed: 'mir-2026', size: 4 });
+const huge = createPlanet({ seed: 'sages-2026', size: 4 });
 add(mppAt(huge, huge.maxLevel) === 1, 'планета 4× тоже доходит до метра в пикселе', `${mppAt(huge, huge.maxLevel)} м`);
 add(huge.widthM > earth.widthM * 3.9, 'планета 4× — 160 300 км по экватору', `${(huge.widthM / 1000).toFixed(0)} км`);
 add(levelPixels(huge, huge.maxLevel).w > 160_000_000, 'максимальный кадр 4× — 160 млн пикселей в строке',
@@ -250,7 +250,7 @@ add(sourcedNaN === 0, 'на глубоком уровне с картой тож
 /* Мост в Azgaar — единственное место, где поле знает имена генератора.
    Снимок с поддельного окна обязан быть годен планете: расхождение имён
    ловится здесь, а не в браузере. Основная карта от Azgaar не зависит. */
-const bridgeSource = readSource(fakeEditorWindow(), { seed: 'mir-2026', width: 96, height: 96 });
+const bridgeSource = readSource(fakeEditorWindow(), { seed: 'sages-2026', width: 96, height: 96 });
 const bridgeField = createSourceField(earth, bridgeSource);
 const bridgeSample = bridgeField.baseAt(earth.widthM / 2, earth.heightM / 2);
 add(Number.isFinite(bridgeSample) && bridgeField.stats().cells === bridgeSource.cellsX * bridgeSource.cellsY,

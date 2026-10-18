@@ -77,7 +77,7 @@ class OptionsModel {
           temperature: { unit: locale() === "en-US" ? "°F" : "°C" },
           population: { scale: 1000, urbanization: { rate: 1, density: 10 } }
         },
-        /* MIR opens on a darker cartographic palette; players can still
+        /* The civilization of the sages opens on a darker cartographic palette; players can still
            change or save any FMG preset from the Style editor. */
         style: { preset: "night" },
         burgs: { groups: Burgs.getDefaultGroups() },

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 
-const port = Number(process.env.MIR_TEST_PORT || 4179);
+const port = Number(process.env.SAGES_TEST_PORT || 4179);
 const base = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, ['server/serve.mjs', 'dist', '--port', String(port), '--no-hub'], {
   stdio: ['ignore', 'pipe', 'pipe'],

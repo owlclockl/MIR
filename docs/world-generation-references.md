@@ -1,6 +1,6 @@
 # Источники генератора мира
 
-> **Текущее устройство.** Собственный основной генератор MIR удалён.
+> **Текущее устройство.** Собственный основной генератор The civilization of the sages удалён.
 > Рабочая карта временно открывается в Azgaar, дополнительная планетарная
 > модель (`src/planet/`) сохранена. Подбор нового движка и разбор присланных
 > репозиториев — [continent-research.md](continent-research.md).
@@ -54,7 +54,7 @@ Azgaar. Источники не означают реконструкцию на
 
 ## Процедурная картография
 
-- [Azgaar's Fantasy Map Generator](https://github.com/Azgaar/Fantasy-Map-Generator) — временная рабочая карта после удаления собственного генератора. В репозитории сохранены исходники, ресурсы и MIT-лицензия; локальная адаптация описана в [`vendor/azgaar-fantasy-map-generator/MIR-INTEGRATION.md`](../vendor/azgaar-fantasy-map-generator/MIR-INTEGRATION.md). Географию Azgaar может читать отдельный вид планеты.
+- [Azgaar's Fantasy Map Generator](https://github.com/Azgaar/Fantasy-Map-Generator) — временная рабочая карта после удаления собственного генератора. В репозитории сохранены исходники, ресурсы и MIT-лицензия; локальная адаптация описана в [`vendor/azgaar-fantasy-map-generator/SAGES-INTEGRATION.md`](../vendor/azgaar-fantasy-map-generator/SAGES-INTEGRATION.md). Географию Azgaar может читать отдельный вид планеты.
 - [Martin O'Leary, “Generating fantasy maps”](https://mewo2.com/notes/terrain/) — практические заметки о генерации высот, берегов и речных сетей; этот материал также указан как источник вдохновения в README Azgaar.
 - [Amit Patel, “Polygonal Map Generation for Games”](http://www-cs-students.stanford.edu/~amitp/game-programming/polygon-map-generation) — связность ячеек, высотные поля, реки и климатические признаки для игровых карт; также процитирован upstream-проектом.
 

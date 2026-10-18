@@ -26,7 +26,7 @@ describe("getRequestedMapSize", () => {
     });
   });
 
-  it("takes an exact points count from the link (MIR Earth-sized maps)", () => {
+  it("takes an exact points count from the link (Sages Earth-sized maps)", () => {
     expect(getRequestedMapSize(new URLSearchParams("width=40075017&height=20003932&points=1000000"))).toEqual({
       width: 40075017,
       height: 20003932,
@@ -37,7 +37,7 @@ describe("getRequestedMapSize", () => {
   });
 });
 
-describe("MIR physical whole-world profile", () => {
+describe("Sages physical whole-world profile", () => {
   it("keeps metre-sized planet extents out of the SVG / Voronoi graph", () => {
     const size = getRequestedMapSize(new URLSearchParams("world=earth&width=40075017&height=20003932&points=1000000"));
     expect(size.width).toBe(2000);

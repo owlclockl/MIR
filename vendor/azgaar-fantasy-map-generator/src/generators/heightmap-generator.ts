@@ -555,7 +555,7 @@ class HeightmapModule {
     return options.generation.template;
   }
 
-  // MIR: explicit one-shot RTWG import, never used for ordinary seed generation.
+  // Sages: explicit one-shot RTWG import, never used for ordinary seed generation.
   private externalHeightmap: { width: number; height: number; values: Float32Array; sea: number; scale: number } | null = null;
 
   queueExternalHeightmap(data: { width: number; height: number; values: ArrayLike<number>; sea: number; scale: number }) {
@@ -618,7 +618,7 @@ class HeightmapModule {
     for (const step of steps) {
       const elements = step.trim().split(" ");
       if (elements.length < 2) throw new Error(`Heightmap template: steps < 2. Template: ${id}. Step: ${elements}`);
-      // MIR Earth profile: reuse upstream Range on land, without spawning
+      // Sages Earth profile: reuse upstream Range on land, without spawning
       // mountain islands/bridges in the oceans; final smoothing cannot drown
       // the low coastal plains. All other templates keep
       // their original semantics, PRNG and execution order.

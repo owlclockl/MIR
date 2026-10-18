@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: mir-${{ github.workflow }}-${{ github.ref }}
+  group: sages-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -47,7 +47,7 @@ jobs:
           npm run test:worker
       - name: Test live local hub and jsdom UI
         run: |
-          node server/serve.mjs dist --port 4173 > /tmp/mir-server.log 2>&1 &
+          node server/serve.mjs dist --port 4173 > /tmp/sages-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 40); do

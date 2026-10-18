@@ -133,21 +133,21 @@ export function httpError(status, message) {
 }
 
 /* Заголовки для чужого источника. Игра может быть открыта откуда
-   угодно — с GitHub Pages, из APK, из mir.html на флешке, — а хаб
+   угодно — с GitHub Pages, из APK, из sages.html на флешке, — а хаб
    жить на другом домене. Пароли по сети не ходят, вместо cookie —
    токен в заголовке Authorization, поэтому «*» здесь безопасно:
    без токена чужая вкладка не получит ничего, кроме /api/ping. */
 export const corsHeaders = () => ({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Mir-Admin',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Sages-Admin',
   'Access-Control-Max-Age': '86400',
 });
 
 /* Ключ администратора панели по умолчанию — заводской, публичный: он в
    открытом исходнике, поэтому панель сама напоминает его сменить. Владелец
    хаба может задать свой ключ переменной окружения / секретом воркера
-   (MIR_ADMIN_KEY) или сменить его в панели — тогда ключ хранится в данных
+   (SAGES_ADMIN_KEY) или сменить его в панели — тогда ключ хранится в данных
    хаба и переживает перезапуск. */
 export const HUB_DEFAULT_ADMIN_KEY = 'owlananaslwo';
 const HUB_ADMIN_MIN_KEY = 6;
@@ -389,11 +389,11 @@ export function createHubCore({
 
   /* ---------- панель админа ----------------------------------
      Служебные маршруты для владельца игры: список аккаунтов и правки.
-     Вход — по ключу администратора в заголовке X-Mir-Admin.
+     Вход — по ключу администратора в заголовке X-Sages-Admin.
 
      Какой ключ действует, в порядке убывания: сменённый через панель
      (лежит в db.adminKey и сохраняется вместе с данными хаба), затем
-     ключ из переменной окружения / секрета воркера (MIR_ADMIN_KEY),
+     ключ из переменной окружения / секрета воркера (SAGES_ADMIN_KEY),
      затем заводской HUB_DEFAULT_ADMIN_KEY. Панель на хабе включена
      всегда — заводской ключ публичный, панель сама напоминает сменить
      его. Пароли и здесь не ходят открытым текстом — панель присылает
@@ -403,7 +403,7 @@ export function createHubCore({
   const adminKeyIsDefault = () => !String(db.adminKey || '').trim() && !String(adminKey || '').trim();
 
   const adminAuth = (req) => {
-    const given = req.headers?.['x-mir-admin'] || req.headers?.['X-Mir-Admin'] || '';
+    const given = req.headers?.['x-sages-admin'] || req.headers?.['X-Sages-Admin'] || '';
     if (!secretEquals(given, effectiveAdminKey())) throw httpError(403, 'Неверный ключ администратора.');
   };
 
@@ -856,7 +856,7 @@ export function createHubCore({
 
   const routes = {
     ...lobbies.routes,
-    'GET /api/ping': () => ({ ok: true, hub: 'mir', users: db.users.length }),
+    'GET /api/ping': () => ({ ok: true, hub: 'sages', users: db.users.length }),
 
     'GET /api/salt': (req) => {
       const user = byName(req.query.get('name'));
@@ -1086,7 +1086,7 @@ export function createHubCore({
 
     'POST /api/admin/ping': (req) => {
       adminAuth(req);
-      return { ok: true, hub: 'mir', stats: adminStats() };
+      return { ok: true, hub: 'sages', stats: adminStats() };
     },
 
     'POST /api/admin/state': (req) => {

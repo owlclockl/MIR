@@ -4,7 +4,7 @@
  *   node locale/extract.mjs            — сводка: сколько строк и сколько переведено
  *   node locale/extract.mjs --write    — пересобрать locale/en.tsv (что надо перевести)
  *   node locale/extract.mjs --seed     — перенести переводы в ru.tsv на новые id
- *   node locale/extract.mjs --check    — строгая проверка (её зовёт сборка MIR)
+ *   node locale/extract.mjs --check    — строгая проверка (её зовёт сборка Sages)
  *
  * en.tsv (id → английский текст) генерируется из исходников, руками его не правят;
  * ru.tsv (id → русский текст) — единственный файл, который пополняет переводчик.

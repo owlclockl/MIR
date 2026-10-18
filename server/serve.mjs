@@ -10,7 +10,7 @@
  *
  * По умолчанию вместе со статикой работает хаб (/api/*): друзья в той же
  * Wi-Fi видят общие аккаунты, списки друзей и коды-приглашения. Данные —
- * в data/mir-hub.json.
+ * в data/sages-hub.json.
  */
 import { createServer, get as httpGet } from 'node:http';
 import { get as httpsGet } from 'node:https';
@@ -62,10 +62,10 @@ const MIME = {
 
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.map']);
 
-/* ---------- логирование в файл logs/mir-server.log ---------- */
+/* ---------- логирование в файл logs/sages-server.log ---------- */
 
 const LOG_DIR = resolve('logs');
-const LOG_FILE = join(LOG_DIR, 'mir-server.log');
+const LOG_FILE = join(LOG_DIR, 'sages-server.log');
 
 function logToFile(level, category, message) {
   try {
@@ -175,7 +175,7 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 /* ---------- хаб общих аккаунтов ---------- */
 
 const hub = args.hub
-  ? createHub({ dbFile: fromRoot('data', 'mir-hub.json') })
+  ? createHub({ dbFile: fromRoot('data', 'sages-hub.json') })
   : null;
 
 /* ---------- сервер ---------- */
@@ -390,17 +390,17 @@ function onReady(port) {
       console.log(
         '  ⚠ Публичная ссылка открыта наружу, а ключ панели — заводской.\n' +
           '    Смените его в панели (Система → Ключ администратора) или задайте\n' +
-          '    свой: MIR_ADMIN_KEY=свой-ключ node serve.mjs --public',
+          '    свой: SAGES_ADMIN_KEY=свой-ключ node serve.mjs --public',
       );
     else if (hub.adminKeyIsDefault)
-      console.log('  Свой ключ: в панели (Система → Ключ администратора) или MIR_ADMIN_KEY=свой-ключ');
+      console.log('  Свой ключ: в панели (Система → Ключ администратора) или SAGES_ADMIN_KEY=свой-ключ');
   }
   console.log('');
   if (!args.public) {
     console.log('  Нужны друзья из интернета? Запустите с флагом --public');
     console.log('');
   }
-  console.log('  Журнал логов: logs/mir-server.log');
+  console.log('  Журнал логов: logs/sages-server.log');
   console.log('  Ctrl+C — остановить');
   console.log('');
 
@@ -453,7 +453,7 @@ function startTunnelWatchdog(url, port, onFail) {
       const getter = isHttps ? httpsGet : httpGet;
       const pingUrl = `${url}/api/health`;
 
-      const req = getter(pingUrl, { headers: { 'User-Agent': 'MIR-Watchdog/1.0' } }, (res) => {
+      const req = getter(pingUrl, { headers: { 'User-Agent': 'Sages-Watchdog/1.0' } }, (res) => {
         res.resume();
         if (res.statusCode >= 200 && res.statusCode < 500) {
           if (failureCount > 0) {

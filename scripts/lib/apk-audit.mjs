@@ -65,13 +65,13 @@ export function auditApk(buf, log, { prefix = '' } = {}) {
     fail: 'комментарий после EOCD ломает поиск блока подписи v2',
   });
 
-  const need = ['AndroidManifest.xml', 'classes.dex', 'resources.arsc', 'assets/mir.html'];
+  const need = ['AndroidManifest.xml', 'classes.dex', 'resources.arsc', 'assets/sages.html'];
   for (const name of need) {
     log.check(zip.byName.has(name), `в архиве есть ${name}`, {
       fail:
         name === 'classes.dex'
           ? 'без кода активность не запустится: ClassNotFoundException'
-          : name === 'assets/mir.html'
+          : name === 'assets/sages.html'
             ? 'WebView покажет «net::ERR_FILE_NOT_FOUND» — чёрный экран'
             : 'пакет не распознаётся установщиком',
     });
@@ -346,8 +346,8 @@ export function auditApk(buf, log, { prefix = '' } = {}) {
     } else {
       log.warn('в DEX нет адреса file:///android_asset/… — непонятно, что именно грузит WebView');
     }
-    const tag = dex.strings.includes('MIR');
-    log.check(tag, 'в коде есть тег журнала MIR (adb logcat -s MIR)', {
+    const tag = dex.strings.includes('SAGES');
+    log.check(tag, 'в коде есть тег журнала SAGES (adb logcat -s SAGES)', {
       fail: 'на телефоне нечего будет искать в системном журнале',
     });
   } catch (err) {
@@ -357,8 +357,8 @@ export function auditApk(buf, log, { prefix = '' } = {}) {
   /* ---------------------------------------------------------------
      5. Сама игра внутри APK
      --------------------------------------------------------------- */
-  section('Игра внутри APK (assets/mir.html)');
-  const htmlEntry = zip.byName.get('assets/mir.html');
+  section('Игра внутри APK (assets/sages.html)');
+  const htmlEntry = zip.byName.get('assets/sages.html');
   if (htmlEntry) {
     const html = htmlEntry.data.toString('utf8');
     info.htmlSize = htmlEntry.data.length;
@@ -374,7 +374,7 @@ export function auditApk(buf, log, { prefix = '' } = {}) {
     log.check(!html.includes('/assets/'), 'нет ссылок на внешние файлы сборки', {
       fail: 'внутри APK таких файлов нет: часть игры не загрузится',
     });
-    log.check(html.includes('MIRDiag'), 'встроен экранный журнал ошибок', {
+    log.check(html.includes('SagesDiag'), 'встроен экранный журнал ошибок', {
       fail: 'ошибку внутри WebView не увидеть без компьютера',
     });
     const external = [...new Set((html.match(/https?:\/\/[^"'\s)]+/g) ?? []).map((u) => u.split('/')[2]))];
@@ -454,7 +454,7 @@ export const PHONE_LOG_HELP = [
   '  3. Если экран просто чёрный — подождите 6 секунд: встроенная',
   '     диагностика сама покажет отчёт о том, что не выполнилось.',
   '  4. Полный системный журнал (нужен компьютер и USB-отладка):',
-  '       adb logcat -s MIR:V AndroidRuntime:E PackageManager:I',
+  '       adb logcat -s SAGES:V AndroidRuntime:E PackageManager:I',
   '     Строки «onCreate: start» и «WebView created» означают, что',
   '     приложение запустилось; их отсутствие — что система не дошла',
   '     даже до старта активности.',

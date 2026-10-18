@@ -1,11 +1,11 @@
 /* Проверка артефактов сборки.
 
    Зачем. Сборка — единственный шаг, который нельзя перепроверить на глаз:
-   сломанный `mir.html` открывается чёрным экраном, а лишний файл в `dist/`
+   сломанный `sages.html` открывается чёрным экраном, а лишний файл в `dist/`
    на хостинге замечают через неделю. Здесь мы разбираем готовые файлы и
    отвечаем на вопросы, которые иначе всплывают у игрока:
 
-     • самодостаточен ли `mir.html` (нет ли ссылок на файлы вне себя);
+     • самодостаточен ли `sages.html` (нет ли ссылок на файлы вне себя);
      • запустится ли его скрипт по file:// (обычный скрипт, а не модуль);
      • та ли версия в разметке, что в package.json;
      • все ли файлы, на которые ссылается `dist/index.html` и список
@@ -18,13 +18,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import vm from 'node:vm';
-import { BUILD_INFO_FILE } from './vite-mir.mjs';
+import { BUILD_INFO_FILE } from './vite-build.mjs';
 
-const ROOT_FILES = ['dist', 'mir.html'];
+const ROOT_FILES = ['dist', 'sages.html'];
 
 /* Бюджеты ловят случайно попавшие ресурсы. Собственный основной генератор
    удалён; в JS остаются приложение и дополнительный планетарный вид.
-   Azgaar в web загружается из /fmg/, а в mir.html вшивается целиком.
+   Azgaar в web загружается из /fmg/, а в sages.html вшивается целиком.
    Звуки web-версии остаются отдельными файлами. */
 export const BUDGETS = {
   js: 16 * 1024 * 1024,
@@ -123,7 +123,7 @@ export function checkWeb() {
   );
 
   const expected = version();
-  const meta = html.match(/<meta name="mir-version" content="([^"]+)"/);
+  const meta = html.match(/<meta name="sages-version" content="([^"]+)"/);
   add(
     meta?.[1] === expected,
     'версия в разметке совпадает с package.json',
@@ -137,7 +137,7 @@ export function checkWeb() {
      остаться ни картотеки слотов, ни страницы мира, ни встроенного редактора
      Azgaar. Положительная половина проверки — меню сообщества на месте. */
   add(
-    !/mir-world-slots|world-page-open|open-world|open-lobby|world-editor-frame|#optionsContainer/.test(appCode),
+    !/sages-world-slots|world-page-open|open-world|open-lobby|world-editor-frame|#optionsContainer/.test(appCode),
     'в web-бандле нет удалённых экранов мира, лобби и встроенного редактора',
     'ни «Играть», ни слотов, ни iframe Azgaar; движки остаются в исходниках',
   );
@@ -178,10 +178,10 @@ export function checkWeb() {
     `${assetFiles.length} файлов; нехешированные: ${unhashedAssets.join(', ') || 'нет'}`,
   );
 
-  const mirCssBytes = files
+  const appCssBytes = files
     .filter((name) => name.startsWith('assets/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
-  add(mirCssBytes > 0 && mirCssBytes <= BUDGETS.css, `стили приложения в бюджете (${kb(BUDGETS.css)})`, kb(mirCssBytes));
+  add(appCssBytes > 0 && appCssBytes <= BUDGETS.css, `стили приложения в бюджете (${kb(BUDGETS.css)})`, kb(appCssBytes));
   const fmgCssBytes = files
     .filter((name) => name.startsWith('fmg/') && name.endsWith('.css'))
     .reduce((sum, name) => sum + statSync(join('dist', name)).size, 0);
@@ -198,7 +198,7 @@ export function checkWeb() {
     const sw = readFileSync('dist/sw.js', 'utf8');
     const cache = sw.match(/const CACHE = '([^']+)'/);
     add(
-      Boolean(cache) && cache[1].startsWith(`mir-app-${expected}-`) && /-[0-9a-f]{8}$/.test(cache[1]),
+      Boolean(cache) && cache[1].startsWith(`sages-app-${expected}-`) && /-[0-9a-f]{8}$/.test(cache[1]),
       'имя кэша service worker привязано к версии и сборке',
       cache?.[1] ?? 'не найдено',
     );
@@ -241,7 +241,7 @@ export function checkWeb() {
       `файлов оболочки: ${precache.length}`,
     );
     add(
-      /mir:skip-waiting/.test(sw) && /\bskipWaiting\b/.test(sw),
+      /sages:skip-waiting/.test(sw) && /\bskipWaiting\b/.test(sw),
       'service worker принимает просьбу «обновить сейчас»',
     );
   }
@@ -265,7 +265,7 @@ export function checkWeb() {
       buildInfo ? `${buildInfo.version}, ${buildInfo.build}` : 'файл не разобран',
     );
 
-    const buildMeta = html.match(/<meta name="mir-build" content="([^"]+)"/);
+    const buildMeta = html.match(/<meta name="sages-build" content="([^"]+)"/);
     add(
       buildMeta?.[1] === buildInfo?.build,
       'метка сборки в разметке совпадает с новостями о сборке',
@@ -309,20 +309,20 @@ export function checkWeb() {
   return checks;
 }
 
-/** Проверки однофайловой сборки (mir.html). */
+/** Проверки однофайловой сборки (sages.html). */
 export function checkSingle() {
   const checks = [];
   const add = (ok, what, detail = '') => checks.push({ ok, what, detail });
 
-  if (!existsSync('mir.html')) {
-    add(false, 'mir.html собран');
+  if (!existsSync('sages.html')) {
+    add(false, 'sages.html собран');
     return checks;
   }
-  const html = readFileSync('mir.html', 'utf8');
+  const html = readFileSync('sages.html', 'utf8');
   const bytes = Buffer.byteLength(html);
-  add(true, 'mir.html собран', kb(bytes));
+  add(true, 'sages.html собран', kb(bytes));
   add(
-    !/mir-world-slots|open-world/.test(html) && !/data-action=\\?"world-slot/.test(html),
+    !/sages-world-slots|open-world/.test(html) && !/data-action=\\?"world-slot/.test(html),
     'в автономной сборке нет удалённого экрана миров',
     'ни кнопки «Играть», ни картотеки слотов',
   );
@@ -340,17 +340,17 @@ export function checkSingle() {
     ['modulepreload', 'предзагрузка модулей'],
     ['(?:src|href)="/assets/', 'ссылки на каталог сборки'],
     ['(?:src|href)="/sounds/', 'ссылки на звуки файлами'],
-    [/__MIR_[A-Z_]+__/.source, 'неподставленные метки сборщика'],
+    [/__SAGES_[A-Z_]+__/.source, 'неподставленные метки сборщика'],
   ];
   for (const [pattern, what] of forbidden)
-    add(!new RegExp(pattern).test(html), `в mir.html нет: ${what}`);
+    add(!new RegExp(pattern).test(html), `в sages.html нет: ${what}`);
 
   const fontHost = (url) => url.startsWith('https://fonts.googleapis.com') || url.startsWith('https://fonts.gstatic.com');
   const external = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
   const allowed = external.every(fontHost);
   add(
     allowed,
-    'из внешнего в mir.html только шрифты',
+    'из внешнего в sages.html только шрифты',
     external.filter((url) => !allowed || !/fonts\.g/.test(url)).join(', ') || `${external.length} ссылок`,
   );
 
@@ -359,14 +359,14 @@ export function checkSingle() {
      внешний скрипт сломает офлайн-запуск. Ссылки в тексте справки
      (картинки, встроенные страницы Watabou) открываются только по просьбе
      игрока и здесь не проверяются. */
-  const templateMatch = html.match(/<script type="application\/json" id="mir-fmg-template">([\s\S]*?)<\/script>/);
+  const templateMatch = html.match(/<script type="application\/json" id="sages-fmg-template">([\s\S]*?)<\/script>/);
   let template = '';
   try {
     template = templateMatch ? JSON.parse(templateMatch[1]) : '';
   } catch {
     template = '';
   }
-  add(template.length > 1_000_000, 'редактор Azgaar вшит в mir.html', template ? kb(template.length) : 'шаблон не найден');
+  add(template.length > 1_000_000, 'редактор Azgaar вшит в sages.html', template ? kb(template.length) : 'шаблон не найден');
   /* Внешние скрипты сборщик уже вставляет внутрь; если ссылка на скрипт
      осталась, это сломанная сборка — поэтому запрещаем любой <script src>. */
   const templateScriptSrc = [...template.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
@@ -379,19 +379,19 @@ export function checkSingle() {
   );
   add(
     html.includes('Copyright 2017-2024 Max Haniyeu (Azgaar)') && html.includes('MIT License'),
-    'MIT-лицензия Azgaar и атрибуция сохранены в mir.html',
+    'MIT-лицензия Azgaar и атрибуция сохранены в sages.html',
   );
 
   const expected = version();
   add(
-    html.includes(`<meta name="mir-version" content="${expected}"`),
-    'версия mir.html совпадает с package.json',
+    html.includes(`<meta name="sages-version" content="${expected}"`),
+    'версия sages.html совпадает с package.json',
     expected,
   );
-  const buildMeta = html.match(/<meta name="mir-build" content="([0-9a-f]{8})"\s*\/>/);
+  const buildMeta = html.match(/<meta name="sages-build" content="([0-9a-f]{8})"\s*\/>/);
   add(
     Boolean(buildMeta),
-    'метка сборки mir.html на месте',
+    'метка сборки sages.html на месте',
     buildMeta?.[1] ?? 'не найдена',
   );
 
@@ -404,13 +404,13 @@ export function checkSingle() {
   add(/rel="icon"[^>]*href="data:image\/png;base64,/.test(html), 'значок вкладки встроен');
 
   const mib = (n) => `${(n / 1024 / 1024).toFixed(1)} МиБ`;
-  add(bytes <= BUDGETS.single, `mir.html в бюджете (${mib(BUDGETS.single)})`, mib(bytes));
+  add(bytes <= BUDGETS.single, `sages.html в бюджете (${mib(BUDGETS.single)})`, mib(bytes));
 
   /* Главная проверка: скрипт из файла — обычный скрипт. Разбираем его как
      классический код: модульный синтаксис (import/export) здесь не пройдёт,
      а значит по file:// игра запустится. */
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  add(scripts.length === 1, 'в mir.html ровно один скрипт', `${scripts.length}`);
+  add(scripts.length === 1, 'в sages.html ровно один скрипт', `${scripts.length}`);
   let parsed = false;
   let parseError = '';
   try {
@@ -419,7 +419,7 @@ export function checkSingle() {
   } catch (error) {
     parseError = error.message;
   }
-  add(parsed, 'скрипт mir.html разбирается как обычный (не модульный)', parseError);
+  add(parsed, 'скрипт sages.html разбирается как обычный (не модульный)', parseError);
 
   add(
     html.indexOf('<script>') > html.indexOf('<div id="app">'),

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/* Разбор готового MIR.apk: что внутри и почему он может не работать.
+/* Разбор готового Sages.apk: что внутри и почему он может не работать.
 
    Запуск:
-     npm run apk:doctor               — разобрать MIR.apk в корне проекта
+     npm run apk:doctor               — разобрать Sages.apk в корне проекта
      npm run apk:doctor -- путь.apk   — разобрать любой другой файл
      npm run apk:doctor -- --verbose  — печатать весь разбор в консоль
 
@@ -25,7 +25,7 @@ import { auditApk, PHONE_LOG_HELP, fingerprint } from './lib/apk-audit.mjs';
 import { readZip } from './lib/apk-read.mjs';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-const candidates = args.length ? args : ['MIR.apk', 'dist-app/MIR.apk'];
+const candidates = args.length ? args : ['Sages.apk', 'dist-app/Sages.apk'];
 const target = candidates.find((p) => existsSync(p));
 
 console.log('============================================================');
@@ -38,7 +38,7 @@ if (!target) {
   for (const c of candidates) console.log(`    • ${c}`);
   console.log('');
   console.log('  Сначала соберите приложение: npm run build:apk');
-  console.log('  Или укажите путь: npm run apk:doctor -- C:\\путь\\MIR.apk');
+  console.log('  Или укажите путь: npm run apk:doctor -- C:\\путь\\Sages.apk');
   process.exit(1);
 }
 
@@ -61,16 +61,16 @@ try {
 
   /* --- Свежесть: собран ли APK из того, что лежит в проекте сейчас --- */
   log.section('Свежесть сборки');
-  if (existsSync('mir.html')) {
+  if (existsSync('sages.html')) {
     const zip = readZip(buf);
-    const inside = zip.byName.get('assets/mir.html');
-    const outside = readFileSync('mir.html');
+    const inside = zip.byName.get('assets/sages.html');
+    const outside = readFileSync('sages.html');
     const same = inside && inside.data.includes(outside.subarray(0, 2000));
-    log.detail('mir.html в проекте', human(outside.length));
-    log.detail('mir.html внутри APK', inside ? human(inside.data.length) : 'нет');
+    log.detail('sages.html в проекте', human(outside.length));
+    log.detail('sages.html внутри APK', inside ? human(inside.data.length) : 'нет');
     if (!same) {
       log.warn(
-        'игра внутри APK не совпадает с текущим mir.html',
+        'игра внутри APK не совпадает с текущим sages.html',
         'APK собран из другой версии исходников — пересоберите: npm run build:apk',
       );
     } else {

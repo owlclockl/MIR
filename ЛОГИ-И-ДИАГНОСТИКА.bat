@@ -17,10 +17,10 @@ echo.
 node scripts\doctor.mjs
 if errorlevel 1 goto :fail
 
-if not exist "MIR.apk" goto :noapk
+if not exist "Sages.apk" goto :noapk
 echo.
 echo ============================================================
-echo   Разбираю собранный MIR.apk
+echo   Разбираю собранный Sages.apk
 echo   (почему он может не ставиться или не запускаться)
 echo ============================================================
 echo.
@@ -30,7 +30,7 @@ goto :report
 
 :noapk
 echo.
-echo   MIR.apk не найден — разбор Android-приложения пропущен.
+echo   Sages.apk не найден — разбор Android-приложения пропущен.
 echo   Собрать: СБОРКА.bat, пункт [3].
 
 :report
@@ -38,10 +38,10 @@ echo.
 echo ============================================================
 echo   ОТЧЁТЫ СФОРМИРОВАНЫ!
 echo     logs\diagnostic-report.txt  — система, сеть, порты
-echo     logs\apk-report.txt         — разбор MIR.apk
+echo     logs\apk-report.txt         — разбор Sages.apk
 echo     logs\apk-build.log          — протокол последней сборки APK
 echo     logs\apk-doctor.log         — полный разбор APK по байтам
-echo     logs\mir-server.log         — журнал сервера
+echo     logs\sages-server.log         — журнал сервера
 echo.
 echo   Последний отчёт уже в буфере обмена — Ctrl+V в чат разработчику.
 echo ============================================================

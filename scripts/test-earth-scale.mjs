@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fromRoot } from './lib/root.mjs';
 
-const dir = mkdtempSync(join(tmpdir(), 'mir-earth-'));
+const dir = mkdtempSync(join(tmpdir(), 'sages-earth-'));
 try {
   const vendor = fromRoot('vendor/azgaar-fantasy-map-generator');
   const entry = (name) => JSON.stringify(join(vendor, 'src', name));
@@ -105,7 +105,7 @@ try {
     return result.sort((a, b) => b.area - a.area);
   };
   let firstHeights;
-  for (const seed of ['earth-test', 'MIR-2026', 'земля', 'sages-earth', '1337', '987654321', 'earth-test']) {
+  for (const seed of ['earth-test', 'SAGES-2026', 'земля', 'sages-earth', '1337', '987654321', 'earth-test']) {
     globalThis.options = { map: { seed, graph: expectedGraph } };
     const graph = Grid.generate(seed, world.graphWidth, world.graphHeight, EARTH_WORLD_POINTS);
     let coastBeforeMountains;

@@ -1,11 +1,11 @@
 /* Service worker: офлайн-кэш без автоматических перезагрузок. Новый worker
    не отбирает управление у открытой игры сам — версия ждёт закрытия вкладок
    и включается при следующем запуске. Перейти на неё раньше можно только по
-   просьбе страницы (сообщение mir:skip-waiting): так работает кнопка
+   просьбе страницы (сообщение sages:skip-waiting): так работает кнопка
    «Обновить сейчас» — открытую игру она не прерывает сама, её нажимает игрок.
 
    Этот файл — шаблон: сборщик подставляет в него имя кэша, список файлов
-   оболочки, метку и версию сборки (см. scripts/lib/vite-mir.mjs). Имя кэша
+   оболочки, метку и версию сборки (см. scripts/lib/vite-build.mjs). Имя кэша
    включает версию и хеш содержимого сборки, поэтому «забыть поднять ключ
    кэша» больше нельзя, а неизменившаяся сборка не гонит пользователю новый
    worker.
@@ -13,23 +13,23 @@
    Документы берём из сети (свежесть важнее), остальное — stale-while-
    revalidate: экран не мигает, а следующий запуск получает обновление.
    /api/* не кэшируем вовсе: это аккаунты и живые данные хаба, а
-   /mir-build.json — свежие новости о версии: отдать его из кэша значит
+   /sages-build.json — свежие новости о версии: отдать его из кэша значит
    сравнивать старую сборку со старой же и никогда не увидеть новую. */
 
-const CACHE = '__MIR_CACHE__';
-const PRECACHE = __MIR_PRECACHE__;
-const BUILD = '__MIR_BUILD__';
-const VERSION = '__MIR_VERSION__';
+const CACHE = '__SAGES_CACHE__';
+const PRECACHE = __SAGES_PRECACHE__;
+const BUILD = '__SAGES_BUILD__';
+const VERSION = '__SAGES_VERSION__';
 
 /* Файл, по которому приложение узнаёт о новой сборке на сервере. */
-const BUILD_INFO_PATH = '/mir-build.json';
+const BUILD_INFO_PATH = '/sages-build.json';
 /* Тег фоновой проверки: по нему браузер будит worker (periodicsync). */
-const UPDATE_TAG = 'mir-update-check';
+const UPDATE_TAG = 'sages-update-check';
 /* Кэш настроек: страница присылает сюда выбор игрока («уведомления на
    телефон»), потому что localStorage service worker не видит. Отдельное имя,
    чтобы чистка версий его не задевала. */
-const PREFS_CACHE = 'mir-prefs';
-const PREF_URL = '/mir-notify-preference';
+const PREFS_CACHE = 'sages-prefs';
+const PREF_URL = '/sages-notify-preference';
 
 self.addEventListener('install', (event) => {
   /* Каждый файл кладём отдельно: один недоступный ресурс (например, иконка,
@@ -48,7 +48,7 @@ self.addEventListener('activate', (event) => {
       const names = await caches.keys();
       await Promise.all(
         names
-          .filter((name) => name !== CACHE && name.startsWith('mir-app-'))
+          .filter((name) => name !== CACHE && name.startsWith('sages-app-'))
           .map((name) => caches.delete(name)),
       );
       /* Фоновая проверка обновлений: там, где браузер это умеет (Chrome на
@@ -122,13 +122,13 @@ self.addEventListener('message', (event) => {
   const data = event.data || {};
   /* «Обновить сейчас»: страница просит нового worker'а взять управление.
      Только по её команде — сам worker этого не делает никогда. */
-  if (data.type === 'mir:skip-waiting') {
+  if (data.type === 'sages:skip-waiting') {
     self.skipWaiting();
     return;
   }
   /* Настройка «уведомления на телефон»: запоминаем, чтобы фоновая проверка
      не спорила с выбором игрока. */
-  if (data.type === 'mir:notify-preference') {
+  if (data.type === 'sages:notify-preference') {
     event.waitUntil(writeNotifyPreference(Boolean(data.value)));
   }
 });
@@ -155,7 +155,7 @@ const readNotifyPreference = async () => {
 };
 
 const updateNotification = () => ({
-  tag: 'mir-update',
+  tag: 'sages-update',
   icon: '/icons/icon-192.png',
   badge: '/icons/icon-192.png',
   data: { url: '/' },

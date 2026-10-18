@@ -1,4 +1,4 @@
-// Сборка Android-приложения (MIR.apk) без Android SDK, Java и интернета.
+// Сборка Android-приложения (Sages.apk) без Android SDK, Java и интернета.
 // Запуск: npm run build:apk
 //
 // Что внутри APK:
@@ -7,7 +7,7 @@
 //                         WebChromeClient (без него WebView не открывает
 //                         выбор файла — аватарку не добавить);
 //   resources.arsc      — таблица ресурсов с иконкой запуска;
-//   assets/mir.html     — сама игра одним файлом.
+//   assets/sages.html     — сама игра одним файлом.
 //
 // Почему так, а не «просто zip»: Android отказывается ставить пакет, если
 //   • не объявлен targetSdkVersion ≥ 23 (Android 14) / ≥ 24 (Android 15);
@@ -29,7 +29,7 @@
 //
 // Если APK не запускается на телефоне, разбор того же файла в любой момент
 // повторяет `npm run apk:doctor`, а сама игра внутри APK при падении
-// показывает стек ошибки прямо на экране и пишет его в logcat под тегом MIR.
+// показывает стек ошибки прямо на экране и пишет его в logcat под тегом SAGES.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,12 +43,12 @@ import { auditApk } from './lib/apk-audit.mjs';
 import { injectDiagnostics } from './lib/web-diagnostics.mjs';
 
 const PRODUCT_NAME = 'The civilization of the sages';
-const log = createLogger('apk-build', { title: `Сборка ${PRODUCT_NAME} для Android (MIR.apk)` });
+const log = createLogger('apk-build', { title: `Сборка ${PRODUCT_NAME} для Android (Sages.apk)` });
 
-const PACKAGE = 'com.mir.game';
+const PACKAGE = 'com.sages.game';
 const LABEL = 'Sages';
-/* Тег в системном журнале Android: `adb logcat -s MIR` покажет только нас. */
-const LOG_TAG = 'MIR';
+/* Тег в системном журнале Android: `adb logcat -s SAGES` покажет только нас. */
+const LOG_TAG = 'SAGES';
 const MIN_SDK = 21;
 const TARGET_SDK = 34;
 const KEY_FILE = join('data', 'apk-signing-key.json');
@@ -127,7 +127,7 @@ function crc32(buf) {
    1. classes.dex
    ------------------------------------------------------------
    Генерируем два класса. Первый — активность: полноэкранный WebView,
-   который рассказывает о себе в системный журнал (logcat, тег MIR), а
+   который рассказывает о себе в системный журнал (logcat, тег SAGES), а
    любую ошибку запуска показывает прямо на экране телефона — иначе
    Android покажет «Приложение остановлено», а настоящая причина
    останется только в logcat, до которого без компьютера не добраться.
@@ -138,7 +138,7 @@ function crc32(buf) {
    ничего). Android намеренно не даёт WebView системный выбор файла сам
    по себе — приложение обязано реализовать onShowFileChooser.
 
-     package com.mir.game;
+     package com.sages.game;
 
      public class MainActivity extends android.app.Activity {
        static ValueCallback<Uri[]> fileCallback;   // ждёт результата выбора файла
@@ -146,7 +146,7 @@ function crc32(buf) {
        public MainActivity() { super(); }
 
        protected void onCreate(Bundle b) {
-         Log.i("MIR", "onCreate: старт, версия и код сборки");
+         Log.i("SAGES", "onCreate: старт, версия и код сборки");
          try {
            super.onCreate(b);
            WebView w = new WebView(this);
@@ -155,13 +155,13 @@ function crc32(buf) {
            s.setDomStorageEnabled(true);
            s.setAllowFileAccess(true);
            w.setWebViewClient(new WebViewClient());
-           w.setWebChromeClient(new MirChromeClient(this));   // выбор файла
+           w.setWebChromeClient(new SagesChromeClient(this));   // выбор файла
            setContentView(w);
-           w.loadUrl("file:///android_asset/mir.html");
-           Log.i("MIR", "onCreate: WebView создан, загружаю mir.html");
+           w.loadUrl("file:///android_asset/sages.html");
+           Log.i("SAGES", "onCreate: WebView создан, загружаю sages.html");
          } catch (Throwable t) {
            String trace = Log.getStackTraceString(t);
-           Log.e("MIR", trace);
+           Log.e("SAGES", trace);
            TextView tv = new TextView(this);
            tv.setTextIsSelectable(true);
            tv.setText("The civilization of the sages не запустилась. Покажите этот текст разработчику:\n\n" + trace);
@@ -176,17 +176,17 @@ function crc32(buf) {
            try {
              cb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
            } catch (Throwable t) {
-             Log.e("MIR", Log.getStackTraceString(t));
+             Log.e("SAGES", Log.getStackTraceString(t));
            }
          }
-         Log.i("MIR", "onActivityResult: выбор файла вернул код " + resultCode);
+         Log.i("SAGES", "onActivityResult: выбор файла вернул код " + resultCode);
        }
      }
 
-     class MirChromeClient extends android.webkit.WebChromeClient {
+     class SagesChromeClient extends android.webkit.WebChromeClient {
        private final Activity activity;
 
-       MirChromeClient(Activity activity) {
+       SagesChromeClient(Activity activity) {
          super();
          this.activity = activity;
        }
@@ -196,11 +196,11 @@ function crc32(buf) {
          if (MainActivity.fileCallback != null) MainActivity.fileCallback.onReceiveValue(null);
          MainActivity.fileCallback = callback;
          try {
-           Log.i("MIR", "onShowFileChooser: открываю системный выбор файла");
+           Log.i("SAGES", "onShowFileChooser: открываю системный выбор файла");
            Intent intent = params.createIntent();          // ACTION_GET_CONTENT + accept
            activity.startActivityForResult(intent, 1);     // разрешение не нужно
          } catch (Throwable t) {
-           Log.e("MIR", Log.getStackTraceString(t));
+           Log.e("SAGES", Log.getStackTraceString(t));
            if (MainActivity.fileCallback != null) MainActivity.fileCallback.onReceiveValue(null);
            MainActivity.fileCallback = null;
            return false;
@@ -216,8 +216,8 @@ function crc32(buf) {
    ============================================================ */
 
 function buildDex() {
-  const CLASS = 'Lcom/mir/game/MainActivity;';
-  const CHROME_CLASS = 'Lcom/mir/game/MirChromeClient;';
+  const CLASS = 'Lcom/sages/game/MainActivity;';
+  const CHROME_CLASS = 'Lcom/sages/game/SagesChromeClient;';
   const SUPER = 'Landroid/app/Activity;';
   const WEBVIEW = 'Landroid/webkit/WebView;';
   const SETTINGS = 'Landroid/webkit/WebSettings;';
@@ -234,10 +234,10 @@ function buildDex() {
   const STRING = 'Ljava/lang/String;';
   const CHARSEQ = 'Ljava/lang/CharSequence;';
   const SOURCE_FILE = 'MainActivity.java';
-  const CHROME_SOURCE_FILE = 'MirChromeClient.java';
-  const START_URL = 'file:///android_asset/mir.html';
-  const BOOT_MSG = `onCreate: start, MIR ${VERSION_NAME} (${VERSION_CODE})`;
-  const READY_MSG = 'onCreate: WebView created, loading assets/mir.html';
+  const CHROME_SOURCE_FILE = 'SagesChromeClient.java';
+  const START_URL = 'file:///android_asset/sages.html';
+  const BOOT_MSG = `onCreate: start, SAGES ${VERSION_NAME} (${VERSION_CODE})`;
+  const READY_MSG = 'onCreate: WebView created, loading assets/sages.html';
   const PICKER_MSG = 'onShowFileChooser: открываю системный выбор файла';
   const RESULT_MSG = 'onActivityResult: выбор файла вернул код ';
   const CRASH_PREFIX = 'The civilization of the sages не запустилась. Покажите этот экран разработчику:\n\n';
@@ -485,7 +485,7 @@ function buildDex() {
      Если в журнале телефона нет этой строки — Android не дошёл даже до
      запуска активности (не установилось, не распознался манифест). */
   const prologue = [
-    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),             // const-string v0, "MIR"
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),             // const-string v0, "SAGES"
     ...reg16(OP.constString, 1, strIdx.get(BOOT_MSG)),            // const-string v1, "onCreate: start…"
     ...invoke(OP.invokeStatic, M.logI, [0, 1]),                // Log.i(v0, v1)
   ];
@@ -505,13 +505,13 @@ function buildDex() {
     ...invoke(OP.invokeVirtual, M.wvSetClient, [0, 3]),
     /* Без WebChromeClient WebView игнорирует <input type="file">: кнопка
        «Добавить аватарку» в APK не открывала ничего. */
-    ...reg16(OP.newInstance, 3, typeIdx.get(CHROME_CLASS)),        // new-instance v3, MirChromeClient
-    ...invoke(OP.invokeDirect, M.chromeInit, [3, THIS]),        // new MirChromeClient(this)
+    ...reg16(OP.newInstance, 3, typeIdx.get(CHROME_CLASS)),        // new-instance v3, SagesChromeClient
+    ...invoke(OP.invokeDirect, M.chromeInit, [3, THIS]),        // new SagesChromeClient(this)
     ...invoke(OP.invokeVirtual, M.wvSetChromeClient, [0, 3]),
     ...invoke(OP.invokeVirtual, M.setContentView, [THIS, 0]),
     ...reg16(OP.constString, 4, strIdx.get(START_URL)),            // const-string v4, url
     ...invoke(OP.invokeVirtual, M.wvLoadUrl, [0, 4]),
-    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),              // const-string v0, "MIR"
+    ...reg16(OP.constString, 0, strIdx.get(LOG_TAG)),              // const-string v0, "SAGES"
     ...reg16(OP.constString, 1, strIdx.get(READY_MSG)),            // const-string v1, "…created"
     ...invoke(OP.invokeStatic, M.logI, [0, 1]),                 // Log.i(v0, v1)
   ];
@@ -521,8 +521,8 @@ function buildDex() {
     reg8(OP.moveException, 0),                                  // move-exception v0
     ...invoke(OP.invokeStatic, M.logTrace, [0]),                // Log.getStackTraceString(v0)
     reg8(OP.moveResultObject, 1),                              // move-result-object v1 (текст стека)
-    ...reg16(OP.constString, 2, strIdx.get(LOG_TAG)),              // const-string v2, "MIR"
-    ...invoke(OP.invokeStatic, M.logE, [2, 1]),                 // Log.e("MIR", стек)
+    ...reg16(OP.constString, 2, strIdx.get(LOG_TAG)),              // const-string v2, "SAGES"
+    ...invoke(OP.invokeStatic, M.logE, [2, 1]),                 // Log.e("SAGES", стек)
     ...reg16(OP.constString, 2, strIdx.get(CRASH_PREFIX)),         // const-string v2, пояснение
     ...invoke(OP.invokeVirtual, M.strConcat, [2, 1]),           // пояснение + стек
     reg8(OP.moveResultObject, 1),                              // move-result-object v1
@@ -602,7 +602,7 @@ function buildDex() {
     arHead.length + 2 + arDeliver.length,
   );
 
-  /* ---- MirChromeClient(Activity): registers=3, ins=2 → p0 = v1, p1 = v2 ---- */
+  /* ---- SagesChromeClient(Activity): registers=3, ins=2 → p0 = v1, p1 = v2 ---- */
   const chromeInitCode = [
     ...invoke(OP.invokeDirect, M.chromeSuperInit, [1]),          // super()
     ...ifield(OP.iputObject, 2, 1, F.activity),                  // this.activity = активность
@@ -677,11 +677,11 @@ function buildDex() {
       buf: codeItem('MainActivity.onActivityResult', 7, 4, 3, activityResultCode, activityResultTry),
       tries: activityResultTry,
     },
-    { name: 'MirChromeClient.<init>', units: chromeInitCode.length, buf: codeItem('MirChromeClient.<init>', 3, 2, 1, chromeInitCode), tries: null },
+    { name: 'SagesChromeClient.<init>', units: chromeInitCode.length, buf: codeItem('SagesChromeClient.<init>', 3, 2, 1, chromeInitCode), tries: null },
     {
-      name: 'MirChromeClient.onShowFileChooser',
+      name: 'SagesChromeClient.onShowFileChooser',
       units: chromeShowCode.length,
-      buf: codeItem('MirChromeClient.onShowFileChooser', 7, 4, 3, chromeShowCode, chromeShowTry),
+      buf: codeItem('SagesChromeClient.onShowFileChooser', 7, 4, 3, chromeShowCode, chromeShowTry),
       tries: chromeShowTry,
     },
   ];
@@ -744,7 +744,7 @@ function buildDex() {
   }
 
   /* Список class_def. Родитель обязан идти раньше наследника, если он
-     тоже объявлен в этом файле; MirChromeClient наследует системный
+     тоже объявлен в этом файле; SagesChromeClient наследует системный
      WebChromeClient, поэтому порядок здесь свободный — но фиксированный.
      Смещения кода становятся известны только в раскладке файла, поэтому
      список собирается функцией. */
@@ -780,7 +780,7 @@ function buildDex() {
         staticFields: [],
         instanceFields: [F.activity],
         directMethods: [
-          { method: M.chromeInit, access: 0x10001, codeOff: codeOff['MirChromeClient.<init>'] },
+          { method: M.chromeInit, access: 0x10001, codeOff: codeOff['SagesChromeClient.<init>'] },
         ],
         /* onShowFileChooser в WebChromeClient публичный: переопределение
            с более строгим доступом верификатор ART отвергает. */
@@ -788,7 +788,7 @@ function buildDex() {
           {
             method: M.chromeOnShowFileChooser,
             access: 0x0001,
-            codeOff: codeOff['MirChromeClient.onShowFileChooser'],
+            codeOff: codeOff['SagesChromeClient.onShowFileChooser'],
           },
         ],
       }),
@@ -1391,7 +1391,7 @@ function serialNumber() {
 
 function makeCertificate(keys) {
   const rdn = (oid, value) => derSet(derSeq(derOid(oid), derUtf8(value)));
-  const name = derSeq(rdn('2.5.4.6', 'RU'), rdn('2.5.4.10', 'MIR'), rdn('2.5.4.3', 'The civilization of the sages'));
+  const name = derSeq(rdn('2.5.4.6', 'RU'), rdn('2.5.4.10', 'The civilization of the sages'), rdn('2.5.4.3', 'The civilization of the sages'));
   const serial = serialNumber();
   const validity = derSeq(derUtcTime('200101000000Z'), derUtcTime('491231235959Z'));
   const spki = keys.publicKey.export({ type: 'spki', format: 'der' });
@@ -1416,7 +1416,7 @@ function saveKey(privateKey, certificate) {
     KEY_FILE,
     JSON.stringify(
       {
-        note: 'Ключ подписи MIR.apk. Не удаляйте: без него обновление поверх установленной игры не поставится.',
+        note: 'Ключ подписи Sages.apk. Не удаляйте: без него обновление поверх установленной игры не поставится.',
         privateKey: privateKey.export({ type: 'pkcs8', format: 'pem' }),
         certificate: certificate.toString('base64'),
       },
@@ -1464,7 +1464,7 @@ function loadOrCreateKey() {
    ============================================================ */
 
 function buildV1Signature(files, key) {
-  let manifestMf = 'Manifest-Version: 1.0\r\nCreated-By: MIR build-apk.mjs\r\n\r\n';
+  let manifestMf = 'Manifest-Version: 1.0\r\nCreated-By: The civilization of the sages build-apk.mjs\r\n\r\n';
   const sections = new Map();
   for (const file of files) {
     const digest = crypto.createHash('sha256').update(file.data).digest('base64');
@@ -1475,7 +1475,7 @@ function buildV1Signature(files, key) {
   const manifestBuf = Buffer.from(manifestMf, 'utf8');
 
   let certSf = 'Signature-Version: 1.0\r\n';
-  certSf += 'Created-By: MIR build-apk.mjs\r\n';
+  certSf += 'Created-By: The civilization of the sages build-apk.mjs\r\n';
   /* Защита от отката на v1: см. «APK signature scheme v2 / Rollback protections». */
   certSf += 'X-Android-APK-Signed: 2\r\n';
   certSf += `SHA-256-Digest-Manifest: ${crypto.createHash('sha256').update(manifestBuf).digest('base64')}\r\n\r\n`;
@@ -1933,8 +1933,8 @@ try {
   log.step('Собираю однофайловую версию игры (vite build + инлайн)');
   const startSingle = Date.now();
   const rawHtml = await buildSingleHtml();
-  log.ok(`mir.html собран за ${((Date.now() - startSingle) / 1000).toFixed(1)} с — ${human(Buffer.byteLength(rawHtml))}`);
-  log.check(rawHtml.includes('<script'), 'в mir.html есть код игры', { fail: 'в WebView будет пустая страница' });
+  log.ok(`sages.html собран за ${((Date.now() - startSingle) / 1000).toFixed(1)} с — ${human(Buffer.byteLength(rawHtml))}`);
+  log.check(rawHtml.includes('<script'), 'в sages.html есть код игры', { fail: 'в WebView будет пустая страница' });
   log.check(!rawHtml.includes('<script type="module"'), 'скрипт не модульный', {
     fail: 'модульные скрипты не работают по file:// — WebView покажет чёрный экран',
   });
@@ -2046,7 +2046,7 @@ try {
     { path: 'classes.dex', data: dex },
     { path: 'resources.arsc', data: arscBin, stored: true },
     { path: ICON_PATH, data: icon, stored: true },
-    { path: 'assets/mir.html', data: Buffer.from(html, 'utf8') },
+    { path: 'assets/sages.html', data: Buffer.from(html, 'utf8') },
   ];
   log.table(
     payload.map((p) => ({ 'файл': p.path, 'размер': human(p.data.length), 'сжатие': p.stored ? 'нет (STORED)' : 'deflate' })),
@@ -2073,15 +2073,15 @@ try {
   /* --- 7. Запись ---------------------------------------------------- */
   log.section('7. Запись файлов');
   if (!existsSync('dist-app')) mkdirSync('dist-app', { recursive: true });
-  writeFileSync(join('dist-app', 'MIR.apk'), apk);
-  writeFileSync('MIR.apk', apk);
-  log.ok(`Sages (MIR.apk) записан (${human(apk.length)}), копия в dist-app/MIR.apk`);
+  writeFileSync(join('dist-app', 'Sages.apk'), apk);
+  writeFileSync('Sages.apk', apk);
+  log.ok(`Sages (Sages.apk) записан (${human(apk.length)}), копия в dist-app/Sages.apk`);
   log.detail('SHA-256 файла', sha256(apk));
 
   /* --- 8. Полный разбор того, что реально записалось ---------------- */
   log.section('8. Проверка записанного файла');
   log.info('Файл читается с диска заново и разбирается так же, как его читает Android.');
-  const written = readFileSync('MIR.apk');
+  const written = readFileSync('Sages.apk');
   log.check(written.equals(apk), 'записанный файл побайтово совпадает с собранным', {
     fail: 'диск или антивирус испортили файл при записи',
   });
@@ -2097,11 +2097,11 @@ try {
   console.log('============================================================');
   if (ok) {
     console.log('  ✓ Android-приложение собрано, подписано и проверено');
-    console.log(`     ${info.label} (MIR.apk) — ${human(apk.length)}, версия ${info.versionName} (${info.versionCode})`);
+    console.log(`     ${info.label} (Sages.apk) — ${human(apk.length)}, версия ${info.versionName} (${info.versionCode})`);
     console.log(`     Пакет ${info.package}, minSdk ${info.minSdk}, targetSdk ${info.targetSdk}`);
     console.log(`     Подпись: v1 + v2, ключ ${info.signature?.keyType ?? '?'} ${info.signature?.keyBits ?? ''} бит`);
     console.log('');
-    console.log('  Установка: перекиньте Sages (MIR.apk) на телефон (Telegram, USB, диск),');
+    console.log('  Установка: перекиньте Sages (Sages.apk) на телефон (Telegram, USB, диск),');
     console.log('  откройте и разрешите установку из этого источника.');
     console.log('');
     console.log('  Если на телефоне что-то пойдёт не так — ошибка будет видна:');
