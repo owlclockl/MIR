@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /* Конфигурация сборки. Две сборки из одного кода:
 
    web    — `npm run build` → dist/: обычная модульная сборка с хешированными
@@ -66,7 +67,12 @@ export default defineConfig(({ mode }) => {
               entryFileNames: 'app.js',
             },
           }
-        : {},
+        : {
+            input: {
+              index: resolve(process.cwd(), 'index.html'),
+              control: resolve(process.cwd(), 'control.html'),
+            },
+          },
     },
 
     server: {
