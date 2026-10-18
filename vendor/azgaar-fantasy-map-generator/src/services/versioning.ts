@@ -152,7 +152,7 @@ function announceVersion(): void {
   const loadingScreenVersion = document.getElementById("versionText");
   if (loadingScreenVersion) loadingScreenVersion.innerText = `v${VERSION}`;
 
-  // the update window points at web releases and the desktop app; a page embedded in mir.html has neither
+  // the update window points at web releases and the desktop app; a page embedded in sages.html has neither
   if (isEmbedded()) return;
 
   const storedVersion = localStorage.getItem("version");

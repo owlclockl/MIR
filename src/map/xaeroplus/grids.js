@@ -1,5 +1,5 @@
 /* RegionGrid / MapArtGrid arithmetic adapted from XaeroPlus, MIT,
-   Copyright (c) 2022 rfresh2. MIR coordinates are Azgaar source-map units,
+   Copyright (c) 2022 rfresh2. Sages coordinates are Azgaar source-map units,
    NOT Minecraft blocks. Browser host clips to visible bounds; map-art origin
    is fixed at -64 so zoomed grids remain stable while panning. */
 export function gridGeometry(mode, source, visible = [0, 0, 1, 1], zoom = 0) {

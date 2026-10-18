@@ -29,10 +29,10 @@ try {
 
 globalThis.RTCPeerConnection = RTCPeerConnection;
 
-const BASE = process.env.MIR_HUB ?? 'http://127.0.0.1:4300';
+const BASE = process.env.SAGES_HUB ?? 'http://127.0.0.1:4300';
 
 const clientDir = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'mir-p2p-'));
+  const dir = mkdtempSync(join(tmpdir(), 'sages-p2p-'));
   cpSync(fromRoot('src', 'data'), dir, { recursive: true });
   return pathToFileURL(join(dir, '/')).href;
 };

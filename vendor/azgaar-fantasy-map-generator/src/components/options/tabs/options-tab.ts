@@ -384,7 +384,7 @@ const TEMPLATE = /* html */ `
     </tr>
     <tr data-tip="Set theme hue for dialogs and tool windows">
       <td>
-        <i data-tip="Restore the MIR forest-green theme" id="themeColorRestore" class="icon-ccw"></i>
+        <i data-tip="Restore the Sages forest-green theme" id="themeColorRestore" class="icon-ccw"></i>
       </td>
       <td>Theme color</td>
       <td>

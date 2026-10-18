@@ -74,7 +74,7 @@ const formatGeo = (lat, lon) => {
  *   если документ не отдал размеры), `source` — готовый снимок (проверки)
  * @returns {object} view — element, error, stats, dispose
  */
-export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, frame: editorFrameElement = null, config = null, source = null } = {}) => {
+export const mountPlanetView = (host, { seed = 'sages-2026', size = 1, onExit, frame: editorFrameElement = null, config = null, source = null } = {}) => {
   const element = document.createElement('div');
   element.className = 'planet-view';
   element.innerHTML = `
@@ -256,7 +256,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   /* ---------- мир ---------- */
 
   const buildWorld = () => {
-    const planet = createPlanet({ seed: view.seed || 'mir-2026', size: view.size });
+    const planet = createPlanet({ seed: view.seed || 'sages-2026', size: view.size });
     /* Бюджеты кэшей: тайлы высот дороже всего (их пересчёт — цепочка предков),
        поэтому им отдано больше всего; климат и картинки дешевле пересчитать. */
     const elev = createElevation(planet, { bytes: 64 * 1024 * 1024, source: view.source });
@@ -266,7 +266,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
     /* Живой мир: часы, погода, огни, вулканы и дрейф. Он же считает климат
        целиком — климатология нужна облакам, огням и снегу, — поэтому создаётся
        здесь же, за той же завесой «Считаю мир…». */
-    const living = createLivingWorld({ planet, elevation: elev, climate: cli, hydro: water, seed: view.seed || 'mir-2026', clock });
+    const living = createLivingWorld({ planet, elevation: elev, climate: cli, hydro: water, seed: view.seed || 'sages-2026', clock });
     const paint = createAlivePainter({ living, planet, seasonFields: createSeasonFields({ climate: cli }) });
     world = { planet, elevation: elev, climate: cli, hydro: water, tiles: tileCache, living, painter: paint };
     /* География из карты генератора — а если её нет, процедурная: об этом
@@ -885,7 +885,7 @@ export const mountPlanetView = (host, { seed = 'mir-2026', size = 1, onExit, fra
   };
 
   const onSeedChange = () => {
-    view.seed = seedInput.value.trim() || 'mir-2026';
+    view.seed = seedInput.value.trim() || 'sages-2026';
     rebuild();
   };
 

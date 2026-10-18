@@ -1,4 +1,4 @@
-/* Смоук-проверка интерфейса: настоящий `mir.html` открывается в jsdom,
+/* Смоук-проверка интерфейса: настоящий `sages.html` открывается в jsdom,
    и по нему кликают, как человек, — окна меню и настройки, общий хаб,
    подключение по адресу, регистрацию, профиль, партии (комнаты для игры:
    создание, код, состав, закрытие), отключение и то, что игровых экранов
@@ -33,11 +33,11 @@ const HUB = (process.argv[2] || 'http://127.0.0.1:8787').replace(/\/+$/, '');
    вышла новая версия, и сказать об этом — не перезагружая игру сама. */
 const SERVER_BUILD = { version: '99.0.0', build: 'deadbeef' };
 const fetchStub = (w) => (input, init) =>
-  String(input).includes('mir-build.json')
+  String(input).includes('sages-build.json')
     ? Promise.resolve({ ok: true, json: async () => ({ ...SERVER_BUILD, builtAt: '' }) })
     : globalThis.fetch(input, init);
 
-const html = readFileSync(fromRoot('mir.html'), 'utf8');
+const html = readFileSync(fromRoot('sages.html'), 'utf8');
 const testCanvasContext = (canvas) => new Proxy({
   canvas,
   measureText: (text) => ({ width: String(text).length * 7 }),
@@ -87,15 +87,15 @@ window.TextDecoder = globalThis.TextDecoder;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* Отдельная «страница» на том же mir.html — для проверок перезагрузки:
+/* Отдельная «страница» на том же sages.html — для проверок перезагрузки:
    браузер отдаёт ей ту же localStorage, что была у прошлой страницы.
    Вшитый 27 МБ шаблон редактора карт проверяется в основном окне выше,
    поэтому во вспомогательных окнах перезагрузки не парсим его повторно в JSDOM. */
-const fmgTagStart = html.indexOf('<script type="application/json" id="mir-fmg-template">');
+const fmgTagStart = html.indexOf('<script type="application/json" id="sages-fmg-template">');
 const fmgTagEnd = fmgTagStart >= 0 ? html.indexOf('</script>', fmgTagStart) : -1;
 const htmlReload =
   fmgTagStart >= 0 && fmgTagEnd >= 0
-    ? `${html.slice(0, fmgTagStart)}<script type="application/json" id="mir-fmg-template">""</script>${html.slice(fmgTagEnd + '</script>'.length)}`
+    ? `${html.slice(0, fmgTagStart)}<script type="application/json" id="sages-fmg-template">""</script>${html.slice(fmgTagEnd + '</script>'.length)}`
     : html;
 const bootPage2 = (saved, pageUrl = `${HUB}/`) => {
   const origin = new URL(pageUrl).origin;
@@ -165,12 +165,12 @@ window.onerror = (m) => errors.push(String(m));
 await wait(2200); // даём завершиться стартовой проверке текущего адреса-хаба
 
 /* Веб/PWA-раздача открывает Azgaar отдельной страницей /fmg/ (игра подключает её ссылкой),
-   а однофайловый mir.html вшивает тот же редактор. Проверяем, что страница и её модули на месте. */
-const fmgResponse = await fetch(`${HUB}/fmg/index.html?seed=MIR-UI-TEST`);
+   а однофайловый sages.html вшивает тот же редактор. Проверяем, что страница и её модули на месте. */
+const fmgResponse = await fetch(`${HUB}/fmg/index.html?seed=SAGES-UI-TEST`);
 const fmgHtml = fmgResponse.ok ? await fmgResponse.text() : '';
 const fmgScript = fmgHtml.match(/src="(\/fmg\/[^\"]+\.js)"/)?.[1];
 const fmgScriptResponse = fmgScript ? await fetch(new URL(fmgScript, `${HUB}/`).href) : null;
-const fmgThemeResponse = await fetch(`${HUB}/fmg/mir-theme.css`);
+const fmgThemeResponse = await fetch(`${HUB}/fmg/sages-theme.css`);
 const fmgTheme = fmgThemeResponse.ok ? await fmgThemeResponse.text() : '';
 const fmgIconsResponse = await fetch(`${HUB}/fmg/icons.css`);
 const fmgIconsCss = fmgIconsResponse.ok ? await fmgIconsResponse.text() : '';
@@ -181,26 +181,28 @@ const unmappedFmgIcons = [...legacyIconClasses].filter((name) => !lucideIconClas
 const fmgLicenseResponse = await fetch(`${HUB}/fmg/LUCIDE-LICENSE.txt`);
 const fmgStyleResponse = await fetch(`${HUB}/fmg/styles/night.json`);
 const fmgWorkerResponse = await fetch(`${HUB}/fmg/sw.js`);
-const mirWorkerResponse = await fetch(`${HUB}/sw.js`);
-const mirWorker = mirWorkerResponse.ok ? await mirWorkerResponse.text() : '';
+const workerResponse = await fetch(`${HUB}/sw.js`);
+const workerScript = workerResponse.ok ? await workerResponse.text() : '';
 ok('сервер раздаёт Azgaar для веб-сборки и его входной модуль', fmgResponse.ok && Boolean(fmgScriptResponse?.ok) && /<title>The civilization of the sages — редактор карт<\/title>/i.test(fmgHtml));
 ok('веб-редактор получает фирменную тему и ночную картографическую палитру', fmgThemeResponse.ok && fmgStyleResponse.ok);
 ok(
   'Azgaar переведён на единый Lucide SVG-пак, включая кнопки боевых меню',
   fmgTheme.includes('Lucide 1.53.0') && fmgTheme.includes('.icon-button-melee::before')
-    && fmgTheme.includes('mask: var(--mir-lucide-mask)') && fmgTheme.includes('data:image/svg+xml')
+    && fmgTheme.includes('mask: var(--sages-lucide-mask)') && fmgTheme.includes('data:image/svg+xml')
     && fmgIconsResponse.ok && unmappedFmgIcons.length === 0
     && fmgLicenseResponse.ok && /ISC License/.test(await fmgLicenseResponse.text()),
   `классов Font Awesome: ${legacyIconClasses.size}, не переведены: ${unmappedFmgIcons.join(', ') || 'нет'}`,
 );
-ok('FMG не регистрирует вложенный worker, корневой worker обслуживает offline-страницу', fmgWorkerResponse.status === 404 && mirWorker.includes("'/fmg/index.html'") && mirWorker.includes('ignoreSearch: url.pathname.startsWith'));
+ok('FMG не регистрирует вложенный worker, корневой worker обслуживает offline-страницу', fmgWorkerResponse.status === 404 && workerScript.includes("'/fmg/index.html'") && workerScript.includes('ignoreSearch: url.pathname.startsWith'));
 
-/* Веб-бандл открываем отдельно от mir.html: это тот же src/main.js, но
-   собранный сборщиком. Проверяем, что он поднимает меню сообщества и не
-   тащит игровые экраны (статику отдельно сторожит `npm run test:build`). */
-const webIndex = readFileSync(fromRoot('dist/index.html'), 'utf8');
+/* Веб-бандл открываем отдельно от sages.html: это тот же src/main.js, но
+   собранный сборщиком. Реальная оболочка приложения — dist/control.html
+   (index.html — отдельная статическая страница-визитка без модуля).
+   Проверяем, что он поднимает меню сообщества и не тащит игровые экраны
+   (статику отдельно сторожит `npm run test:build`). */
+const webIndex = readFileSync(fromRoot('dist/control.html'), 'utf8');
 const webScriptPath = webIndex.match(/<script type="module"[^>]*src="([^"]+)"/)?.[1]?.replace(/^\//, '');
-if (!webScriptPath) throw new Error('В dist/index.html не найден входной модуль веб-сборки');
+if (!webScriptPath) throw new Error('В dist/control.html не найден входной модуль веб-сборки');
 const webCode = readFileSync(fromRoot(`dist/${webScriptPath}`), 'utf8');
 /* Подстановка — функцией: минифицированный код полон `$`, а строковая замена
    развернула бы `$&` и `` $` `` в чужой HTML, и скрипт не собрался бы. */
@@ -240,7 +242,7 @@ try {
       && !webWindow.document.querySelector('[data-action^="open-world"]')
       && !webWindow.document.querySelector('#world-page-root'),
   );
-  const webBuildId = webWindow.document.querySelector('meta[name="mir-build"]')?.content || '';
+  const webBuildId = webWindow.document.querySelector('meta[name="sages-build"]')?.content || '';
   ok(
     'версия в веб-интерфейсе показывает обновляемую метку сборки',
     /^[0-9a-f]{8}$/.test(webBuildId)
@@ -258,7 +260,7 @@ try {
 }
 
 ok('меню нарисовалось', !!$('.shell') && !!$('.rail'), $('.rail__title')?.textContent?.trim());
-const singleBuildId = window.document.querySelector('meta[name="mir-build"]')?.content || '';
+const singleBuildId = window.document.querySelector('meta[name="sages-build"]')?.content || '';
 ok(
   'версия автономной сборки показывает её собственную метку',
   /^[0-9a-f]{8}$/.test(singleBuildId) && $('.footer__version')?.textContent?.includes(singleBuildId),
@@ -921,15 +923,15 @@ await wait(100);
   click2('[data-action="logout"]');
   await wait(1500);
   const afterLogout = dumpStorage(w2);
-  ok('«Выйти» убирает сессию из браузера', !afterLogout['mir:session']);
-  const oldToken = JSON.parse(saved['mir:session']).token;
+  ok('«Выйти» убирает сессию из браузера', !afterLogout['sages:session']);
+  const oldToken = JSON.parse(saved['sages:session']).token;
   const tokenCheck = await fetch(`${HUB}/api/state`, { headers: { Authorization: `Bearer ${oldToken}` } });
   ok('«Выйти» отзывает токен устройства на хабе', tokenCheck.status === 401, `${tokenCheck.status}`);
   ok('после выхода меню показывает гостя', !(w2.document.querySelector('.profile')?.textContent || '').includes(reloadName));
   second.window.close();
 }
 
-/* Локальный режим (mir.html на флешке, APK без хаба): вход тоже обязан
+/* Локальный режим (sages.html на флешке, APK без хаба): вход тоже обязан
    переживать обновление — здесь сессия и аккаунты лежат в одном месте. */
 {
   const localSaved = dumpStorage(window);

@@ -24,9 +24,9 @@
    выключенные анимации не гасили бы ни вертушку, ни появление карты. */
 import { motionOff } from '../ui/motion.js';
 
-const PATCHED = '__mirStage';
-const VEIL_ID = 'mir-gen-veil';
-const STYLE_ID = 'mir-gen-style';
+const PATCHED = '__sagesStage';
+const VEIL_ID = 'sages-gen-veil';
+const STYLE_ID = 'sages-gen-style';
 /* Сколько ждём, пока в iframe появится конвейер. Документ Azgaar
    поднимается за секунды, так что дольше — это уже сбой. */
 const ATTACH_DEADLINE_MS = 120_000;
@@ -79,22 +79,22 @@ export const GENERATION_STEP_LABELS = {
 export const generationStepLabel = (id) => GENERATION_STEP_LABELS[id] ?? String(id);
 
 const STYLE = `
-#mir-gen-veil{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
+#sages-gen-veil{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at center,#16221f 0%,#0a0f0e 72%);color:#dbe8df;
   font-family:system-ui,-apple-system,"Segoe UI",sans-serif;opacity:0;pointer-events:none;transition:opacity .7s ease}
-#mir-gen-veil.is-on{opacity:1;pointer-events:auto}
-.mir-gen-box{display:grid;justify-items:center;gap:14px;width:min(78vw,300px);text-align:center}
-.mir-gen-seal{width:44px;height:44px;animation:mir-gen-spin 7s linear infinite}
-@keyframes mir-gen-spin{to{transform:rotate(360deg)}}
-.mir-gen-stage{margin:0;min-height:14px;font-size:11px;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:#c9dccd}
-.mir-gen-count{margin:0;font-size:10px;letter-spacing:.2em;color:rgba(201,220,205,.55);font-variant-numeric:tabular-nums}
-.mir-gen-track{width:100%;height:2px;background:rgba(201,220,205,.14);overflow:hidden}
-.mir-gen-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,rgba(216,193,132,.3),rgba(216,193,132,.95))}
-#map.mir-reveal{animation:mir-reveal 1.2s cubic-bezier(.2,.7,.2,1) both}
-@keyframes mir-reveal{from{opacity:0;filter:blur(10px);transform:scale(1.02)}to{opacity:1;filter:none;transform:none}}
-@media (prefers-reduced-motion:reduce){.mir-gen-seal{animation:none}#map.mir-reveal{animation:none}}
-.mir-gen-quiet{transition:none}
-.mir-gen-quiet .mir-gen-seal{animation:none}
+#sages-gen-veil.is-on{opacity:1;pointer-events:auto}
+.sages-gen-box{display:grid;justify-items:center;gap:14px;width:min(78vw,300px);text-align:center}
+.sages-gen-seal{width:44px;height:44px;animation:sages-gen-spin 7s linear infinite}
+@keyframes sages-gen-spin{to{transform:rotate(360deg)}}
+.sages-gen-stage{margin:0;min-height:14px;font-size:11px;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:#c9dccd}
+.sages-gen-count{margin:0;font-size:10px;letter-spacing:.2em;color:rgba(201,220,205,.55);font-variant-numeric:tabular-nums}
+.sages-gen-track{width:100%;height:2px;background:rgba(201,220,205,.14);overflow:hidden}
+.sages-gen-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,rgba(216,193,132,.3),rgba(216,193,132,.95))}
+#map.sages-reveal{animation:sages-reveal 1.2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes sages-reveal{from{opacity:0;filter:blur(10px);transform:scale(1.02)}to{opacity:1;filter:none;transform:none}}
+@media (prefers-reduced-motion:reduce){.sages-gen-seal{animation:none}#map.sages-reveal{animation:none}}
+.sages-gen-quiet{transition:none}
+.sages-gen-quiet .sages-gen-seal{animation:none}
 `;
 
 const ensureVeil = (doc) => {
@@ -111,14 +111,14 @@ const ensureVeil = (doc) => {
   veil.setAttribute('role', 'status');
   veil.setAttribute('aria-live', 'polite');
   veil.innerHTML = `
-    <div class="mir-gen-box">
-      <svg class="mir-gen-seal" viewBox="0 0 24 24" fill="none" stroke="#e9e9ec" stroke-width="1.2" stroke-linecap="round" aria-hidden="true">
+    <div class="sages-gen-box">
+      <svg class="sages-gen-seal" viewBox="0 0 24 24" fill="none" stroke="#e9e9ec" stroke-width="1.2" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="#e9e9ec" stroke="none"/>
         <path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/>
       </svg>
-      <p class="mir-gen-stage"></p>
-      <p class="mir-gen-count"></p>
-      <div class="mir-gen-track"><i class="mir-gen-fill"></i></div>
+      <p class="sages-gen-stage"></p>
+      <p class="sages-gen-count"></p>
+      <div class="sages-gen-track"><i class="sages-gen-fill"></i></div>
     </div>`;
   (doc.body || doc.documentElement).append(veil);
   return veil;
@@ -127,10 +127,10 @@ const ensureVeil = (doc) => {
 const showVeil = (doc, { stage, count, ratio }) => {
   const veil = ensureVeil(doc);
   /* Заново на каждый шаг: настройку можно переключить на открытом экране. */
-  veil.classList.toggle('mir-gen-quiet', motionOff());
-  veil.querySelector('.mir-gen-stage').textContent = stage;
-  veil.querySelector('.mir-gen-count').textContent = count;
-  veil.querySelector('.mir-gen-fill').style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+  veil.classList.toggle('sages-gen-quiet', motionOff());
+  veil.querySelector('.sages-gen-stage').textContent = stage;
+  veil.querySelector('.sages-gen-count').textContent = count;
+  veil.querySelector('.sages-gen-fill').style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
   veil.classList.add('is-on');
 };
 
@@ -143,10 +143,10 @@ const hideVeil = (doc, { reveal }) => {
   const map = doc.getElementById('map');
   if (!map) return;
   /* Перезапуск анимации: класс снимаем, даём браузеру отметить это, ставим снова. */
-  map.classList.remove('mir-reveal');
+  map.classList.remove('sages-reveal');
   void map.getBoundingClientRect();
-  map.classList.add('mir-reveal');
-  map.addEventListener('animationend', () => map.classList.remove('mir-reveal'), { once: true });
+  map.classList.add('sages-reveal');
+  map.addEventListener('animationend', () => map.classList.remove('sages-reveal'), { once: true });
 };
 
 /* Подмена конвейера в окне iframe. Возвращает true, если подмена прошла. */
@@ -202,7 +202,7 @@ const patchPipeline = (win, onEvent) => {
    скриптов (см. injectGenerationHook). Он перехватывает присваивание
    window.GenerationPipeline и сразу сообщает родителю — до первого запуска
    генерации. Без него первый шаг (сетка) шёл бы без анимации. */
-const GENERATION_HOOK = `<script>(function(){var f=window.frameElement;var v;try{Object.defineProperty(window,"GenerationPipeline",{configurable:true,get:function(){return v},set:function(x){v=x;if(f&&typeof f.__mirStagePipeline==="function")f.__mirStagePipeline(window)}})}catch(e){}})();</script>`;
+const GENERATION_HOOK = `<script>(function(){var f=window.frameElement;var v;try{Object.defineProperty(window,"GenerationPipeline",{configurable:true,get:function(){return v},set:function(x){v=x;if(f&&typeof f.__sagesStagePipeline==="function")f.__sagesStagePipeline(window)}})}catch(e){}})();</script>`;
 
 /** Вставляет перехватчик первым в <head>. Без <head> HTML возвращается как есть. */
 export const injectGenerationHook = (html) => {
@@ -265,7 +265,7 @@ const startStage = (frame) => {
   };
 
   /* Перехватчик из srcdoc зовёт сюда, как только появляется конвейер. */
-  frame.__mirStagePipeline = (win) => tryWindow(win);
+  frame.__sagesStagePipeline = (win) => tryWindow(win);
 
   const poll = () => {
     state.timer = 0;

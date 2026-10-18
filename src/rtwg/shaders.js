@@ -33,7 +33,7 @@ export function toWebGL(source) {
     .replace(/vs_out\.N/g, 'normalF').replace(/vs_out\.L/g, 'lightF').replace(/vs_out\.V/g, 'viewF');
 }
 export function fragment(source, { simulation = false, scalar = false, waterLayer = false } = {}) {
-  let s = toWebGL(source).replace(/(?:layout\s*\(location\s*=\s*0\)\s*)?out\s+(float|vec3|vec4)\s+color\s*;/, '$1 color;\nlayout(location=0) out vec4 mirOutput;');
+  let s = toWebGL(source).replace(/(?:layout\s*\(location\s*=\s*0\)\s*)?out\s+(float|vec3|vec4)\s+color\s*;/, '$1 color;\nlayout(location=0) out vec4 sagesOutput;');
   s = s.replace(/void main\s*\(/, 'void rtwgMain(');
   // Physical depth must not become negative through evaporation; upstream clamp
   // used sea-ground as the lower bound even over dry terrain.
@@ -41,7 +41,7 @@ export function fragment(source, { simulation = false, scalar = false, waterLaye
   if (simulation && source === wind) s = s.replace(/1\.0\/\(getGround\(dir.x, dir.y\)\s*\+\s*getTexValue\(water,dir.x, dir.y\)\.x\)/, '1.0/max(0.001,(getGround(dir.x, dir.y) + getTexValue(water,dir.x, dir.y).x))');
   const type = /\bvec4 color;/.test(s) ? 'vec4' : scalar ? 'float' : 'vec3';
   const value = type === 'vec4' ? 'color' : scalar ? 'vec4(color,0.,0.,1.)' : 'vec4(color,1.)';
-  return s + `\nvoid main() { color = ${type}(0.); ${waterLayer ? 'if(texture(water,texcoordF).x <= 0.00001) discard;' : ''} rtwgMain(); vec4 v = ${value}; if(any(isnan(v)) || any(isinf(v))) v = vec4(0.,0.,0.,1.); mirOutput = v; }`;
+  return s + `\nvoid main() { color = ${type}(0.); ${waterLayer ? 'if(texture(water,texcoordF).x <= 0.00001) discard;' : ''} rtwgMain(); vec4 v = ${value}; if(any(isnan(v)) || any(isinf(v))) v = vec4(0.,0.,0.,1.); sagesOutput = v; }`;
 }
 export const SIMULATION_SHADERS = [rock, soil, water, temp, moist, wind, ice, climat].map((s, i) => fragment(s, { simulation: true, scalar: i === 0 }));
 export const DISPLAY_SHADER = fragment(display);

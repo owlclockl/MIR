@@ -12,11 +12,11 @@
      · service worker — браузер скачал новый sw.js и держит его в waiting.
        Имя кэша и содержимое sw.js зависят от хеша сборки, поэтому новый
        sw.js означает новую сборку;
-     · сервер — файл /mir-build.json (версия и метка сборки, записанные
+     · сервер — файл /sages-build.json (версия и метка сборки, записанные
        сборщиком). Он нужен там, где service worker недоступен: голый http
        по локальной сети, чужая статика, старый браузер;
      · своя сборка — версия из package.json (__APP_VERSION__) и метка
-       сборки из разметки (meta name="mir-build"); её добавляют и веб-, и
+       сборки из разметки (meta name="sages-build"); её добавляют и веб-, и
        однофайловый сборщики.
 
    Сборка считается новой, если отличается её метка (или версия только в
@@ -26,7 +26,7 @@
 
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
 
-const BUILD_INFO_PATH = '/mir-build.json';
+const BUILD_INFO_PATH = '/sages-build.json';
 
 /* Расписания. Свою сборку сравниваем часто (файл на сотню байт), а браузер о
    новом sw.js спрашиваем реже: он всё равно сам сдерживает частые проверки. */
@@ -39,7 +39,7 @@ const meta = (name) =>
 
 /* Метку сборки подставляет веб-сборщик в разметку, а однофайловый
    сборщик дописывает её после встраивания редактора Azgaar. */
-const BUILD = meta('mir-build');
+const BUILD = meta('sages-build');
 
 const info = {
   started: false,
@@ -266,7 +266,7 @@ export const check = ({ manual = false } = {}) => {
   /* Явная проверка — это ещё и «покажи новость, если она есть»: игрок,
      который раньше нажал «Позже», ждёт ответа на своё действие. */
   if (manual) info.dismissed = false;
-  /* Проверять нечем (открыт файл с диска: mir.html, приложение внутри .apk):
+  /* Проверять нечем (открыт файл с диска: sages.html, приложение внутри .apk):
      говорим об этом прямо, а не показываем «проверено только что». */
   if (!info.checkable) {
     info.phase = 'unavailable';
@@ -339,7 +339,7 @@ export const apply = () => {
   }
   info.applying = true;
   try {
-    registration.waiting.postMessage({ type: 'mir:skip-waiting' });
+    registration.waiting.postMessage({ type: 'sages:skip-waiting' });
   } catch {
     reload();
     return;
@@ -374,7 +374,7 @@ export const notificationState = () => ({
 const syncNotifyPreference = () => {
   try {
     navigator.serviceWorker?.controller?.postMessage({
-      type: 'mir:notify-preference',
+      type: 'sages:notify-preference',
       value: info.notify,
     });
   } catch {
@@ -385,7 +385,7 @@ const syncNotifyPreference = () => {
 const closeDeviceNotifications = () => {
   try {
     info.registration
-      ?.getNotifications?.({ tag: 'mir-update' })
+      ?.getNotifications?.({ tag: 'sages-update' })
       .then((list) => list.forEach((note) => note.close()))
       .catch(() => {});
   } catch {
@@ -437,7 +437,7 @@ export const notifyDevice = ({ title, body }) => {
     registration
       .showNotification(title, {
         body,
-        tag: 'mir-update',
+        tag: 'sages-update',
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         data: { url: '/' },
@@ -458,7 +458,7 @@ export const start = () => {
   info.notify = false;
   info.checkable = swSupported() || /^https?:$/.test(location.protocol);
 
-  /* Открыли файл с диска (mir.html, .apk): сверять не с чем — такую копию
+  /* Открыли файл с диска (sages.html, .apk): сверять не с чем — такую копию
      обновляют целиком, новой сборкой. */
   if (!info.checkable) {
     info.phase = 'unavailable';

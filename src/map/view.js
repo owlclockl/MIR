@@ -241,7 +241,7 @@ export function mountSurfaceView(host, { frame, config, sourceSnapshot, unified 
     if (action === 'import') { el.querySelector('[data-role="map-import"]').click(); return; }
     if (action === 'json' || action === 'geojson') {
       const data = action === 'json' ? makeProject(worldInfo(), annotations, pins, settings) : makeGeoJSON(annotations, pins);
-      download(new Blob([JSON.stringify(data, null, 2)], { type: action === 'geojson' ? 'application/geo+json' : 'application/json' }), `mir-map.${action}`); message('Файл экспортирован'); return;
+      download(new Blob([JSON.stringify(data, null, 2)], { type: action === 'geojson' ? 'application/geo+json' : 'application/json' }), `sages-map.${action}`); message('Файл экспортирован'); return;
     }
     if (!['png-view', 'png-world'].includes(action)) return;
     try {
@@ -251,7 +251,7 @@ export function mountSurfaceView(host, { frame, config, sourceSnapshot, unified 
         view = createMapCamera(worldWidth, worldHeight, image.width, image.height);
       } else { image.width = Math.round(camera.width); image.height = Math.round(camera.height); view = { ...camera }; }
       const context = image.getContext('2d'); if (!context) throw new Error('Canvas недоступен');
-      renderMap(context, view, false); image.toBlob((blob) => { if (blob) { download(blob, `mir-${action}.png`); message('PNG экспортирован'); } else message('Не удалось создать PNG'); }, 'image/png');
+      renderMap(context, view, false); image.toBlob((blob) => { if (blob) { download(blob, `sages-${action}.png`); message('PNG экспортирован'); } else message('Не удалось создать PNG'); }, 'image/png');
     } catch (error) { message(error.message); }
   }
   listen(el.querySelector('[data-role="map-import"]'), 'change', async (event) => {

@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
    web    — `npm run build` → dist/: обычная модульная сборка с хешированными
             именами файлов; её раздаёт server/serve.mjs, хаб, Cloudflare и
             установщик .exe.
-   single — `npm run single` → mir.html: один файл, где JS и стили внутри
+   single — `npm run single` → sages.html: один файл, где JS и стили внутри
             HTML; открывается двойным кликом, едет в .apk и на флешке.
             Редактор карт Azgaar вшивается в него отдельной сборкой
             (scripts/lib/fmg-offline.mjs), поэтому нужен `npm run fmg:install`.
@@ -17,10 +17,10 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import {
   appVersion,
-  mirBuildInfo,
-  mirServiceWorker,
-  mirSingleFile,
-} from './scripts/lib/vite-mir.mjs';
+  buildInfoPlugin,
+  serviceWorkerPlugin,
+  singleFilePlugin,
+} from './scripts/lib/vite-build.mjs';
 
 const version = appVersion();
 
@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     /* Версия доступна коду как __APP_VERSION__. Карта мира — Azgaar в обеих
-       сборках: в web/PWA он берётся из public/fmg, в mir.html вшит целиком. */
+       сборках: в web/PWA он берётся из public/fmg, в sages.html вшит целиком. */
     define: {
       __APP_VERSION__: JSON.stringify(version),
     },
@@ -40,18 +40,18 @@ export default defineConfig(({ mode }) => {
     publicDir: single ? false : 'public',
 
     plugins: single
-      ? [rtwgRawSources(), mirBuildInfo({ version }), mirSingleFile()]
-      : [rtwgRawSources(), mirBuildInfo({ version }), mirServiceWorker({ version })],
+      ? [rtwgRawSources(), buildInfoPlugin({ version }), singleFilePlugin()]
+      : [rtwgRawSources(), buildInfoPlugin({ version }), serviceWorkerPlugin({ version })],
 
     build: {
       /* Однофайловая сборка пишется в память (write: false), каталог нужен
          только на случай ручного `vite build --mode single`. */
-      outDir: single ? 'node_modules/.mir-single' : 'dist',
+      outDir: single ? 'node_modules/.sages-single' : 'dist',
       /* Старые хешированные файлы прошлых сборок не должны копиться в dist:
          их не удалить потом ни на хостинге, ни в установщике .exe. */
       emptyOutDir: true,
       cssCodeSplit: !single,
-      /* В mir.html ресурсы должны лежать внутри, иначе file:// их не найдёт.
+      /* В sages.html ресурсы должны лежать внутри, иначе file:// их не найдёт.
          Веб-версия держит даже маленькие звуки отдельными хешированными файлами:
          data URL аудио раздувает JS и мешает раздельному кешированию. */
       assetsInlineLimit: single ? () => true : 0,
@@ -60,6 +60,12 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize: false,
       rollupOptions: single
         ? {
+            /* Точка входа — control.html: это реальная оболочка приложения
+               (`<script type="module" src="/src/main.js">`, стили подключены
+               через `import './style.css'` в самом модуле). index.html —
+               отдельная статическая страница-визитка без модуля и без
+               стилей, однофайловая сборка не может взять её за основу. */
+            input: resolve(process.cwd(), 'control.html'),
             output: {
               /* IIFE — гарантированно обычный скрипт без import/export. */
               format: 'iife',
@@ -86,7 +92,7 @@ export default defineConfig(({ mode }) => {
 // Keep upstream files byte-identical while avoiding trailing whitespace in
 // generated JS template literals (including the standalone HTML patch).
 function rtwgRawSources() {
-  return { name: 'mir:rtwg-raw-sources', enforce: 'pre', load(id) {
+  return { name: 'sages:rtwg-raw-sources', enforce: 'pre', load(id) {
     if (!id.endsWith('?raw') || !/\/vendor\/(rtwg|rtplatec|libnoise|rtwg-browser)\//.test(id)) return null;
     const source=readFileSync(id.slice(0,-4),'utf8').replace(/\r\n/g,'\n').replace(/[ \t]+$/gm,'');
     return `export default ${JSON.stringify(source)};`;

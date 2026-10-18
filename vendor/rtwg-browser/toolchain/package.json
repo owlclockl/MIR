@@ -1,1 +1,1 @@
-{"name":"mir-rtwg-build-toolchain","private":true,"type":"module","dependencies":{"@live-codes/clang-wasm":"0.3.0"}}
+{"name":"sages-rtwg-build-toolchain","private":true,"type":"module","dependencies":{"@live-codes/clang-wasm":"0.3.0"}}

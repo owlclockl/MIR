@@ -266,7 +266,7 @@ const authNoteHtml = () => {
   if (!backendReady)
     return `<p class="form-note">Подключаемся к общему хабу… Вход станет доступен после проверки.</p>`;
   if (!store.storagePersists())
-    return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте The civilization of the sages по ссылке или используйте Windows-файл MIR-Setup.exe.</p>`;
+    return `<p class="form-note form-note--warn">Браузер не разрешает сохранять данные на этой странице — аккаунт исчезнет после перезагрузки. Откройте The civilization of the sages по ссылке или используйте Windows-файл Sages-Setup.exe.</p>`;
   return `<p class="form-note">${
     store.isHub()
       ? `Аккаунт хранится на общем хабе ${escapeHtml(store.hubHost())}.`
@@ -518,7 +518,7 @@ const profileModalHtml = () => {
 /* --- Окно «Общий хаб» --- */
 /* Хаб — общий сервер аккаунтов. Раньше он подхватывался только по
    адресу страницы: открыл ссылку с ПК друга — попал на его хаб,
-   открыл mir.html с флешки — сидишь один. Теперь адрес можно
+   открыл sages.html с флешки — сидишь один. Теперь адрес можно
    ввести руками: игра из APK, из exe и с флешки подключается к
    хабу в интернете так же, как вкладка браузера. */
 const hubModalHtml = () => {
@@ -561,7 +561,7 @@ const hubModalHtml = () => {
           <label class="field">
             <span class="field__label">Адрес хаба</span>
             <input class="input" name="url" type="text" inputmode="url" spellcheck="false"
-                   autocomplete="off" placeholder="https://mir.имя.workers.dev"
+                   autocomplete="off" placeholder="https://sages.имя.workers.dev"
                    value="${escapeHtml(ui.hubDraft)}" data-role="hub-input" data-autofocus ${ready ? '' : 'disabled'} />
           </label>
           <p class="form-error" data-role="form-error" hidden></p>
@@ -791,7 +791,7 @@ const linkHint = (friend, link) => {
 
 /* --- Окно прямого подключения по коду --- */
 /* Сценарий без всякого сервера: один создаёт код, второй отвечает
-   своим. Нужен, когда хаба нет вовсе — например, у обоих mir.html. */
+   своим. Нужен, когда хаба нет вовсе — например, у обоих sages.html. */
 
 /* После падения соединения интерфейс обязан сказать, что произошло:
    молчаливое «нет связи» выглядит как зависание. */
@@ -889,7 +889,7 @@ const directInviteHtml = () => `
         ? `<form class="form" data-form="direct-complete" novalidate>
              <label class="field">
                <span class="field__label">2. Вставьте ответный код друга</span>
-               <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-answer" placeholder="MIR1.…">${escapeHtml(ui.direct.answerDraft)}</textarea>
+               <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-answer" placeholder="SAGES1.…">${escapeHtml(ui.direct.answerDraft)}</textarea>
              </label>
              <p class="form-error" data-role="form-error" hidden></p>
              <button class="mini-button mini-button--accent" type="submit">Соединиться</button>
@@ -903,7 +903,7 @@ const directJoinHtml = () => `
     <form class="form" data-form="direct-accept" novalidate>
       <label class="field">
         <span class="field__label">1. Вставьте код приглашения</span>
-        <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-offer" placeholder="MIR1.…">${escapeHtml(ui.direct.offerDraft)}</textarea>
+        <textarea class="input input--code-area" rows="3" spellcheck="false" data-role="direct-offer" placeholder="SAGES1.…">${escapeHtml(ui.direct.offerDraft)}</textarea>
       </label>
       <p class="form-error" data-role="form-error" hidden></p>
       <button class="mini-button mini-button--accent" type="submit">Получить ответный код</button>
@@ -1506,7 +1506,7 @@ const adminLoginHtml = () => {
         </div>
         <p class="admin-gate__hint">${
           hub
-            ? `Если ключ не меняли, действует заводской <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code>. Можно задать свой через <strong>MIR_ADMIN_KEY</strong> или сменить ключ после входа — во вкладке «Система».`
+            ? `Если ключ не меняли, действует заводской <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code>. Можно задать свой через <strong>SAGES_ADMIN_KEY</strong> или сменить ключ после входа — во вкладке «Система».`
             : `Заводской ключ <code translate="no">${escapeHtml(store.DEFAULT_ADMIN_KEY)}</code> подходит только для аккаунтов этого браузера. Для безопасности смените его во вкладке «Система».`
         }</p>
       </footer>
@@ -5183,7 +5183,7 @@ window.addEventListener('beforeunload', () => {
 
 /* PWA и обновления: по https/localhost регистрируем service worker — меню
    становится устанавливаемым приложением и работает офлайн. С file://
-   (mir.html) и на голом http по локальной сети браузеры SW не разрешают, но
+   (sages.html) и на голом http по локальной сети браузеры SW не разрешают, но
    проверка новой сборки по серверу работает и там. Модуль обновлений сам
    решает, что доступно на странице, и сам никогда не перезагружает игру:
    обновление применяет игрок (кнопка «Обновить») либо следующий запуск. */

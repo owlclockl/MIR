@@ -23,7 +23,7 @@ export function measurementLength(shape, worldWidth, worldHeight) {
   return new Line(shape.u1 * worldWidth, shape.v1 * worldHeight, shape.u2 * worldWidth, shape.v2 * worldHeight).length();
 }
 
-/** Upstream extrapolation in integer host units, then intersection with MIR's
+/** Upstream extrapolation in integer host units, then intersection with Sages'
     rectangular map instead of Minecraft's square +/-30M world border. */
 export function infiniteEndpoints(s) {
   const scale = 1e12;

@@ -14,7 +14,7 @@
    Динамика: тумблер «Анимации» в настройках игры — класс `reduce-motion` на
    `<html>` родителя. Накладка живёт в документе iframe, поэтому CSS-правило
    родителя её не достаёт: проверяем, что выключенные анимации гасят и
-   вертушку (`mir-gen-quiet`), и появление карты (без `mir-reveal`). */
+   вертушку (`sages-gen-quiet`), и появление карты (без `sages-reveal`). */
 
 import './lib/root.mjs';
 
@@ -112,13 +112,13 @@ scene.win.GenerationPipeline = {
       id: 'grid',
       run: () => {
         stepsDone.push('grid');
-        const veil = scene.doc.getElementById('mir-gen-veil');
+        const veil = scene.doc.getElementById('sages-gen-veil');
         seenInside.push({
-          stage: veil?.querySelector('.mir-gen-stage')?.textContent ?? '',
-          count: veil?.querySelector('.mir-gen-count')?.textContent ?? '',
+          stage: veil?.querySelector('.sages-gen-stage')?.textContent ?? '',
+          count: veil?.querySelector('.sages-gen-count')?.textContent ?? '',
           on: veil?.classList.contains('is-on') ?? false,
-          quiet: veil?.classList.contains('mir-gen-quiet') ?? false,
-          fill: veil?.querySelector('.mir-gen-fill')?.style.width ?? '',
+          quiet: veil?.classList.contains('sages-gen-quiet') ?? false,
+          fill: veil?.querySelector('.sages-gen-fill')?.style.width ?? '',
         });
       },
     },
@@ -146,7 +146,7 @@ const kinds = events.map((event) => event.type);
 
 /* Подмена обязана сохранить и результат конвейера: Azgaar возвращает из run
    собранную карту, и проглотить её значило бы сломать открытие слота. */
-add(scene.win.GenerationPipeline.__mirStage === true, 'конвейер Azgaar подменён');
+add(scene.win.GenerationPipeline.__sagesStage === true, 'конвейер Azgaar подменён');
 
 add(kinds[0] === 'start' && kinds[kinds.length - 1] === 'done', 'ход генерации кончается событием «готово»', kinds.join(' → '));
 add(
@@ -169,21 +169,21 @@ add(
 add(seenInside[0]?.on === true, 'на время шага накладка видна');
 add(seenInside[0]?.fill === '0%' && seenInside[1] === undefined, 'полоса прогресса начинается с нуля', seenInside[0]?.fill ?? '');
 
-const veilAfter = scene.doc.getElementById('mir-gen-veil');
+const veilAfter = scene.doc.getElementById('sages-gen-veil');
 add(veilAfter?.classList.contains('is-on') === false, 'после готовности накладка снята');
 
 /* ---------- 3. Динамика: тумблер «Анимации» в игре ---------- */
 
 add(
-  scene.doc.getElementById('map')?.classList.contains('mir-reveal') === true,
+  scene.doc.getElementById('map')?.classList.contains('sages-reveal') === true,
   'включённые анимации — карта появляется',
   'класс появления на #map',
 );
-add(veilAfter?.classList.contains('mir-gen-quiet') === false, 'включённые анимации — вертушка играет');
+add(veilAfter?.classList.contains('sages-gen-quiet') === false, 'включённые анимации — вертушка играет');
 
 /* Выключаем настройку на живом экране: следующий прогон обязан стать тихим. */
 window.document.documentElement.classList.add('reduce-motion');
-scene.doc.getElementById('map').classList.remove('mir-reveal');
+scene.doc.getElementById('map').classList.remove('sages-reveal');
 seenInside.length = 0;
 events.length = 0;
 
@@ -193,7 +193,7 @@ await tick();
 
 add(seenInside[0]?.quiet === true, 'выключенные анимации — вертушка встаёт', `quiet=${seenInside[0]?.quiet}`);
 add(
-  scene.doc.getElementById('map')?.classList.contains('mir-reveal') !== true,
+  scene.doc.getElementById('map')?.classList.contains('sages-reveal') !== true,
   'выключенные анимации — карта появляется без анимации',
 );
 add(
@@ -233,10 +233,10 @@ add(
   thrown,
 );
 add(
-  failed.doc.getElementById('mir-gen-veil')?.classList.contains('is-on') === false,
+  failed.doc.getElementById('sages-gen-veil')?.classList.contains('is-on') === false,
   'после ошибки накладка снята, а карта не «появляется»',
 );
-add(failed.doc.getElementById('map')?.classList.contains('mir-reveal') !== true, 'после ошибки появления нет');
+add(failed.doc.getElementById('map')?.classList.contains('sages-reveal') !== true, 'после ошибки появления нет');
 
 /* ---------- 5. Накладка вне генерации ---------- */
 
@@ -244,15 +244,15 @@ const manual = frame();
 showEditorStage(manual.element, 'Карта мастера');
 
 add(
-  manual.doc.querySelector('.mir-gen-stage')?.textContent === 'Карта мастера',
+  manual.doc.querySelector('.sages-gen-stage')?.textContent === 'Карта мастера',
   'подпись вне генерации показывается в накладке',
 );
 
 hideEditorStage(manual.element);
 
 add(
-  manual.doc.getElementById('mir-gen-veil')?.classList.contains('is-on') === false &&
-    manual.doc.getElementById('map')?.classList.contains('mir-reveal') !== true,
+  manual.doc.getElementById('sages-gen-veil')?.classList.contains('is-on') === false &&
+    manual.doc.getElementById('map')?.classList.contains('sages-reveal') !== true,
   'снятие накладки вне генерации не играет появление',
 );
 

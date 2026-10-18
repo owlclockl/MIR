@@ -1,10 +1,10 @@
-// Сборка Windows-установщика MIR-Setup.exe.
+// Сборка Windows-установщика Sages-Setup.exe.
 // Запуск: npm run build:exe
 //
 // Как это работает:
 //   1. собираем сайт (vite) и упаковываем папку dist/ во внутренний архив;
 //   2. делаем app.ico из PNG-иконок;
-//   3. компилируем scripts/win/MirSetup.cs штатным csc.exe из .NET Framework
+//   3. компилируем scripts/win/SagesSetup.cs штатным csc.exe из .NET Framework
 //      (есть на любой Windows 10/11) и вшиваем архив + иконку как ресурсы;
 //   4. проверяем, что получился настоящий PE-файл для Windows.
 //
@@ -21,7 +21,7 @@ import './lib/root.mjs';
 import { buildWeb } from './lib/build.mjs';
 
 const OUT_DIR = 'dist-app';
-const CS_SOURCE = join('scripts', 'win', 'MirSetup.cs');
+const CS_SOURCE = join('scripts', 'win', 'SagesSetup.cs');
 const PACKAGE_VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version ?? '0.0.0';
 const ASSEMBLY_VERSION = `${PACKAGE_VERSION}.0`;
 
@@ -29,8 +29,8 @@ console.log('--- The civilization of the sages — сборка Windows-прил
 
 /* ---------- 1. свежая сборка сайта -------------------------------- */
 
-/* Установщик раздаёт dist/ своим локальным сервером (см. MirSetup.cs):
-   модульная веб-сборка здесь и нужна, однофайловый mir.html — нет. */
+/* Установщик раздаёт dist/ своим локальным сервером (см. SagesSetup.cs):
+   модульная веб-сборка здесь и нужна, однофайловый sages.html — нет. */
 await buildWeb();
 
 /* ---------- 2. архив с сайтом ------------------------------------- */
@@ -70,7 +70,7 @@ function packSite(files) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 const sitePack = packSite(siteFiles);
-const sitePackPath = join(OUT_DIR, 'site.mirpak');
+const sitePackPath = join(OUT_DIR, 'site.sagespak');
 writeFileSync(sitePackPath, sitePack);
 
 /* ---------- 3. иконка приложения ----------------------------------- */
@@ -109,14 +109,14 @@ if (!compiler) {
   console.error('  Если файла нет — поставьте .NET Framework 4.8:');
   console.error('    https://dotnet.microsoft.com/download/dotnet-framework/net48');
   console.error('');
-  console.error('  Веб-версия при этом уже собрана: dist\\ и mir.html.');
+  console.error('  Веб-версия при этом уже собрана: dist\\ и sages.html.');
   console.error('');
   process.exit(1);
 }
 
 /* csc.exe определяет кодировку исходника по BOM: без него русские строки
    превратятся в кракозябры. Поэтому компилируем копию с BOM. */
-const sourceWithBom = join(OUT_DIR, 'MirSetup.cs');
+const sourceWithBom = join(OUT_DIR, 'SagesSetup.cs');
 const csharpSource = readFileSync(CS_SOURCE, 'utf8')
   .replaceAll('__APP_ASSEMBLY_VERSION__', ASSEMBLY_VERSION)
   .replaceAll('__APP_VERSION__', PACKAGE_VERSION);
@@ -126,12 +126,12 @@ writeFileSync(sourceWithBom, '\uFEFF' + csharpSource, 'utf8');
 /* Манифест: asInvoker — чтобы Windows не считала файл с «Setup» в имени
    установщиком и не просила права администратора (мы ставим игру в папку
    пользователя); dpiAware — чтобы окно не было размытым на HiDPI-экранах. */
-const manifestPath = join(OUT_DIR, 'MirSetup.manifest');
+const manifestPath = join(OUT_DIR, 'SagesSetup.manifest');
 writeFileSync(
   manifestPath,
   `<?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="${ASSEMBLY_VERSION}" name="MIR.Setup" type="win32" />
+  <assemblyIdentity version="${ASSEMBLY_VERSION}" name="Sages.Setup" type="win32" />
   <description>The civilization of the sages</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
@@ -157,7 +157,7 @@ writeFileSync(
   'utf8',
 );
 
-const exePath = join(OUT_DIR, 'MIR-Setup.exe');
+const exePath = join(OUT_DIR, 'Sages-Setup.exe');
 const args = [
   '/nologo',
   '/target:winexe',
@@ -167,11 +167,11 @@ const args = [
   '/reference:System.dll',
   '/reference:System.Drawing.dll',
   '/reference:System.Windows.Forms.dll',
-  `/resource:${sitePackPath},mir.site`,
+  `/resource:${sitePackPath},sages.site`,
   `/win32manifest:${manifestPath}`,
 ];
 if (existsSync(icoPath)) {
-  args.push(`/resource:${icoPath},mir.icon`);
+  args.push(`/resource:${icoPath},sages.icon`);
   args.push(`/win32icon:${icoPath}`);
 }
 args.push(sourceWithBom);
@@ -195,7 +195,7 @@ if (exe.subarray(0, 2).toString('ascii') !== 'MZ') problems.push('нет сиг�
 const peOffset = exe.readUInt32LE(0x3c);
 if (exe.subarray(peOffset, peOffset + 4).toString('binary') !== 'PE\0\0') problems.push('нет заголовка PE');
 if (exe.length < 20 * 1024) problems.push(`подозрительно маленький файл (${exe.length} байт)`);
-if (!exe.includes(Buffer.from('mir.site', 'ascii'))) problems.push('в exe не видно ресурса с сайтом');
+if (!exe.includes(Buffer.from('sages.site', 'ascii'))) problems.push('в exe не видно ресурса с сайтом');
 
 if (problems.length) {
   console.error('');
@@ -204,11 +204,11 @@ if (problems.length) {
   process.exit(1);
 }
 
-writeFileSync('MIR-Setup.exe', exe);
+writeFileSync('Sages-Setup.exe', exe);
 
 console.log('');
 console.log('✓ Установщик The civilization of the sages собран:');
-console.log('    MIR-Setup.exe  (копия: dist-app/MIR-Setup.exe)');
+console.log('    Sages-Setup.exe  (копия: dist-app/Sages-Setup.exe)');
 console.log(`    Размер: ${(exe.length / 1024).toFixed(1)} КБ, внутри ${siteFiles.length} файлов игры`);
 console.log('    Проверено: настоящий PE-файл, ресурсы на месте.');
 console.log('');

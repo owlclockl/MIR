@@ -4,7 +4,7 @@
    проверяется сам по себе, без интерфейса.
 
    Нужен vite dev-сервер (`npm run dev`) и установленный Playwright Chromium
-   либо MIR_CHROMIUM_EXECUTABLE. Адрес можно задать аргументом:
+   либо SAGES_CHROMIUM_EXECUTABLE. Адрес можно задать аргументом:
    `npm run test:rtwg-browser -- http://127.0.0.1:5173/`. */
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
@@ -14,7 +14,7 @@ const { chromium } = await import(
 );
 const browser = await chromium.launch({
   headless: true,
-  executablePath: process.env.MIR_CHROMIUM_EXECUTABLE || undefined,
+  executablePath: process.env.SAGES_CHROMIUM_EXECUTABLE || undefined,
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });

@@ -1569,7 +1569,7 @@
 1569 Minimum mean elevation «charts-overview.ts»
 1570 Minimum zoom level to show the group «labels-group-editor.ts»
 1571 Minimum zoom to show the group, leave empty for no limit «labels-group-editor.ts»
-1572 MIR — Azgaar Fantasy Map Generator «index.html»
+1572 Sages — Azgaar Fantasy Map Generator «index.html»
 1573 Mirror «transform-tool.ts»
 1574 Mirror heightmap along axis «heightmap-editor.ts»
 1575 Missing groups: «labels-group-editor.ts»
@@ -2243,7 +2243,7 @@
 2243 Restore the default zoom extent «options-tab.ts»
 2244 Restore the defaults and re-define biomes based on current moisture and temperature «biomes-editor.ts»
 2245 Restore the icon's default colors «markers-editor.ts»
-2246 Restore the MIR forest-green theme «options-tab.ts»
+2246 Restore the Sages forest-green theme «options-tab.ts»
 2247 Restore winds «world-configurator.ts»
 2248 Restrict brush to specific cell types «heightmap-editor.ts»
 2249 Retreat phase. Units strength reduced «battle-screen.ts»

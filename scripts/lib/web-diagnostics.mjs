@@ -21,7 +21,7 @@
 
 const SCRIPT = String.raw`
 <script>
-/* MIR: экранный журнал ошибок. Встраивается сборщиком APK (scripts/lib/web-diagnostics.mjs). */
+/* Экранный журнал ошибок. Встраивается сборщиком APK (scripts/lib/web-diagnostics.mjs). */
 (function () {
   var VERSION = '__VERSION__';
   var BUILT = '__BUILT__';
@@ -40,19 +40,19 @@ const SCRIPT = String.raw`
     if (entries.length > 200) entries.shift();
     if (kind === 'ОШИБКА') show();
     else if (badge) badge.style.display = 'block';
-    try { if (window.console && console.log) console.log('[MIR ' + kind + '] ' + text); } catch (e) {}
+    try { if (window.console && console.log) console.log('[Sages ' + kind + '] ' + text); } catch (e) {}
   }
 
   function env() {
     var lines = [];
-    lines.push('The civilization of the sages (MIR) ' + VERSION + ', сборка ' + BUILT);
+    lines.push('The civilization of the sages ' + VERSION + ', сборка ' + BUILT);
     lines.push('адрес: ' + location.href);
     lines.push('браузер: ' + navigator.userAgent);
     lines.push('язык: ' + navigator.language + ', экран: ' + screen.width + 'x' + screen.height +
       ', окно: ' + window.innerWidth + 'x' + window.innerHeight + ', DPR: ' + (window.devicePixelRatio || 1));
     lines.push('онлайн: ' + navigator.onLine);
     var checks = [
-      ['localStorage', function () { localStorage.setItem('mir-diag', '1'); localStorage.removeItem('mir-diag'); return true; }],
+      ['localStorage', function () { localStorage.setItem('sages-diag', '1'); localStorage.removeItem('sages-diag'); return true; }],
       ['crypto.subtle', function () { return !!(window.crypto && window.crypto.subtle); }],
       ['crypto.getRandomValues', function () { return !!(window.crypto && window.crypto.getRandomValues); }],
       ['TextEncoder', function () { return typeof TextEncoder !== 'undefined'; }],
@@ -92,13 +92,13 @@ const SCRIPT = String.raw`
       bar.appendChild(button('Скопировать', function () { copy(report()); }));
       bar.appendChild(button('Закрыть', function () { panel.style.display = 'none'; if (badge) badge.style.display = 'block'; }));
       var text = document.createElement('div');
-      text.id = 'mir-diag-text';
+      text.id = 'sages-diag-text';
       panel.appendChild(bar);
       panel.appendChild(text);
       document.body.appendChild(panel);
     }
     panel.style.display = 'block';
-    var box = document.getElementById('mir-diag-text');
+    var box = document.getElementById('sages-diag-text');
     if (box) box.textContent = report();
   }
 
@@ -179,7 +179,7 @@ const SCRIPT = String.raw`
     if (entries.length) badge.style.display = 'block';
   });
 
-  window.MIRDiag = { entries: entries, show: show, report: report, env: env, add: add };
+  window.SagesDiag = { entries: entries, show: show, report: report, env: env, add: add };
   add('старт', 'диагностика подключена');
 })();
 </script>

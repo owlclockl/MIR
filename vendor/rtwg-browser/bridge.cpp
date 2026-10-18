@@ -1,4 +1,4 @@
-// MIR browser adapter, GPL-3.0-or-later. RTplatec source remains unmodified.
+// The civilization of the sages browser adapter, GPL-3.0-or-later. RTplatec source remains unmodified.
 #include "lithosphere.hpp"
 #include "FractalGenerator.h"
 #include <cstdlib>

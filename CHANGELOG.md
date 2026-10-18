@@ -2,6 +2,115 @@
 
 Все заметные изменения проекта. Новые записи — сверху.
 
+## 2026-10-18 — полное переименование MIR → Sages и проверка визуальной системы
+
+**Контекст.** Переименование 2026-10-05 нарочно оставило технические
+идентификаторы (`mir.html`, `com.mir.game`, имя Cloudflare Worker, протокол
+прямого подключения, localStorage-ключи, процедурный seed по умолчанию,
+формат экспортированного JSON) на `MIR` ради совместимости — это было
+явно задокументировано в `AGENTS.md` и `docs/brand-guidelines.md`. По
+прямому запросу эта совместимость принесена в жертву: переименовано
+абсолютно всё, включая внутренние идентификаторы, с принятием всех
+последствий (ниже).
+
+**Что сделано**
+- **Все пользовательские и технические строки.** Полный проход по
+  репозиторию: `mir.html` → `sages.html`, `scripts/win/MirSetup.cs` →
+  `SagesSetup.cs` (с разделением `Branding.ShortName = "Sages"` и
+  `LegacyName = "MIR"`, второе оставлено только для очистки ярлыков от
+  старых установок), `MIR-INTEGRATION.md` → `SAGES-INTEGRATION.md` (x2),
+  `mir-theme.css` → `sages-theme.css` (vendor и `public/fmg`), пакет
+  Android `com.mir.game` → `com.sages.game`, имя Cloudflare Worker и
+  класс Durable Object `mir`/`MirHub` → `sages`/`SagesHub` (миграция
+  `renamed_classes` в `wrangler.toml` сохраняет данные по новому адресу),
+  переменные окружения `MIR_ADMIN_KEY`/`VITE_MIR_HUB` →
+  `SAGES_ADMIN_KEY`/`VITE_SAGES_HUB`, заголовок `X-Mir-Admin` →
+  `X-Sages-Admin`, префикс localStorage/IndexedDB `mir:` → `sages:`,
+  протокол прямого подключения `MIR0./MIR1.` → `SAGES0./SAGES1.`, формат
+  RTWG-снимка `mir-rtwg` → `sages-rtwg`, формат файла рисунков
+  поверхности `MIR surface annotations` → `Sages surface annotations`,
+  GeoJSON-поля `mirDrawing`/`mirProjection` → `sagesDrawing`/
+  `sagesProjection`, плейсхолдеры service worker `__MIR_*__` → `__SAGES_*__`
+  и путь новостей о сборке `/mir-build.json` → `/sages-build.json`,
+  экспортируемые из игры файлы `mir-map.*`/`mir-png.png` →
+  `sages-map.*`/`sages-png.png`, DOM-идентификаторы наложения генерации
+  карты (`mir-gen-*`, `mir-reveal`) → `sages-gen-*`/`sages-reveal`
+  (`src/game/generation-stage.js`), id блока офлайн-редактора в
+  `sages.html` (`mir-fmg-assets` → `sages-fmg-assets`), кеш и адрес
+  уведомлений в `src/sw.js` (`mir-prefs`/`/mir-notify-preference` →
+  `sages-prefs`/`/sages-notify-preference`), процедурный seed по
+  умолчанию `mir-2026` → `sages-2026` (мастерская планеты и генератор).
+  Переименованы и внутренние имена кода без внешнего смысла, но
+  попадавшие под «MIR»: функции и файл `scripts/lib/vite-mir.mjs` →
+  `scripts/lib/vite-build.mjs` (`mirBuildInfo/mirSingleFile/
+  mirServiceWorker` → `buildInfoPlugin/singleFilePlugin/
+  serviceWorkerPlugin`), `Symbol.for('mir.build.state')` →
+  `'sages.build.state'`, DOM-идентификатор правила игрока в редакторе
+  Azgaar (`mir-player-restriction` → `sages-player-restriction`),
+  переменная шейдера RTWG (`mirOutput` → `sagesOutput`), временные
+  каталоги и User-Agent тестовых и build-скриптов.
+- **Принятые последствия** (подтверждены явно, не доработка «на потом»):
+  Android-апдейт поверх старого `com.mir.game` невозможен — это новый
+  пакет, данные игрока не переносятся автоматически; уже развёрнутый
+  Cloudflare Worker/Durable Object по адресу `mir.*.workers.dev` отрезан
+  от данных (миграция переименовывает класс, но старый адрес хаба больше
+  не обслуживается); процедурный мир с seed по умолчанию выглядит иначе,
+  чем раньше; старые экспортированные JSON миров и GeoJSON-рисунки с
+  полями `mirDrawing`/`mir-rtwg` не распознаются текущей версией.
+- **Визуальная система приложения проверена и дошлифована.** Выяснилось,
+  что сам экран приложения (`control.html` → `src/style.css`,
+  `src/main.js`) уже был переведён на фирменную палитру и типографику
+  (лесная ночь `#080d0e`, шалфей `#c2d9c9`, тёплое золото `#d8c184`,
+  Manrope/Inter) в записях 2026-10-16/17 («стиль «плавающий остров»»,
+  «визуальный проход по всем элементам») ещё до `brand/`: фирменная книга
+  лишь задокументировала то, что уже было применено. Переделки требовал
+  только `index.html` — отдельная статическая страница-визитка (не часть
+  сборки `/src/main.js`): она использовала старую золотую
+  ар-деко-тему («солнечный диск», силуэт башен) и была переписана с нуля
+  на фирменные токены и инлайновый SVG-знак из `public/logo-mark.svg`.
+  Встроенный вид RTWG (`.rtwg-view` и соседние классы в `src/style.css`)
+  переведён с точечных hex-цветов на те же переменные бренда
+  (`--bg`, `--gold`, `--text-dim`, `--danger` и т.д.) — визуально почти
+  не изменился, но перестал быть источником рассинхрона при следующей
+  правке палитры.
+- **Найден и исправлен скрытый баг однофайловой сборки.** `vite.config.js`
+  в режиме `single` не задавал `rollupOptions.input` и неявно брал
+  `index.html` — страницу без модуля и без стилей, поэтому `npm run
+  single` падал на «в сборке нет стилей» независимо от переименования
+  (воспроизведено и на коммите до начала этой работы). Точка входа
+  однофайловой сборки явно указана на `control.html` — реальную оболочку
+  приложения.
+- **Найден и исправлен скрытый баг проверки обновлений.** Метка сборки
+  `<meta name="sages-build">` вставлялась только в один HTML-файл сборки
+  (случайно — `index.html`, а не `control.html`, который её читает),
+  поэтому баннер «вышло обновление» в реальном приложении никогда не
+  видел собственную метку и работал как попало (баг тоже воспроизведён
+  на коммите до начала этой работы). Теперь плагин `sages:service-worker`
+  метит все HTML-страницы сборки.
+- **Тесты обновлены вслед за переименованием и исправлениями:**
+  `scripts/test-ui.mjs` теперь читает входной модуль из
+  `dist/control.html` (не `dist/index.html`), ждёт `/fmg/sages-theme.css`
+  и переменную `--sages-lucide-mask`; `scripts/test-worker.mjs` ждёт
+  событие `sages_hub_request_failed`; `scripts/test-stage.mjs` ждёт
+  классы `sages-gen-*`/`sages-reveal` и маркер `__sagesStage`.
+- **Проверки:** `fmg:build`, `build`, `single`, `test:build` (50),
+  `test:spacing` (28), `test:brand` (48), `test:worker`, `test:hub`
+  (живой сервер), `test:realtime`, `test:lobby-client`, `test:parties`,
+  `test:party-slots`, `test:avatar`, `test:ui` (114, живой сервер),
+  `test:xaeroplus` (72), `test:blocks` (52), `test:surface` (61),
+  `test:earth` (104), `test:stage` (25), `test:planet` (77),
+  `test:planet-view` (49), `test:alive` (56), `test:unified-planet` (72),
+  `test:invite-code`, `test:settings`, `test:rtwg` (31), `test:perf`,
+  `test:keys`, `doctor`. `test:p2p` пропущен (нет опционального
+  `node-datachannel` в песочнице), `test:browser` пропущен (нет
+  установленного Playwright, сети для `npx playwright install` нет) —
+  оба падают по той же причине на чистом окружении независимо от этой
+  правки, не из-за неё.
+- **Не делалось:** `data/apk-signing-key.json` не тронут (не часть
+  брендинга); исторические записи журнала и ASCII-дерево каталогов в
+  `README.md`/`AGENTS.md`, где `MIR/` — название реальной локальной
+  директории, не переписаны.
+
 ## 2026-10-17 — фирменная книга, девять редакций логотипа и тест бренда
 
 **Что сделано**

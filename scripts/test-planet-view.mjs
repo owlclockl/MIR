@@ -151,7 +151,7 @@ const frame = host.querySelector('.world-editor-frame');
 
 let view = null;
 try {
-  view = mountPlanetView(host, { seed: 'mir-2026', size: 1, onExit: () => {} });
+  view = mountPlanetView(host, { seed: 'sages-2026', size: 1, onExit: () => {} });
   add(!view.error, 'вид монтируется без ошибки', view.error ?? '');
 } catch (error) {
   add(false, 'вид монтируется без ошибки', error instanceof Error ? error.message : String(error));

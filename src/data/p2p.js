@@ -12,7 +12,7 @@
    2. Параллельно WebRTC пробует прямой канал; сообщения переключаются
       на него только при ошибке доставки через хаб.
    3. Ручное подключение по коду — отдельный последний вариант без хаба,
-      например для двух однофайловых `mir.html`.
+      например для двух однофайловых `sages.html`.
 
    Поэтому состояние «через хаб» — штатное основное подключение, а не
    ошибка или деградация. P2P — дополнительный маршрут.
@@ -33,7 +33,7 @@ const ICE_SERVERS = [
   { urls: 'stun:stun.nextcloud.com:443' },
 ];
 
-const CHANNEL = 'mir';
+const CHANNEL = 'sages';
 
 const TIMING = {
   tick: 2500, // как часто пересматриваем, с кем надо быть на связи
@@ -718,7 +718,7 @@ export const send = (peerId, text) => {
    Прямое подключение по коду — вообще без сервера.
    Код это сжатый SDP в base64: один создаёт «код приглашения»,
    второй отвечает «кодом ответа». Так связываются даже два
-   mir.html с флешки, лишь бы устройства видели друг друга по сети.
+   sages.html с флешки, лишь бы устройства видели друг друга по сети.
    =========================================================== */
 
 const toBase64 = (bytes) => {
@@ -753,12 +753,12 @@ const inflate = async (bytes, packed) => {
 
 const encodeCode = async (payload) => {
   const { packed, bytes } = await deflate(JSON.stringify(payload));
-  return `MIR${packed ? 1 : 0}.${toBase64(bytes)}`;
+  return `SAGES${packed ? 1 : 0}.${toBase64(bytes)}`;
 };
 
 const decodeCode = async (code) => {
   const clean = String(code || '').trim().replace(/\s+/g, '');
-  const match = /^MIR([01])\.(.+)$/.exec(clean);
+  const match = /^SAGES([01])\.(.+)$/.exec(clean);
   if (!match) throw new Error('Это не код прямого подключения.');
   const text = await inflate(fromBase64(match[2]), match[1] === '1').catch(() => {
     throw new Error('Код повреждён — попросите прислать его заново.');

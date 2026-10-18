@@ -21,12 +21,12 @@
    к исходному. */
 
 const args = process.argv.slice(2).filter((a) => a !== '--keep');
-const BASE = (args[0] || process.env.MIR_HUB || 'http://127.0.0.1:4173').replace(/\/+$/, '');
+const BASE = (args[0] || process.env.SAGES_HUB || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 
 /* Ключ панели админа. По умолчанию заводской (в открытом исходнике);
-   если владелец задал свой (MIR_ADMIN_KEY или сменил в панели) —
+   если владелец задал свой (SAGES_ADMIN_KEY или сменил в панели) —
    проверяем его. Панель на хабе включена всегда. */
-const ADMIN_KEY = process.env.MIR_ADMIN_KEY || 'owlananaslwo';
+const ADMIN_KEY = process.env.SAGES_ADMIN_KEY || 'owlananaslwo';
 
 let failures = 0;
 const ok = (what, detail = '') => console.log(`  ✓ ${what}${detail ? ` — ${detail}` : ''}`);
@@ -43,7 +43,7 @@ const call = async (method, path, { body, token, admin, timeout = 30_000 } = {})
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(admin ? { 'X-Mir-Admin': admin } : {}),
+      ...(admin ? { 'X-Sages-Admin': admin } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -94,7 +94,7 @@ const ping = await call('GET', '/api/ping', { timeout: 15_000 }).catch((error) =
   console.log('\nПЛОХО: адрес недоступен. Проверьте, что сервер запущен и ссылка верна.');
   process.exit(1);
 });
-expect('ping', ping.status === 200 && ping.data.hub === 'mir', `игроков на хабе: ${ping.data.users}`);
+expect('ping', ping.status === 200 && ping.data.hub === 'sages', `игроков на хабе: ${ping.data.users}`);
 expect(
   'CORS разрешён (игру можно открыть с другого адреса)',
   ping.headers.get('access-control-allow-origin') === '*',
@@ -104,9 +104,9 @@ expect(
 const preflight = await fetch(`${BASE}/api/admin/state`, {
   method: 'OPTIONS',
   headers: {
-    Origin: 'https://mir-ui.example',
+    Origin: 'https://sages-ui.example',
     'Access-Control-Request-Method': 'POST',
-    'Access-Control-Request-Headers': 'content-type,x-mir-admin',
+    'Access-Control-Request-Headers': 'content-type,x-sages-admin',
   },
 });
 const allowedHeaders = (preflight.headers.get('access-control-allow-headers') || '')
@@ -114,7 +114,7 @@ const allowedHeaders = (preflight.headers.get('access-control-allow-headers') ||
   .map((header) => header.trim().toLowerCase());
 expect(
   'префлайт разрешает JSON и заголовок ключа админа',
-  preflight.status === 204 && allowedHeaders.includes('content-type') && allowedHeaders.includes('x-mir-admin'),
+  preflight.status === 204 && allowedHeaders.includes('content-type') && allowedHeaders.includes('x-sages-admin'),
   `${preflight.status}; разрешено: ${allowedHeaders.join(', ') || 'ничего'}`,
 );
 

@@ -55,7 +55,7 @@ const continents = `Hill 1 80-85 60-80 40-60
   Pit 3-4 10-20 15-85 20-80
   Mask 4 0 0 0`;
 
-// MIR's whole-world preset, composed exclusively from Azgaar terrain tools.
+// Sages' whole-world preset, composed exclusively from Azgaar terrain tools.
 // Lower-variance Hill growth forms coherent continental interiors instead of
 // the old branching, pointed hill tops. Lower land before adding ranges: plains, then mountain
 // belts. The Earth-only Range coast guard in fromTemplate keeps ocean ridges

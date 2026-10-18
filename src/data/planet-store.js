@@ -5,7 +5,7 @@ let connection;
 async function database() {
   if (!globalThis.indexedDB) throw new Error('Хранилище планет недоступно; скачайте файл планеты.');
   if (!connection) connection = new Promise((resolve, reject) => {
-    const request = indexedDB.open('mir:unified-planets', 1);
+    const request = indexedDB.open('sages:unified-planets', 1);
     request.onupgradeneeded = () => request.result.createObjectStore('slots');
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => { connection = null; reject(request.error); };

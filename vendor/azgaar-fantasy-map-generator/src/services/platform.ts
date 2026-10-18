@@ -16,9 +16,9 @@ export const savedMessage = (name: string): string =>
   isElectron() ? `${name} is saved` : `${name} is saved. Open "Downloads" screen (CTRL + J) to check`;
 
 export function registerServiceWorker(): void {
-  /* MIR serves the editor below /fmg/ and owns one root-scope service worker.
+  /* Sages serves the editor below /fmg/ and owns one root-scope service worker.
      A nested worker would take over requests for the more-specific /fmg/
-     scope, bypass the MIR precache, and load Workbox from a remote CDN. The
+     scope, bypass the Sages precache, and load Workbox from a remote CDN. The
      root worker already precaches the complete editor for offline use. */
   if (location.pathname.startsWith("/fmg/")) return;
   if (!("serviceWorker" in navigator) || !isProduction() || isElectron()) return;

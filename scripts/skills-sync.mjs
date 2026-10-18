@@ -68,7 +68,7 @@ const GITHUB_API = 'https://api.github.com';
 const curl = (args) =>
   execFileSync(
     'curl',
-    ['-sSL', '--fail', '-m', '60', '-H', 'User-Agent: mir-skills-sync', ...args],
+    ['-sSL', '--fail', '-m', '60', '-H', 'User-Agent: sages-skills-sync', ...args],
     { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 },
   );
 

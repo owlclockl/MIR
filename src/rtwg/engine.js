@@ -7,7 +7,7 @@ import { createTectonics } from './tectonics.js';
 import { FULLSCREEN_VERTEX, SIMULATION_SHADERS, DISPLAY_SHADER, FLOW_SHADER, MESH_VERTEX, LAND_SHADER, WATER_SHADER, DEPTH_SHADER } from './shaders.js';
 import { multiply, lookAt, perspective, ortho, BIAS } from './matrix.js';
 
-export async function createRtwgEngine(canvas, { seed = 'MIR-RTWG', width = 256, height = 128, parameters = defaultParameters() } = {}) {
+export async function createRtwgEngine(canvas, { seed = 'SAGES-RTWG', width = 256, height = 128, parameters = defaultParameters() } = {}) {
   parameters = validateParameters(parameters);
   if (![64,128,256,512].includes(width) || height !== width / 2) throw Error('RTWG: разрешение должно быть 64–512 × половина ширины');
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, preserveDrawingBuffer: true });
@@ -111,7 +111,7 @@ export async function createRtwgEngine(canvas, { seed = 'MIR-RTWG', width = 256,
         const vp=multiply(perspective(canvas.width/canvas.height),lookAt(eye,target)); common(land,vp,0); gl.drawElements(gl.TRIANGLES,indices.length,gl.UNSIGNED_INT,0);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); common(water,vp,1); gl.drawElements(gl.TRIANGLES,indices.length,gl.UNSIGNED_INT,0); gl.depthMask(true); gl.disable(gl.BLEND);
       },
-      snapshot() { return { format:'mir-rtwg', version:1, seed, width, height, iteration, parameters:structuredClone(parameters), enabled:{...enabled}, timeTemp,timeWind,noiseCounter, fields:FIELDS.map((_,i)=>read(i)) }; },
+      snapshot() { return { format:'sages-rtwg', version:1, seed, width, height, iteration, parameters:structuredClone(parameters), enabled:{...enabled}, timeTemp,timeWind,noiseCounter, fields:FIELDS.map((_,i)=>read(i)) }; },
       restore(s) { s=validateSnapshot(s); if(s.width!==width||s.height!==height||s.seed!==seed) throw Error('Разрешение снимка не совпадает'); for(const group of Object.keys(parameters)) Object.assign(parameters[group],s.parameters[group]); engine.importHeights(Float32Array.from(s.fields[0].filter((_,i)=>i%4===0))); for(let i=0;i<8;i++) upload(fields[i][0].t,Float32Array.from(s.fields[i])); Object.assign(enabled,s.enabled); iteration=s.iteration; timeTemp=s.timeTemp; timeWind=s.timeWind; noiseCounter=s.noiseCounter; binding(8,noise); upload(noise,rgba(tectonics.noise(noiseCounter?`${seed}:wind:${noiseCounter}`:`${seed}:wind`,parameters.wind.windNoiseRoughness,parameters.wind.windNoiseTurbulence))); },
       dispose: cleanup,
     };

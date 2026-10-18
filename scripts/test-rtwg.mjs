@@ -8,7 +8,7 @@ import { crc32, zipStored } from '../src/rtwg/export.js';
 let count=0;
 const check=(fn,label)=>{fn();count++;console.log(`✓ ${label}`);};
 const bytes=fs.readFileSync('src/rtwg/rtplatec.wasm');
-const config={seed:'MIR-RTWG-test',width:64,height:32};
+const config={seed:'SAGES-RTWG-test',width:64,height:32};
 const a=await createTectonics(bytes,config),b=await createTectonics(bytes,config);
 try {
   const initial=a.heights();
@@ -29,7 +29,7 @@ try {
 } finally {a.dispose();b.dispose();}
 check(()=>assert.throws(()=>a.step()),'доступ после dispose запрещён');
 await assert.rejects(()=>createTectonics(bytes,{...config,plates:100}));count++;
-const s={format:'mir-rtwg',version:1,...config,iteration:12,noiseCounter:0,timeTemp:.1,timeWind:.2,parameters:defaultParameters(),enabled:Object.fromEntries(['rock','soil','water','temp','moist','wind','ice','climat'].map(f=>[f,true])),fields:Array.from({length:8},()=>new Float32Array(64*32*4).fill(.5))};
+const s={format:'sages-rtwg',version:1,...config,iteration:12,noiseCounter:0,timeTemp:.1,timeWind:.2,parameters:defaultParameters(),enabled:Object.fromEntries(['rock','soil','water','temp','moist','wind','ice','climat'].map(f=>[f,true])),fields:Array.from({length:8},()=>new Float32Array(64*32*4).fill(.5))};
 check(()=>assert.deepEqual(validateParameters(s.parameters),s.parameters),'все исходные параметры RTWG и диапазоны');
 check(()=>assert.deepEqual(decodeSnapshot(encodeSnapshot(s)),{...s,encoding:'float32-le-base64'}),'JSON сохраняет Float32 без потерь');
 for(const mutate of [s=>s.width=100000,s=>s.fields[0][0]=NaN,s=>s.parameters.tectonic.plates=100,s=>s.enabled.wind='yes',s=>s.fields.pop(),s=>s.timeTemp=Infinity,s=>s.iteration=-1,s=>s.fields[0][0]=-1]){

@@ -39,7 +39,7 @@ async function checkUrl(url, timeoutMs = 5000) {
   return new Promise((res) => {
     const isHttps = url.startsWith('https:');
     const getter = isHttps ? httpsGet : httpGet;
-    const req = getter(url, { headers: { 'User-Agent': 'MIR-Doctor/1.0' } }, (response) => {
+    const req = getter(url, { headers: { 'User-Agent': 'Sages-Doctor/1.0' } }, (response) => {
       response.resume();
       res({ ok: true, status: response.statusCode, error: null });
     });
@@ -194,8 +194,8 @@ if (hasEnvToken || hasFileToken) {
 }
 
 // 7. Последние записи логов сервера
-add('\n--- 7. ПОСЛЕДНИЕ СОБЫТИЯ ИЗ ЖУРНАЛА (logs/mir-server.log) ---');
-const logFile = resolve('logs/mir-server.log');
+add('\n--- 7. ПОСЛЕДНИЕ СОБЫТИЯ ИЗ ЖУРНАЛА (logs/sages-server.log) ---');
+const logFile = resolve('logs/sages-server.log');
 if (existsSync(logFile)) {
   const logContent = readFileSync(logFile, 'utf8');
   const lines = logContent.trim().split(/\r?\n/).filter(Boolean);

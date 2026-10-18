@@ -15,11 +15,11 @@
    Использование:
 
      import { createLogger } from './lib/log.mjs';
-     const log = createLogger('apk-build', { title: 'Сборка MIR.apk' });
+     const log = createLogger('apk-build', { title: 'Сборка Sages.apk' });
      log.section('1. Исходники');
-     log.step('Собираю mir.html');
+     log.step('Собираю sages.html');
      log.detail('Размер', '91 867 байт');
-     log.check(true, 'mir.html собран', { fail: 'Android покажет пустой экран' });
+     log.check(true, 'sages.html собран', { fail: 'Android покажет пустой экран' });
      log.finish();
 */
 
@@ -59,14 +59,14 @@ const stamp = () => {
 /**
  * Создаёт журнал. name — имя файла в logs/ без расширения.
  * Опции: title — заголовок отчёта; verbose — печатать в консоль вообще всё
- * (включается ещё и флагом --verbose или переменной MIR_LOG=debug).
+ * (включается ещё и флагом --verbose или переменной SAGES_LOG=debug).
  */
 export function createLogger(name, { title = name, verbose = false } = {}) {
   const wantVerbose =
     verbose ||
     process.argv.includes('--verbose') ||
     process.argv.includes('-v') ||
-    String(process.env.MIR_LOG ?? '').toLowerCase() === 'debug';
+    String(process.env.SAGES_LOG ?? '').toLowerCase() === 'debug';
 
   if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
   const file = join(LOG_DIR, `${name}.log`);

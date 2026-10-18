@@ -1,9 +1,9 @@
 /* Редактор карт Azgaar внутри игры.
 
-   Рабочая карта после удаления собственного основного генератора MIR.
+   Рабочая карта после удаления собственного основного генератора.
    Здесь описаны URL и ограничения Azgaar:
 
-   • в mir.html редактор вшит шаблоном — JSON-блок #mir-fmg-template
+   • в sages.html редактор вшит шаблоном — JSON-блок #sages-fmg-template
      (сборка: scripts/lib/fmg-offline.mjs). Документ открывается через
      iframe srcdoc: отдельных файлов не нужно, работает и по file://;
    • в веб- и PWA-версии редактор раздаётся сервером из /fmg/.
@@ -17,7 +17,7 @@
 import { WORLD_MAP_POINTS } from '../data/store.js';
 import { attachGenerationStage, injectGenerationHook } from './generation-stage.js';
 
-const TEMPLATE_ID = 'mir-fmg-template';
+const TEMPLATE_ID = 'sages-fmg-template';
 /* В шаблоне стоит JSON-строка с этим плейсхолдером — сюда подставляется запрос. */
 const QUERY_PLACEHOLDER = '"__FMG_QUERY__"';
 
@@ -54,9 +54,9 @@ export const editorQuery = ({ seed, width, height }) =>
 
 const restrictEditor = (frame) => {
   const doc = frame.contentDocument;
-  if (!doc?.head || doc.getElementById('mir-player-restriction')) return;
+  if (!doc?.head || doc.getElementById('sages-player-restriction')) return;
   const style = doc.createElement('style');
-  style.id = 'mir-player-restriction';
+  style.id = 'sages-player-restriction';
   style.textContent = PLAYER_CSS;
   doc.head.append(style);
 };

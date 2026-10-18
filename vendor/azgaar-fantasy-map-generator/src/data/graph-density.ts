@@ -14,7 +14,7 @@ export const POINTS_BY_DENSITY: Record<number, number> = {
   11: 80000,
   12: 90000,
   13: 100000,
-  // Kept for old links/editor maps. MIR's physical world profile now uses
+  // Kept for old links/editor maps. Sages' physical world profile now uses
   // step 13: the terrain generator has shape coefficients through 100K only.
   14: 1000000
 };

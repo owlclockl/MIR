@@ -9,10 +9,10 @@ const run = (env) => spawnSync(process.execPath, [fromRoot('scripts/keys-status.
   encoding: 'utf8',
 });
 
-const safe = run({ GH_TOKEN: 'fake-github-key-never-print', MIR_ADMIN_KEY: 'fake-admin-key-never-print' });
+const safe = run({ GH_TOKEN: 'fake-github-key-never-print', SAGES_ADMIN_KEY: 'fake-admin-key-never-print' });
 assert.equal(safe.status, 0, safe.stderr);
 assert.match(safe.stdout, /GH_TOKEN: задана/);
-assert.match(safe.stdout, /MIR_ADMIN_KEY: задана/);
+assert.match(safe.stdout, /SAGES_ADMIN_KEY: задана/);
 assert.doesNotMatch(safe.stdout + safe.stderr, /fake-github-key-never-print|fake-admin-key-never-print/);
 
 const unsafe = run({ VITE_OPENAI_API_KEY: 'fake-public-key-never-print' });

@@ -1,7 +1,7 @@
-// Собирает игру в один самодостаточный HTML-файл (mir.html).
+// Собирает игру в один самодостаточный HTML-файл (sages.html).
 // Запуск: npm run single
 //
-// Самодостаточность даёт Vite: плагин `mir:single-file` (scripts/lib/vite-mir.mjs)
+// Самодостаточность даёт Vite: плагин `sages:single-file` (scripts/lib/vite-build.mjs)
 // встраивает скрипт и стили прямо в разметку, а модули сборки собирает как
 // обычный скрипт (формат IIFE). Такой файл запускается по file:// двойным
 // кликом и внутри WebView в .apk, где модульные скрипты браузеры запрещают
@@ -16,7 +16,7 @@ import { buildSingleHtml } from './lib/build.mjs';
 
 const started = Date.now();
 await buildSingleHtml();
-const kb = (statSync('mir.html').size / 1024).toFixed(0);
+const kb = (statSync('sages.html').size / 1024).toFixed(0);
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
-console.log(`The civilization of the sages — автономный файл mir.html готов: ${kb} КБ за ${seconds} с. Откройте двойным кликом в браузере.`);
+console.log(`The civilization of the sages — автономный файл sages.html готов: ${kb} КБ за ${seconds} с. Откройте двойным кликом в браузере.`);

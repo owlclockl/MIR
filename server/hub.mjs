@@ -5,7 +5,7 @@
    заявки, коды, сигналинг) живёт там и одинакова на ПК и на
    бесплатном хостинге. Здесь — только то, что присуще Node:
    чтение тела запроса, заголовки ответа и хранение данных в одном
-   JSON-файле (data/mir-hub.json), который пишется атомарно.
+   JSON-файле (data/sages-hub.json), который пишется атомарно.
 
    ПК, на котором запущен serve.mjs, становится «сервером» для
    друзей в той же Wi-Fi. Без зависимостей — встроенные модули Node.
@@ -42,7 +42,7 @@ const clientIp = (req) => {
 
 /* Ключ администратора панели. Порядок такой: ключ, сменённый через
    панель (лежит в файле данных), затем переменная окружения
-   (MIR_ADMIN_KEY), затем заводской HUB_DEFAULT_ADMIN_KEY. Хаб на ПК
+   (SAGES_ADMIN_KEY), затем заводской HUB_DEFAULT_ADMIN_KEY. Хаб на ПК
    живёт в своей сети, поэтому заводской ключ работает «из коробки»,
    а публичную ссылку (--public) serve.mjs помечает предупреждением:
    там ключ стоит сменить. На хостинге — то же самое: заводской ключ
@@ -76,11 +76,11 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   const db = load();
 
   /* Ключ из панели (файл данных) старше переменной окружения: владелец
-     мог сменить ключ в панели после того, как задал MIR_ADMIN_KEY.
+     мог сменить ключ в панели после того, как задал SAGES_ADMIN_KEY.
      Заводской ключ в файл не пишем — иначе он уедет в репозиторий
      вместе с данными хаба. Сам ключ разруливает hub-core: панельный,
      затем из окружения, затем заводской. */
-  const envKey = String(adminKey || process.env.MIR_ADMIN_KEY || '').trim();
+  const envKey = String(adminKey || process.env.SAGES_ADMIN_KEY || '').trim();
   const key = String(db.adminKey || '').trim() || envKey || DEFAULT_ADMIN_KEY;
 
   let saveTimer = null;
@@ -123,9 +123,9 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   };
 
   /* На ПК файлы панели также зеркалятся в data/files/ на диске, а серверный
-     журнал logs/mir-server.log виден и очищается прямо из панели. */
+     журнал logs/sages-server.log виден и очищается прямо из панели. */
   const filesRoot = resolve(dirname(dbFile), 'files');
-  const serverLogFile = resolve(dirname(dbFile), '..', 'logs', 'mir-server.log');
+  const serverLogFile = resolve(dirname(dbFile), '..', 'logs', 'sages-server.log');
   const safeDiskPath = (relPath) => {
     const candidate = resolve(filesRoot, String(relPath || ''));
     if (candidate === filesRoot || !candidate.startsWith(filesRoot + sep)) return null;
@@ -134,7 +134,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
   const serverFiles = {
     systemFiles: () => [
       {
-        path: 'logs/mir-server.log',
+        path: 'logs/sages-server.log',
         category: 'log',
         system: true,
         writable: true,
@@ -266,7 +266,7 @@ export function createHub({ dbFile, limits = DEFAULT_LIMITS, adminKey = '' }) {
       const url = new URL(req.url || '/', 'http://x');
       if (!url.pathname.startsWith('/api/')) return false;
       /* Игра может быть открыта с другого адреса (GitHub Pages, APK,
-         mir.html с флешки) — браузер сначала спросит разрешение. */
+         sages.html с флешки) — браузер сначала спросит разрешение. */
       if (req.method === 'OPTIONS') {
         send(res, 204, null);
         return true;

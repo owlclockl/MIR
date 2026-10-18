@@ -13,7 +13,7 @@
 
    Запуск: npm run test:worker  (нужен только Node, сети не нужно) */
 
-import worker, { MirHub } from '../hosting/cloudflare/worker.js';
+import worker, { SagesHub } from '../hosting/cloudflare/worker.js';
 import { MAX_REQUEST_BYTES } from '../server/hub-core.mjs';
 
 /* ---------- поддельное хранилище Durable Object ---------- */
@@ -53,12 +53,12 @@ const makeStorage = () => {
 
 const boot = async (storage) => {
   const state = { ...storage, blockConcurrencyWhile: (fn) => fn() };
-  const hub = new MirHub(state, { MIR_ADMIN_KEY: '' });
+  const hub = new SagesHub(state, { SAGES_ADMIN_KEY: '' });
   /* В настоящем Durable Object первый запрос ждёт загрузки данных;
      здесь её никто не ждёт — даём загрузке завершиться. */
   await new Promise((resolve) => setTimeout(resolve, 20));
   const call = async (method, path, body, headers = {}) => {
-    const request = new Request(`https://mir.example.workers.dev${path}`, {
+    const request = new Request(`https://sages.example.workers.dev${path}`, {
       method,
       headers: { 'Content-Type': 'application/json', ...headers },
       ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) }),
@@ -88,15 +88,15 @@ console.log('Хостинг: Cloudflare Worker + Durable Object (поддель�
 
 const storage = makeStorage();
 let call = await boot(storage);
-const admin = { 'X-Mir-Admin': 'owlananaslwo' };
+const admin = { 'X-Sages-Admin': 'owlananaslwo' };
 
 const preflight = await call.hub.fetch(
-  new Request('https://mir.example.workers.dev/api/admin/state', {
+  new Request('https://sages.example.workers.dev/api/admin/state', {
     method: 'OPTIONS',
     headers: {
-      Origin: 'https://mir-ui.example',
+      Origin: 'https://sages-ui.example',
       'Access-Control-Request-Method': 'POST',
-      'Access-Control-Request-Headers': 'content-type,x-mir-admin',
+      'Access-Control-Request-Headers': 'content-type,x-sages-admin',
     },
   }),
 );
@@ -105,13 +105,13 @@ const allowedHeaders = (preflight.headers.get('access-control-allow-headers') ||
   .map((header) => header.trim().toLowerCase());
 ok(
   'CORS preflight разрешает заголовок ключа администратора',
-  preflight.status === 204 && allowedHeaders.includes('x-mir-admin'),
+  preflight.status === 204 && allowedHeaders.includes('x-sages-admin'),
   `${preflight.status}; ${allowedHeaders.join(', ')}`,
 );
 
 const oversizedBody = JSON.stringify({ value: 'x'.repeat(MAX_REQUEST_BYTES) });
 const oversizedResponse = await call.hub.fetch(
-  new Request('https://mir.example.workers.dev/api/register', {
+  new Request('https://sages.example.workers.dev/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: oversizedBody,
@@ -126,13 +126,13 @@ ok(
 let durableLookups = 0;
 const boundedEnv = {
   HUB: {
-    idFromName: () => { durableLookups += 1; return 'mir'; },
+    idFromName: () => { durableLookups += 1; return 'sages'; },
     get: () => ({ fetch: async () => new Response('Durable Object should not be reached') }),
   },
   ASSETS: { fetch: async () => new Response('unused') },
 };
 const declaredOversizedResponse = await worker.fetch(
-  new Request('https://mir.example.workers.dev/api/register', {
+  new Request('https://sages.example.workers.dev/api/register', {
     method: 'POST',
     headers: { 'Content-Length': String(MAX_REQUEST_BYTES + 1) },
     body: '{}',
@@ -152,7 +152,7 @@ const streamedBody = new ReadableStream({
   },
 });
 const streamedOversizedResponse = await worker.fetch(
-  new Request('https://mir.example.workers.dev/api/register', {
+  new Request('https://sages.example.workers.dev/api/register', {
     method: 'POST',
     body: streamedBody,
     duplex: 'half',
@@ -165,7 +165,7 @@ ok(
   `${streamedOversizedResponse.status}; вызовов объекта: ${durableLookups}`,
 );
 const malformedResponse = await call.hub.fetch(
-  new Request('https://mir.example.workers.dev/api/register', {
+  new Request('https://sages.example.workers.dev/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{',
@@ -276,10 +276,10 @@ console.error = (...values) => errorLogs.push(...values.map(String));
 let failedWorkerResponse;
 try {
   failedWorkerResponse = await worker.fetch(
-    new Request('https://mir.example.workers.dev/api/failure?token=do-not-log'),
+    new Request('https://sages.example.workers.dev/api/failure?token=do-not-log'),
     {
       HUB: {
-        idFromName: () => 'mir',
+        idFromName: () => 'sages',
         get: () => ({ fetch: async () => { throw new Error('token=do-not-log'); } }),
       },
       ASSETS: { fetch: async () => new Response('unused') },
@@ -294,7 +294,7 @@ ok(
   'ошибка Durable Object даёт 503 и структурный лог без query/секрета',
   failedWorkerResponse.status === 503 &&
     failureBody.error === 'Хаб временно недоступен.' &&
-    errorEvent.event === 'mir_hub_request_failed' &&
+    errorEvent.event === 'sages_hub_request_failed' &&
     errorEvent.path === '/api/failure' &&
     !JSON.stringify(errorEvent).includes('do-not-log'),
   `${failedWorkerResponse.status} ${errorEvent.event || 'лога нет'}`,
@@ -395,7 +395,7 @@ ok(
 
 const openLive = async (who) => {
   const response = await lobbyCall.hub.fetch(
-    new Request('https://mir.example.workers.dev/api/ws', { headers: { Upgrade: 'websocket' } }),
+    new Request('https://sages.example.workers.dev/api/ws', { headers: { Upgrade: 'websocket' } }),
   );
   const end = response.webSocket;
   const inbox = [];
