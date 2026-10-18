@@ -48,7 +48,7 @@ const kb = (bytes) => `${(bytes / 1024).toFixed(1)} КБ`;
 /** Локальные ссылки разметки (/assets/…, /icons/…) и их наличие в dist. */
 const localRefs = (html) =>
   [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)]
-    .map((match) => match[1])
+    .map((match) => match[1].split(/[?#]/, 1)[0])
     .filter((ref) => !ref.startsWith('/api/'));
 
 const walk = (dir, base = dir) => {
