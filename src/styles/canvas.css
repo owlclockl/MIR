@@ -1,0 +1,44 @@
+:root {
+  --bg: #0b0e11;
+  --text: #e9e7e2;
+  --accent: #ff9d37;
+  --grid-line: rgba(255, 255, 255, 0.055);
+  --grid-step: 40px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Холст. Пока пустой. */
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas.is-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-step) var(--grid-step);
+}
